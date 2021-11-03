@@ -22,6 +22,7 @@ prospector = "^1.2.0"
 black = "^20.8b1"
 isort = "^5.9.3"
 numpydoc = "^1.1.0"
+poethepoet = "^0.10.0"
 
 [tool.black]
 line-length = 120
@@ -49,6 +50,18 @@ profile = "black"
 multi_line_output = 3
 line_length = 120
 skip_gitignore = true
+
+[tool.poe.tasks]
+_format_black = "black ."
+_format_isort = "isort ."
+format = ["_format_black", "_format_isort"]
+lint = { cmd = "prospector", help = "Lint all files with Prospector." }
+_check_black = "black . --check"
+_check_isort = "isort . --check"
+check = { sequence = ["_check_black", "_check_isort", "lint"], help = "Check all potential format and linting issues.", ignore_fail = true }
+test = { cmd = "pytest --cov=tpcp", help = "Run Pytest with coverage." }
+docs = { "script" = "_tasks:task_docs()" , help = "Build the html docs using Sphinx." }
+bump_version = { "script" = "_tasks:task_update_version()" }
 
 [build-system]
 requires = ["poetry_core>=1.0.0"]
