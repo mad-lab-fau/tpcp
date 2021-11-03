@@ -1,3 +1,5 @@
+"""Base classes for all algorithms and pipelines."""
+
 import inspect
 import json
 import types
@@ -74,9 +76,7 @@ class _BaseSerializable:
             if p.kind == p.VAR_POSITIONAL:
                 raise RuntimeError(
                     "tpcp-algorithms and pipeline should always specify their parameters in the signature of their "
-                    "__init__ (no varargs). {} with constructor {} doesn't follow this convention.".format(
-                        cls, init_signature
-                    )
+                    f"__init__ (no varargs). {cls} with constructor {init_signature} doesn't follow this convention."
                 )
         # Extract and sort argument names excluding 'self'
         return sorted([p.name for p in parameters])
@@ -92,7 +92,7 @@ class _BaseSerializable:
         for subclass in _BaseSerializable._get_subclasses():
             if subclass.__name__ == name:
                 return subclass
-        raise ValueError("No algorithm class with name {} exists".format(name))
+        raise ValueError(f"No algorithm class with name {name} exists")
 
     @classmethod
     def _from_json_dict(cls: Type[BaseType], json_dict: Dict) -> BaseType:
@@ -152,7 +152,7 @@ class _BaseSerializable:
         for key, value in params.items():
             key, delim, sub_key = key.partition("__")
             if key not in valid_params:
-                raise ValueError("`{}` is not a valid parameter name for {}.".format(key, self.__class__.__name__))
+                raise ValueError(f"`{key}` is not a valid parameter name for {self.__class__.__name__}.")
 
             if delim:
                 nested_params[key][sub_key] = value

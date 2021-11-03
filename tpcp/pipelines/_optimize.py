@@ -332,7 +332,7 @@ class GridSearch(BaseOptimize):
             return_optimized = "score"
             if self.multimetric_ and isinstance(self.return_optimized, str):
                 return_optimized = self.return_optimized
-            self.best_index_ = results["rank_{}".format(return_optimized)].argmin()
+            self.best_index_ = results[f"rank_{return_optimized}"].argmin()
             self.best_score_ = results[return_optimized][self.best_index_]
             self.best_params_ = results["params"][self.best_index_]
             # We clone twice, in case one of the params was itself an algorithm.
@@ -356,8 +356,8 @@ class GridSearch(BaseOptimize):
         single_scores_dict = _normalize_score_results(out["single_scores"])
         for c, v in scores_dict.items():
             results[c] = v
-            results["rank_{}".format(c)] = np.asarray(rankdata(-v, method="min"), dtype=np.int32)
-            results["single_{}".format(c)] = single_scores_dict[c]
+            results[f"rank_{c}"] = np.asarray(rankdata(-v, method="min"), dtype=np.int32)
+            results[f"single_{c}"] = single_scores_dict[c]
 
         results["data_labels"] = out["data_labels"]
         results["score_time"] = out["score_time"]
@@ -380,7 +380,7 @@ class GridSearch(BaseOptimize):
                 # An all masked empty array gets created for the key
                 # `"param_%s" % name` at the first occurrence of `name`.
                 # Setting the value at an index also unmasks that index
-                param_results["param_{}".format(name)][cand_idx] = value
+                param_results[f"param_{name}"][cand_idx] = value
 
         results.update(param_results)
         # Store a list of param dicts at the key 'params'
@@ -635,8 +635,8 @@ class GridSearchCV(BaseOptimize):
             return_optimized = "score"
             if self.multimetric_ and isinstance(self.return_optimized, str):
                 return_optimized = self.return_optimized
-            self.best_index_ = results["rank_test_{}".format(return_optimized)].argmin()
-            self.best_score_ = results["mean_test_{}".format(return_optimized)][self.best_index_]
+            self.best_index_ = results[f"rank_test_{return_optimized}"].argmin()
+            self.best_score_ = results[f"mean_test_{return_optimized}"][self.best_index_]
             self.best_params_ = results["params"][self.best_index_]
             # We clone twice, in case one of the params was itself an algorithm.
             best_optimizer = Optimize(self.pipeline.clone().set_params(**self.best_params_).clone())
@@ -673,7 +673,7 @@ class GridSearchCV(BaseOptimize):
 
             for split_idx, split in enumerate(array):
                 # Uses closure to alter the results
-                results["split{}_{}".format(split_idx, key_name)] = split
+                results[f"split{split_idx}_{key_name}"] = split
 
         def _store(key_name: str, array, weights=None, splits=False, rank=False):
             """Store numeric scores/times to the cv_results_."""
@@ -684,9 +684,9 @@ class GridSearchCV(BaseOptimize):
             if splits:
                 for split_idx in range(n_splits):
                     # Uses closure to alter the results
-                    results["split{}_{}".format(split_idx, key_name)] = array[:, split_idx]
+                    results[f"split{split_idx}_{key_name}"] = array[:, split_idx]
             array_means = np.average(array, axis=1, weights=weights)
-            results["mean_{}".format(key_name)] = array_means
+            results[f"mean_{key_name}"] = array_means
 
             if key_name.startswith(("train_", "test_")) and np.any(~np.isfinite(array_means)):
                 warnings.warn(
@@ -695,10 +695,10 @@ class GridSearchCV(BaseOptimize):
                 )
             # Weighted std is not directly available in numpy
             array_stds = np.sqrt(np.average((array - array_means[:, np.newaxis]) ** 2, axis=1, weights=weights))
-            results["std_{}".format(key_name)] = array_stds
+            results[f"std_{key_name}"] = array_stds
 
             if rank:
-                results["rank_{}".format(key_name)] = np.asarray(rankdata(-array_means, method="min"), dtype=np.int32)
+                results[f"rank_{key_name}"] = np.asarray(rankdata(-array_means, method="min"), dtype=np.int32)
 
         _store("optimize_time", out["optimize_time"])
         _store("score_time", out["score_time"])
@@ -720,9 +720,9 @@ class GridSearchCV(BaseOptimize):
         for cand_idx, params in enumerate(candidate_params):
             for name, value in params.items():
                 # An all masked empty array gets created for the key
-                # `"param_%s" % name` at the first occurrence of `name`.
+                # `"param_{name}` at the first occurrence of `name`.
                 # Setting the value at an index also unmasks that index
-                param_results["param_%s" % name][cand_idx] = value
+                param_results[f"param_{name}"][cand_idx] = value
 
         results.update(param_results)
         # Store a list of param dicts at the key 'params'
@@ -736,11 +736,11 @@ class GridSearchCV(BaseOptimize):
 
         for scorer_name in test_scores_dict:
             # Computed the (weighted) mean and std for test scores alone
-            _store("test_{}".format(scorer_name), test_scores_dict[scorer_name], splits=True, rank=True, weights=None)
-            _store_non_numeric("test_single_{}".format(scorer_name), test_single_scores_dict[scorer_name])
+            _store(f"test_{scorer_name}", test_scores_dict[scorer_name], splits=True, rank=True, weights=None)
+            _store_non_numeric(f"test_single_{scorer_name}", test_single_scores_dict[scorer_name])
             if self.return_train_score:
-                _store("train_{}".format(scorer_name), train_scores_dict[scorer_name], splits=True)
-                _store_non_numeric("train_single_{}".format(scorer_name), train_single_scores_dict[scorer_name])
+                _store(f"train_{scorer_name}", train_scores_dict[scorer_name], splits=True)
+                _store_non_numeric(f"train_single_{scorer_name}", train_single_scores_dict[scorer_name])
 
         return results
 

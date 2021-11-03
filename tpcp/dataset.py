@@ -54,6 +54,8 @@ class Dataset(_BaseSerializable):
     >>> import pandas as pd
     >>> from itertools import product
     >>>
+    >>> from tpcp import Dataset
+    >>>
     >>> test_index = pd.DataFrame(
     ...     list(product(("patient_1", "patient_2", "patient_3"), ("test_1", "test_2"), ("1", "2"))),
     ...     columns=["patient", "test", "extra"],
@@ -239,9 +241,8 @@ class Dataset(_BaseSerializable):
             return self.index.set_index(groupby_cols, drop=False)
         except KeyError as e:
             raise KeyError(
-                "You can only groupby columns that are part of the index columns ({}) and not {}".format(
-                    list(self.index.columns), self.groupby_cols
-                )
+                f"You can only groupby columns that are part of the index columns ({list(self.index.columns)}) and not"
+                f" {self.groupby_cols}"
             ) from e
 
     def _get_unique_groups(self) -> Union[pd.MultiIndex, pd.Index]:
@@ -344,11 +345,8 @@ class Dataset(_BaseSerializable):
             repr_index = self.index
         else:
             repr_index = self.grouped_index
-        return "{} [{} groups/rows]\n\n   {}\n\n   ".format(
-            self.__class__.__name__,
-            self.shape[0],
-            str(repr_index).replace("\n", "\n   "),
-        )[:-5]
+        repr_index = str(repr_index).replace("\n", "\n   ")
+        return f"{self.__class__.__name__} [{self.shape[0]} groups/rows]\n\n   {repr_index}\n\n   "[:-5]
 
     def _repr_html_(self) -> str:
         """Return html representation of the dataset object."""
@@ -356,14 +354,13 @@ class Dataset(_BaseSerializable):
             repr_index = self.index
         else:
             repr_index = self.grouped_index
-        return '<h4 style="margin-bottom: 0.1em;">{} [{} groups/rows]</h3>\n'.format(
-            self.__class__.__name__, self.shape[0]
-        ) + repr_index._repr_html_().replace("<div>", '<div style="margin-top: 0em">').replace(
-            '<table border="1" class="dataframe"', '<table style="margin-left: 3em;"'
-        ).replace(
-            "<th>", '<th style="text-align: center;">'
-        ).replace(
-            "<td>", '<td style="text-align: center; padding-left: 2em; padding-right: 2em;">'
+        return (
+            f'<h4 style="margin-bottom: 0.1em;">{self.__class__.__name__} [{self.shape[0]} groups/rows]</h3>\n'
+            + repr_index._repr_html_()
+            .replace("<div>", '<div style="margin-top: 0em">')
+            .replace('<table border="1" class="dataframe"', '<table style="margin-left: 3em;"')
+            .replace("<th>", '<th style="text-align: center;">')
+            .replace("<td>", '<td style="text-align: center; padding-left: 2em; padding-right: 2em;">')
         )
 
     def __iter__(self: Self) -> Iterator[Self]:
@@ -422,10 +419,8 @@ class Dataset(_BaseSerializable):
             if groupby_cols is None:
                 groupby_cols = self.index.columns.to_list()
             raise ValueError(
-                "The data value {} of dataset {} can only be accessed if there is only a single "
-                "combination of the columns {} left in a data-subset".format(
-                    property_name, self.__class__.__name__, groupby_cols
-                )
+                f"The data value {property_name} of dataset {self.__class__.__name__} can only be accessed if there is"
+                f" only a single combination of the columns {groupby_cols} left in a data-subset"
             )
 
     def create_group_labels(self, label_cols: Union[str, List[str]]):
@@ -453,12 +448,11 @@ class Dataset(_BaseSerializable):
             if self.groupby_cols is not None:
                 raise KeyError(
                     "When using `create_group_labels` with a grouped dataset, the selected columns must "
-                    "be a subset of `self.groupby_cols` ({}) and not ({})".format(self.groupby_cols, label_cols)
+                    f"be a subset of `self.groupby_cols` ({self.groupby_cols}) and not ({label_cols})"
                 ) from e
             raise KeyError(
-                "The selected label columns ({}) are not in the index of the dataset ({})".format(
-                    label_cols, list(self.index.columns)
-                )
+                f"The selected label columns ({label_cols}) are not in the index of the dataset "
+                f"({list(self.index.columns)})."
             ) from e
 
     def create_index(self) -> pd.DataFrame:

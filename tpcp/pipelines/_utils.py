@@ -68,7 +68,7 @@ def _get_nested_paras(param_dict: Optional[Dict], nested_object_name="pipeline")
     """
     if not param_dict:
         return {}
-    return {k.split("__", 1)[1]: v for k, v in param_dict.items() if k.startswith("{}__".format(nested_object_name))}
+    return {k.split("__", 1)[1]: v for k, v in param_dict.items() if k.startswith(f"{nested_object_name}__")}
 
 
 def _clone_parameter_dict(param_dict: Optional[Dict]) -> Dict:
@@ -127,7 +127,7 @@ def _check_safe_run(pipeline: SimplePipeline, *args, **kwargs):
         raise ValueError(
             "The `run` method of the pipeline must return `self` or in rare cases a new instance of the "
             "pipeline itself. "
-            "But the return value had the type {}".format(type(output))
+            f"But the return value had the type {type(output)}"
         )
     if not output._action_is_applied:
         raise ValueError(
