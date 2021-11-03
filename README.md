@@ -11,14 +11,14 @@ pip install tpcp
 Evaluating Algorithms - in particular when they contain machine learning - is hard.
 Besides understanding required steps (Cross-validation, Bias, Overfitting, ...), you need to implement the required 
 concepts and make them work together with your algorithms and data.
-If you are doing something "regular" like training an SVM on tabulary data, amazing libraries like [sklearn](), 
-[time-series-learn](), [pytorch](), and many others, have your back.
+If you are doing something "regular" like training an SVM on tabulary data, amazing libraries like [sklearn](https://scikit-learn.org), 
+[tslearn](https://github.com/tslearn-team/tslearn), [pytorch](https://pytorch.org), and many others, have your back.
 By using their built-in tools (e.g. `sklearn.evaluation.GridSearchCV`) you prevent implementation errors, and you are
 provided with a sensible structure to organise your code that is well understood in the community.
 
 However, often the problems we are trying to solve are not regular.
 They are **complex**.
-As an example, here is the summary of the method from one of our [recent papers]:
+As an example, here is the summary of the method from one of our [recent papers](https://jneuroengrehab.biomedcentral.com/articles/10.1186/s12984-021-00883-7):
 - We have continues multi-dimensional sensor recordings from multiple participants from a hospital visit and multiple days at home
 - For each participant we have global metadata (age, diagnosis) and daily annotations
 - We want to train HMM an algorithm that can find events in the data streams
