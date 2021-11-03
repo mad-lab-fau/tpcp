@@ -15,18 +15,18 @@ from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
 
-from gaitmap.base import BaseAlgorithm
-from gaitmap.future.dataset import Dataset
-from gaitmap.future.pipelines._pipelines import OptimizablePipeline, SimplePipeline
-from gaitmap.future.pipelines._score import _optimize_and_score, _score
-from gaitmap.future.pipelines._scorer import _ERROR_SCORE_TYPE, GaitmapScorer, _validate_scorer
-from gaitmap.future.pipelines._utils import (
+from tpcp._base import BaseAlgorithm
+from tpcp._exceptions import PotentialUserErrorWarning
+from tpcp.dataset import Dataset
+from tpcp.pipelines._pipelines import OptimizablePipeline, SimplePipeline
+from tpcp.pipelines._score import _optimize_and_score, _score
+from tpcp.pipelines._scorer import _ERROR_SCORE_TYPE, Scorer, _validate_scorer
+from tpcp.pipelines._utils import (
     _aggregate_final_results,
     _normalize_score_results,
     _prefix_para_dict,
     _split_hyper_and_pure_parameters,
 )
-from gaitmap.utils.exceptions import PotentialUserErrorWarning
 
 
 class BaseOptimize(BaseAlgorithm):
@@ -110,7 +110,7 @@ class Optimize(BaseOptimize):
         Parameters
         ----------
         dataset
-            An instance of a :class:`~gaitmap.future.dataset.Dataset` containing one or multiple data points that can
+            An instance of a :class:`~tpcp.dataset.Dataset` containing one or multiple data points that can
             be used for optimization.
             The structure of the data and the available reference information will depend on the dataset.
         optimize_params
@@ -248,7 +248,7 @@ class GridSearch(BaseOptimize):
     """
 
     parameter_grid: ParameterGrid
-    scoring: Optional[Union[Callable, GaitmapScorer]]
+    scoring: Optional[Union[Callable, Scorer]]
     n_jobs: Optional[int]
     return_optimized: Union[bool, str]
     pre_dispatch: Union[int, str]
@@ -265,7 +265,7 @@ class GridSearch(BaseOptimize):
         pipeline: SimplePipeline,
         parameter_grid: ParameterGrid,
         *,
-        scoring: Optional[Union[Callable, GaitmapScorer]] = None,
+        scoring: Optional[Union[Callable, Scorer]] = None,
         n_jobs: Optional[int] = None,
         pre_dispatch: Union[int, str] = "n_jobs",
         return_optimized: Union[bool, str] = True,
@@ -300,7 +300,7 @@ class GridSearch(BaseOptimize):
         # pipeline to the scorer.
         # Looping over the individual datapoints in the dataset and aggregating the scores is handled by the scorer
         # itself.
-        # If not explicitly changed the scorer is an instance of `GaitmapScorer` that wraps the actual `scoring`
+        # If not explicitly changed the scorer is an instance of `Scorer` that wraps the actual `scoring`
         # function provided by the user.
         with parallel:
             # Evaluate each parameter combination
@@ -393,15 +393,15 @@ class GridSearchCV(BaseOptimize):
     """Exhaustive (Hyper)Parameter search using a cross validation based score to optimize pipeline parameters.
 
     This class follows as much as possible the interface of :func:`~sklearn.model_selection.GridSearchCV`.
-    If the gaitmap documentation is missing some information, the respective documentation of sklearn might be helpful.
+    If the tpcp documentation is missing some information, the respective documentation of sklearn might be helpful.
 
-    Compared to the sklearn implementation this method uses a couple of gaitmap specific optimizations and
+    Compared to the sklearn implementation this method uses a couple of tpcp specific optimizations and
     quality-of-life improvements.
 
     Parameters
     ----------
     pipeline
-        A gaitmap pipeline implementing `self_optimize`.
+        A tpcp pipeline implementing `self_optimize`.
     parameter_grid
         A sklearn parameter grid to define the search space for the grid search.
     scoring
@@ -527,7 +527,7 @@ class GridSearchCV(BaseOptimize):
 
     pipeline: OptimizablePipeline
     parameter_grid: ParameterGrid
-    scoring: Optional[Union[Callable, GaitmapScorer]]
+    scoring: Optional[Union[Callable, Scorer]]
     return_optimized: Union[bool, str]
     cv: Optional[Union[int, BaseCrossValidator, Iterator]]
     pure_parameter_names: Optional[List[str]]
@@ -549,7 +549,7 @@ class GridSearchCV(BaseOptimize):
         pipeline: OptimizablePipeline,
         parameter_grid: ParameterGrid,
         *,
-        scoring: Optional[Union[Callable, GaitmapScorer]] = None,
+        scoring: Optional[Union[Callable, Scorer]] = None,
         return_optimized: Union[bool, str] = True,
         cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
         pure_parameter_names: Optional[List[str]] = None,
@@ -596,7 +596,7 @@ class GridSearchCV(BaseOptimize):
         # pipeline itself is modified.
         tmp_dir_context = nullcontext()
         if self.pure_parameter_names:
-            tmp_dir_context = TemporaryDirectory("joblib_gaitmap_cache")
+            tmp_dir_context = TemporaryDirectory("joblib_tpcp_cache")
         with tmp_dir_context as cachedir:
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None
 

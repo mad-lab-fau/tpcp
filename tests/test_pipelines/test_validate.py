@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 from sklearn.model_selection import KFold
 
-from gaitmap.future.pipelines import Optimize, cross_validate
-from tests.test_future.test_pipelines.conftest import DummyDataset, DummyPipeline, dummy_single_score_func
+from tests.test_pipelines.conftest import DummyDataset, DummyPipeline, dummy_single_score_func
+from tpcp.pipelines import Optimize, cross_validate
 
 
 class TestCrossValidate:

@@ -3,8 +3,8 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from gaitmap.future.pipelines._score import _score
-from tests.test_future.test_pipelines.conftest import DummyDataset, DummyPipeline
+from tests.test_pipelines.conftest import DummyDataset, DummyPipeline
+from tpcp.pipelines._score import _score
 
 
 class TestScoreMock:

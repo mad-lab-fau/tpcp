@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 from sklearn.model_selection import KFold
 
-from gaitmap.future.dataset import Dataset
+from tpcp.dataset import Dataset
 
 
 def _create_valid_index(input_dict=None, columns_names=None):

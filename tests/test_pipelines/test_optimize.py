@@ -8,12 +8,8 @@ import pandas as pd
 import pytest
 from sklearn.model_selection import ParameterGrid, PredefinedSplit
 
-from gaitmap.future.pipelines import GaitmapScorer, GridSearch, Optimize
-from gaitmap.future.pipelines._optimize import BaseOptimize, GridSearchCV
-from gaitmap.future.pipelines._score import _optimize_and_score
-from gaitmap.utils.exceptions import PotentialUserErrorWarning
 from tests.mixins.test_algorithm_mixin import TestAlgorithmMixin
-from tests.test_future.test_pipelines.conftest import (
+from tests.test_pipelines.conftest import (
     DummyDataset,
     DummyPipeline,
     create_dummy_multi_score_func,
@@ -21,6 +17,10 @@ from tests.test_future.test_pipelines.conftest import (
     dummy_multi_score_func,
     dummy_single_score_func,
 )
+from tpcp._exceptions import PotentialUserErrorWarning
+from tpcp.pipelines import GridSearch, Optimize, Scorer
+from tpcp.pipelines._optimize import BaseOptimize, GridSearchCV
+from tpcp.pipelines._score import _optimize_and_score
 
 
 class TestMetaFunctionalityGridSearch(TestAlgorithmMixin):
@@ -28,7 +28,7 @@ class TestMetaFunctionalityGridSearch(TestAlgorithmMixin):
     algorithm_class = GridSearch
 
     @pytest.fixture()
-    def after_action_instance(self, healthy_example_imu_data) -> GridSearch:
+    def after_action_instance(self) -> GridSearch:
         gs = GridSearch(DummyPipeline(), ParameterGrid({"para_1": [1]}), scoring=dummy_single_score_func)
         gs.optimize(DummyDataset())
         return gs
@@ -46,7 +46,7 @@ class TestMetaFunctionalityGridSearchCV(TestAlgorithmMixin):
     algorithm_class = GridSearchCV
 
     @pytest.fixture()
-    def after_action_instance(self, healthy_example_imu_data) -> GridSearchCV:
+    def after_action_instance(self) -> GridSearchCV:
         gs = GridSearchCV(DummyPipeline(), ParameterGrid({"para_1": [1]}), cv=2, scoring=dummy_single_score_func)
         gs.optimize(DummyDataset())
         return gs
@@ -64,7 +64,7 @@ class TestMetaFunctionalityOptimize(TestAlgorithmMixin):
     algorithm_class = Optimize
 
     @pytest.fixture()
-    def after_action_instance(self, healthy_example_imu_data) -> Optimize:
+    def after_action_instance(self) -> Optimize:
         gs = Optimize(DummyPipeline())
         gs.optimize(DummyDataset())
         return gs
@@ -486,7 +486,7 @@ class TestGridSearchCV:
                 result = _optimize_and_score(
                     Optimize(DummyPipeline()),
                     DummyDataset(),
-                    GaitmapScorer(dummy_single_score_func),
+                    Scorer(dummy_single_score_func),
                     np.array([0]),
                     np.array([1]),
                     pure_parameters={"pipeline__para_1": "some_value"},

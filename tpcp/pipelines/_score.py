@@ -14,13 +14,13 @@ import numpy as np
 from joblib import Memory
 from typing_extensions import TypedDict
 
-from gaitmap.future.dataset import Dataset
-from gaitmap.future.pipelines._pipelines import SimplePipeline
-from gaitmap.future.pipelines._scorer import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SINGLE_SCORE_TYPE, GaitmapScorer
-from gaitmap.future.pipelines._utils import _clone_parameter_dict, _get_nested_paras
+from tpcp.dataset import Dataset
+from tpcp.pipelines._pipelines import SimplePipeline
+from tpcp.pipelines._scorer import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SINGLE_SCORE_TYPE, Scorer
+from tpcp.pipelines._utils import _clone_parameter_dict, _get_nested_paras
 
 if TYPE_CHECKING:
-    from gaitmap.future.pipelines._optimize import BaseOptimize  # noqa: cyclic-import
+    from tpcp.pipelines._optimize import BaseOptimize  # noqa: cyclic-import
 
 
 class ScoreResults(TypedDict, total=False):
@@ -51,7 +51,7 @@ class OptimizeScoreResults(TypedDict, total=False):
 def _score(
     pipeline: SimplePipeline,
     dataset: Dataset,
-    scorer: GaitmapScorer,
+    scorer: Scorer,
     parameters: Optional[Dict[str, Any]],
     return_parameters=False,
     return_data_labels=False,
@@ -63,9 +63,9 @@ def _score(
     Parameters
     ----------
     pipeline
-        An instance of a gaitmap pipeline
+        An instance of a tpcp pipeline
     dataset
-        An instance of a gaitmap dataset with multiple data points.
+        An instance of a tpcp dataset with multiple data points.
     scorer
         A scorer that calculates a score by running the pipeline on each data point and then aggregates the results.
     parameters : dict of valid parameters for the pipeline
@@ -128,7 +128,7 @@ def _score(
 def _optimize_and_score(  # noqa: too-many-branches
     optimizer: BaseOptimize,
     dataset: Dataset,
-    scorer: GaitmapScorer,
+    scorer: Scorer,
     train: np.ndarray,
     test: np.ndarray,
     *,
@@ -243,7 +243,7 @@ def _cached_optimize(
     optimized_pipeline_paras = optimizer.optimized_pipeline_.get_params()
     # We check that the pure parameters on the optimize object haven't changed and that the pure parameters belonging
     # to the pipeline have not changed in the `optimized_pipeline`.
-    # Note, that the first case will never happen with gaitmap native Optimizers, but could happen for custom
+    # Note, that the first case will never happen with tpcp native Optimizers, but could happen for custom
     # optimizers.
     if pipeline_pure_para_hash != joblib.hash(
         {k: optimized_pipeline_paras[k] for k in _get_nested_paras(pure_parameters, "pipeline")}

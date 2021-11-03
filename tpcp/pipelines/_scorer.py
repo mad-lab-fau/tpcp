@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, Type, U
 import numpy as np
 from typing_extensions import Literal
 
-from gaitmap.future.dataset import Dataset
+from tpcp.dataset import Dataset
 
 if TYPE_CHECKING:
-    from gaitmap.future.pipelines._pipelines import SimplePipeline
+    from tpcp.pipelines._pipelines import SimplePipeline
 
 _ERROR_SCORE_TYPE = Union[Literal["raise"], float]  # noqa: invalid-name
 _SCORE_TYPE = List[Union[Dict[str, float], float]]  # noqa: invalid-name
@@ -20,7 +20,7 @@ _AGG_SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
 _SINGLE_SCORE_TYPE = Union[Dict[str, np.ndarray], np.ndarray]  # noqa: invalid-name
 
 
-class GaitmapScorer:
+class Scorer:
     """A scorer to score multiple data points of a dataset and average the results.
 
     Parameters
@@ -101,10 +101,10 @@ def _passthrough_scoring(pipeline: SimplePipeline, datapoint: Dataset):
 
 
 def _validate_scorer(
-    scoring: Optional[Union[Callable, GaitmapScorer]],
+    scoring: Optional[Union[Callable, Scorer]],
     pipeline: SimplePipeline,
-    base_class: Type[GaitmapScorer] = GaitmapScorer,
-) -> GaitmapScorer:
+    base_class: Type[Scorer] = Scorer,
+) -> Scorer:
     """Convert the provided scoring method into a valid scorer object."""
     if scoring is None:
         # If scoring is None, we will try to use the score method of the pipeline
@@ -119,9 +119,9 @@ def _validate_scorer(
     if isinstance(scoring, base_class):
         return scoring
     if callable(scoring):
-        # We wrap the scorer, unless the user already supplied a instance of the GaitmapScorer class (or subclass)
+        # We wrap the scorer, unless the user already supplied a instance of the Scorer class (or subclass)
         return base_class(scoring)
-    raise ValueError("A valid scorer must either be a instance of `GaitmapScorer` (or subclass), None, or a callable.")
+    raise ValueError("A valid scorer must either be a instance of `Scorer` (or subclass), None, or a callable.")
 
 
 def _aggregate_scores(scores: _SCORE_TYPE, agg_method: Callable) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:

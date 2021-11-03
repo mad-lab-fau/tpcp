@@ -3,9 +3,7 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from gaitmap.future.pipelines import GaitmapScorer
-from gaitmap.future.pipelines._scorer import _passthrough_scoring, _validate_scorer
-from tests.test_future.test_pipelines.conftest import (
+from tests.test_pipelines.conftest import (
     DummyDataset,
     DummyPipeline,
     dummy_error_score_func,
@@ -13,19 +11,21 @@ from tests.test_future.test_pipelines.conftest import (
     dummy_multi_score_func,
     dummy_single_score_func,
 )
+from tpcp.pipelines import Scorer
+from tpcp.pipelines._scorer import _passthrough_scoring, _validate_scorer
 
 
-class TestGaitmapScorerCalls:
-    scorer: GaitmapScorer
+class TestScorerCalls:
+    scorer: Scorer
 
     @pytest.fixture(autouse=True)
     def create_scorer(self):
-        self.scorer = GaitmapScorer(lambda x: x)
+        self.scorer = Scorer(lambda x: x)
 
     def test_score_func_called(self):
         """Test that the score func is called once per dataset"""
         mock_score_func = Mock(return_value=1)
-        scorer = GaitmapScorer(mock_score_func)
+        scorer = Scorer(mock_score_func)
         pipe = DummyPipeline()
         scorer(pipeline=pipe, data=DummyDataset(), error_score=np.nan)
 
@@ -37,9 +37,9 @@ class TestGaitmapScorerCalls:
             assert id(pipe) != id(call[0][0])
 
 
-class TestGaitmapScorer:
+class TestScorer:
     def test_score_return_val_single_score(self):
-        scorer = GaitmapScorer(dummy_single_score_func)
+        scorer = Scorer(dummy_single_score_func)
         pipe = DummyPipeline()
         data = DummyDataset()
         agg, single = scorer(pipe, data, np.nan)
@@ -49,7 +49,7 @@ class TestGaitmapScorer:
         assert agg == np.mean(data.groups)
 
     def test_score_return_val_multi_score(self):
-        scorer = GaitmapScorer(dummy_multi_score_func)
+        scorer = Scorer(dummy_multi_score_func)
         pipe = DummyPipeline()
         data = DummyDataset()
         agg, single = scorer(pipe, data, np.nan)
@@ -70,7 +70,7 @@ class TestGaitmapScorer:
 
     @pytest.mark.parametrize("err_val", (np.nan, 1))
     def test_scoring_return_err_val(self, err_val):
-        scorer = GaitmapScorer(dummy_error_score_func)
+        scorer = Scorer(dummy_error_score_func)
         pipe = DummyPipeline()
         data = DummyDataset()
         with pytest.warns(UserWarning) as ws:
@@ -96,7 +96,7 @@ class TestGaitmapScorer:
 
     @pytest.mark.parametrize("err_val", (np.nan, 1))
     def test_scoring_return_err_val_multi(self, err_val):
-        scorer = GaitmapScorer(dummy_error_score_func_multi)
+        scorer = Scorer(dummy_error_score_func_multi)
         pipe = DummyPipeline()
         data = DummyDataset()
         agg, single = scorer(pipe, data, err_val)
@@ -117,7 +117,7 @@ class TestGaitmapScorer:
                 assert v == np.mean(expected)
 
     def test_err_val_raises(self):
-        scorer = GaitmapScorer(dummy_error_score_func)
+        scorer = Scorer(dummy_error_score_func)
         pipe = DummyPipeline()
         data = DummyDataset()
         with pytest.raises(ValueError) as e:
@@ -129,7 +129,7 @@ class TestGaitmapScorer:
     @pytest.mark.parametrize("bad_scorer", (lambda x, y: "test", lambda x, y: {"val": "test"}))
     def test_bad_scorer(self, error_score, bad_scorer):
         """Check that we catch cases where the scoring func returns invalid values independent of the error_score val"""
-        scorer = GaitmapScorer(bad_scorer)
+        scorer = Scorer(bad_scorer)
         pipe = DummyPipeline()
         data = DummyDataset()
         with pytest.raises(ValueError) as e:
@@ -149,9 +149,9 @@ class TestScorerUtils:
     @pytest.mark.parametrize(
         "scoring, expected",
         (
-            (None, GaitmapScorer(_passthrough_scoring)),
-            (_dummy_func, GaitmapScorer(_dummy_func)),
-            (GaitmapScorer(_dummy_func_2), GaitmapScorer(_dummy_func_2)),
+            (None, Scorer(_passthrough_scoring)),
+            (_dummy_func, Scorer(_dummy_func)),
+            (Scorer(_dummy_func_2), Scorer(_dummy_func_2)),
         ),
     )
     def test_validate_scorer(self, scoring, expected):

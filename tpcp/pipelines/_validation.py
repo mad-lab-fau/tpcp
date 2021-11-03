@@ -9,11 +9,11 @@ import numpy as np
 from joblib import Parallel, delayed
 from sklearn.model_selection import BaseCrossValidator, check_cv
 
-from gaitmap.future.dataset import Dataset
-from gaitmap.future.pipelines._optimize import BaseOptimize
-from gaitmap.future.pipelines._score import _optimize_and_score
-from gaitmap.future.pipelines._scorer import _ERROR_SCORE_TYPE, _validate_scorer
-from gaitmap.future.pipelines._utils import _aggregate_final_results, _normalize_score_results
+from tpcp.dataset import Dataset
+from tpcp.pipelines._optimize import BaseOptimize
+from tpcp.pipelines._score import _optimize_and_score
+from tpcp.pipelines._scorer import _ERROR_SCORE_TYPE, _validate_scorer
+from tpcp.pipelines._utils import _aggregate_final_results, _normalize_score_results
 
 
 def cross_validate(
@@ -34,19 +34,19 @@ def cross_validate(
     """Evaluate a pipeline on a dataset using cross validation.
 
     This function follows as much as possible the interface of :func:`~sklearn.model_selection.cross_validate`.
-    If the gaitmap documentation is missing some information, the respective documentation of sklearn might be helpful.
+    If the tpcp documentation is missing some information, the respective documentation of sklearn might be helpful.
 
     Parameters
     ----------
     optimizable
         A optimizable class instance like `GridSearch`/`GridSearchCV` or a pipeline wrapped in an `Optimize` object.
     dataset
-        A gaitmap dataset containing all information.
+        A tpctpcpet containing all information.
     groups
         Group labels for samples used by the cross validation helper, in case a grouped CV is used (e.g.
         :class:`~sklearn.model_selection.GroupKFold`).
-        Check the documentation of the :class:`~gaitmap.future.dataset.Dataset` class and the respective example for
-        information on how to generate group labels for gaitmap datasets.
+        Check the documentation of the :class:`~tpcp.dataset.Dataset` class and the respective example for
+        information on how to generate group labels for tpcp datasets.
     scoring
         A callable that can score a single data point given a pipeline.
         This function should return either a single score or a dictionary of scores.

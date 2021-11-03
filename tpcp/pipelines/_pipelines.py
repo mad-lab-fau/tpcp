@@ -1,9 +1,9 @@
 """Base Classes for custom pipelines."""
 from typing import Dict, TypeVar, Union
 
-from gaitmap.base import BaseAlgorithm
-from gaitmap.future.dataset import Dataset
-from gaitmap.future.pipelines._utils import _check_safe_run
+from tpcp._base import BaseAlgorithm
+from tpcp.dataset import Dataset
+from tpcp.pipelines._utils import _check_safe_run
 
 Self = TypeVar("Self", bound="SimplePipeline")
 
@@ -27,7 +27,7 @@ class SimplePipeline(BaseAlgorithm):
         Parameters
         ----------
         datapoint
-            An instance of a :class:`gaitmap.future.dataset.Dataset` containing only a single datapoint.
+            An instance of a :class:`tpcp.dataset.Dataset` containing only a single datapoint.
             The structure of the data will depend on the dataset.
 
         Returns
@@ -54,7 +54,7 @@ class SimplePipeline(BaseAlgorithm):
         Parameters
         ----------
         datapoint
-            An instance of a :class:`gaitmap.future.dataset.Dataset` containing only a single datapoint.
+            An instance of a :class:`tpcp.dataset.Dataset` containing only a single datapoint.
             The structure of the data will depend on the dataset.
 
         Returns
@@ -77,7 +77,7 @@ class SimplePipeline(BaseAlgorithm):
         Parameters
         ----------
         datapoint
-            An instance of a :class:`gaitmap.future.dataset.Dataset` containing only a single datapoint.
+            An instance of a :class:`tpcp.dataset.Dataset` containing only a single datapoint.
             The structure of the data and the available reference information will depend on the dataset.
 
         Returns
@@ -95,14 +95,14 @@ class OptimizablePipeline(SimplePipeline):
 
     OptimizablePipelines are expected to implement a concrete way to train internal models or optimize parameters.
     This should not be a reimplementation of GridSearch or similar methods.
-    For this :class:`gaitmap.future.pipelines.GridSearch` should be used directly.
+    For this :class:`tpcp.pipelines.GridSearch` should be used directly.
 
     It is important that `self_optimize` only modifies input parameters of the pipeline.
     This means, if a parameter is optimized, by `self_optimize` it should be named in the `__init__` and should be
     exportable when calling `pipeline.get_params`.
     It is also possible to optimize nested parameters.
-    For example, if the pipeline takes a :class:`~gaitmap.stride_segmentation.DtwTemplate` as input, `self_optimize`
-    can modify the template (or create a new DTW Template class).
+    For example, if the input of the pipeline is an algorithm or another pipeline on its own, all parameters of these
+    objects can be modified as well.
     In any case, you should make sure that all optimized parameters are still there if you call `.clone()` on the
     optimized pipeline.
     """
@@ -119,7 +119,7 @@ class OptimizablePipeline(SimplePipeline):
         Parameters
         ----------
         dataset
-            An instance of a :class:`gaitmap.future.dataset.Dataset` containing one or multiple data points that can
+            An instance of a :class:`tpcp.dataset.Dataset` containing one or multiple data points that can
             be used for training.
             The structure of the data and the available reference information will depend on the dataset.
         kwargs

@@ -4,13 +4,13 @@ from typing import Iterator, List, Optional, Sequence, Tuple, TypeVar, Union
 import numpy as np
 import pandas as pd
 
-from gaitmap.base import _BaseSerializable
+from tpcp._base import _BaseSerializable
 
 Self = TypeVar("Self", bound="Dataset")
 
 
 class Dataset(_BaseSerializable):
-    """Baseclass for gaitmap Dataset objects.
+    """Baseclass for tpcp Dataset objects.
 
     This class provides fundamental functionality like iteration, getting subsets and compatibility with sklearn's
     cross validation helper.

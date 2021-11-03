@@ -3,9 +3,9 @@ from unittest.mock import patch
 
 import pytest
 
-from gaitmap.future.dataset import Dataset
-from gaitmap.future.pipelines import SimplePipeline
-from tests.test_future.test_pipelines.conftest import DummyDataset, DummyPipeline
+from tests.test_pipelines.conftest import DummyDataset, DummyPipeline
+from tpcp.dataset import Dataset
+from tpcp.pipelines import SimplePipeline
 
 
 class PipelineInputModify(SimplePipeline):

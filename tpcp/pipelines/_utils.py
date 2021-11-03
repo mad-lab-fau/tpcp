@@ -10,7 +10,7 @@ import numpy as np
 from sklearn import clone
 
 if TYPE_CHECKING:
-    from gaitmap.future.pipelines import SimplePipeline
+    from tpcp.pipelines import SimplePipeline
 
 
 def _aggregate_final_results(results: List) -> Dict:
