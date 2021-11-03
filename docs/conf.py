@@ -26,7 +26,7 @@ import tpcp
 sys.path.insert(0, os.path.abspath(".."))
 
 
-URL = "https://mad-srv.informatik.uni-erlangen.de/MadLab/GaitAnalysis/gaitmap/"
+URL = "https://github.com/mad-lab-fau/tpcp"
 
 # -- Project information -----------------------------------------------------
 
@@ -114,7 +114,7 @@ add_function_parentheses = False
 # Activate the theme.
 html_theme = "pydata_sphinx_theme"
 html_theme_options = {
-    "gitlab_url": "https://mad-srv.informatik.uni-erlangen.de/MadLab/GaitAnalysis/gaitmap/-/blob/master",
+    "github_url": "https://github.com/mad-lab-fau/tpcp",
     "show_prev_next": False,
 }
 

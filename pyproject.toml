@@ -7,6 +7,9 @@ authors = [
     "Raul C. Sîmpetru <raul.simpetru@fau.de>",
     "Felix Kluge <felix.kluge@fau.de>"
 ]
+readme = "README.md"
+homepage = "https://github.com/mad-lab-fau/tpcp"
+repository = "https://github.com/mad-lab-fau/tpcp
 
 [tool.poetry.dependencies]
 python = ">=3.7.1,<3.11"
