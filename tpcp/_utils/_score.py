@@ -12,15 +12,20 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 import joblib
 import numpy as np
 from joblib import Memory
-from typing_extensions import TypedDict
+from typing_extensions import TypedDict, Literal
 
-from tpcp.dataset import Dataset
-from tpcp.pipelines._pipelines import SimplePipeline
-from tpcp.pipelines._scorer import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SINGLE_SCORE_TYPE, Scorer
-from tpcp.pipelines._utils import _clone_parameter_dict, _get_nested_paras
+from tpcp._utils._general import _clone_parameter_dict, _get_nested_paras
+
+_ERROR_SCORE_TYPE = Union[Literal["raise"], float]  # noqa: invalid-name
+_SCORE_TYPE = List[Union[Dict[str, float], float]]  # noqa: invalid-name
+_AGG_SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
+_SINGLE_SCORE_TYPE = Union[Dict[str, np.ndarray], np.ndarray]  # noqa: invalid-name
 
 if TYPE_CHECKING:
-    from tpcp.pipelines._optimize import BaseOptimize  # noqa: cyclic-import
+    from tpcp._base import BaseOptimize
+    from tpcp.dataset import Dataset
+    from tpcp.pipelines import SimplePipeline
+    from tpcp.validation import Scorer
 
 
 class ScoreResults(TypedDict, total=False):

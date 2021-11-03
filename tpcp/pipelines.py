@@ -3,7 +3,7 @@ from typing import Dict, TypeVar, Union
 
 from tpcp._base import BaseAlgorithm
 from tpcp.dataset import Dataset
-from tpcp.pipelines._utils import _check_safe_run
+from tpcp._utils._general import _check_safe_run
 
 Self = TypeVar("Self", bound="SimplePipeline")
 

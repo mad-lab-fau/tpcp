@@ -6,7 +6,8 @@ import pytest
 from sklearn.model_selection import KFold
 
 from tests.test_pipelines.conftest import DummyDataset, DummyPipeline, dummy_single_score_func
-from tpcp.pipelines import Optimize, cross_validate
+from tpcp.optimize import Optimize
+from tpcp.validation import cross_validate
 
 
 class TestCrossValidate:

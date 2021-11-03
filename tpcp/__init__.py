@@ -1,7 +1,6 @@
 """tpcp - Tiny Pipelines for Complicated Problems."""
-from ._base import BaseAlgorithm
-from .dataset import Dataset
+from tpcp._base import BaseAlgorithm, BaseOptimize
 
 __version__ = "0.1.0"
 
-__all__ = ["BaseAlgorithm", "Dataset"]
+__all__ = ["BaseAlgorithm", "BaseOptimize"]

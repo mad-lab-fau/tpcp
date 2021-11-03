@@ -15,55 +15,19 @@ from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
 
-from tpcp._base import BaseAlgorithm
-from tpcp._exceptions import PotentialUserErrorWarning
+from tpcp._base import BaseOptimize
+from tpcp._utils._exceptions import PotentialUserErrorWarning
 from tpcp.dataset import Dataset
-from tpcp.pipelines._pipelines import OptimizablePipeline, SimplePipeline
-from tpcp.pipelines._score import _optimize_and_score, _score
-from tpcp.pipelines._scorer import _ERROR_SCORE_TYPE, Scorer, _validate_scorer
-from tpcp.pipelines._utils import (
+from tpcp.pipelines import OptimizablePipeline, SimplePipeline
+from tpcp._utils._score import _optimize_and_score, _score
+from tpcp.validation._scorer import _ERROR_SCORE_TYPE, _validate_scorer
+from tpcp.validation import Scorer
+from tpcp._utils._general import (
     _aggregate_final_results,
     _normalize_score_results,
     _prefix_para_dict,
     _split_hyper_and_pure_parameters,
 )
-
-
-class BaseOptimize(BaseAlgorithm):
-    """Base class for all optimizer."""
-
-    pipeline: SimplePipeline
-
-    dataset: Dataset
-
-    optimized_pipeline_: SimplePipeline
-
-    _action_method = "optimize"
-
-    def optimize(self, dataset: Dataset, **optimize_params):
-        """Apply some form of optimization on the the input parameters of the pipeline."""
-        raise NotImplementedError()
-
-    def run(self, datapoint: Dataset):
-        """Run the optimized pipeline.
-
-        This is a wrapper to contain API compatibility with `SimplePipeline`.
-        """
-        return self.optimized_pipeline_.run(datapoint)
-
-    def safe_run(self, datapoint: Dataset):
-        """Call the safe_run method of the optimized pipeline.
-
-        This is a wrapper to contain API compatibility with `SimplePipeline`.
-        """
-        return self.optimized_pipeline_.safe_run(datapoint)
-
-    def score(self, datapoint: Dataset):
-        """Execute score on the optimized pipeline.
-
-        This is a wrapper to contain API compatibility with `SimplePipeline`.
-        """
-        return self.optimized_pipeline_.score(datapoint)
 
 
 class Optimize(BaseOptimize):

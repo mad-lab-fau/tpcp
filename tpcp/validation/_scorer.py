@@ -4,20 +4,15 @@ from __future__ import annotations
 import numbers
 import warnings
 from traceback import format_exc
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Callable, Optional, Tuple, Type, Union
 
 import numpy as np
-from typing_extensions import Literal
 
 from tpcp.dataset import Dataset
+from tpcp._utils._score import _ERROR_SCORE_TYPE, _AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE
 
 if TYPE_CHECKING:
-    from tpcp.pipelines._pipelines import SimplePipeline
-
-_ERROR_SCORE_TYPE = Union[Literal["raise"], float]  # noqa: invalid-name
-_SCORE_TYPE = List[Union[Dict[str, float], float]]  # noqa: invalid-name
-_AGG_SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
-_SINGLE_SCORE_TYPE = Union[Dict[str, np.ndarray], np.ndarray]  # noqa: invalid-name
+    from tpcp.pipelines import SimplePipeline
 
 
 class Scorer:

@@ -54,7 +54,7 @@ class Dataset(_BaseSerializable):
     >>> import pandas as pd
     >>> from itertools import product
     >>>
-    >>> from tpcp import Dataset
+    >>> from tpcp.dataset import Dataset
     >>>
     >>> test_index = pd.DataFrame(
     ...     list(product(("patient_1", "patient_2", "patient_3"), ("test_1", "test_2"), ("1", "2"))),

@@ -10,10 +10,10 @@ from joblib import Parallel, delayed
 from sklearn.model_selection import BaseCrossValidator, check_cv
 
 from tpcp.dataset import Dataset
-from tpcp.pipelines._optimize import BaseOptimize
-from tpcp.pipelines._score import _optimize_and_score
-from tpcp.pipelines._scorer import _ERROR_SCORE_TYPE, _validate_scorer
-from tpcp.pipelines._utils import _aggregate_final_results, _normalize_score_results
+from tpcp._base import BaseOptimize
+from tpcp._utils._score import _optimize_and_score
+from tpcp.validation._scorer import _ERROR_SCORE_TYPE, _validate_scorer
+from tpcp._utils._general import _aggregate_final_results, _normalize_score_results
 
 
 def cross_validate(

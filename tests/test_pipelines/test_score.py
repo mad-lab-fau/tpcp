@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from tests.test_pipelines.conftest import DummyDataset, DummyPipeline
-from tpcp.pipelines._score import _score
+from tpcp._utils._score import _score
 
 
 class TestScoreMock:

@@ -1,15 +1,19 @@
 """Base classes for all algorithms and pipelines."""
-
+from __future__ import annotations
 import inspect
 import json
 import types
 import warnings
 from collections import defaultdict
-from typing import Any, Callable, DefaultDict, Dict, List, Type, TypeVar, Union
+from typing import Any, Callable, DefaultDict, Dict, List, Type, TypeVar, Union, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 from joblib import Memory
+
+if TYPE_CHECKING:
+    from tpcp.pipelines import SimplePipeline
+    from tpcp.dataset import Dataset
 
 BaseType = TypeVar("BaseType", bound="_BaseSerializable")
 
@@ -281,3 +285,40 @@ class BaseAlgorithm(_BaseSerializable):
             if v.endswith("_") and not v.startswith("__") and not isinstance(getattr(self, v), types.MethodType)
         }
         return attrs
+
+
+class BaseOptimize(BaseAlgorithm):
+    """Base class for all optimizer."""
+
+    pipeline: SimplePipeline
+
+    dataset: Dataset
+
+    optimized_pipeline_: SimplePipeline
+
+    _action_method = "optimize"
+
+    def optimize(self, dataset: Dataset, **optimize_params):
+        """Apply some form of optimization on the the input parameters of the pipeline."""
+        raise NotImplementedError()
+
+    def run(self, datapoint: Dataset):
+        """Run the optimized pipeline.
+
+        This is a wrapper to contain API compatibility with `SimplePipeline`.
+        """
+        return self.optimized_pipeline_.run(datapoint)
+
+    def safe_run(self, datapoint: Dataset):
+        """Call the safe_run method of the optimized pipeline.
+
+        This is a wrapper to contain API compatibility with `SimplePipeline`.
+        """
+        return self.optimized_pipeline_.safe_run(datapoint)
+
+    def score(self, datapoint: Dataset):
+        """Execute score on the optimized pipeline.
+
+        This is a wrapper to contain API compatibility with `SimplePipeline`.
+        """
+        return self.optimized_pipeline_.score(datapoint)
