@@ -1,4 +1,6 @@
+import platform
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -12,9 +14,9 @@ def task_docs():
     shutil.rmtree(str(HERE / "docs/modules/generated"), ignore_errors=True)
 
     if platform.system() == "Windows":
-        return {"actions": [[HERE / "docs/make.bat", "html"]], "verbosity": 2}
+        subprocess.run([HERE / "docs/make.bat", "html"], shell=False, check=True)
     else:
-        return {"actions": [["make", "-C", HERE / "docs", "html"]], "verbosity": 2}
+        subprocess.run(["make", "-C", HERE / "docs", "html"], shell=False, check=True)
 
 
 def update_version_strings(file_path, new_version):
