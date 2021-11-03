@@ -23,6 +23,10 @@ black = "^20.8b1"
 isort = "^5.9.3"
 numpydoc = "^1.1.0"
 poethepoet = "^0.10.0"
+sphinx-gallery = "^0.10.0"
+pydata-sphinx-theme = "^0.7.1"
+recommonmark = "^0.7.1"
+memory-profiler = "^0.58.0"
 
 [tool.black]
 line-length = 120
@@ -60,7 +64,7 @@ _check_black = "black . --check"
 _check_isort = "isort . --check"
 check = { sequence = ["_check_black", "_check_isort", "lint"], help = "Check all potential format and linting issues.", ignore_fail = true }
 test = { cmd = "pytest --cov=tpcp", help = "Run Pytest with coverage." }
-docs = { "script" = "_tasks:task_docs()" , help = "Build the html docs using Sphinx." }
+docs = { "script" = "_tasks:task_docs()",  help = "Build the html docs using Sphinx." }
 bump_version = { "script" = "_tasks:task_update_version()" }
 
 [build-system]
