@@ -27,9 +27,10 @@ They are **complex**.
 As an example, here is the summary of the method from one of our [recent papers](https://jneuroengrehab.biomedcentral.com/articles/10.1186/s12984-021-00883-7):
 - We have continues multi-dimensional sensor recordings from multiple participants from a hospital visit and multiple days at home
 - For each participant we have global metadata (age, diagnosis) and daily annotations
-- We want to train HMM an algorithm that can find events in the data streams
+- We want to train Hidden-Markov-Model that can find events in the data streams
 - We need to tune hyper-parameters of the algorithm using a participant-wise cross-validation
 - We want to evaluate the final performance of the algorithm for the settings trained on the hospital data -> tested on home data and trained on home data -> tested on home data
+- Using the same structure we want to evaluate a state-of-the-art algorithm to compare the results
 
 None of the standard frameworks can easily abstract this problem, because we had none-tabular data, multiple data 
 sources per participant, a non-traditional ML algorithm, and a complex train-test split logic.
