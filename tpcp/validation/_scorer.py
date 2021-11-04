@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Callable, Optional, Tuple, Type, Union
 
 import numpy as np
 
+from tpcp._utils._score import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SINGLE_SCORE_TYPE, _SCORE_TYPE
 from tpcp.dataset import Dataset
-from tpcp._utils._score import _ERROR_SCORE_TYPE, _AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE
 
 if TYPE_CHECKING:
     from tpcp.pipelines import SimplePipeline

@@ -1,19 +1,20 @@
 """Base classes for all algorithms and pipelines."""
 from __future__ import annotations
+
 import inspect
 import json
 import types
 import warnings
 from collections import defaultdict
-from typing import Any, Callable, DefaultDict, Dict, List, Type, TypeVar, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, DefaultDict, Dict, List, Type, TypeVar, Union
 
 import numpy as np
 import pandas as pd
 from joblib import Memory
 
 if TYPE_CHECKING:
-    from tpcp.pipelines import SimplePipeline
     from tpcp.dataset import Dataset
+    from tpcp.pipelines import SimplePipeline
 
 BaseType = TypeVar("BaseType", bound="_BaseSerializable")
 

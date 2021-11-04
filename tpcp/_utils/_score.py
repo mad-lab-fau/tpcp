@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 import joblib
 import numpy as np
 from joblib import Memory
-from typing_extensions import TypedDict, Literal
+from typing_extensions import Literal, TypedDict
 
 from tpcp._utils._general import _clone_parameter_dict, _get_nested_paras
 
