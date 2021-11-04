@@ -14,13 +14,11 @@ import os
 import re
 import sys
 from datetime import datetime
-from importlib import import_module
-from inspect import getsourcefile, getsourcelines
 from pathlib import Path
 
 import toml
 
-import tpcp
+from docs.sphinxext.githublink import make_linkcode_resolve
 
 sys.path.insert(0, os.path.abspath(".."))
 
@@ -155,40 +153,10 @@ sphinx_gallery_conf = {
 }
 
 
-# Linkcode
-
-
-def get_nested_attr(obj, attr):
-    attrs = attr.split(".", 1)
-    new_obj = getattr(obj, attrs[0])
-    if len(attrs) == 1:
-        return new_obj
-    else:
-        return get_nested_attr(new_obj, attrs[1])
-
-
-# TODO: Update for github
-def linkcode_resolve(domain, info):
-    if domain != "py":
-        return None
-    if not info["module"]:
-        return None
-    module = import_module(info["module"])
-    obj = get_nested_attr(module, info["fullname"])
-    code_line = None
-    filename = ""
-    try:
-        filename = str(Path(getsourcefile(obj)).relative_to(Path(getsourcefile(tpcp)).parent.parent))
-    except:
-        pass
-    try:
-        code_line = getsourcelines(obj)[-1]
-    except:
-        pass
-    if filename:
-        if code_line:
-            return "{}/{}#L{}".format(URL, filename, code_line)
-        return "{}/{}".format(URL, filename)
+linkcode_resolve = make_linkcode_resolve(
+    "tpcp",
+    "https://github.com/mad-lab-fau/tpcp/blob/{revision}/{package}/{path}#L{lineno}",
+)
 
 
 def skip_properties(app, what, name, obj, skip, options):
