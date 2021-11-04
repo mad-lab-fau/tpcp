@@ -30,6 +30,7 @@ sphinx-gallery = "^0.10.0"
 pydata-sphinx-theme = "^0.7.1"
 recommonmark = "^0.7.1"
 memory-profiler = "^0.58.0"
+matplotlib = "^3.4.3"
 
 [tool.black]
 line-length = 120

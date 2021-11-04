@@ -1,10 +1,7 @@
-.. gaitmap documentation master file, created by
-   sphinx-quickstart on Tue Mar 17 16:05:48 2020.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. tpcp documentation master file
 
-gaitmap Docu Overview
-=====================
+tpcp Docu Overview
+==================
 
 .. toctree::
    :maxdepth: 1
@@ -12,6 +9,7 @@ gaitmap Docu Overview
 
    Getting Started <README.md>
    modules/index.rst
+   auto_examples/index.rst
    Changelog <CHANGELOG.md>
 
 Indices and tables

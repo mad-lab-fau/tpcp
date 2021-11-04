@@ -19,7 +19,6 @@ from inspect import getsourcefile, getsourcelines
 from pathlib import Path
 
 import toml
-from sphinx_gallery.sorting import ExplicitOrder
 
 import tpcp
 
@@ -64,7 +63,7 @@ extensions = [
     "sphinx.ext.doctest",
     "sphinx.ext.intersphinx",
     # "sphinx.ext.imgconverter",
-    # "sphinx_gallery.gen_gallery",
+    "sphinx_gallery.gen_gallery",
     "recommonmark",
 ]
 
@@ -132,11 +131,10 @@ intersphinx_module_mapping = {
     "scipy": ("https://docs.scipy.org/doc/scipy/reference/", None),
     "matplotlib": ("https://matplotlib.org/", None),
     "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", None),
-    "tslearn": ("https://tslearn.readthedocs.io/en/stable", None),
-    "sklearn": ("https://scikit-learn.org/stable", None),
+    "sklearn": ("https://scikit-learn.org/stable/", None),
 }
 
-user_agent = 'Mozilla/5.0 (X11; Linux x86_64; rv:25.0) Gecko/20100101 Firefox/25.0'
+user_agent = "Mozilla/5.0 (X11; Linux x86_64; rv:25.0) Gecko/20100101 Firefox/25.0"
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/{.major}".format(sys.version_info), None),
@@ -144,32 +142,18 @@ intersphinx_mapping = {
 }
 
 # Sphinx Gallary
-# TODO: commented out until examples are added
-# sphinx_gallery_conf = {
-#     "examples_dirs": ["../examples"],
-#     "gallery_dirs": ["./auto_examples"],
-#     "reference_url": {"tpcp": None, **{k: v[0] for k, v in intersphinx_module_mapping.items()}},
-#     # 'default_thumb_file': 'fig/logo.png',
-#     "backreferences_dir": "modules/generated/backreferences",
-#     "doc_module": ("tpcp",),
-#     "filename_pattern": re.escape(os.sep),
-#     "remove_config_comments": True,
-#     "show_memory": True,
-#     "subsection_order": ExplicitOrder(
-#         [
-#             "../examples/full_pipelines",
-#             "../examples/preprocessing",
-#             "../examples/gait_detection",
-#             "../examples/stride_segmentation",
-#             "../examples/event_detection",
-#             "../examples/trajectory_reconstruction",
-#             "../examples/parameters",
-#             "../examples/datasets_and_pipelines",
-#             "../examples/advanced_features",
-#             "../examples/generic_algorithms",
-#         ]
-#     ),
-# }
+sphinx_gallery_conf = {
+    "examples_dirs": ["../examples"],
+    "gallery_dirs": ["./auto_examples"],
+    "reference_url": {"tpcp": None, **{k: v[0] for k, v in intersphinx_module_mapping.items()}},
+    # 'default_thumb_file': 'fig/logo.png',
+    "backreferences_dir": "modules/generated/backreferences",
+    "doc_module": ("tpcp",),
+    "filename_pattern": re.escape(os.sep),
+    "remove_config_comments": True,
+    "show_memory": True,
+}
+
 
 # Linkcode
 
