@@ -6,11 +6,11 @@
 
 # -- Path setup --------------------------------------------------------------
 
+import os
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-import os
 import re
 import sys
 from datetime import datetime
@@ -18,9 +18,12 @@ from pathlib import Path
 
 import toml
 
-from docs.sphinxext.githublink import make_linkcode_resolve
+HERE = Path(__file__)
 
-sys.path.insert(0, os.path.abspath(".."))
+sys.path.insert(0, str(HERE.parent))
+sys.path.insert(0, str(HERE.parent.parent))
+
+from sphinxext.githublink import make_linkcode_resolve
 
 
 URL = "https://github.com/mad-lab-fau/tpcp"
