@@ -15,6 +15,18 @@ class DummyPipeline(OptimizablePipeline):
         return self
 
 
+class MutableParaPipeline(OptimizablePipeline):
+    def __init__(self, para_normal=3, para_mutable={}, optimized=False):
+        self.para_normal = para_normal
+        self.para_mutable = para_mutable
+        self.optimized = True
+
+    def self_optimize(self, dataset: Dataset, **kwargs):
+        self.optimized = True
+        self.para_mutable["test"] = True
+        return self
+
+
 class DummyDataset(Dataset):
     def create_index(self) -> pd.DataFrame:
         return pd.DataFrame({"value": list(range(5))})

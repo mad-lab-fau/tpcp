@@ -1,6 +1,7 @@
 """Base classes for all algorithms and pipelines."""
 from __future__ import annotations
 
+import copy
 import inspect
 import json
 import types
@@ -169,15 +170,33 @@ class _BaseSerializable:
             valid_params[key].set_params(**sub_params)
         return self
 
-    def clone(self: BaseType) -> BaseType:
+    def clone(self: BaseType, deepcopy=True) -> BaseType:
         """Create a new instance of the class with all parameters copied over.
 
         This will create a new instance of the class itself and all nested objects
+
+        Parameters
+        ----------
+        deepcopy
+            If True, all paras that are not nested pipelines or algorithms (i.e. no childs of `_BaseSerializable`) are
+            deepcopied.
+            This ensures that new instances of mutable objects are created and you do not accidentally mutate them on
+            the cloned structure.
+            Disable deepcopy only, if you have a good understanding of the implications and can ensure that you will
+            never use mutable objects in the parameters of a Algorithm/pipeline instance.
+
         """
+        # TODO: Should we really deepcopy all objects or should there be whitelist of types that should not be copied
+        #  for performance/memory reasons?
+        #  Having an additonal isinstance check might create overhead for small objects, but the memory savings might
+        #  be worth it for large objects.
+        #  But, in general it is unlikely that large objects are stored in immutable data constructs as parameters.
         cloned_dict = self.get_params(deep=False)
         for k, v in cloned_dict.items():
             if isinstance(v, _BaseSerializable):
                 cloned_dict[k] = v.clone()
+            elif deepcopy is True:
+                cloned_dict[k] = copy.deepcopy(v)
         return self.__class__(**cloned_dict)
 
     def to_json(self) -> str:

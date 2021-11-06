@@ -12,6 +12,7 @@ from tests.mixins.test_algorithm_mixin import TestAlgorithmMixin
 from tests.test_pipelines.conftest import (
     DummyDataset,
     DummyPipeline,
+    MutableParaPipeline,
     create_dummy_multi_score_func,
     create_dummy_score_func,
     dummy_multi_score_func,
@@ -542,6 +543,20 @@ class TestOptimize:
                 Optimize(DummyPipeline()).optimize(ds)
 
         assert "Calling `self_optimize` did not return an instance" in str(e.value)
+
+    def test_mutable_inputs(self):
+        """Test how mutable inputs are handled.
+
+        Sometimes we have mutableobjects (e.g. dicts or sklearn classifier) as parameters.
+        These might be modified during training.
+        However, in no case should this modify the original pipeline when using Optimize.
+        """
+        ds = DummyDataset()
+        p = MutableParaPipeline()
+        opt = Optimize(p).optimize(ds)
+
+        assert joblib.hash({}) == joblib.hash(p.para_mutable)
+        assert joblib.hash({"test": True}) == joblib.hash(opt.optimized_pipeline_.para_mutable)
 
 
 class TestOptimizeBase:
