@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Callable, Optional, Tuple, Type, Union
 
 import numpy as np
 
-from tpcp._utils._score import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SINGLE_SCORE_TYPE, _SCORE_TYPE
+from tpcp._utils._score import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SCORE_TYPE, _SINGLE_SCORE_TYPE
 from tpcp.dataset import Dataset
 
 if TYPE_CHECKING:

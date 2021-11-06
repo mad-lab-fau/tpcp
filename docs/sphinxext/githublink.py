@@ -5,12 +5,12 @@ The original source is licenced under BSD 3-Clause and can be obtained from here
 https://github.com/scikit-learn/scikit-learn/blob/60cf98bc897442dd718c8cfa207613380ac8bbef/doc/sphinxext/github_link.py
 """
 
-from operator import attrgetter
 import inspect
-import subprocess
 import os
+import subprocess
 import sys
 from functools import partial
+from operator import attrgetter
 
 REVISION_CMD = "git rev-parse --short HEAD"
 
