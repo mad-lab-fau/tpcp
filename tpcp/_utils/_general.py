@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import copy
 import numbers
-from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, TypeVar, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 
 import joblib
 import numpy as np
@@ -11,10 +11,10 @@ import numpy as np
 import tpcp._base
 
 if TYPE_CHECKING:
-    from tpcp._base import BaseSerializable
+    from tpcp.base import BaseTpcpObject
+    from tpcp._base import Algo
     from tpcp.pipelines import SimplePipeline
 
-Algo = TypeVar("Algo", bound="BaseSerializable")
 _EMPTY = object()
 _DEFAULT_PARA_NAME = "__TPCP_DEFAULT"
 
@@ -145,7 +145,7 @@ def _check_safe_run(pipeline: SimplePipeline, *args, **kwargs):
 
 
 def clone(
-    algorithm: Union[BaseSerializable, List[BaseSerializable], Set[BaseSerializable], Tuple[BaseSerializable]],
+    algorithm: Union[BaseTpcpObject, List[BaseTpcpObject], Set[BaseTpcpObject], Tuple[BaseTpcpObject]],
     *,
     safe: bool = True,
 ):
@@ -170,8 +170,7 @@ def clone(
     algorithm : {list, tuple, set} of algorithm instance or a single algorithm instance
         The algorithm or group of algorithms to be cloned.
     safe : bool, default=False
-        If safe is False, clone will fall back to a deep copy on objects
-        that are not algorithms.
+        If safe is False, clone will fall back to a deep copy on objects that are not algorithms.
 
     """
     if algorithm is _EMPTY:
@@ -184,7 +183,7 @@ def clone(
     # Due to the way algorithms/pipelines in tpcp work, they need to inherit from _BaseSerializable.
     # Therefore, we check explicitly for that, as we do not want to accidentally treat an sklearn algo (or similar) as
     # algorithm
-    if not isinstance(algorithm, tpcp.base.BaseSerializable):
+    if not isinstance(algorithm, tpcp.base.BaseTpcpObject):
         if not safe:
             return copy.deepcopy(algorithm)
         raise TypeError(

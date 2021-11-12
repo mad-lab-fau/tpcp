@@ -7,7 +7,7 @@ from tpcp._utils._general import _DEFAULT_PARA_NAME, clone
 
 
 def _get_dangerous_mutable_types() -> Tuple[type]:
-    return (_base._BaseSerializable,)
+    return (_base._BaseTpcpObject,)
 
 
 def _is_dangerous_mutable(para: Parameter):
@@ -33,7 +33,7 @@ class AlgorithmMeta(type):
 
     def __init__(cls, name, bases, dct):
         super().__init__(name, bases, dct)
-        assert issubclass(cls, _base._BaseSerializable)
+        assert issubclass(cls, _base._BaseTpcpObject)
         init_defaults = cls._get_init_defaults()
         if init_defaults:
             dangerous_mutables = {k: v.default for k, v in init_defaults.items() if _is_dangerous_mutable(v)}
@@ -54,7 +54,7 @@ class AlgorithmMeta(type):
     def __call__(cls, *args, **kwargs):
         # Overwriting call overwrites the instance creation of the final class
         instance = super().__call__(*args, **kwargs)
-        assert isinstance(instance, _base._BaseSerializable)
+        assert isinstance(instance, _base._BaseTpcpObject)
         # Check if any of the initial values has a "default parameter flag".
         # If yes we replace it with a clone (in case of a tpcp object) or a deepcopy in case of other objects.
         for k, v in instance.get_params(deep=False).items():

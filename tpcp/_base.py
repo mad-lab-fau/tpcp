@@ -6,51 +6,15 @@ In basically all cases, you do not need them.
 from __future__ import annotations
 
 import inspect
-import json
-import warnings
 from collections import defaultdict
-from typing import Any, DefaultDict, Dict, List, Type, TypeVar, Union
+from typing import Any, DefaultDict, Dict, List, Type, TypeVar
 
-import numpy as np
-import pandas as pd
-from joblib import Memory
+import tpcp._utils._general as gen_utils
 
-from tpcp._utils._general import clone
-
-BaseType = TypeVar("BaseType", bound="_BaseSerializable")
+Algo = TypeVar("Algo", bound="_BaseTpcpObject")
 
 
-class _CustomEncoder(json.JSONEncoder):
-    def default(self, o):  # noqa: method-hidden
-        if isinstance(o, _BaseSerializable):
-            return o._to_json_dict()
-        if isinstance(o, np.generic):
-            return o.item()
-        if isinstance(o, np.ndarray):
-            return dict(_obj_type="Array", array=o.tolist())
-        if isinstance(o, pd.DataFrame):
-            return dict(_obj_type="DataFrame", df=o.to_json(orient="split"))
-        if isinstance(o, pd.Series):
-            return dict(_obj_type="Series", df=o.to_json(orient="split"))
-        if isinstance(o, Memory):
-            warnings.warn(
-                "Exporting `joblib.Memory` objects to json is not supported. "
-                "The value will be replaced by `None` and caching needs to be reactivated after loading the "
-                "object again. "
-                "This can be using `instance.set_params(memory=Memory(...))`"
-            )
-            return None
-        # Let the base class default method raise the TypeError
-        return json.JSONEncoder.default(self, o)
-
-
-def _custom_deserialize(json_obj):
-    if "_tpcp_obj" in json_obj:
-        return _BaseSerializable._find_subclass(json_obj["_tpcp_obj"])._from_json_dict(json_obj)
-    return json_obj
-
-
-class _BaseSerializable:
+class _BaseTpcpObject:
     @classmethod
     def _get_param_names(cls) -> List[str]:
         """Get parameter names for the estimator.
@@ -93,34 +57,20 @@ class _BaseSerializable:
         return defaults
 
     @classmethod
-    def _get_subclasses(cls: Type[BaseType]):
+    def _get_subclasses(cls: Type[Algo]):
         for subclass in cls.__subclasses__():
             yield from subclass._get_subclasses()
             yield subclass
 
     @classmethod
-    def _find_subclass(cls: Type[BaseType], name: str) -> Type[BaseType]:
-        for subclass in _BaseSerializable._get_subclasses():
+    def _find_subclass(cls: Type[Algo], name: str) -> Type[Algo]:
+        for subclass in _BaseTpcpObject._get_subclasses():
             if subclass.__name__ == name:
                 return subclass
         raise ValueError(f"No algorithm class with name {name} exists")
 
-    @classmethod
-    def _from_json_dict(cls: Type[BaseType], json_dict: Dict) -> BaseType:
-        params = json_dict["params"]
-        input_data = {k: params[k] for k in cls._get_param_names() if k in params}
-        instance = cls(**input_data)
-        return instance
-
     def _get_params_without_nested_class(self) -> Dict[str, Any]:
-        return {k: v for k, v in self.get_params().items() if not isinstance(v, _BaseSerializable)}
-
-    def _to_json_dict(self) -> Dict[str, Any]:
-        json_dict: Dict[str, Union[str, Dict[str, Any]]] = {
-            "_tpcp_obj": self.__class__.__name__,
-            "params": self.get_params(deep=False),
-        }
-        return json_dict
+        return {k: v for k, v in self.get_params().items() if not isinstance(v, _BaseTpcpObject)}
 
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
         """Get parameters for this algorithm.
@@ -142,13 +92,13 @@ class _BaseSerializable:
         out: Dict[str, Any] = {}
         for key in self._get_param_names():
             value = getattr(self, key)
-            if deep and isinstance(value, _BaseSerializable):
+            if deep and isinstance(value, _BaseTpcpObject):
                 deep_items = value.get_params(deep=True).items()
                 out.update((key + "__" + k, val) for k, val in deep_items)
             out[key] = value
         return out
 
-    def set_params(self: BaseType, **params: Any) -> BaseType:
+    def set_params(self: Algo, **params: Any) -> Algo:
         """Set the parameters of this Algorithm.
 
         To set parameters of nested objects use `nested_object_name__para_name=`.
@@ -175,39 +125,9 @@ class _BaseSerializable:
             valid_params[key].set_params(**sub_params)
         return self
 
-    def clone(self: BaseType) -> BaseType:
+    def clone(self: Algo) -> Algo:
         """Create a new instance of the class with all parameters copied over.
 
         This will create a new instance of the class itself and all nested objects
         """
-        return clone(self, safe=True)
-
-    def to_json(self) -> str:
-        """Export the current object parameters as json.
-
-        For details have a look at the this :ref:`example <algo_serialize>`.
-
-        You can use the `from_json` method of any tpcp algorithm to load the object again.
-
-        .. warning:: This will only export the Parameters of the instance, but **not** any results!
-
-        """
-        final_dict = self._to_json_dict()
-        return json.dumps(final_dict, indent=4, cls=_CustomEncoder)
-
-    @classmethod
-    def from_json(cls: Type[BaseType], json_str: str) -> BaseType:
-        """Import an tpcp object from its json representation.
-
-        For details have a look at the this :ref:`example <algo_serialize>`.
-
-        You can use the `to_json` method of a class to export it as a compatible json string.
-
-        Parameters
-        ----------
-        json_str
-            json formatted string
-
-        """
-        instance = json.loads(json_str, object_hook=_custom_deserialize)
-        return instance
+        return gen_utils.clone(self, safe=True)

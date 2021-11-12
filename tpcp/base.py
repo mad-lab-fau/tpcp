@@ -5,7 +5,7 @@ from __future__ import annotations
 import types
 from typing import TYPE_CHECKING, Any, Callable, Dict
 
-from tpcp._base import _BaseSerializable
+from tpcp._base import _BaseTpcpObject
 from tpcp._meta import AlgorithmMeta
 
 if TYPE_CHECKING:
@@ -13,11 +13,11 @@ if TYPE_CHECKING:
     from tpcp.pipelines import SimplePipeline
 
 
-class BaseSerializable(_BaseSerializable, metaclass=AlgorithmMeta):
+class BaseTpcpObject(_BaseTpcpObject, metaclass=AlgorithmMeta):
     """Baseclass for all tpcp objects."""
 
 
-class BaseAlgorithm(BaseSerializable):
+class BaseAlgorithm(BaseTpcpObject):
     """Base class for all algorithms.
 
     All type-specific algorithm classes should inherit from this class and need to

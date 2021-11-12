@@ -4,12 +4,12 @@ from typing import Iterator, List, Optional, Sequence, Tuple, TypeVar, Union
 import numpy as np
 import pandas as pd
 
-from tpcp.base import BaseSerializable
+from tpcp.base import BaseTpcpObject
 
 Self = TypeVar("Self", bound="Dataset")
 
 
-class Dataset(BaseSerializable):
+class Dataset(BaseTpcpObject):
     """Baseclass for tpcp Dataset objects.
 
     This class provides fundamental functionality like iteration, getting subsets and compatibility with sklearn's

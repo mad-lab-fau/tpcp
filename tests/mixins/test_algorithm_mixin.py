@@ -6,7 +6,7 @@ import pytest
 from numpydoc.docscrape import NumpyDocString
 
 from tests.conftest import compare_algo_objects
-from tpcp._base import BaseType
+from tpcp._base import Algo
 
 
 class TestAlgorithmMixin:
@@ -14,7 +14,7 @@ class TestAlgorithmMixin:
     __test__ = False
 
     @pytest.fixture()
-    def after_action_instance(self) -> BaseType:
+    def after_action_instance(self) -> Algo:
         pass
 
     def test_init(self):
@@ -83,15 +83,6 @@ class TestAlgorithmMixin:
 
         assert "an_invalid_name" in str(e)
         assert self.algorithm_class.__name__ in str(e)
-
-    def test_json_roundtrip(self, after_action_instance):
-        instance = after_action_instance.clone()
-
-        json_str = instance.to_json()
-
-        instance_from_json = self.algorithm_class.from_json(json_str)
-
-        compare_algo_objects(instance, instance_from_json)
 
     def test_hashing(self, after_action_instance):
         """This checks if caching with joblib will work as expected."""
