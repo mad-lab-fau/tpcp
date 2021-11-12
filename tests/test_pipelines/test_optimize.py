@@ -18,9 +18,9 @@ from tests.test_pipelines.conftest import (
     dummy_multi_score_func,
     dummy_single_score_func,
 )
-from tpcp._base import BaseOptimize
 from tpcp._utils._exceptions import PotentialUserErrorWarning
 from tpcp._utils._score import _optimize_and_score
+from tpcp.base import BaseOptimize
 from tpcp.optimize import GridSearch, Optimize
 from tpcp.optimize._optimize import GridSearchCV
 from tpcp.validation import Scorer

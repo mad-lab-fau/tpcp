@@ -1,21 +1,21 @@
-"""Base classes for all algorithms and pipelines."""
+"""Private base classes for tpcp.
+
+These classes are in a separate module to avoid circular imports.
+In basically all cases, you do not need them.
+"""
 from __future__ import annotations
 
-import copy
 import inspect
 import json
-import types
 import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable, DefaultDict, Dict, List, Type, TypeVar, Union
+from typing import Any, DefaultDict, Dict, List, Type, TypeVar, Union
 
 import numpy as np
 import pandas as pd
 from joblib import Memory
 
-if TYPE_CHECKING:
-    from tpcp.dataset import Dataset
-    from tpcp.pipelines import SimplePipeline
+from tpcp._utils._general import clone
 
 BaseType = TypeVar("BaseType", bound="_BaseSerializable")
 
@@ -68,24 +68,29 @@ class _BaseSerializable:
             List of parameter names of the algorithm
 
         """
-        # fetch the constructor or the original constructor before deprecation wrapping if any
-        init = cls.__init__
-        if init is object.__init__:
-            # No explicit constructor to introspect
-            return []
-
-        # introspect the constructor arguments to find the model parameters to represent
-        init_signature = inspect.signature(init)
-        # Consider the constructor parameters excluding 'self'
-        parameters = [p for p in init_signature.parameters.values() if p.name != "self" and p.kind != p.VAR_KEYWORD]
+        parameters = list(cls._get_init_defaults().values())
         for p in parameters:
             if p.kind == p.VAR_POSITIONAL:
                 raise RuntimeError(
                     "tpcp-algorithms and pipeline should always specify their parameters in the signature of their "
-                    f"__init__ (no varargs). {cls} with constructor {init_signature} doesn't follow this convention."
+                    f"__init__ (no varargs). {cls} doesn't follow this convention."
                 )
         # Extract and sort argument names excluding 'self'
         return sorted([p.name for p in parameters])
+
+    @classmethod
+    def _get_init_defaults(cls) -> Dict[str, inspect.Parameter]:
+        # fetch the constructor or the original constructor before deprecation wrapping if any
+        init = cls.__init__
+        if init is object.__init__:
+            # No explicit constructor to introspect
+            return {}
+
+        # introspect the constructor arguments to find the model parameters to represent
+        init_signature = inspect.signature(init)
+        # Consider the constructor parameters excluding 'self'
+        defaults = {k: p for k, p in init_signature.parameters.items() if p.name != "self" and p.kind != p.VAR_KEYWORD}
+        return defaults
 
     @classmethod
     def _get_subclasses(cls: Type[BaseType]):
@@ -170,34 +175,12 @@ class _BaseSerializable:
             valid_params[key].set_params(**sub_params)
         return self
 
-    def clone(self: BaseType, deepcopy=True) -> BaseType:
+    def clone(self: BaseType) -> BaseType:
         """Create a new instance of the class with all parameters copied over.
 
         This will create a new instance of the class itself and all nested objects
-
-        Parameters
-        ----------
-        deepcopy
-            If True, all paras that are not nested pipelines or algorithms (i.e. no childs of `_BaseSerializable`) are
-            deepcopied.
-            This ensures that new instances of mutable objects are created and you do not accidentally mutate them on
-            the cloned structure.
-            Disable deepcopy only, if you have a good understanding of the implications and can ensure that you will
-            never use mutable objects in the parameters of a Algorithm/pipeline instance.
-
         """
-        # TODO: Should we really deepcopy all objects or should there be whitelist of types that should not be copied
-        #  for performance/memory reasons?
-        #  Having an additonal isinstance check might create overhead for small objects, but the memory savings might
-        #  be worth it for large objects.
-        #  But, in general it is unlikely that large objects are stored in immutable data constructs as parameters.
-        cloned_dict = self.get_params(deep=False)
-        for k, v in cloned_dict.items():
-            if isinstance(v, _BaseSerializable):
-                cloned_dict[k] = v.clone()
-            elif deepcopy is True:
-                cloned_dict[k] = copy.deepcopy(v)
-        return self.__class__(**cloned_dict)
+        return clone(self, safe=True)
 
     def to_json(self) -> str:
         """Export the current object parameters as json.
@@ -228,117 +211,3 @@ class _BaseSerializable:
         """
         instance = json.loads(json_str, object_hook=_custom_deserialize)
         return instance
-
-
-class BaseAlgorithm(_BaseSerializable):
-    """Base class for all algorithms.
-
-    All type-specific algorithm classes should inherit from this class and need to
-
-    1. overwrite `_action_method` with the name of the actual action method of this class type
-    2. implement a stub for the action method
-
-    Attributes
-    ----------
-    _action_method
-        The name of the action method used by the Childclass
-
-    """
-
-    _action_method: str
-
-    @property
-    def _action_is_applied(self) -> bool:
-        """Check if the action method was already called/results were generated."""
-        if len(self.get_attributes()) == 0:
-            return False
-        return True
-
-    def _get_action_method(self) -> Callable:
-        """Get the action method as callable.
-
-        This is intended to be used by wrappers, that do not know the Type of an algorithm
-        """
-        return getattr(self, self._action_method)
-
-    def get_other_params(self) -> Dict[str, Any]:
-        """Get all "Other Parameters" of the Algorithm.
-
-        "Other Parameters" are all parameters set outside of the `__init__` that are not considered results.
-        This usually includes the "data" and all other parameters passed to the action method.
-
-        Returns
-        -------
-        params
-            Parameter names mapped to their values.
-
-        """
-        params = self.get_params()
-        attrs = {
-            v: getattr(self, v) for v in vars(self) if not v.endswith("_") and not v.startswith("_") and v not in params
-        }
-        return attrs
-
-    def get_attributes(self) -> Dict[str, Any]:
-        """Get all Attributes of the Algorithm.
-
-        "Attributes" are all values considered results of the algorithm.
-        They are indicated by a trailing "_" in their name.
-        The values are only populated after the action method of the algorithm was called.
-
-        Returns
-        -------
-        params
-            Parameter names mapped to their values.
-
-        Raises
-        ------
-        AttributeError
-            If one or more of the attributes are not retrievable from the instance.
-            This usually indicates that the action method was not called yet.
-
-        """
-        all_attributes = dir(self)
-        attrs = {
-            v: getattr(self, v)
-            for v in all_attributes
-            if v.endswith("_") and not v.startswith("__") and not isinstance(getattr(self, v), types.MethodType)
-        }
-        return attrs
-
-
-class BaseOptimize(BaseAlgorithm):
-    """Base class for all optimizer."""
-
-    pipeline: SimplePipeline
-
-    dataset: Dataset
-
-    optimized_pipeline_: SimplePipeline
-
-    _action_method = "optimize"
-
-    def optimize(self, dataset: Dataset, **optimize_params):
-        """Apply some form of optimization on the the input parameters of the pipeline."""
-        raise NotImplementedError()
-
-    def run(self, datapoint: Dataset):
-        """Run the optimized pipeline.
-
-        This is a wrapper to contain API compatibility with `SimplePipeline`.
-        """
-        return self.optimized_pipeline_.run(datapoint)
-
-    def safe_run(self, datapoint: Dataset):
-        """Call the safe_run method of the optimized pipeline.
-
-        This is a wrapper to contain API compatibility with `SimplePipeline`.
-        """
-        return self.optimized_pipeline_.safe_run(datapoint)
-
-    def score(self, datapoint: Dataset):
-        """Execute score on the optimized pipeline.
-
-        This is a wrapper to contain API compatibility with `SimplePipeline`.
-        """
-        return self.optimized_pipeline_.score(datapoint)

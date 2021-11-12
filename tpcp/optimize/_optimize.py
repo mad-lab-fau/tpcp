@@ -15,7 +15,6 @@ from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
 
-from tpcp._base import BaseOptimize
 from tpcp._utils._exceptions import PotentialUserErrorWarning
 from tpcp._utils._general import (
     _aggregate_final_results,
@@ -24,6 +23,7 @@ from tpcp._utils._general import (
     _split_hyper_and_pure_parameters,
 )
 from tpcp._utils._score import _optimize_and_score, _score
+from tpcp.base import BaseOptimize
 from tpcp.dataset import Dataset
 from tpcp.pipelines import OptimizablePipeline, SimplePipeline
 from tpcp.validation import Scorer

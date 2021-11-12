@@ -1,8 +1,8 @@
 """Base Classes for custom pipelines."""
 from typing import Dict, TypeVar, Union
 
-from tpcp._base import BaseAlgorithm
 from tpcp._utils._general import _check_safe_run
+from tpcp.base import BaseAlgorithm
 from tpcp.dataset import Dataset
 
 Self = TypeVar("Self", bound="SimplePipeline")

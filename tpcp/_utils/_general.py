@@ -1,16 +1,22 @@
 """Some helper to work with the format the results of GridSearches and CVs."""
 from __future__ import annotations
 
+import copy
 import numbers
-from copy import copy
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, TypeVar, Union
 
 import joblib
 import numpy as np
-from sklearn import clone
+
+import tpcp._base
 
 if TYPE_CHECKING:
+    from tpcp._base import BaseSerializable
     from tpcp.pipelines import SimplePipeline
+
+Algo = TypeVar("Algo", bound="BaseSerializable")
+_EMPTY = object()
+_DEFAULT_PARA_NAME = "__TPCP_DEFAULT"
 
 
 def _aggregate_final_results(results: List) -> Dict:
@@ -99,7 +105,7 @@ def _split_hyper_and_pure_parameters(
         return [(c, None) for c in param_dict]
     split_param_dict = []
     for c in param_dict:
-        c = copy(c)  # Otherwise we remove elements from the actual parameter list that is passed as input.
+        c = copy.copy(c)  # Otherwise we remove elements from the actual parameter list that is passed as input.
         tmp = {}
         for k in list(c.keys()):
             if k in pure_parameters:
@@ -136,3 +142,84 @@ def _check_safe_run(pipeline: SimplePipeline, *args, **kwargs):
             "names of result attributes have a trailing `_` to mark them as such."
         )
     return output
+
+
+def clone(
+    algorithm: Union[BaseSerializable, List[BaseSerializable], Set[BaseSerializable], Tuple[BaseSerializable]],
+    *,
+    safe: bool = True,
+):
+    """Construct a new algorithm object with the same parameters.
+
+    This is a modified version from sklearn and the original was published under a BSD-3 license and the original file
+    can be found here: https://github.com/scikit-learn/scikit-learn/blob/0d378913b/sklearn/base.py#L31
+
+    The method creates a copy of tpcp algorithms and pipelines, without any results attached.
+    I.e. it is equivalent to creating a new instance with the same parameter.
+    For all objects that are not tpcp objects (or lists of them), a deepcopy is created.
+
+    .. warning :: This function will not clone sklearn models as expected!
+                  `sklearn.clone` will remove the trained model from sklearn object by creating a new instance.
+                  This clone method, will deepcopy sklearn models.
+                  This means fitted models will be copied and are still available afterwards.
+                  For more information have a look at the documenation about "inputs and results" in tpcp.
+                  TODO: Link
+
+    Parameters
+    ----------
+    algorithm : {list, tuple, set} of algorithm instance or a single algorithm instance
+        The algorithm or group of algorithms to be cloned.
+    safe : bool, default=False
+        If safe is False, clone will fall back to a deep copy on objects
+        that are not algorithms.
+
+    """
+    if algorithm is _EMPTY:
+        return _EMPTY
+    # XXX: not handling dictionaries
+    if isinstance(algorithm, (list, tuple, set, frozenset)):
+        return type(algorithm)([clone(a, safe=safe) for a in algorithm])  # noqa: to-many-function-args
+    # Compared to sklearn, we check specifically for _BaseSerializable and not just if `get_params` is defined on the
+    # object.
+    # Due to the way algorithms/pipelines in tpcp work, they need to inherit from _BaseSerializable.
+    # Therefore, we check explicitly for that, as we do not want to accidentally treat an sklearn algo (or similar) as
+    # algorithm
+    if not isinstance(algorithm, tpcp.base.BaseSerializable):
+        if not safe:
+            return copy.deepcopy(algorithm)
+        raise TypeError(
+            f"Cannot clone object '{repr(algorithm)}' (type {type(algorithm)}): "
+            "it does not seem to be a compatible algorithm class algorithm as it does not inherit from "
+            "_BaseSerializable or BaseAlgorithm method."
+        )
+
+    klass = algorithm.__class__
+    new_object_params = algorithm.get_params(deep=False)
+    for name, param in new_object_params.items():
+        new_object_params[name] = clone(param, safe=False)
+    new_object = klass(**new_object_params)
+    params_set = new_object.get_params(deep=False)
+
+    # quick sanity check of the parameters of the clone
+    for name in new_object_params:
+        param1 = new_object_params[name]
+        param2 = params_set[name]
+        if param1 is not param2:
+            raise RuntimeError(
+                f"Cannot clone object {algorithm}, as the constructor either does not set or modifies parameter {name}"
+            )
+    return new_object
+
+
+def default(algo: Algo) -> Algo:
+    """Wrap nested algorithm arguments to mark them as default value.
+
+    This is required, as algorithms by default are mutable.
+    Hence, when one algo instance is used as default parameter for another algo instance, we have a mutable default,
+    which is bad.
+
+    We handle that by cloning default values on init.
+    To mark a parameter to be cloned on init, it needs to be wrapped with this function.
+    """
+    setattr(algo, _DEFAULT_PARA_NAME, True)
+    return algo
