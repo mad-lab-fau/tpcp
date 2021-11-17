@@ -11,8 +11,8 @@ import numpy as np
 import tpcp._base
 
 if TYPE_CHECKING:
-    from tpcp.base import BaseTpcpObject
     from tpcp._base import Algo
+    from tpcp.base import BaseTpcpObject
     from tpcp.pipelines import SimplePipeline
 
 _EMPTY = object()

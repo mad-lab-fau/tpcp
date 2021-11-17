@@ -3,6 +3,7 @@ from inspect import Parameter
 from typing import Tuple
 
 from tpcp import _base
+from tpcp._utils._exceptions import MutableDefaultsError
 from tpcp._utils._general import _DEFAULT_PARA_NAME, clone
 
 
@@ -38,7 +39,7 @@ class AlgorithmMeta(type):
         if init_defaults:
             dangerous_mutables = {k: v.default for k, v in init_defaults.items() if _is_dangerous_mutable(v)}
             if len(dangerous_mutables) > 0:
-                raise ValueError(
+                raise MutableDefaultsError(
                     f"The class {name} contains mutable objects as default values ({dangerous_mutables}). "
                     "This can lead to unexpected and unpleasant issues! "
                     "To solve this issue wrap your mutable default arguments explicitly with `default` "

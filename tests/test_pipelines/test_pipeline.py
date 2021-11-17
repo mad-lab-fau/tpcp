@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from tests.test_pipelines.conftest import DummyDataset, DummyPipeline
-from tpcp import df
+from tpcp import mdf
 from tpcp.dataset import Dataset
 from tpcp.pipelines import SimplePipeline
 
@@ -19,7 +19,7 @@ class PipelineInputModify(SimplePipeline):
 
 
 class PipelineInputModifyNested(SimplePipeline):
-    def __init__(self, pipe=df(PipelineInputModify())):
+    def __init__(self, pipe=mdf(PipelineInputModify())):
         self.pipe = pipe
 
     def run(self, datapoint: Dataset):

@@ -5,7 +5,9 @@ from typing import Any, Dict, Tuple
 import joblib
 import pytest
 
-from tpcp import BaseAlgorithm
+from tpcp import BaseAlgorithm, default, mdf
+from tpcp._utils._exceptions import MutableDefaultsError
+from tpcp._utils._general import _DEFAULT_PARA_NAME
 
 
 def _init_getter():
@@ -24,12 +26,18 @@ def create_test_class(action_method_name, params=None, private_params=None, acti
     user_set_params = {**params, **private_params}
     if action_method:
         class_dict = {**class_dict, action_method_name: action_method}
+
+    # We create the class once, then create a proper signature and then create the class again to trigger the
+    # signature related checks of the metaclass
     test_class = type("TestClass", (BaseAlgorithm,), class_dict)
 
     # Set the signature to conform to the expected conventions
     sig = signature(test_class.__init__)
-    sig = sig.replace(parameters=(Parameter(k, Parameter.KEYWORD_ONLY) for k in params.keys()))
+    sig = sig.replace(parameters=(Parameter(k, Parameter.KEYWORD_ONLY, default=v) for k, v in params.items()))
     test_class.__init__.__signature__ = sig
+    class_dict = {**class_dict, "__init__": test_class.__init__}
+    # Recreate the class with the correct init
+    test_class = type("TestClass", (BaseAlgorithm,), class_dict)
 
     test_instance = test_class(**user_set_params)
 
@@ -148,7 +156,7 @@ def test_action_is_applied(example_test_class_after_action):
 def test_nested_get_params():
     nested_instance = create_test_class("nested", params={"nested1": "n1", "nested2": "n2"})
     top_level_params = {"test1": "t1"}
-    test_instance = create_test_class("test", params={**top_level_params, "nested_class": nested_instance})
+    test_instance = create_test_class("test", params={**top_level_params, "nested_class": default(nested_instance)})
 
     params = test_instance.get_params()
 
@@ -164,7 +172,9 @@ def test_nested_get_params():
 def test_nested_set_params():
     nested_instance = create_test_class("nested", params={"nested1": "n1", "nested2": "n2"})
     top_level_params = {"test1": "t1"}
-    test_instance = create_test_class("test", params={**top_level_params, "nested_class": nested_instance})
+    test_instance = create_test_class("test", params={**top_level_params, "nested_class": default(nested_instance)})
+    # We get the actual object here again, because the meta class has created a copy of the nested instance.
+    nested_instance = test_instance.nested_class
     new_params_top_level = {"test1": "new_t1"}
     new_params_nested = {"nested2": "new_n2"}
     test_instance.set_params(**new_params_top_level, **{"nested_class__" + k: v for k, v in new_params_nested.items()})
@@ -182,7 +192,7 @@ def test_nested_set_params():
 def test_nested_clone():
     nested_instance = create_test_class("nested", params={"nested1": "n1", "nested2": "n2"})
     top_level_params = {"test1": "t1"}
-    test_instance = create_test_class("test", params={**top_level_params, "nested_class": nested_instance})
+    test_instance = create_test_class("test", params={**top_level_params, "nested_class": default(nested_instance)})
 
     cloned_instance = test_instance.clone()
 
@@ -215,3 +225,35 @@ def test_clone_mutable():
     assert test_instance.mutable is mutable
     assert cloned_instance.mutable is not mutable
     assert joblib.hash(cloned_instance.mutable) == joblib.hash(test_instance.mutable) == joblib.hash(mutable)
+
+
+def test_mutable_default_nested_objects_error():
+    nested_instance = create_test_class("nested", params={"nested1": "n1", "nested2": "n2"})
+
+    with pytest.raises(MutableDefaultsError):
+        create_test_class("mutable", params={"normal": "n1", "mutable": nested_instance})
+
+    # When wrapped in default, no error is raised
+    create_test_class("mutable", params={"normal": "n1", "mutable": default(nested_instance)})
+
+
+@pytest.mark.parametrize("wrapper", (mdf, default))
+def test_default_wrapper(wrapper, example_test_class_initialised):
+    wrapped = wrapper(example_test_class_initialised[0])
+    assert getattr(wrapped, _DEFAULT_PARA_NAME) is True
+
+
+def test_nested_mutable_algorithm_copy():
+    """When a object is wrapped with default, it will be copied on init."""
+    nested_params = {"nested1": "n1", "nested2": "n2"}
+    nested_instance = create_test_class("nested", params=nested_params)
+
+    test_instance = create_test_class("mutable", params={"normal": "n1", "mutable": default(nested_instance)})
+
+    assert nested_instance is not test_instance.mutable
+    assert hasattr(test_instance.mutable, _DEFAULT_PARA_NAME) is False
+    assert (
+        joblib.hash(test_instance.mutable.get_params())
+        == joblib.hash(nested_instance.get_params())
+        == joblib.hash(nested_params)
+    )
