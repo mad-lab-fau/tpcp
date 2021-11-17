@@ -209,16 +209,9 @@ def test_clone_mutable():
     # deep cloning (the default)
     cloned_instance = test_instance.clone()
 
-    # Chek that the object is different, but the content is still the same
+    # Check that the object is different, but the content is still the same
     assert cloned_instance is not test_instance
     assert cloned_instance.mutable is not test_instance.mutable
     assert test_instance.mutable is mutable
     assert cloned_instance.mutable is not mutable
     assert joblib.hash(cloned_instance.mutable) == joblib.hash(test_instance.mutable) == joblib.hash(mutable)
-
-    # without deep cloning
-    cloned_instance = test_instance.clone(deepcopy=False)
-
-    # Mutable Objects should still be the same
-    assert cloned_instance is not test_instance
-    assert cloned_instance.mutable is test_instance.mutable
