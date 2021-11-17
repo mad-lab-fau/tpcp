@@ -3,8 +3,8 @@ from inspect import Parameter
 from typing import Tuple
 
 from tpcp import _base
-from tpcp._utils._exceptions import MutableDefaultsError
 from tpcp._utils._general import _DEFAULT_PARA_NAME, clone
+from tpcp.exceptions import MutableDefaultsError
 
 
 def _get_dangerous_mutable_types() -> Tuple[type]:

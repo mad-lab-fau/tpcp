@@ -6,8 +6,8 @@ import joblib
 import pytest
 
 from tpcp import BaseAlgorithm, default, mdf
-from tpcp._utils._exceptions import MutableDefaultsError
 from tpcp._utils._general import _DEFAULT_PARA_NAME
+from tpcp.exceptions import MutableDefaultsError
 
 
 def _init_getter():

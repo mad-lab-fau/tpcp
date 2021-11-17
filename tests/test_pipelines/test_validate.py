@@ -11,6 +11,7 @@ from tpcp.validation import cross_validate
 
 
 class TestCrossValidate:
+    @pytest.mark.filterwarnings("ignore::tpcp.exceptions.PotentialUserErrorWarning")
     def test_optimize_called(self):
         """Test that optimize of the pipeline is called correctly."""
         ds = DummyDataset()

@@ -10,6 +10,7 @@ import numpy as np
 
 from tpcp._utils._score import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SCORE_TYPE, _SINGLE_SCORE_TYPE
 from tpcp.dataset import Dataset
+from tpcp.exceptions import ScorerFailed
 
 if TYPE_CHECKING:
     from tpcp.pipelines import SimplePipeline
@@ -67,7 +68,7 @@ class Scorer:
                     f"Scoring failed for data point: {d.groups}. "
                     f"The score of this data point will be set to {error_score}. Details: \n"
                     f"{format_exc()}",
-                    UserWarning,
+                    ScorerFailed,
                 )
             # We check that the scorer returns only numeric values.
             _validate_score_return_val(score)

@@ -95,6 +95,7 @@ class TestScorer:
             assert agg == np.mean(expected)
 
     @pytest.mark.parametrize("err_val", (np.nan, 1))
+    @pytest.mark.filterwarnings("ignore::tpcp.exceptions.ScorerFailed")
     def test_scoring_return_err_val_multi(self, err_val):
         scorer = Scorer(dummy_error_score_func_multi)
         pipe = DummyPipeline()
