@@ -17,6 +17,7 @@ joblib = "^1.1.0"
 scikit-learn = "^1"
 numpy = "^1"
 pandas = "^1"
+tqdm = "^4.62.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.1"

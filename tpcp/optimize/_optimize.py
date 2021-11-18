@@ -14,6 +14,7 @@ from joblib import Memory, Parallel, delayed
 from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
+from tqdm.auto import tqdm
 
 from tpcp._utils._general import (
     _aggregate_final_results,
@@ -21,6 +22,7 @@ from tpcp._utils._general import (
     _prefix_para_dict,
     _split_hyper_and_pure_parameters,
 )
+from tpcp._utils._multiprocess import init_progressbar
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.base import BaseOptimize
 from tpcp.dataset import Dataset
@@ -318,7 +320,6 @@ class GridSearch(BaseOptimize):
         self.dataset = dataset
         scoring = _validate_scorer(self.scoring, self.pipeline)
 
-        parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
         # We use a similar structure as sklearns GridSearchCV here, but instead of calling something equivalent to
         # `fit_score`, we call `score`, which just applies and scores the pipeline on the entirety of our dataset as
         # we do not need a "train" step.
@@ -329,21 +330,23 @@ class GridSearch(BaseOptimize):
         # itself.
         # If not explicitly changed the scorer is an instance of `Scorer` that wraps the actual `scoring`
         # function provided by the user.
-        with parallel:
-            # Evaluate each parameter combination
-            results = parallel(
-                delayed(_score)(
-                    self.pipeline.clone(),
-                    dataset,
-                    scoring,
-                    paras,
-                    return_parameters=True,
-                    return_data_labels=True,
-                    return_times=True,
-                    error_score=self.error_score,
+        with init_progressbar(True, tqdm(desc="Split-Para Combos"), total=len(self.parameter_grid)):
+            parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
+            with parallel:
+                # Evaluate each parameter combination
+                results = parallel(
+                    delayed(_score)(
+                        self.pipeline.clone(),
+                        dataset,
+                        scoring,
+                        paras,
+                        return_parameters=True,
+                        return_data_labels=True,
+                        return_times=True,
+                        error_score=self.error_score,
+                    )
+                    for paras in self.parameter_grid
                 )
-                for paras in self.parameter_grid
-            )
         # We check here if all results are dicts. We only check the dtype of the first value, as the scorer should
         # have handled issues with non uniform cases already.
         first_test_score = results[0]["scores"]
@@ -626,32 +629,31 @@ class GridSearchCV(BaseOptimize):
             tmp_dir_context = TemporaryDirectory("joblib_tpcp_cache")
         with tmp_dir_context as cachedir:
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None
-
-            parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
-            # We use a similar structure to sklearns GridSearchCv here (see GridSearch for more info).
-            with parallel:
-                # Evaluate each parameter combination
-                out = parallel(
-                    delayed(_optimize_and_score)(
-                        optimizer.clone(),
-                        dataset,
-                        scoring,
-                        train,
-                        test,
-                        optimize_params=optimize_params,
-                        hyperparameters=_prefix_para_dict(hyper_paras, parameter_prefix),
-                        pure_parameters=_prefix_para_dict(pure_paras, parameter_prefix),
-                        return_train_score=self.return_train_score,
-                        return_parameters=False,
-                        return_data_labels=True,
-                        return_times=True,
-                        error_score=self.error_score,
-                        memory=tmp_cache,
+            combinations = list(product(enumerate(split_parameters), enumerate(cv.split(dataset, groups=groups))))
+            with init_progressbar(True, tqdm(desc="Split-Para Combos"), total=len(combinations)):
+                parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
+                # We use a similar structure to sklearns GridSearchCv here (see GridSearch for more info).
+                with parallel:
+                    # Evaluate each parameter combination
+                    out = parallel(
+                        delayed(_optimize_and_score)(
+                            optimizer.clone(),
+                            dataset,
+                            scoring,
+                            train,
+                            test,
+                            optimize_params=optimize_params,
+                            hyperparameters=_prefix_para_dict(hyper_paras, parameter_prefix),
+                            pure_parameters=_prefix_para_dict(pure_paras, parameter_prefix),
+                            return_train_score=self.return_train_score,
+                            return_parameters=False,
+                            return_data_labels=True,
+                            return_times=True,
+                            error_score=self.error_score,
+                            memory=tmp_cache,
+                        )
+                        for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in combinations
                     )
-                    for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in product(
-                        enumerate(split_parameters), enumerate(cv.split(dataset, groups=groups))
-                    )
-                )
         results = self._format_results(parameters, n_splits, out)
         self.cv_results_ = results
 
