@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.test_pipelines.conftest import DummyDataset, DummyPipeline
+from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline
 from tpcp import mdf
 from tpcp.dataset import Dataset
 from tpcp.pipelines import SimplePipeline
@@ -45,7 +45,7 @@ class TestSafeRun:
         assert "Running the pipeline did modify the parameters of the pipeline." in str(e)
 
     def test_no_self_return(self):
-        pipe = DummyPipeline()
+        pipe = DummyOptimizablePipeline()
         pipe.run = lambda d: "some Value"
         with pytest.raises(ValueError) as e:
             pipe.safe_run(DummyDataset()[0])
@@ -59,11 +59,11 @@ class TestSafeRun:
         assert "Running the pipeline did not set any results on the output." in str(e)
 
     def test_output(self):
-        pipe = DummyPipeline()
+        pipe = DummyOptimizablePipeline()
         pipe.result_ = "some result"
         ds = DummyDataset()[0]
-        with patch.object(DummyPipeline, "run", return_value=pipe) as mock:
-            result = DummyPipeline().safe_run(ds)
+        with patch.object(DummyOptimizablePipeline, "run", return_value=pipe) as mock:
+            result = DummyOptimizablePipeline().safe_run(ds)
 
         mock.assert_called_with(ds)
         assert id(result) == id(pipe)

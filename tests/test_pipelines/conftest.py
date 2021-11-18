@@ -1,10 +1,17 @@
 import pandas as pd
 
 from tpcp.dataset import Dataset
-from tpcp.pipelines import OptimizablePipeline
+from tpcp.pipelines import OptimizablePipeline, SimplePipeline
 
 
-class DummyPipeline(OptimizablePipeline):
+class DummyPipeline(SimplePipeline):
+    def __init__(self, para_1=None, para_2=None, optimized=False):
+        self.para_1 = para_1
+        self.para_2 = para_2
+        self.optimized = optimized
+
+
+class DummyOptimizablePipeline(OptimizablePipeline):
     def __init__(self, para_1=None, para_2=None, optimized=False):
         self.para_1 = para_1
         self.para_2 = para_2

@@ -30,6 +30,69 @@ from tpcp.validation import Scorer
 from tpcp.validation._scorer import _ERROR_SCORE_TYPE, _validate_scorer
 
 
+class DummyOptimize(BaseOptimize):
+    """Provide API compatibility for SimplePipelines in optimize wrappers.
+
+    This is a simple dummy Optimizer, that will **not** optimize anything, but just provide the correct api so that
+    pipelines that do not have the possibility to be optimizes can be passed to wrappers like `cross_validate`.
+
+
+    Parameters
+    ----------
+    pipeline
+        The pipeline to wrap.
+        It will not optimized in any way, but simple copied to `self.optimized_pipeline_` if optimize is called.
+
+    Other Parameters
+    ----------------
+    dataset
+        The dataset used for optimization.
+        As no optimization is performed, this will be ignored.
+
+    Attributes
+    ----------
+    optimized_pipeline_
+        The optimized version of the pipeline.
+        In case of this class, this is just a unmodified clone of the input pipeline.
+
+    """
+
+    pipeline: SimplePipeline
+
+    optimized_pipeline_: SimplePipeline
+
+    def __init__(self, pipeline: SimplePipeline):
+        self.pipeline = pipeline
+
+    def optimize(self, dataset: Dataset, **optimize_params):
+        """Run the "dummy" optimization.
+
+        Parameters
+        ----------
+        dataset
+            The parameter is ignored, as no real optimization is performed
+        optimize_params
+            The parameter is ignored, as no real optimization is performed
+
+        Returns
+        -------
+        self
+            The class instance with all result attributes populated
+
+        """
+        self.dataset = dataset
+        if hasattr(self.pipeline, "self_optimize"):
+            warnings.warn(
+                "You are using `DummyOptimize` with a pipeline that implements `self_optimize` and hence indicates, "
+                "that the pipeline can be optimized. "
+                "`DummmyOptimize` does never call this method and skips any optimization steps! "
+                "Use `Optimize` if you actually want to optimize your pipeline.",
+                PotentialUserErrorWarning,
+            )
+        self.optimized_pipeline_ = self.pipeline.clone()
+        return self
+
+
 class Optimize(BaseOptimize):
     """Run a generic self-optimization on the pipeline.
 

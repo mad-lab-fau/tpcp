@@ -5,7 +5,7 @@ import pytest
 
 from tests.test_pipelines.conftest import (
     DummyDataset,
-    DummyPipeline,
+    DummyOptimizablePipeline,
     dummy_error_score_func,
     dummy_error_score_func_multi,
     dummy_multi_score_func,
@@ -26,13 +26,13 @@ class TestScorerCalls:
         """Test that the score func is called once per dataset"""
         mock_score_func = Mock(return_value=1)
         scorer = Scorer(mock_score_func)
-        pipe = DummyPipeline()
+        pipe = DummyOptimizablePipeline()
         scorer(pipeline=pipe, data=DummyDataset(), error_score=np.nan)
 
         assert mock_score_func.call_count == len(DummyDataset())
         for call, d in zip(mock_score_func.call_args_list, DummyDataset()):
             assert call[0][1].groups == d.groups
-            assert isinstance(call[0][0], DummyPipeline)
+            assert isinstance(call[0][0], DummyOptimizablePipeline)
             # Check that the pipeline was cloned before calling
             assert id(pipe) != id(call[0][0])
 
@@ -40,7 +40,7 @@ class TestScorerCalls:
 class TestScorer:
     def test_score_return_val_single_score(self):
         scorer = Scorer(dummy_single_score_func)
-        pipe = DummyPipeline()
+        pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         agg, single = scorer(pipe, data, np.nan)
         assert len(single) == len(data)
@@ -50,7 +50,7 @@ class TestScorer:
 
     def test_score_return_val_multi_score(self):
         scorer = Scorer(dummy_multi_score_func)
-        pipe = DummyPipeline()
+        pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         agg, single = scorer(pipe, data, np.nan)
         assert isinstance(single, dict)
@@ -71,7 +71,7 @@ class TestScorer:
     @pytest.mark.parametrize("err_val", (np.nan, 1))
     def test_scoring_return_err_val(self, err_val):
         scorer = Scorer(dummy_error_score_func)
-        pipe = DummyPipeline()
+        pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         with pytest.warns(UserWarning) as ws:
             agg, single = scorer(pipe, data, err_val)
@@ -98,7 +98,7 @@ class TestScorer:
     @pytest.mark.filterwarnings("ignore::tpcp.exceptions.ScorerFailed")
     def test_scoring_return_err_val_multi(self, err_val):
         scorer = Scorer(dummy_error_score_func_multi)
-        pipe = DummyPipeline()
+        pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         agg, single = scorer(pipe, data, err_val)
 
@@ -119,7 +119,7 @@ class TestScorer:
 
     def test_err_val_raises(self):
         scorer = Scorer(dummy_error_score_func)
-        pipe = DummyPipeline()
+        pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         with pytest.raises(ValueError) as e:
             scorer(pipe, data, "raise")
@@ -131,7 +131,7 @@ class TestScorer:
     def test_bad_scorer(self, error_score, bad_scorer):
         """Check that we catch cases where the scoring func returns invalid values independent of the error_score val"""
         scorer = Scorer(bad_scorer)
-        pipe = DummyPipeline()
+        pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         with pytest.raises(ValueError) as e:
             scorer(pipe, data, error_score)
@@ -156,7 +156,7 @@ class TestScorerUtils:
         ),
     )
     def test_validate_scorer(self, scoring, expected):
-        pipe = DummyPipeline()
+        pipe = DummyOptimizablePipeline()
         pipe.score = lambda x: x
         out = _validate_scorer(scoring, pipe)
         assert isinstance(out, type(expected))
@@ -164,10 +164,10 @@ class TestScorerUtils:
 
     def test_score_not_implemented(self):
         with pytest.raises(NotImplementedError):
-            _validate_scorer(None, DummyPipeline())
+            _validate_scorer(None, DummyOptimizablePipeline())
 
     def test_invalid_input(self):
-        pipe = DummyPipeline()
+        pipe = DummyOptimizablePipeline()
         pipe.score = lambda x: x
         with pytest.raises(ValueError) as e:
             _validate_scorer("something invalid", pipe)

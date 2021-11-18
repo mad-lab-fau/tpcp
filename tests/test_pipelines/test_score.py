@@ -3,7 +3,7 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from tests.test_pipelines.conftest import DummyDataset, DummyPipeline
+from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline
 from tpcp._utils._score import _score
 
 
@@ -13,7 +13,7 @@ class TestScoreMock:
         dataset = DummyDataset()
         # We mock the scorer and just return the dataset itself and 1 as agg score
         scorer = Mock(return_value=(1, np.asarray(dataset.groups)))
-        pipe = DummyPipeline()
+        pipe = DummyOptimizablePipeline()
 
         self.dummy_paras = (pipe, dataset, scorer)
 
@@ -41,7 +41,7 @@ class TestScoreMock:
         assert id(scorer.call_args[0][0]) == id(self.dummy_paras[0])
 
     def test_parameter_clone(self):
-        nested_obj = DummyPipeline()
+        nested_obj = DummyOptimizablePipeline()
         paras = {"para_1": "para_1_val", "para_2": nested_obj}
         _score(*self.dummy_paras, parameters=paras)
         scorer = self.dummy_paras[2]

@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from sklearn.model_selection import KFold
 
-from tests.test_pipelines.conftest import DummyDataset, DummyPipeline, dummy_single_score_func
+from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline, dummy_single_score_func
 from tpcp.optimize import Optimize
 from tpcp.validation import cross_validate
 
@@ -15,12 +15,12 @@ class TestCrossValidate:
     def test_optimize_called(self):
         """Test that optimize of the pipeline is called correctly."""
         ds = DummyDataset()
-        pipeline = DummyPipeline()
+        pipeline = DummyOptimizablePipeline()
 
         # The we use len(ds) splits, effectively a leave one our CV for testing.
         cv = KFold(n_splits=len(ds))
         train, test = zip(*cv.split(ds))
-        with patch.object(DummyPipeline, "self_optimize", return_value=pipeline) as mock:
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=pipeline) as mock:
             cross_validate(Optimize(pipeline), ds, cv=cv, scoring=lambda x, y: 1)
 
         assert mock.call_count == len(train)
@@ -35,12 +35,12 @@ class TestCrossValidate:
             return 1
 
         ds = DummyDataset()
-        pipeline = DummyPipeline()
+        pipeline = DummyOptimizablePipeline()
 
         # We want to have two datapoints in the test set sometimes
         cv = KFold(n_splits=len(ds) // 2)
         train, test = zip(*cv.split(ds))
-        with patch.object(DummyPipeline, "run", return_value=pipeline) as mock:
+        with patch.object(DummyOptimizablePipeline, "run", return_value=pipeline) as mock:
             cross_validate(Optimize(pipeline), ds, cv=cv, scoring=scoring)
 
         test_flat = [t for split in test for t in split]
@@ -54,7 +54,7 @@ class TestCrossValidate:
         cv = KFold(n_splits=len(ds))
 
         results = cross_validate(
-            Optimize(DummyPipeline()), ds, scoring=dummy_single_score_func, cv=cv, return_train_score=True
+            Optimize(DummyOptimizablePipeline()), ds, scoring=dummy_single_score_func, cv=cv, return_train_score=True
         )
         results_df = pd.DataFrame(results)
 
@@ -92,9 +92,9 @@ class TestCrossValidate:
         ),
     )
     def test_return_elements(self, kwargs, expected):
-        results = cross_validate(Optimize(DummyPipeline()), DummyDataset(), scoring=dummy_single_score_func)
+        results = cross_validate(Optimize(DummyOptimizablePipeline()), DummyDataset(), scoring=dummy_single_score_func)
         results_additionally = cross_validate(
-            Optimize(DummyPipeline()), DummyDataset(), scoring=dummy_single_score_func, **kwargs
+            Optimize(DummyOptimizablePipeline()), DummyDataset(), scoring=dummy_single_score_func, **kwargs
         )
 
         assert set(results_additionally.keys()) - set(results.keys()) == set(expected)

@@ -11,6 +11,7 @@ from sklearn.model_selection import ParameterGrid, PredefinedSplit
 from tests.mixins.test_algorithm_mixin import TestAlgorithmMixin
 from tests.test_pipelines.conftest import (
     DummyDataset,
+    DummyOptimizablePipeline,
     DummyPipeline,
     MutableParaPipeline,
     create_dummy_multi_score_func,
@@ -22,7 +23,7 @@ from tpcp._utils._score import _optimize_and_score
 from tpcp.base import BaseOptimize
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.optimize import GridSearch, Optimize
-from tpcp.optimize._optimize import GridSearchCV
+from tpcp.optimize._optimize import DummyOptimize, GridSearchCV
 from tpcp.validation import Scorer
 
 
@@ -32,7 +33,7 @@ class TestMetaFunctionalityGridSearch(TestAlgorithmMixin):
 
     @pytest.fixture()
     def after_action_instance(self) -> GridSearch:
-        gs = GridSearch(DummyPipeline(), ParameterGrid({"para_1": [1]}), scoring=dummy_single_score_func)
+        gs = GridSearch(DummyOptimizablePipeline(), ParameterGrid({"para_1": [1]}), scoring=dummy_single_score_func)
         gs.optimize(DummyDataset())
         return gs
 
@@ -50,7 +51,9 @@ class TestMetaFunctionalityGridSearchCV(TestAlgorithmMixin):
 
     @pytest.fixture()
     def after_action_instance(self) -> GridSearchCV:
-        gs = GridSearchCV(DummyPipeline(), ParameterGrid({"para_1": [1]}), cv=2, scoring=dummy_single_score_func)
+        gs = GridSearchCV(
+            DummyOptimizablePipeline(), ParameterGrid({"para_1": [1]}), cv=2, scoring=dummy_single_score_func
+        )
         gs.optimize(DummyDataset())
         return gs
 
@@ -68,7 +71,21 @@ class TestMetaFunctionalityOptimize(TestAlgorithmMixin):
 
     @pytest.fixture()
     def after_action_instance(self) -> Optimize:
-        gs = Optimize(DummyPipeline())
+        gs = self.algorithm_class(DummyOptimizablePipeline())
+        gs.optimize(DummyDataset())
+        return gs
+
+    def test_empty_init(self):
+        pytest.skip()
+
+
+class TestMetaFunctionalityDummyOptimize(TestAlgorithmMixin):
+    __test__ = True
+    algorithm_class = DummyOptimize
+
+    @pytest.fixture()
+    def after_action_instance(self) -> DummyOptimize:
+        gs = self.algorithm_class(DummyPipeline())
         gs.optimize(DummyDataset())
         return gs
 
@@ -83,8 +100,8 @@ class TestGridSearchCommon:
         autouse=True,
         ids=["GridSearch", "GridSearchCV"],
         params=(
-            GridSearch(DummyPipeline(), parameter_grid=ParameterGrid({"para_1": [1, 2]})),
-            GridSearchCV(DummyPipeline(), ParameterGrid({"para_1": [1, 2]}), cv=2),
+            GridSearch(DummyOptimizablePipeline(), parameter_grid=ParameterGrid({"para_1": [1, 2]})),
+            GridSearchCV(DummyOptimizablePipeline(), ParameterGrid({"para_1": [1, 2]}), cv=2),
         ),
     )
     def gridsearch(self, request):
@@ -114,7 +131,7 @@ class TestGridSearchCommon:
             assert gs.best_params_ == {"para_1": 2}
             assert gs.best_index_ == 1
             assert gs.best_score_ == 2
-            assert isinstance(gs.optimized_pipeline_, DummyPipeline)
+            assert isinstance(gs.optimized_pipeline_, DummyOptimizablePipeline)
             assert gs.optimized_pipeline_.para_1 == gs.best_params_["para_1"]
         else:
             assert not hasattr(gs, "best_params_")
@@ -139,7 +156,7 @@ class TestGridSearchCommon:
             )
             assert gs.best_index_ == {"score_1": 2, "score_2": 0}[return_optimized]
             assert gs.best_score_ == {"score_1": 2, "score_2": 4}[return_optimized]
-            assert isinstance(gs.optimized_pipeline_, DummyPipeline)
+            assert isinstance(gs.optimized_pipeline_, DummyOptimizablePipeline)
             assert gs.optimized_pipeline_.para_1 == gs.best_params_["para_1"]
         else:
             assert not hasattr(gs, "best_params_")
@@ -192,7 +209,7 @@ class TestGridSearchCommon:
 
 class TestGridSearch:
     def test_single_score(self):
-        gs = GridSearch(DummyPipeline(), ParameterGrid({"para_1": [1, 2]}), scoring=dummy_single_score_func)
+        gs = GridSearch(DummyOptimizablePipeline(), ParameterGrid({"para_1": [1, 2]}), scoring=dummy_single_score_func)
         gs.optimize(DummyDataset())
         results = gs.gs_results_
         results_df = pd.DataFrame(results)
@@ -214,7 +231,10 @@ class TestGridSearch:
 
     def test_multi_score(self):
         gs = GridSearch(
-            DummyPipeline(), ParameterGrid({"para_1": [1, 2]}), scoring=dummy_multi_score_func, return_optimized=False
+            DummyOptimizablePipeline(),
+            ParameterGrid({"para_1": [1, 2]}),
+            scoring=dummy_multi_score_func,
+            return_optimized=False,
         )
         gs.optimize(DummyDataset())
         results = gs.gs_results_
@@ -255,7 +275,9 @@ class TestGridSearchCV:
         # Fixed cv iterator
         cv = PredefinedSplit(test_fold=[0, 0, 1, 1, 1])  # Test Fold 0 has len==2 and 1 has len == 3
         ds = DummyDataset()
-        gs = GridSearchCV(DummyPipeline(), ParameterGrid({"para_1": [1, 2]}), scoring=dummy_single_score_func, cv=cv)
+        gs = GridSearchCV(
+            DummyOptimizablePipeline(), ParameterGrid({"para_1": [1, 2]}), scoring=dummy_single_score_func, cv=cv
+        )
         gs.optimize(ds)
         results = gs.cv_results_
         results_df = pd.DataFrame(results)
@@ -304,7 +326,7 @@ class TestGridSearchCV:
         # Fixed cv iterator
         cv = PredefinedSplit(test_fold=[0, 0, 1, 1, 1])  # Test Fold 0 has len==2 and 1 has len == 3
         gs = GridSearchCV(
-            DummyPipeline(),
+            DummyOptimizablePipeline(),
             ParameterGrid({"para_1": [1, 2]}),
             scoring=dummy_multi_score_func,
             return_optimized=False,
@@ -380,7 +402,7 @@ class TestGridSearchCV:
         # Fixed cv iterator
         cv = PredefinedSplit(test_fold=[0, 0, 1, 1, 1])  # Test Fold 0 has len==2 and 1 has len == 3
         gs = GridSearchCV(
-            DummyPipeline(),
+            DummyOptimizablePipeline(),
             ParameterGrid({"para_1": [1, 2]}),
             scoring=dummy_multi_score_func,
             return_optimized=False,
@@ -410,13 +432,13 @@ class TestGridSearchCV:
         )
 
     def test_final_optimized_trained_on_all_data(self):
-        optimized_pipe = DummyPipeline()
+        optimized_pipe = DummyOptimizablePipeline()
         optimized_pipe.optimized = True
         ds = DummyDataset()
 
-        with patch.object(DummyPipeline, "self_optimize", return_value=optimized_pipe) as mock:
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
             GridSearchCV(
-                DummyPipeline(),
+                DummyOptimizablePipeline(),
                 ParameterGrid({"para_1": [1, 2, 3]}),
                 scoring=dummy_single_score_func,
                 cv=2,
@@ -428,13 +450,13 @@ class TestGridSearchCV:
         assert len(mock.call_args_list[-1][0][0]) == 5
 
     def test_pure_parameters(self):
-        optimized_pipe = DummyPipeline()
+        optimized_pipe = DummyOptimizablePipeline()
         optimized_pipe.optimized = True
         ds = DummyDataset()
 
-        with patch.object(DummyPipeline, "self_optimize", return_value=optimized_pipe) as mock:
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
             GridSearchCV(
-                DummyPipeline(),
+                DummyOptimizablePipeline(),
                 ParameterGrid({"para_1": [1, 2, 3], "para_2": [0, 1]}),
                 scoring=dummy_single_score_func,
                 cv=2,
@@ -444,9 +466,9 @@ class TestGridSearchCV:
         assert mock.call_count == 12  # 6 para combis * 2 Cv
 
         # Now with caching
-        with patch.object(DummyPipeline, "self_optimize", return_value=optimized_pipe) as mock:
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
             GridSearchCV(
-                DummyPipeline(),
+                DummyOptimizablePipeline(),
                 ParameterGrid({"para_1": [1, 2, 3], "para_2": [0, 1]}),
                 scoring=dummy_single_score_func,
                 cv=2,
@@ -463,16 +485,16 @@ class TestGridSearchCV:
         self.test_pure_parameters()
 
     def test_pure_parameter_modified_error(self):
-        optimized_pipe = DummyPipeline()
+        optimized_pipe = DummyOptimizablePipeline()
         optimized_pipe.optimized = True
         # Modify pure para
         optimized_pipe.para_1 = "something"
         ds = DummyDataset()
 
-        with patch.object(DummyPipeline, "self_optimize", return_value=optimized_pipe):
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe):
             with pytest.raises(ValueError) as e:
                 GridSearchCV(
-                    DummyPipeline(),
+                    DummyOptimizablePipeline(),
                     ParameterGrid({"para_1": [1, 2, 3], "para_2": [0, 1]}),
                     scoring=dummy_single_score_func,
                     cv=2,
@@ -487,7 +509,7 @@ class TestGridSearchCV:
             # We run that multiple times to trigger the cache
             for _ in range(2):
                 result = _optimize_and_score(
-                    Optimize(DummyPipeline()),
+                    Optimize(DummyOptimizablePipeline()),
                     DummyDataset(),
                     Scorer(dummy_single_score_func),
                     np.array([0]),
@@ -504,13 +526,13 @@ class TestGridSearchCV:
 
 class TestOptimize:
     def test_self_optimized_called(self):
-        optimized_pipe = DummyPipeline()
+        optimized_pipe = DummyOptimizablePipeline()
         optimized_pipe.optimized = True
 
         ds = DummyDataset()
         kwargs = {"some_kwargs": "some value"}
-        with patch.object(DummyPipeline, "self_optimize", return_value=optimized_pipe) as mock:
-            result = Optimize(DummyPipeline()).optimize(ds, **kwargs)
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
+            result = Optimize(DummyOptimizablePipeline()).optimize(ds, **kwargs)
 
         mock.assert_called_once()
         mock.assert_called_with(ds, **kwargs)
@@ -523,14 +545,14 @@ class TestOptimize:
         "output,warn", (({}, True), (dict(optimized=True), False), (dict(some_random_para_="val"), True))
     )
     def test_optimize_warns(self, output, warn):
-        optimized_pipe = DummyPipeline()
+        optimized_pipe = DummyOptimizablePipeline()
         for k, v in output.items():
             setattr(optimized_pipe, k, v)
         ds = DummyDataset()
-        with patch.object(DummyPipeline, "self_optimize", return_value=optimized_pipe):
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe):
             warning = PotentialUserErrorWarning if warn else None
             with pytest.warns(warning) as w:
-                Optimize(DummyPipeline()).optimize(ds)
+                Optimize(DummyOptimizablePipeline()).optimize(ds)
 
             if len(w) > 0:
                 assert "Optimizing the pipeline doesn't seem to have changed" in str(w[0])
@@ -538,9 +560,9 @@ class TestOptimize:
     def test_optimize_error(self):
         ds = DummyDataset()
         # return anything that is not of the optimizer class
-        with patch.object(DummyPipeline, "self_optimize", return_value="some_value"):
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value="some_value"):
             with pytest.raises(ValueError) as e:
-                Optimize(DummyPipeline()).optimize(ds)
+                Optimize(DummyOptimizablePipeline()).optimize(ds)
 
         assert "Calling `self_optimize` did not return an instance" in str(e.value)
 
@@ -559,21 +581,46 @@ class TestOptimize:
         assert joblib.hash({"test": True}) == joblib.hash(opt.optimized_pipeline_.para_mutable)
 
 
+class TestDummyOptimize:
+    def test_optimize_does_not_modify(self):
+        pipeline = DummyPipeline()
+        optimizer = DummyOptimize(pipeline)
+
+        optimized = optimizer.optimize(dataset=None).optimized_pipeline_
+        assert optimized is not pipeline
+        assert joblib.hash(pipeline) == joblib.hash(optimized)
+
+    def test_warning(self):
+        with pytest.warns(PotentialUserErrorWarning) as w:
+            DummyOptimize(DummyOptimizablePipeline()).optimize(dataset=None)
+
+        assert len(w.list) == 1
+
+        with pytest.warns(None) as w:
+            DummyOptimize(DummyPipeline()).optimize(dataset=None)
+
+        assert len(w.list) == 0
+
+
 class TestOptimizeBase:
-    optimzer: BaseOptimize
+    optimizer: BaseOptimize
 
     @pytest.fixture(
-        autouse=True, params=(Optimize(DummyPipeline()), GridSearch(DummyPipeline(), ParameterGrid({"para_1": [1]})))
+        autouse=True,
+        params=(
+            Optimize(DummyOptimizablePipeline()),
+            GridSearch(DummyOptimizablePipeline(), ParameterGrid({"para_1": [1]})),
+        ),
     )
-    def optimzer_instance(self, request):
+    def optimizer_instance(self, request):
         self.optimizer = request.param
 
     @pytest.mark.parametrize("method", ("run", "score"))
     def test_run_and_score(self, method):
         ds = DummyDataset()[0]
         return_val = "return_val"
-        self.optimizer.optimized_pipeline_ = DummyPipeline()
-        with patch.object(DummyPipeline, method, return_value=return_val) as mock_method:
+        self.optimizer.optimized_pipeline_ = DummyOptimizablePipeline()
+        with patch.object(DummyOptimizablePipeline, method, return_value=return_val) as mock_method:
             out = getattr(self.optimizer, method)(ds)
 
         assert mock_method.called_with(ds)
