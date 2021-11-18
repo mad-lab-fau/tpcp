@@ -126,7 +126,13 @@ def cross_validate(
     splits = list(cv.split(dataset, groups=groups))
     # We clone the estimator to make sure that all the folds are
     # independent, and that it is pickle-able.
-    with init_progressbar(progress_bar, desc="CV Folds", total=len(splits)):
+    with init_progressbar(
+        progress_bar,
+        n_jobs=n_jobs,
+        iterable=splits,
+        desc="CV Folds",
+        total=len(splits),
+    ) as wrapped_iterable:
         parallel = Parallel(n_jobs=n_jobs, verbose=verbose, pre_dispatch=pre_dispatch)
         results = parallel(
             delayed(_optimize_and_score)(
@@ -144,7 +150,7 @@ def cross_validate(
                 return_optimizer=return_optimizer,
                 error_score=error_score,
             )
-            for train, test in splits
+            for train, test in wrapped_iterable
         )
 
     results = _aggregate_final_results(results)

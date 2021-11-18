@@ -334,7 +334,13 @@ class GridSearch(BaseOptimize):
         # itself.
         # If not explicitly changed the scorer is an instance of `Scorer` that wraps the actual `scoring`
         # function provided by the user.
-        with init_progressbar(self.progress_bar, desc="Split-Para Combos", total=len(self.parameter_grid)):
+        with init_progressbar(
+            self.progress_bar,
+            n_jobs=self.n_jobs,
+            iterable=self.parameter_grid,
+            desc="Para Combos",
+            total=len(self.parameter_grid),
+        ) as wrapped_iterable:
             parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
             with parallel:
                 # Evaluate each parameter combination
@@ -349,7 +355,7 @@ class GridSearch(BaseOptimize):
                         return_times=True,
                         error_score=self.error_score,
                     )
-                    for paras in self.parameter_grid
+                    for paras in wrapped_iterable
                 )
         # We check here if all results are dicts. We only check the dtype of the first value, as the scorer should
         # have handled issues with non uniform cases already.
@@ -639,7 +645,13 @@ class GridSearchCV(BaseOptimize):
         with tmp_dir_context as cachedir:
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None
             combinations = list(product(enumerate(split_parameters), enumerate(cv.split(dataset, groups=groups))))
-            with init_progressbar(self.progress_bar, desc="Split-Para Combos", total=len(combinations)):
+            with init_progressbar(
+                self.progress_bar,
+                n_jobs=self.n_jobs,
+                iterable=combinations,
+                desc="Split-Para Combos",
+                total=len(combinations),
+            ) as wrapped_iterable:
                 parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
                 # We use a similar structure to sklearns GridSearchCv here (see GridSearch for more info).
                 with parallel:
@@ -661,7 +673,7 @@ class GridSearchCV(BaseOptimize):
                             error_score=self.error_score,
                             memory=tmp_cache,
                         )
-                        for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in combinations
+                        for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in wrapped_iterable
                     )
         results = self._format_results(parameters, n_splits, out)
         self.cv_results_ = results
