@@ -4,6 +4,7 @@ from typing import ContextManager, Union
 
 import joblib
 from tqdm.std import tqdm as tqdm_base
+from tqdm.auto import tqdm
 
 
 @contextlib.contextmanager
@@ -27,12 +28,10 @@ def tqdm_joblib(tqdm_object: tqdm_base):
         tqdm_object.close()
 
 
-def init_progressbar(progress_bar: Union[bool, tqdm_base], default_progress_bar: tqdm_base, **kwargs) -> ContextManager:
+def init_progressbar(progress_bar: bool, **kwargs) -> ContextManager:
     """Create a multiprocess context manager to create a progress bar."""
     if progress_bar is False:
         return contextlib.nullcontext()
     if progress_bar is True:
-        progress_bar = default_progress_bar
-    for k, v in kwargs.items():
-        setattr(progress_bar, k, v)
+        progress_bar = tqdm(**kwargs)
     return tqdm_joblib(progress_bar)

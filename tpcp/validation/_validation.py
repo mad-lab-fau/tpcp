@@ -8,7 +8,6 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 import numpy as np
 from joblib import Parallel, delayed
 from sklearn.model_selection import BaseCrossValidator, check_cv
-from tqdm.std import tqdm as tqdm_std
 from tqdm.auto import tqdm
 
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results
@@ -33,7 +32,7 @@ def cross_validate(
     return_train_score: bool = False,
     return_optimizer: bool = False,
     error_score: _ERROR_SCORE_TYPE = np.nan,
-    progress_bar: Union[bool, tqdm_std] = True,
+    progress_bar: bool = True,
 ):
     """Evaluate a pipeline on a dataset using cross validation.
 
@@ -130,7 +129,7 @@ def cross_validate(
     splits = list(cv.split(dataset, groups=groups))
     # We clone the estimator to make sure that all the folds are
     # independent, and that it is pickle-able.
-    with init_progressbar(progress_bar, tqdm(desc="CV Folds"), total=len(splits)):
+    with init_progressbar(progress_bar, desc="CV Folds", total=len(splits)):
         parallel = Parallel(n_jobs=n_jobs, verbose=verbose, pre_dispatch=pre_dispatch)
         results = parallel(
             delayed(_optimize_and_score)(

@@ -330,7 +330,7 @@ class GridSearch(BaseOptimize):
         # itself.
         # If not explicitly changed the scorer is an instance of `Scorer` that wraps the actual `scoring`
         # function provided by the user.
-        with init_progressbar(True, tqdm(desc="Split-Para Combos"), total=len(self.parameter_grid)):
+        with init_progressbar(True, desc="Split-Para Combos", total=len(self.parameter_grid)):
             parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
             with parallel:
                 # Evaluate each parameter combination
@@ -630,7 +630,7 @@ class GridSearchCV(BaseOptimize):
         with tmp_dir_context as cachedir:
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None
             combinations = list(product(enumerate(split_parameters), enumerate(cv.split(dataset, groups=groups))))
-            with init_progressbar(True, tqdm(desc="Split-Para Combos"), total=len(combinations)):
+            with init_progressbar(True, desc="Split-Para Combos", total=len(combinations)):
                 parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
                 # We use a similar structure to sklearns GridSearchCv here (see GridSearch for more info).
                 with parallel:
