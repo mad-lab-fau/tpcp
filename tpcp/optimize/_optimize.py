@@ -14,7 +14,6 @@ from joblib import Memory, Parallel, delayed
 from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
-from tqdm.auto import tqdm
 
 from tpcp._utils._general import (
     _aggregate_final_results,

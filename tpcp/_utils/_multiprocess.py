@@ -1,10 +1,10 @@
 """Some helper to handle mutliprocess progressbars."""
 import contextlib
-from typing import ContextManager, Union
+from typing import ContextManager
 
 import joblib
-from tqdm.std import tqdm as tqdm_base
 from tqdm.auto import tqdm
+from tqdm.std import tqdm as tqdm_base
 
 
 @contextlib.contextmanager

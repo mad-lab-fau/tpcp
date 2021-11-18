@@ -8,7 +8,6 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 import numpy as np
 from joblib import Parallel, delayed
 from sklearn.model_selection import BaseCrossValidator, check_cv
-from tqdm.auto import tqdm
 
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results
 from tpcp._utils._multiprocess import init_progressbar
