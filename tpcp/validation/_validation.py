@@ -82,8 +82,6 @@ def cross_validate(
         If a numeric value is given, a Warning is raised.
     progress_bar
         True/False to enable/disable a tqdm progressbar.
-        Otherwise, a instance of a tqdm progressbar can be provided to customize the bar.
-        Note that `total` will be overwritten.
 
     Returns
     -------

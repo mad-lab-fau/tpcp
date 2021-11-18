@@ -226,6 +226,8 @@ class GridSearch(BaseOptimize):
         Value to assign to the score if an error occurs during scoring.
         If set to ‘raise’, the error is raised.
         If a numeric value is given, a Warning is raised.
+    progress_bar
+        True/False to enable/disable a tqdm progressbar.
 
     Other Parameters
     ----------------
@@ -281,6 +283,7 @@ class GridSearch(BaseOptimize):
     return_optimized: Union[bool, str]
     pre_dispatch: Union[int, str]
     error_score: _ERROR_SCORE_TYPE
+    progress_bar: bool
 
     gs_results_: Dict[str, Any]
     best_params_: Dict
@@ -298,6 +301,7 @@ class GridSearch(BaseOptimize):
         pre_dispatch: Union[int, str] = "n_jobs",
         return_optimized: Union[bool, str] = True,
         error_score: _ERROR_SCORE_TYPE = np.nan,
+        progress_bar: bool = True,
     ):
         self.pipeline = pipeline
         self.parameter_grid = parameter_grid
@@ -306,6 +310,7 @@ class GridSearch(BaseOptimize):
         self.pre_dispatch = pre_dispatch
         self.return_optimized = return_optimized
         self.error_score = error_score
+        self.progress_bar = progress_bar
 
     def optimize(self, dataset: Dataset, **_):
         """Run the GridSearch over the dataset and find the best parameter combination.
@@ -329,7 +334,7 @@ class GridSearch(BaseOptimize):
         # itself.
         # If not explicitly changed the scorer is an instance of `Scorer` that wraps the actual `scoring`
         # function provided by the user.
-        with init_progressbar(True, desc="Split-Para Combos", total=len(self.parameter_grid)):
+        with init_progressbar(self.progress_bar, desc="Split-Para Combos", total=len(self.parameter_grid)):
             parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
             with parallel:
                 # Evaluate each parameter combination
@@ -483,6 +488,8 @@ class GridSearchCV(BaseOptimize):
         Value to assign to the score if an error occurs during scoring.
         If set to ‘raise’, the error is raised.
         If a numeric value is given, a Warning is raised.
+    progress_bar
+        True/False to enable/disable a tqdm progressbar.
 
     Other Parameters
     ----------------
@@ -565,6 +572,7 @@ class GridSearchCV(BaseOptimize):
     n_jobs: Optional[int]
     pre_dispatch: Union[int, str]
     error_score: _ERROR_SCORE_TYPE
+    progress_bar: bool
 
     cv_results_: Dict[str, Any]
     best_params_: Dict
@@ -587,6 +595,7 @@ class GridSearchCV(BaseOptimize):
         n_jobs: Optional[int] = None,
         pre_dispatch: Union[int, str] = "n_jobs",
         error_score: _ERROR_SCORE_TYPE = np.nan,
+        progress_bar: bool = True,
     ):
         self.pipeline = pipeline
         self.parameter_grid = parameter_grid
@@ -599,6 +608,7 @@ class GridSearchCV(BaseOptimize):
         self.n_jobs = n_jobs
         self.pre_dispatch = pre_dispatch
         self.error_score = error_score
+        self.progress_bar = progress_bar
 
     def optimize(self, dataset: Dataset, *, groups=None, **optimize_params):  # noqa: arguments-differ
         self.dataset = dataset
@@ -629,7 +639,7 @@ class GridSearchCV(BaseOptimize):
         with tmp_dir_context as cachedir:
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None
             combinations = list(product(enumerate(split_parameters), enumerate(cv.split(dataset, groups=groups))))
-            with init_progressbar(True, desc="Split-Para Combos", total=len(combinations)):
+            with init_progressbar(self.progress_bar, desc="Split-Para Combos", total=len(combinations)):
                 parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
                 # We use a similar structure to sklearns GridSearchCv here (see GridSearch for more info).
                 with parallel:
