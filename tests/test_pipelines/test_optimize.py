@@ -22,7 +22,7 @@ from tests.test_pipelines.conftest import (
 from tpcp._utils._score import _optimize_and_score
 from tpcp.base import BaseOptimize
 from tpcp.exceptions import PotentialUserErrorWarning
-from tpcp.optimize import GridSearch, Optimize, DummyOptimize, GridSearchCV
+from tpcp.optimize import DummyOptimize, GridSearch, GridSearchCV, Optimize
 from tpcp.validation import Scorer
 
 
