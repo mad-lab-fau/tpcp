@@ -1,8 +1,20 @@
 """tpcp - Tiny Pipelines for Complicated Problems."""
+from tpcp._dataset import Dataset
+from tpcp._pipelines import OptimizablePipeline, SimplePipeline
 from tpcp._utils._general import clone, default
-from tpcp.base import BaseAlgorithm, BaseOptimize
+from tpcp.base import BaseAlgorithm
 
 __version__ = "0.2.0"
 
+
 mdf = default
-__all__ = ["BaseAlgorithm", "BaseOptimize", "default", "mdf", "clone"]
+
+__all__ = [
+    "default",
+    "mdf",
+    "clone",
+    "BaseAlgorithm",
+    "Dataset",
+    "SimplePipeline",
+    "OptimizablePipeline",
+]

@@ -1,7 +1,7 @@
-The dataset base class
-======================
+The pipeline base classes
+=========================
 
-.. automodule:: tpcp._dataset
+.. automodule:: tpcp._pipelines
     :no-members:
     :no-inherited-members:
 
@@ -14,4 +14,5 @@ Classes
    :toctree: generated/base
    :template: class_with_private.rst
 
-    Dataset
+    SimplePipeline
+    OptimizablePipeline

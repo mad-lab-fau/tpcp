@@ -9,8 +9,7 @@ from tpcp._base import _BaseTpcpObject
 from tpcp._meta import AlgorithmMeta
 
 if TYPE_CHECKING:
-    from tpcp.dataset import Dataset
-    from tpcp.pipelines import SimplePipeline
+    from tpcp import Dataset, SimplePipeline
 
 
 class BaseTpcpObject(_BaseTpcpObject, metaclass=AlgorithmMeta):

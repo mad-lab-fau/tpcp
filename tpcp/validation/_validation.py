@@ -9,11 +9,11 @@ import numpy as np
 from joblib import Parallel, delayed
 from sklearn.model_selection import BaseCrossValidator, check_cv
 
+from tpcp import Dataset
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results
 from tpcp._utils._multiprocess import init_progressbar
 from tpcp._utils._score import _optimize_and_score
 from tpcp.base import BaseOptimize
-from tpcp.dataset import Dataset
 from tpcp.validation._scorer import _ERROR_SCORE_TYPE, _validate_scorer
 
 

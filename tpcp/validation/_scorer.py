@@ -8,12 +8,12 @@ from typing import TYPE_CHECKING, Callable, Optional, Tuple, Type, Union
 
 import numpy as np
 
+from tpcp._dataset import Dataset
 from tpcp._utils._score import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SCORE_TYPE, _SINGLE_SCORE_TYPE
-from tpcp.dataset import Dataset
 from tpcp.exceptions import ScorerFailed
 
 if TYPE_CHECKING:
-    from tpcp.pipelines import SimplePipeline
+    from tpcp._pipelines import SimplePipeline
 
 
 class Scorer:

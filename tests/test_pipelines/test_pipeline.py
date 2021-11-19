@@ -4,9 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline
-from tpcp import mdf
-from tpcp.dataset import Dataset
-from tpcp.pipelines import SimplePipeline
+from tpcp import Dataset, SimplePipeline, mdf
 
 
 class PipelineInputModify(SimplePipeline):

@@ -22,9 +22,8 @@ _AGG_SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
 _SINGLE_SCORE_TYPE = Union[Dict[str, np.ndarray], np.ndarray]  # noqa: invalid-name
 
 if TYPE_CHECKING:
-    from tpcp._base import BaseOptimize
-    from tpcp.dataset import Dataset
-    from tpcp.pipelines import SimplePipeline
+    from tpcp import Dataset, SimplePipeline
+    from tpcp.optimize import BaseOptimize
     from tpcp.validation import Scorer
 
 

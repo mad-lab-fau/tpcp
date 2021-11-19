@@ -49,7 +49,7 @@ index
 # Now we use this index as the index of our new dataset.
 # To see the dataset in action, we need to create an instance of it.
 # Its string representation will show us the most important information.
-from tpcp.dataset import Dataset
+from tpcp._dataset import Dataset
 
 
 class CustomDataset(Dataset):

@@ -11,9 +11,9 @@ import numpy as np
 import tpcp._base
 
 if TYPE_CHECKING:
+    from tpcp import SimplePipeline
     from tpcp._base import Algo
     from tpcp.base import BaseTpcpObject
-    from tpcp.pipelines import SimplePipeline
 
 _EMPTY = object()
 _DEFAULT_PARA_NAME = "__TPCP_DEFAULT"
@@ -147,7 +147,7 @@ def _check_safe_run(pipeline: SimplePipeline, *args, **kwargs):
 def clone(
     algorithm: Union[BaseTpcpObject, List[BaseTpcpObject], Set[BaseTpcpObject], Tuple[BaseTpcpObject]],
     *,
-    safe: bool = True,
+    safe: bool = False,
 ):
     """Construct a new algorithm object with the same parameters.
 
