@@ -5,7 +5,6 @@ import joblib
 import pytest
 from numpydoc.docscrape import NumpyDocString
 
-from tests.conftest import compare_algo_objects
 from tpcp._base import Algo
 
 
