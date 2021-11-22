@@ -98,3 +98,13 @@ class TestCrossValidate:
         )
 
         assert set(results_additionally.keys()) - set(results.keys()) == set(expected)
+
+    def test_returned_optimizer_per_fold_independent(self):
+        """Double check that the optimizer is cloned correctly"""
+        optimizer = Optimize(DummyOptimizablePipeline())
+        results = cross_validate(
+            Optimize(DummyOptimizablePipeline()), DummyDataset(), scoring=dummy_single_score_func, return_optimizer=True
+        )
+        optimizers = results["optimizer"]
+        for o in optimizers:
+            assert o is not optimizer
