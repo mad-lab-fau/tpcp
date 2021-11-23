@@ -127,6 +127,11 @@ grouped_subset.groups
 final_subset.groups
 
 # %%
+# In both cases, we can use the group labels (or a subset of them) to index our dataset.
+# This can be in particular helpful, if you want to recreate specific train test splits provided by `cross_validate`.
+final_subset.get_subset(groups=final_subset.groups[:3])
+
+# %%
 # If you want, you can also ungroup a dataset again.
 # This can be useful for a nested iteration:
 for outer, group in enumerate(grouped_subset):

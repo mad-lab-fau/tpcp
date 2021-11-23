@@ -275,14 +275,22 @@ class Dataset(BaseTpcpObject):
     def get_subset(
         self: Self,
         *,
+        groups: List[Union[str, Tuple[str, ...]]] = None,
         index: Optional[pd.DataFrame] = None,
         bool_map: Optional[Sequence[bool]] = None,
         **kwargs: Optional[Union[List[str], str]],
     ) -> Self:
         """Get a subset of the dataset.
 
+        Note that all arguments are mutable exclusive!
+
         Parameters
         ----------
+        groups
+            A valid row locator or slice that can be passed to `self.grouped_index.loc[locator, :]`.
+            This basically needs to be a subset of `self.groups`.
+            Note, that this is the only indexer that works on the grouped index.
+            All other indexers work on the pure index.
         index
             `pd.DataFrame` that is a valid subset of the current dataset index.
         bool_map
@@ -303,12 +311,15 @@ class Dataset(BaseTpcpObject):
             list(
                 map(
                     lambda x: x is None or (isinstance(x, dict) and len(x) == 0),
-                    (index, bool_map, kwargs),
+                    (groups, index, bool_map, kwargs),
                 )
             ).count(False)
             > 1
         ):
-            raise ValueError("Only one of `selected_keys`, `index`, `bool_map` or kwarg can be set!")
+            raise ValueError("Only one of `groups`, `selected_keys`, `index`, `bool_map` or kwarg can be set!")
+
+        if groups is not None:
+            return self.clone().set_params(subset_index=self.grouped_index.loc[groups, :].reset_index(drop=True))
 
         if index is not None:
             if len(index) == 0:
@@ -337,7 +348,7 @@ class Dataset(BaseTpcpObject):
 
             return self.clone().set_params(subset_index=subset_index)
 
-        raise ValueError("At least one of `selected_keys`, `index`, `bool_map` or kwarg must not be None!")
+        raise ValueError("At least one of `groups`, `selected_keys`, `index`, `bool_map` or kwarg must not be None!")
 
     def __repr__(self) -> str:
         """Return string representation of the dataset object."""

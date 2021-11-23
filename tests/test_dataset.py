@@ -108,14 +108,14 @@ class TestDataset:
                 None,
                 None,
                 None,
-                "At least one of `selected_keys`, `index`, `bool_map` or kwarg must not be None!",
+                "At least one of `groups`, `selected_keys`, `index`, `bool_map` or kwarg must not be None!",
                 ValueError,
             ),
             (
                 _create_valid_index(),
                 _create_random_bool_map(12, 432),
                 None,
-                "Only one of `selected_keys`, `index`, `bool_map` or kwarg can be set!",
+                "Only one of `groups`, `selected_keys`, `index`, `bool_map` or kwarg can be set!",
                 ValueError,
             ),
         ],
@@ -145,6 +145,58 @@ class TestDataset:
     def test_get_subset_index_valid_input(self, index, what_to_expect):
         pd.testing.assert_frame_equal(
             left=what_to_expect, right=Dataset(subset_index=_create_valid_index()).get_subset(index=index).index
+        )
+
+    @pytest.mark.parametrize(
+        "groups,what_to_expect",
+        [
+            (
+                [("patient_1", "test_2", "0")],
+                _create_valid_index(
+                    {"patient_1": {"a": ["test_2"], "b": ["0"]}},
+                    columns_names=["patients", "tests", "extra"],
+                ),
+            ),
+            (
+                [("patient_1", "test_2", "0"), ("patient_1", "test_2", "1")],
+                _create_valid_index(
+                    {"patient_1": {"a": ["test_2"], "b": ["0", "1"]}},
+                    columns_names=["patients", "tests", "extra"],
+                ),
+            ),
+        ],
+    )
+    def test_get_subset_groups_valid_input(self, groups, what_to_expect):
+        pd.testing.assert_frame_equal(
+            left=what_to_expect, right=Dataset(subset_index=_create_valid_index()).get_subset(groups=groups).index
+        )
+
+    @pytest.mark.parametrize(
+        "groups,what_to_expect",
+        [
+            (
+                [("patient_1", "test_2")],
+                _create_valid_index(
+                    {"patient_1": {"a": ["test_2"], "b": ["0", "1"]}},
+                    columns_names=["patients", "tests", "extra"],
+                ),
+            ),
+            (
+                [("patient_1", "test_1"), ("patient_1", "test_2")],
+                _create_valid_index(
+                    {"patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]}},
+                    columns_names=["patients", "tests", "extra"],
+                ),
+            ),
+        ],
+    )
+    def test_get_subset_groups_valid_input_grouped(self, groups, what_to_expect):
+        pd.testing.assert_frame_equal(
+            left=what_to_expect,
+            right=Dataset(subset_index=_create_valid_index())
+            .groupby(["patients", "tests"])
+            .get_subset(groups=groups)
+            .index,
         )
 
     @pytest.mark.parametrize(
