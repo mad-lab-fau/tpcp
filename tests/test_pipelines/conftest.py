@@ -1,3 +1,5 @@
+from itertools import product
+
 import pandas as pd
 
 from tpcp._dataset import Dataset
@@ -37,6 +39,11 @@ class MutableParaPipeline(OptimizablePipeline):
 class DummyDataset(Dataset):
     def create_index(self) -> pd.DataFrame:
         return pd.DataFrame({"value": list(range(5))})
+
+
+class DummyGroupedDataset(Dataset):
+    def create_index(self) -> pd.DataFrame:
+        return pd.DataFrame(list(product("abc", range(5))), columns=["v1", "v2"])
 
 
 def dummy_single_score_func(pipeline, data_point):

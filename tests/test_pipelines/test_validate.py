@@ -3,9 +3,14 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import pytest
-from sklearn.model_selection import KFold
+from sklearn.model_selection import GroupKFold, KFold
 
-from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline, dummy_single_score_func
+from tests.test_pipelines.conftest import (
+    DummyDataset,
+    DummyGroupedDataset,
+    DummyOptimizablePipeline,
+    dummy_single_score_func,
+)
 from tpcp.optimize import Optimize
 from tpcp.validation import cross_validate
 
@@ -108,3 +113,25 @@ class TestCrossValidate:
         optimizers = results["optimizer"]
         for o in optimizers:
             assert o is not optimizer
+
+    @pytest.mark.parametrize("propagate", (True, False))
+    def test_propagate_groups(self, propagate):
+        pipeline = DummyOptimizablePipeline()
+        dataset = DummyGroupedDataset()
+        groups = dataset.create_group_labels("v1")
+        # With 3 splits, each group get its own split -> so basically only "a", only "b", and only "c"
+        cv = GroupKFold(n_splits=3)
+
+        dummy_results = Optimize(pipeline).optimize(dataset)
+        with patch.object(Optimize, "optimize", return_value=dummy_results) as mock:
+            cross_validate(
+                Optimize(pipeline), dataset, cv=cv, scoring=lambda x, y: 1, groups=groups, propagate_groups=propagate
+            )
+
+        assert mock.call_count == 3
+        for call, label in zip(mock.call_args_list, "cba"):
+            train_labels = "abc".replace(label, "")
+            if propagate:
+                assert set(np.unique(call[1]["groups"])) == set(train_labels)
+            else:
+                assert "groups" not in call[1]

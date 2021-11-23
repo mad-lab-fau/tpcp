@@ -27,6 +27,7 @@ def cross_validate(
     n_jobs: Optional[int] = None,
     verbose: int = 0,
     optimize_params: Optional[Dict[str, Any]] = None,
+    propagate_groups: bool = True,
     pre_dispatch: Union[str, int] = "2*n_jobs",
     return_train_score: bool = False,
     return_optimizer: bool = False,
@@ -66,6 +67,12 @@ def cross_validate(
         At the moment this only effects `Parallel`.
     optimize_params
         Additional parameter that are forwarded to the `optimize` method.
+    propagate_groups
+        In case your optimizable is a cross-validation based optimize (e.g. `GridSearchCv`) and you are using a grouped
+        cross validation, you probably want to use the same grouped CV for the outer and the inner cross validation.
+        If `propagate_groups` is True, the group labels belonging to the training of each fold are passed to the
+        `optimize` method of the optimizable.
+        This only has an effect, if `groups` are specified.
     pre_dispatch
         The number of jobs that should be pre dispatched.
         For an explanation see the documentation of :class:`~joblib.Parallel`.
@@ -123,6 +130,14 @@ def cross_validate(
 
     scoring = _validate_scorer(scoring, optimizable.pipeline)
 
+    optimize_params = optimize_params or {}
+    if propagate_groups is True and "groups" in optimize_params:
+        raise ValueError(
+            "You can not use `propagate_groups` and specify `groups` in `optimize_params`. "
+            "The latter would overwrite the prior. "
+            "Most likely you only want to use `propagate_groups`."
+        )
+
     splits = list(cv.split(dataset, groups=groups))
     # We clone the estimator to make sure that all the folds are
     # independent, and that it is pickle-able.
@@ -141,7 +156,7 @@ def cross_validate(
                 scoring,
                 train,
                 test,
-                optimize_params=optimize_params,
+                optimize_params={**_propagate_groups(propagate_groups, groups, train), **optimize_params},
                 hyperparameters=None,
                 pure_parameters=None,
                 return_train_score=return_train_score,
@@ -168,3 +183,11 @@ def cross_validate(
 
     results.update(score_results)
     return results
+
+
+def _propagate_groups(
+    propagate_groups: bool, groups: Optional[List[Union[str, Tuple[str, ...]]]], train_idx: List[int]
+):
+    if propagate_groups is False or groups is None:
+        return {}
+    return {"groups": np.array(groups)[train_idx]}
