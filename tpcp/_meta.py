@@ -8,6 +8,7 @@ from tpcp.exceptions import MutableDefaultsError
 
 
 def _get_dangerous_mutable_types() -> Tuple[type]:
+    # TODO: Update this list or even make it a white list?
     return (_base._BaseTpcpObject,)
 
 
