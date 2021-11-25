@@ -3,7 +3,7 @@ from typing import Dict, TypeVar, Union
 
 from tpcp._dataset import Dataset
 from tpcp._utils._general import _check_safe_run
-from tpcp.base import BaseAlgorithm
+from tpcp.base import BaseAlgorithm, Optimizable
 
 Self = TypeVar("Self", bound="SimplePipeline")
 
@@ -16,7 +16,7 @@ class SimplePipeline(BaseAlgorithm):
 
     dataset_single: Dataset
 
-    _action_method = "run"
+    _action_method = ("safe_run", "run")
 
     def run(self: Self, datapoint: Dataset) -> Self:
         """Run the pipeline.
@@ -90,7 +90,7 @@ class SimplePipeline(BaseAlgorithm):
         raise NotImplementedError()  # pragma: no cover
 
 
-class OptimizablePipeline(SimplePipeline):
+class OptimizablePipeline(SimplePipeline, Optimizable):
     """Pipeline with custom ways to optimize and/or train input parameters.
 
     OptimizablePipelines are expected to implement a concrete way to train internal models or optimize parameters.
@@ -106,29 +106,3 @@ class OptimizablePipeline(SimplePipeline):
     In any case, you should make sure that all optimized parameters are still there if you call `.clone()` on the
     optimized pipeline.
     """
-
-    def self_optimize(self: Self, dataset: Dataset, **kwargs) -> Self:
-        """Optimize the input parameter of the pipeline using any logic.
-
-        This method can be used to adapt the input parameters (values provided in the init) based on any data driven
-        heuristic.
-
-        Note that the optimizations must only modify the input parameters (aka `self.clone` should retain the
-        optimization results).
-
-        Parameters
-        ----------
-        dataset
-            An instance of a :class:`tpcp.dataset.Dataset` containing one or multiple data points that can
-            be used for training.
-            The structure of the data and the available reference information will depend on the dataset.
-        kwargs
-            Additional parameter required for the optimization process.
-
-        Returns
-        -------
-        self
-            The class instance with optimized input parameters.
-
-        """
-        raise NotImplementedError()  # pragma: no cover

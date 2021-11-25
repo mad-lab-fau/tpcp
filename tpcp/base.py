@@ -3,13 +3,41 @@
 from __future__ import annotations
 
 import types
-from typing import TYPE_CHECKING, Any, Callable, Dict
+from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple
 
-from tpcp._base import _BaseTpcpObject
+from tpcp._base import _BaseTpcpObject, Algo
 from tpcp._meta import AlgorithmMeta
 
 if TYPE_CHECKING:
     from tpcp import Dataset, SimplePipeline
+
+
+class Optimizable:
+    def self_optimize(self: Algo, dataset: Dataset, **kwargs) -> Algo:
+        """Optimize the input parameter of the pipeline or algorithm using any logic.
+
+        This method can be used to adapt the input parameters (values provided in the init) based on any data driven
+        heuristic.
+
+        Note that the optimizations must only modify the input parameters (aka `self.clone` should retain the
+        optimization results).
+
+        Parameters
+        ----------
+        dataset
+            An instance of a :class:`tpcp.dataset.Dataset` containing one or multiple data points that can
+            be used for training.
+            The structure of the data and the available reference information will depend on the dataset.
+        kwargs
+            Additional parameter required for the optimization process.
+
+        Returns
+        -------
+        self
+            The class instance with optimized input parameters.
+
+        """
+        raise NotImplementedError()  # pragma: no cover
 
 
 class BaseTpcpObject(_BaseTpcpObject, metaclass=AlgorithmMeta):
@@ -43,9 +71,20 @@ class BaseAlgorithm(BaseTpcpObject):
     def _get_action_method(self) -> Callable:
         """Get the action method as callable.
 
-        This is intended to be used by wrappers, that do not know the Type of an algorithm
+        This is intended to be used by wrappers, that do not know the Type of an algorithm.
         """
+        if isinstance(self._action_method, (list, tuple)):
+            return getattr(self, self._action_method[0])
         return getattr(self, self._action_method)
+
+    def _get_action_methods(self) -> Tuple[Callable, ...]:
+        """Get the action method as callable.
+
+        This is intended to be used by wrappers, that do not know the Type of an algorithm.
+        """
+        if not isinstance(self._action_method, (list, tuple)):
+            return (getattr(self, self._action_method),)
+        return tuple(getattr(self, a) for a in self._action_method)
 
     def get_other_params(self) -> Dict[str, Any]:
         """Get all "Other Parameters" of the Algorithm.
@@ -91,6 +130,10 @@ class BaseAlgorithm(BaseTpcpObject):
             if v.endswith("_") and not v.startswith("__") and not isinstance(getattr(self, v), types.MethodType)
         }
         return attrs
+
+
+class OptimizableAlgorithm(BaseAlgorithm, Optimizable):
+    """Baseclass for a algorithm with native optimization."""
 
 
 class BaseOptimize(BaseAlgorithm):
