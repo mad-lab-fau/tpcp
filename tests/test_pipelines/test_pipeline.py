@@ -42,7 +42,7 @@ class TestSafeRun:
         with pytest.raises(ValueError) as e:
             pipe().safe_run(DummyDataset()[0])
 
-        assert "Running the pipeline did modify the parameters of the pipeline." in str(e)
+        assert f"Running `safe_run` of {pipe.__name__} did modify the parameters of the algorithm" in str(e)
 
     def test_no_self_return(self):
         pipe = DummyOptimizablePipeline()
@@ -50,13 +50,13 @@ class TestSafeRun:
         with pytest.raises(ValueError) as e:
             pipe.safe_run(DummyDataset()[0])
 
-        assert "The `run` method of the pipeline must return `self`" in str(e)
+        assert "The `safe_run` method of DummyOptimizablePipeline must return `self`" in str(e)
 
     def test_no_output(self):
         with pytest.raises(ValueError) as e:
             PipelineNoOutput().safe_run(DummyDataset()[0])
 
-        assert "Running the pipeline did not set any results on the output." in str(e)
+        assert "Running the `safe_run` method of PipelineNoOutput " in str(e)
 
     def test_output(self):
         pipe = DummyOptimizablePipeline()

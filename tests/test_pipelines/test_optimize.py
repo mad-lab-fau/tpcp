@@ -436,6 +436,7 @@ class TestGridSearchCV:
         ds = DummyDataset()
 
         with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
+            mock.__name__ = "self_optimize"
             GridSearchCV(
                 DummyOptimizablePipeline(),
                 ParameterGrid({"para_1": [1, 2, 3]}),
@@ -446,7 +447,7 @@ class TestGridSearchCV:
 
         assert mock.call_count == 7  # 3 paras * 2 folds + final optimize
         # Final optimize was called with all the data.
-        assert len(mock.call_args_list[-1][0][0]) == 5
+        assert len(mock.call_args_list[-1][0][1]) == 5
 
     def test_pure_parameters(self):
         optimized_pipe = DummyOptimizablePipeline()
@@ -454,6 +455,7 @@ class TestGridSearchCV:
         ds = DummyDataset()
 
         with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
+            mock.__name__ = "self_optimize"
             GridSearchCV(
                 DummyOptimizablePipeline(),
                 ParameterGrid({"para_1": [1, 2, 3], "para_2": [0, 1]}),
@@ -466,6 +468,7 @@ class TestGridSearchCV:
 
         # Now with caching
         with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
+            mock.__name__ = "self_optimize"
             GridSearchCV(
                 DummyOptimizablePipeline(),
                 ParameterGrid({"para_1": [1, 2, 3], "para_2": [0, 1]}),
@@ -490,7 +493,8 @@ class TestGridSearchCV:
         optimized_pipe.para_1 = "something"
         ds = DummyDataset()
 
-        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe):
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
+            mock.__name__ = "self_optimize"
             with pytest.raises(ValueError) as e:
                 GridSearchCV(
                     DummyOptimizablePipeline(),
@@ -531,7 +535,11 @@ class TestOptimize:
         ds = DummyDataset()
         kwargs = {"some_kwargs": "some value"}
         with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
-            result = Optimize(DummyOptimizablePipeline()).optimize(ds, **kwargs)
+            mock.__name__ = "self_optimize"
+            pipe = DummyOptimizablePipeline()
+            # We make the mock a bound method for this test
+            mock.__self__ = pipe
+            result = Optimize(pipe).optimize(ds, **kwargs)
 
         mock.assert_called_once()
         mock.assert_called_with(ds, **kwargs)
@@ -540,26 +548,39 @@ class TestOptimize:
         # The id must been different, indicating that `optimize` correctly called clone on the output
         assert id(result.optimized_pipeline_) != id(optimized_pipe)
 
-    @pytest.mark.parametrize(
-        "output,warn", (({}, True), (dict(optimized=True), False), (dict(some_random_para_="val"), True))
-    )
+    @pytest.mark.parametrize("output,warn", (({}, True), (dict(optimized=True), False)))
     def test_optimize_warns(self, output, warn):
         optimized_pipe = DummyOptimizablePipeline()
         for k, v in output.items():
             setattr(optimized_pipe, k, v)
         ds = DummyDataset()
-        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe):
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
+            mock.__name__ = "self_optimize"
             warning = PotentialUserErrorWarning if warn else None
             with pytest.warns(warning) as w:
                 Optimize(DummyOptimizablePipeline()).optimize(ds)
 
             if len(w) > 0:
-                assert "Optimizing the pipeline doesn't seem to have changed" in str(w[0])
+                assert "Optimizing the algorithm doesn't seem to have changed" in str(w[0])
+
+    @pytest.mark.parametrize("output", (dict(some_random_para_="val"), dict(optimized=True, some_random_para_="val")))
+    def test_other_para_modified_error(self, output):
+        optimized_pipe = DummyOptimizablePipeline()
+        for k, v in output.items():
+            setattr(optimized_pipe, k, v)
+        ds = DummyDataset()
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
+            mock.__name__ = "self_optimize"
+            with pytest.raises(RuntimeError) as e:
+                Optimize(DummyOptimizablePipeline()).optimize(ds)
+
+        assert "Optimizing seems to have changed class attributes that are not parameters" in str(e.value)
 
     def test_optimize_error(self):
         ds = DummyDataset()
         # return anything that is not of the optimizer class
-        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value="some_value"):
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value="some_value") as mock:
+            mock.__name__ = "self_optimize"
             with pytest.raises(ValueError) as e:
                 Optimize(DummyOptimizablePipeline()).optimize(ds)
 

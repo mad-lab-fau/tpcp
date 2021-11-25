@@ -11,12 +11,11 @@ import joblib
 import numpy as np
 
 import tpcp._base
-from tpcp import OptimizablePipeline
 from tpcp.exceptions import PotentialUserErrorWarning
 
 if TYPE_CHECKING:
     from tpcp._base import Algo
-
+    from tpcp._pipelines import OptimizablePipeline
     from tpcp.base import BaseAlgorithm, BaseTpcpObject, OptimizableAlgorithm
 
 _EMPTY = object()
@@ -119,16 +118,21 @@ def _split_hyper_and_pure_parameters(
     return split_param_dict
 
 
-def _check_safe_run(algorithm: BaseAlgorithm, old_method: Callable, *args, **kwargs):
+def _check_safe_run(algorithm: Algo, old_method: Callable, *args, **kwargs) -> Algo:
     """Run the pipeline and check that run behaved as expected."""
     before_paras = algorithm.get_params()
     before_paras_hash = joblib.hash(before_paras)
-    output: BaseAlgorithm = old_method(algorithm, *args, **kwargs)
+    if hasattr(old_method, "__self__"):
+        # In this case the method is already bound and we do not need to pass the algo as first argument
+        output: Algo = old_method(*args, **kwargs)
+    else:
+        output: Algo = old_method(algorithm, *args, **kwargs)
     after_paras = algorithm.get_params()
     after_paras_hash = joblib.hash(after_paras)
     if not before_paras_hash == after_paras_hash:
         raise ValueError(
-            f"Running `{old_method.__name__}` of {type(algorithm)} did modify the parameters of the algorithm. "
+            f"Running `{old_method.__name__}` of {type(algorithm).__name__} did modify the parameters of the "
+            "algorithm. "
             "This must not happen to make sure individual runs of the algorithm/pipeline are independent.\n\n"
             "This usually happens, when you use an algorithm object or other mutable objects as a parameter to your "
             "algorithm/pipeline. "
@@ -137,13 +141,14 @@ def _check_safe_run(algorithm: BaseAlgorithm, old_method: Callable, *args, **kwa
         )
     if not isinstance(output, type(algorithm)):
         raise ValueError(
-            f"The `{old_method.__name__}` method of {type(algorithm)} must return `self` or in rare cases a new "
-            f"instance of {type(algorithm)}. "
+            f"The `{old_method.__name__}` method of {type(algorithm).__name__} must return `self` or in rare cases a "
+            f"new instance of {type(algorithm).__name__}. "
             f"But the return value had the type {type(output)}."
         )
     if not output._action_is_applied:
         raise ValueError(
-            f"Running the `{old_method.__name__}` method of {type(algorithm)} did not set any results on the output. "
+            f"Running the `{old_method.__name__}` method of {type(algorithm).__name__} did not set any results on the "
+            "output. "
             f"Make sure the `{old_method.__name__}` method sets the result values as expected as class attributes and "
             f"all names of result attributes have a trailing `_` to mark them as such."
         )
@@ -179,7 +184,7 @@ def safe_action(action_method: Callable):
     ...         return self
 
     """
-    if getattr(action_method, "__is_safe_action", False):
+    if getattr(action_method, "__is_safe_action", False) is True:
         # It seems like the decorator was already applied and we do not want to apply it multiple times and run
         # duplicated checks.
         return action_method
@@ -200,12 +205,14 @@ def safe_action(action_method: Callable):
     return safe_wrapped
 
 
-def _check_safe_optimize(
-    algorithm: Union[OptimizablePipeline, OptimizableAlgorithm], old_method: Callable, *args, **kwargs
-):
+def _check_safe_optimize(algorithm: Algo, old_method: Callable, *args, **kwargs) -> Algo:
     # record the hash of the pipeline to make an educated guess if the optimization works
     before_hash = joblib.hash(algorithm)
-    optimized_algorithm = old_method(algorithm, *args, **kwargs)
+    if hasattr(old_method, "__self__"):
+        # In this case the method is already bound and we do not need to pass the algo as first argument
+        optimized_algorithm: Algo = old_method(*args, **kwargs)
+    else:
+        optimized_algorithm: Algo = old_method(algorithm, *args, **kwargs)
     if not isinstance(optimized_algorithm, algorithm.__class__):
         raise ValueError(
             "Calling `self_optimize` did not return an instance of the algorithm/pipeline itself! "
@@ -268,7 +275,7 @@ def safe_optimize(self_optimize_method: Callable):
     ...         return self
 
     """
-    if getattr(self_optimize_method, "__is_safe_optimize", False):
+    if getattr(self_optimize_method, "__is_safe_optimize", False) is True:
         # It seems like the decorator was already applied and we do not want to apply it multiple times and run
         # duplicated checks.
         return self_optimize_method
