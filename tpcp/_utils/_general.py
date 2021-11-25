@@ -4,8 +4,7 @@ from __future__ import annotations
 import copy
 import numbers
 from functools import wraps
-from types import MethodType
-from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union, Callable
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set, Tuple, Union
 
 import joblib
 import numpy as np
@@ -13,9 +12,9 @@ import numpy as np
 import tpcp._base
 
 if TYPE_CHECKING:
-    from tpcp import SimplePipeline
     from tpcp._base import Algo
-    from tpcp.base import BaseTpcpObject, BaseAlgorithm
+
+    from tpcp.base import BaseAlgorithm, BaseTpcpObject
 
 _EMPTY = object()
 _DEFAULT_PARA_NAME = "__TPCP_DEFAULT"
@@ -36,6 +35,7 @@ def _aggregate_final_results(results: List) -> Dict:
     Example
     -------
     >>> results = [{'a': 1, 'b':10}, {'a': 2, 'b':2}, {'a': 3, 'b':3}, {'a': 10, 'b': 10}]
+    >>>
     >>> _aggregate_final_results(results)                        # doctest: +SKIP
     {'a': array([1, 2, 3, 10]),
      'b': array([10, 2, 3, 10])}
@@ -134,8 +134,8 @@ def _check_safe_run(pipeline: BaseAlgorithm, old_method: Callable, *args, **kwar
         )
     if not isinstance(output, type(pipeline)):
         raise ValueError(
-            f"The `{old_method.__name__}` method of {type(pipeline)} must return `self` or in rare cases a new instance "
-            f"of {type(pipeline)}. "
+            f"The `{old_method.__name__}` method of {type(pipeline)} must return `self` or in rare cases a new "
+            f"instance of {type(pipeline)}. "
             f"But the return value had the type {type(output)}."
         )
     if not output._action_is_applied:
@@ -148,15 +148,52 @@ def _check_safe_run(pipeline: BaseAlgorithm, old_method: Callable, *args, **kwar
 
 
 def safe_action(action_method: Callable):
+    """Apply a set of runtime checks to a custom action method to prevent implementation errors.
+
+    The following things are checked:
+
+        - The action method must return `self` (or at least an instance of the algorithm or pipeline)
+        - The action method must set result attributes on the pipeline
+        - All result attributes must have a trailing `_` in their name
+        - The action method must not modify the input parameters of the pipeline
+
+    In general we recommend to just apply this decorator to all custom action methods.
+    The runtime overhead is usually small enough to not make a difference.
+
+    The only execption are custom pipelines.
+    For pipelines, the `safe_run` method can be used as shortcut to call `run` with the same runtime checks,
+    this decorator provides.
+
+    Examples
+    --------
+    >>> from tpcp import BaseAlgorithm, safe_action
+    >>> class MyAlgorithm(BaseAlgorithm):
+    ...     _action_method = ("detect",)
+    ...
+    ...     @safe_action
+    ...     def detect(self):
+    ...         ...
+    ...         return self
+
+    """
+    if getattr(action_method, "__is_safe_action", False):
+        # It seems like the decorator was already applied and we do not want to apply it multiple times and run
+        # duplicated checks.
+        return action_method
+
     @wraps(action_method)
     def safe_wrapped(self: BaseAlgorithm, *args, **kwargs):
-        if not action_method.__name__ in self._get_action_methods():
+        if action_method.__name__ not in self._action_method:
             raise ValueError(
                 f"The `safe_action` decorator can only be applied to the action methods ({self._get_action_methods()} "
-                f"for {type(self)}) of an algorithm or methods"
+                f"for {type(self)}) of an algorithm or methods. "
+                f"To register an action method add the following to the class definition of {type(self)}:\n\n"
+                f"`    _action_method = ({action_method.__name__},)`\n\n"
+                "Or append it to the tuple, if it already exists."
             )
         return _check_safe_run(self, action_method, *args, **kwargs)
 
+    safe_wrapped.__is_safe_action = True
     return safe_wrapped
 
 

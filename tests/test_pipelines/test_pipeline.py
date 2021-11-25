@@ -34,6 +34,8 @@ class PipelineNoOutput(SimplePipeline):
         return self
 
 
+# TODO: Test with algorithms and not just pipeline
+# TODO: Test double apply
 class TestSafeRun:
     @pytest.mark.parametrize("pipe", (PipelineInputModify, PipelineInputModifyNested))
     def test_modify_input_paras_simple(self, pipe):
