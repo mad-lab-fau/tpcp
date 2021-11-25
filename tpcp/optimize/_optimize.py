@@ -20,7 +20,7 @@ from tpcp._utils._general import (
     _aggregate_final_results,
     _normalize_score_results,
     _prefix_para_dict,
-    _split_hyper_and_pure_parameters,
+    _split_hyper_and_pure_parameters, safe_optimize,
 )
 from tpcp._utils._multiprocess import init_progressbar
 from tpcp._utils._score import _optimize_and_score, _score
@@ -103,6 +103,8 @@ class Optimize(BaseOptimize):
     Optimize will never modify the original pipeline, but will store a copy of the optimized pipeline as
     `optimized_pipeline_`.
 
+    The wrapper applies the same runtime checks as provided by :ref:`~tpcp.safe_optimize`.
+
     Parameters
     ----------
     pipeline
@@ -155,27 +157,11 @@ class Optimize(BaseOptimize):
             raise ValueError(
                 "To use `Optimize` with a pipeline, the pipeline needs to implement a `self_optimize` method."
             )
-        # record the hash of the pipeline to make an educated guess if the optimization works
+        # We clone just to make sure runs are independent
         pipeline = self.pipeline.clone()
-        before_hash = joblib.hash(pipeline)
-        optimized_pipeline = pipeline.self_optimize(dataset, **optimize_params)
-        if not isinstance(optimized_pipeline, pipeline.__class__):
-            raise ValueError(
-                "Calling `self_optimize` did not return an instance of the pipeline itself! "
-                "Normally this method should return `self`."
-            )
-        # We clone the optimized pipeline again, to make sure that only changes to the input parameters are kept.
-        optimized_pipeline = optimized_pipeline.clone()
-        after_hash = joblib.hash(optimized_pipeline)
-        if before_hash == after_hash:
-            # If the hash didn't change the object didn't change.
-            # Something might have gone wrong.
-            warnings.warn(
-                "Optimizing the pipeline doesn't seem to have changed the parameters of the pipeline. "
-                "This could indicate an implementation error of the `self_optimize` method.",
-                PotentialUserErrorWarning,
-            )
-        self.optimized_pipeline_ = optimized_pipeline
+        optimized_pipeline = safe_optimize(pipeline.self_optimize)(dataset, **optimize_params)
+        # We clone again, just to be sure
+        self.optimized_pipeline_ = optimized_pipeline.clone()
         return self
 
 

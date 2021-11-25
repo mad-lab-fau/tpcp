@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import numbers
+import warnings
 from functools import wraps
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set, Tuple, Union
 
@@ -10,11 +11,13 @@ import joblib
 import numpy as np
 
 import tpcp._base
+from tpcp import OptimizablePipeline
+from tpcp.exceptions import PotentialUserErrorWarning
 
 if TYPE_CHECKING:
     from tpcp._base import Algo
 
-    from tpcp.base import BaseAlgorithm, BaseTpcpObject
+    from tpcp.base import BaseAlgorithm, BaseTpcpObject, OptimizableAlgorithm
 
 _EMPTY = object()
 _DEFAULT_PARA_NAME = "__TPCP_DEFAULT"
@@ -116,31 +119,31 @@ def _split_hyper_and_pure_parameters(
     return split_param_dict
 
 
-def _check_safe_run(pipeline: BaseAlgorithm, old_method: Callable, *args, **kwargs):
+def _check_safe_run(algorithm: BaseAlgorithm, old_method: Callable, *args, **kwargs):
     """Run the pipeline and check that run behaved as expected."""
-    before_paras = pipeline.get_params()
+    before_paras = algorithm.get_params()
     before_paras_hash = joblib.hash(before_paras)
-    output: BaseAlgorithm = old_method(pipeline, *args, **kwargs)
-    after_paras = pipeline.get_params()
+    output: BaseAlgorithm = old_method(algorithm, *args, **kwargs)
+    after_paras = algorithm.get_params()
     after_paras_hash = joblib.hash(after_paras)
     if not before_paras_hash == after_paras_hash:
         raise ValueError(
-            f"Running `{old_method.__name__}` of {type(pipeline)} did modify the parameters of the algorithm. "
-            "This must not happen to make sure individual runs of the pipeline are independent.\n\n"
+            f"Running `{old_method.__name__}` of {type(algorithm)} did modify the parameters of the algorithm. "
+            "This must not happen to make sure individual runs of the algorithm/pipeline are independent.\n\n"
             "This usually happens, when you use an algorithm object or other mutable objects as a parameter to your "
-            "pipeline. "
+            "algorithm/pipeline. "
             "In this case, make sure you call `algo_object.clone()` or more general `clone(mutable_input) on the "
             f"within the `{old_method.__name__}` method before modifying the mutable or running the nested algorithm."
         )
-    if not isinstance(output, type(pipeline)):
+    if not isinstance(output, type(algorithm)):
         raise ValueError(
-            f"The `{old_method.__name__}` method of {type(pipeline)} must return `self` or in rare cases a new "
-            f"instance of {type(pipeline)}. "
+            f"The `{old_method.__name__}` method of {type(algorithm)} must return `self` or in rare cases a new "
+            f"instance of {type(algorithm)}. "
             f"But the return value had the type {type(output)}."
         )
     if not output._action_is_applied:
         raise ValueError(
-            f"Running the `{old_method.__name__}` method of {type(pipeline)} did not set any results on the output. "
+            f"Running the `{old_method.__name__}` method of {type(algorithm)} did not set any results on the output. "
             f"Make sure the `{old_method.__name__}` method sets the result values as expected as class attributes and "
             f"all names of result attributes have a trailing `_` to mark them as such."
         )
@@ -171,7 +174,7 @@ def safe_action(action_method: Callable):
     ...     _action_method = ("detect",)
     ...
     ...     @safe_action
-    ...     def detect(self):
+    ...     def detect(self, data, sampling_rate_hz):
     ...         ...
     ...         return self
 
@@ -197,6 +200,92 @@ def safe_action(action_method: Callable):
     return safe_wrapped
 
 
+def _check_safe_optimize(
+    algorithm: Union[OptimizablePipeline, OptimizableAlgorithm], old_method: Callable, *args, **kwargs
+):
+    # record the hash of the pipeline to make an educated guess if the optimization works
+    before_hash = joblib.hash(algorithm)
+    optimized_algorithm = old_method(algorithm, *args, **kwargs)
+    if not isinstance(optimized_algorithm, algorithm.__class__):
+        raise ValueError(
+            "Calling `self_optimize` did not return an instance of the algorithm/pipeline itself! "
+            "Normally this method should return `self`."
+        )
+    # We calculate the hash afterwards twice.
+    # Once directly after the optimization and once after cloning.
+    # The first hash records any changes to the object.
+    # The second hash only records changes to the parameters, because everything else is removed by clone.
+    # Hence, if we see differences between the hashes, other things besides the parameters are changed.
+    after_hash = joblib.hash(optimized_algorithm)
+    after_hash_after_clone = joblib.hash(optimized_algorithm.clone())
+    if after_hash_after_clone != after_hash:
+        # TODO: Can we make that more precise and point to the attributes that have changed?
+        raise RuntimeError(
+            "Optimizing seems to have changed class attributes that are not parameters (i.e. not provided in the "
+            "`__init__`). "
+            "This can lead to unexpected issues!"
+        )
+    if before_hash == after_hash:
+        # If the hash didn't change the object didn't change.
+        # Something might have gone wrong.
+        warnings.warn(
+            "Optimizing the algorithm doesn't seem to have changed the parameters of the algorithm. "
+            "This could indicate an implementation error of the `self_optimize` method.",
+            PotentialUserErrorWarning,
+        )
+    return optimized_algorithm
+
+
+def safe_optimize(self_optimize_method: Callable):
+    """Apply a set of runtime checks to a custom `self_optimize` method to prevent implementation errors.
+
+    The following things are checked:
+
+        - The `self_optimize` method must return `self` (or at least an instance of the algorithm or pipeline).
+        - The `self_optimize` method must only modify input parameters of the pipeline and not any other attributes.
+        - The `self_optimize` method should modify at least one of the input parameters (this doesn't raise an error,
+          but just a warning).
+
+    In general we recommend to just apply this decorator to all custom `self_optimize` methods.
+    The runtime overhead is usually small enough to not make a difference.
+
+    The only execption are custom pipelines that you only optimize using the :ref:`~tpcp.optimize.Optimize` wrapper.
+    This wrapper will apply the same runtime checks anyway.
+    However, it doesn't hurt to apply it decorator as well.
+    We make sure that the cheks will still only be performed once.
+
+    Examples
+    --------
+    >>> from tpcp import OptimizableAlgorithm, safe_optimize
+    >>> class MyAlgorithm(OptimizableAlgorithm):
+    ...     def __init__(self, para_1: int = 4):
+    ...         self.para_1 = para_1
+    ...
+    ...     @safe_optimize
+    ...     def self_optimize(self, train_data, **kwargs):
+    ...         # find a better value for para_1 based on the provided trainings data
+    ...         self.para_1 = better_value_for_para_1
+    ...         return self
+
+    """
+    if getattr(self_optimize_method, "__is_safe_optimize", False):
+        # It seems like the decorator was already applied and we do not want to apply it multiple times and run
+        # duplicated checks.
+        return self_optimize_method
+
+    @wraps(self_optimize_method)
+    def safe_wrapped(self: Union[OptimizablePipeline, OptimizableAlgorithm], *args, **kwargs):
+        if self_optimize_method.__name__ != "self_optimize":
+            raise ValueError(
+                "The `safe_optimize` decorator is only meant for the `self_optimize` method, but you applied it to "
+                f"the `{self_optimize_method.__name__}` method"
+            )
+        return _check_safe_optimize(self, self_optimize_method, *args, **kwargs)
+
+    safe_wrapped.__is_safe_optimize = True
+    return safe_wrapped
+
+
 def clone(
     algorithm: Union[BaseTpcpObject, List[BaseTpcpObject], Set[BaseTpcpObject], Tuple[BaseTpcpObject]],
     *,
@@ -215,7 +304,7 @@ def clone(
                   `sklearn.clone` will remove the trained model from sklearn object by creating a new instance.
                   This clone method, will deepcopy sklearn models.
                   This means fitted models will be copied and are still available afterwards.
-                  For more information have a look at the documenation about "inputs and results" in tpcp.
+                  For more information have a look at the documentation about "inputs and results" in tpcp.
                   TODO: Link
 
     Parameters
