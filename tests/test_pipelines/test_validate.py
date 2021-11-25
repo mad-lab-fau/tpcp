@@ -26,11 +26,12 @@ class TestCrossValidate:
         cv = KFold(n_splits=len(ds))
         train, test = zip(*cv.split(ds))
         with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=pipeline) as mock:
+            mock.__name__ = "self_optimize"
             cross_validate(Optimize(pipeline), ds, cv=cv, scoring=lambda x, y: 1)
 
         assert mock.call_count == len(train)
         for expected, actual in zip(train, mock.call_args_list):
-            pd.testing.assert_frame_equal(ds[expected].index, actual[0][0].index)
+            pd.testing.assert_frame_equal(ds[expected].index, actual[0][1].index)
 
     def test_run_called(self):
         """Test that optimize of the pipeline is called correctly."""

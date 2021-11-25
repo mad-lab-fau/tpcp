@@ -8,7 +8,6 @@ from itertools import product
 from tempfile import TemporaryDirectory
 from typing import Any, Callable, Dict, Iterator, List, Optional, Union
 
-import joblib
 import numpy as np
 from joblib import Memory, Parallel, delayed
 from numpy.ma import MaskedArray
@@ -20,7 +19,8 @@ from tpcp._utils._general import (
     _aggregate_final_results,
     _normalize_score_results,
     _prefix_para_dict,
-    _split_hyper_and_pure_parameters, safe_optimize,
+    _split_hyper_and_pure_parameters,
+    safe_optimize,
 )
 from tpcp._utils._multiprocess import init_progressbar
 from tpcp._utils._score import _optimize_and_score, _score
@@ -159,7 +159,7 @@ class Optimize(BaseOptimize):
             )
         # We clone just to make sure runs are independent
         pipeline = self.pipeline.clone()
-        optimized_pipeline = safe_optimize(pipeline.self_optimize)(dataset, **optimize_params)
+        optimized_pipeline = safe_optimize(pipeline.self_optimize)(pipeline, dataset, **optimize_params)
         # We clone again, just to be sure
         self.optimized_pipeline_ = optimized_pipeline.clone()
         return self
