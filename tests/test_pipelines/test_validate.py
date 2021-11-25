@@ -12,7 +12,7 @@ from tests.test_pipelines.conftest import (
     dummy_single_score_func,
 )
 from tpcp.optimize import Optimize
-from tpcp.validation import cross_validate
+from tpcp.validate import cross_validate
 
 
 class TestCrossValidate:

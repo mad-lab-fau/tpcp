@@ -11,8 +11,8 @@ from tests.test_pipelines.conftest import (
     dummy_multi_score_func,
     dummy_single_score_func,
 )
-from tpcp.validation import Scorer
-from tpcp.validation._scorer import _passthrough_scoring, _validate_scorer
+from tpcp.validate import Scorer
+from tpcp.validate._scorer import _passthrough_scoring, _validate_scorer
 
 
 class TestScorerCalls:

@@ -14,7 +14,7 @@ from tpcp._utils._general import _aggregate_final_results, _normalize_score_resu
 from tpcp._utils._multiprocess import init_progressbar
 from tpcp._utils._score import _optimize_and_score
 from tpcp.base import BaseOptimize
-from tpcp.validation._scorer import _ERROR_SCORE_TYPE, _validate_scorer
+from tpcp.validate._scorer import _ERROR_SCORE_TYPE, _validate_scorer
 
 
 def cross_validate(

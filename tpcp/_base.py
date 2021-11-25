@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import inspect
 from collections import defaultdict
-from typing import Any, DefaultDict, Dict, List, Type, TypeVar
+from typing import Any, DefaultDict, Dict, List, TypeVar
 
 import tpcp._utils._general as gen_utils
 
@@ -55,19 +55,6 @@ class _BaseTpcpObject:
         # Consider the constructor parameters excluding 'self'
         defaults = {k: p for k, p in init_signature.parameters.items() if p.name != "self" and p.kind != p.VAR_KEYWORD}
         return defaults
-
-    @classmethod
-    def _get_subclasses(cls: Type[Algo]):
-        for subclass in cls.__subclasses__():
-            yield from subclass._get_subclasses()
-            yield subclass
-
-    @classmethod
-    def _find_subclass(cls: Type[Algo], name: str) -> Type[Algo]:
-        for subclass in _BaseTpcpObject._get_subclasses():
-            if subclass.__name__ == name:
-                return subclass
-        raise ValueError(f"No algorithm class with name {name} exists")
 
     def _get_params_without_nested_class(self) -> Dict[str, Any]:
         return {k: v for k, v in self.get_params().items() if not isinstance(v, _BaseTpcpObject)}

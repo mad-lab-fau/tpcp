@@ -1,14 +1,14 @@
-tpcp.optimize: Validation helper
-==================================
+tpcp.validate: Validation helper
+================================
 
-.. automodule:: tpcp.validation
+.. automodule:: tpcp.validate
     :no-members:
     :no-inherited-members:
 
 Classes
 -------
 
-.. currentmodule:: tpcp.validation
+.. currentmodule:: tpcp.validate
 
 .. autosummary::
    :toctree: generated/base
@@ -18,7 +18,7 @@ Classes
 
 Functions
 ---------
-.. currentmodule:: tpcp.validation
+.. currentmodule:: tpcp.validate
 
 .. autosummary::
    :toctree: generated/base
