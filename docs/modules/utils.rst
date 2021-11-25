@@ -13,3 +13,5 @@ Utility functions
     default
     mdf
     clone
+    safe_action
+    safe_optimize
