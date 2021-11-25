@@ -5,7 +5,7 @@ from __future__ import annotations
 import types
 from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple
 
-from tpcp._base import _BaseTpcpObject, Algo
+from tpcp._base import Algo, _BaseTpcpObject
 from tpcp._meta import AlgorithmMeta
 
 if TYPE_CHECKING:
@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
 
 class Optimizable:
+    """Mixin class to mark an object as optimizable."""
+
     def self_optimize(self: Algo, dataset: Dataset, **kwargs) -> Algo:
         """Optimize the input parameter of the pipeline or algorithm using any logic.
 
