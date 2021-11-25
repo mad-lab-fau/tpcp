@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import copy
 import numbers
-from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
+from functools import wraps
+from types import MethodType
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union, Callable
 
 import joblib
 import numpy as np
@@ -13,7 +15,7 @@ import tpcp._base
 if TYPE_CHECKING:
     from tpcp import SimplePipeline
     from tpcp._base import Algo
-    from tpcp.base import BaseTpcpObject
+    from tpcp.base import BaseTpcpObject, BaseAlgorithm
 
 _EMPTY = object()
 _DEFAULT_PARA_NAME = "__TPCP_DEFAULT"
@@ -114,34 +116,48 @@ def _split_hyper_and_pure_parameters(
     return split_param_dict
 
 
-def _check_safe_run(pipeline: SimplePipeline, *args, **kwargs):
+def _check_safe_run(pipeline: BaseAlgorithm, old_method: Callable, *args, **kwargs):
     """Run the pipeline and check that run behaved as expected."""
     before_paras = pipeline.get_params()
     before_paras_hash = joblib.hash(before_paras)
-    output: SimplePipeline = pipeline.run(*args, **kwargs)
+    output: BaseAlgorithm = old_method(pipeline, *args, **kwargs)
     after_paras = pipeline.get_params()
     after_paras_hash = joblib.hash(after_paras)
     if not before_paras_hash == after_paras_hash:
         raise ValueError(
-            "Running the pipeline did modify the parameters of the pipeline. "
+            f"Running `{old_method.__name__}` of {type(pipeline)} did modify the parameters of the algorithm. "
             "This must not happen to make sure individual runs of the pipeline are independent.\n\n"
-            "This usually happens, when you use an algorithm object as a parameter to your pipeline. "
-            "In this case, make sure you call `algo_object.clone()` on the algorithm object before using "
-            "it in the run method"
+            "This usually happens, when you use an algorithm object or other mutable objects as a parameter to your "
+            "pipeline. "
+            "In this case, make sure you call `algo_object.clone()` or more general `clone(mutable_input) on the "
+            f"within the `{old_method.__name__}` method before modifying the mutable or running the nested algorithm."
         )
     if not isinstance(output, type(pipeline)):
         raise ValueError(
-            "The `run` method of the pipeline must return `self` or in rare cases a new instance of the "
-            "pipeline itself. "
-            f"But the return value had the type {type(output)}"
+            f"The `{old_method.__name__}` method of {type(pipeline)} must return `self` or in rare cases a new instance "
+            f"of {type(pipeline)}. "
+            f"But the return value had the type {type(output)}."
         )
     if not output._action_is_applied:
         raise ValueError(
-            "Running the pipeline did not set any results on the output. "
-            "Make sure the `run` method sets the result values as expected as class attributes and all "
-            "names of result attributes have a trailing `_` to mark them as such."
+            f"Running the `{old_method.__name__}` method of {type(pipeline)} did not set any results on the output. "
+            f"Make sure the `{old_method.__name__}` method sets the result values as expected as class attributes and "
+            f"all names of result attributes have a trailing `_` to mark them as such."
         )
     return output
+
+
+def safe_action(action_method: Callable):
+    @wraps(action_method)
+    def safe_wrapped(self: BaseAlgorithm, *args, **kwargs):
+        if not action_method.__name__ in self._get_action_methods():
+            raise ValueError(
+                f"The `safe_action` decorator can only be applied to the action methods ({self._get_action_methods()} "
+                f"for {type(self)}) of an algorithm or methods"
+            )
+        return _check_safe_run(self, action_method, *args, **kwargs)
+
+    return safe_wrapped
 
 
 def clone(

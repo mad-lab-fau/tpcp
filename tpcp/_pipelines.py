@@ -2,7 +2,7 @@
 from typing import Dict, TypeVar, Union
 
 from tpcp._dataset import Dataset
-from tpcp._utils._general import _check_safe_run
+from tpcp._utils._general import safe_action
 from tpcp.base import BaseAlgorithm, Optimizable
 
 Self = TypeVar("Self", bound="SimplePipeline")
@@ -38,6 +38,7 @@ class SimplePipeline(BaseAlgorithm, safe=True):
         """
         raise NotImplementedError()  # pragma: no cover
 
+    @safe_action
     def safe_run(self: Self, datapoint: Dataset) -> Self:
         """Run the pipeline with some additional checks.
 
@@ -63,7 +64,7 @@ class SimplePipeline(BaseAlgorithm, safe=True):
             The class instance with all result attributes populated
 
         """
-        return _check_safe_run(self, datapoint)
+        return self.run(datapoint)
 
     def score(self, datapoint: Dataset) -> Union[float, Dict[str, float]]:
         """Calculate performance of the pipeline on a datapoint with reference information.
