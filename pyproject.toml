@@ -71,7 +71,7 @@ lint = { cmd = "prospector", help = "Lint all files with Prospector." }
 _check_black = "black . --check"
 _check_isort = "isort . --check"
 check = { sequence = ["_check_black", "_check_isort", "lint"], help = "Check all potential format and linting issues.", ignore_fail = true }
-test = { cmd = "pytest --cov=tpcp --cov-report=xml", help = "Run Pytest with coverage." }
+test = { cmd = "pytest --cov=tpcp --cov-report=term-missing --cov-report=xml", help = "Run Pytest with coverage." }
 docs = { "script" = "_tasks:task_docs()",  help = "Build the html docs using Sphinx." }
 bump_version = { "script" = "_tasks:task_update_version()" }
 
