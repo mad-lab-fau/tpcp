@@ -61,7 +61,7 @@ class DummyOptimize(BaseOptimize):
 
     optimized_pipeline_: SimplePipeline
 
-    def __init__(self, pipeline: SimplePipeline):
+    def __init__(self, pipeline: SimplePipeline):  # noqa: super-init-not-called
         self.pipeline = pipeline
 
     def optimize(self, dataset: Dataset, **optimize_params):
@@ -126,7 +126,7 @@ class Optimize(BaseOptimize):
 
     optimized_pipeline_: OptimizablePipeline
 
-    def __init__(self, pipeline: OptimizablePipeline):
+    def __init__(self, pipeline: OptimizablePipeline):  # noqa: super-init-not-called
         self.pipeline = pipeline
 
     def optimize(self, dataset: Dataset, **optimize_params):
@@ -290,7 +290,7 @@ class GridSearch(BaseOptimize):
     best_score_: float
     multimetric_: bool
 
-    def __init__(
+    def __init__(  # noqa: super-init-not-called
         self,
         pipeline: SimplePipeline,
         parameter_grid: ParameterGrid,
@@ -586,7 +586,7 @@ class GridSearchCV(BaseOptimize):
     multimetric_: bool
     final_optimize_time_: float
 
-    def __init__(
+    def __init__(  # noqa: super-init-not-called
         self,
         pipeline: OptimizablePipeline,
         parameter_grid: ParameterGrid,

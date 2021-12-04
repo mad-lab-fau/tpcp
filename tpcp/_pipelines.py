@@ -8,7 +8,7 @@ from tpcp.base import BaseAlgorithm, Optimizable
 Self = TypeVar("Self", bound="SimplePipeline")
 
 
-class SimplePipeline(BaseAlgorithm):
+class SimplePipeline(BaseAlgorithm, safe=True):
     """Baseclass for all custom pipelines.
 
     To create your own custom pipeline, subclass this class and implement `run`.
@@ -90,7 +90,7 @@ class SimplePipeline(BaseAlgorithm):
         raise NotImplementedError()  # pragma: no cover
 
 
-class OptimizablePipeline(SimplePipeline, Optimizable):
+class OptimizablePipeline(SimplePipeline, Optimizable, safe=True):
     """Pipeline with custom ways to optimize and/or train input parameters.
 
     OptimizablePipelines are expected to implement a concrete way to train internal models or optimize parameters.

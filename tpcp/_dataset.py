@@ -9,7 +9,7 @@ from tpcp.base import BaseTpcpObject
 Self = TypeVar("Self", bound="Dataset")
 
 
-class Dataset(BaseTpcpObject):
+class Dataset(BaseTpcpObject, safe=True):
     """Baseclass for tpcp Dataset objects.
 
     This class provides fundamental functionality like iteration, getting subsets and compatibility with sklearn's
@@ -190,7 +190,7 @@ class Dataset(BaseTpcpObject):
     groupby_cols: Optional[Union[List[str], str]]
     subset_index: Optional[pd.DataFrame]
 
-    def __init__(
+    def __init__(  # noqa: super-init-not-called
         self,
         *,
         groupby_cols: Optional[Union[List[str], str]] = None,

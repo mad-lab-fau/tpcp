@@ -6,7 +6,6 @@ import types
 from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple
 
 from tpcp._base import Algo, _BaseTpcpObject
-from tpcp._meta import AlgorithmMeta
 
 if TYPE_CHECKING:
     from tpcp import Dataset, SimplePipeline
@@ -42,11 +41,11 @@ class Optimizable:
         raise NotImplementedError()  # pragma: no cover
 
 
-class BaseTpcpObject(_BaseTpcpObject, metaclass=AlgorithmMeta):
+class BaseTpcpObject(_BaseTpcpObject, safe=True):
     """Baseclass for all tpcp objects."""
 
 
-class BaseAlgorithm(BaseTpcpObject):
+class BaseAlgorithm(BaseTpcpObject, safe=True):
     """Base class for all algorithms.
 
     All type-specific algorithm classes should inherit from this class and need to
@@ -134,11 +133,11 @@ class BaseAlgorithm(BaseTpcpObject):
         return attrs
 
 
-class OptimizableAlgorithm(BaseAlgorithm, Optimizable):
+class OptimizableAlgorithm(BaseAlgorithm, Optimizable, safe=True):
     """Baseclass for a algorithm with native optimization."""
 
 
-class BaseOptimize(BaseAlgorithm):
+class BaseOptimize(BaseAlgorithm, safe=True):
     """Base class for all optimizer."""
 
     pipeline: SimplePipeline

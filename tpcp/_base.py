@@ -7,14 +7,51 @@ from __future__ import annotations
 
 import inspect
 from collections import defaultdict
-from typing import Any, DefaultDict, Dict, List, TypeVar
+from functools import wraps
+from inspect import Parameter
+from typing import Any, DefaultDict, Dict, List, Tuple, TypeVar
 
 import tpcp._utils._general as gen_utils
+from tpcp._utils._general import _DEFAULT_PARA_NAME
+from tpcp.exceptions import MutableDefaultsError
 
 Algo = TypeVar("Algo", bound="_BaseTpcpObject")
 
 
 class _BaseTpcpObject:
+    def __init_subclass__(cls, safe=False, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if safe is True:
+            # This allows users to disable all "metaclass" magic and this is also used for library internal base
+            # objects to reduce the number of operations that are performed on start up.
+            return
+        # For the type checker
+        assert issubclass(cls, _BaseTpcpObject)
+        init_defaults = cls._get_init_defaults()
+        if init_defaults:
+            listed_mutables = {k: (v.default, _is_dangerous_mutable(v)) for k, v in init_defaults.items()}
+            # Mutables not wrapped in default
+            unwrapped_mutables = {k: v[0] for k, v in listed_mutables.items() if v[1] is True}
+            # Mutables that are wrapped in default
+            wrapped_mutables = {k: v[0] for k, v in listed_mutables.items() if v[1] is False}
+            if len(unwrapped_mutables) > 0:
+                raise MutableDefaultsError(
+                    f"The class {cls.__name__} contains mutable objects as default values ({unwrapped_mutables}). "
+                    "This can lead to unexpected and unpleasant issues! "
+                    "To solve this issue wrap your mutable default arguments explicitly with `default` "
+                    "(or `df`). "
+                    "This will enforce a clone/copy of the respective input, whenever a new instance of "
+                    "your Algorithm or Pipeline is created. "
+                    "\n"
+                    "Note, that we do not check for all cases of mutable objects. "
+                    f"At the moment, we check only for {_get_dangerous_mutable_types()}. "
+                    "To learn more about this topic, check TODO: LINK."
+                )
+            # Finally we wrap the init to replace the marked mutables on each class init.
+            # We only do that when there are actual arguments that need to be wrapped.
+            if wrapped_mutables and cls.__init__ is not object.__init__:
+                cls.__init__ = _replace_defaults_wrapper(cls.__init__)
+
     @classmethod
     def _get_param_names(cls) -> List[str]:
         """Get parameter names for the estimator.
@@ -118,3 +155,49 @@ class _BaseTpcpObject:
         This will create a new instance of the class itself and all nested objects
         """
         return gen_utils.clone(self, safe=True)
+
+
+def _get_dangerous_mutable_types() -> Tuple[type]:
+    # TODO: Update this list or even make it a white list?
+    return (_BaseTpcpObject,)
+
+
+def _is_dangerous_mutable(para: Parameter):
+    """Check if a parameter is one of the mutable objects "considered" dangerous.
+
+    If None, it is not a mutable from the list
+    If True, it is a mutable not wrapped in default
+    If False, it is a mutable from the list, but not dangerous, because it is wrapped in `default`.
+    """
+    val = para.default
+    if not isinstance(val, _get_dangerous_mutable_types()):
+        return None
+    if getattr(val, _DEFAULT_PARA_NAME, None):
+        return False
+    return True
+
+
+def _replace_defaults_wrapper(old_init):
+    """A decorator inteded to wrap an init to create new instances of mutable defaults.
+
+    This should only be used in combiantion with `default` and will be applied as part of `__init_subclass`.
+    Direct usage of this decorator should not be required.
+    """
+    @wraps(old_init)
+    def new_init(self, *args, **kwargs):
+        # Overwriting call overwrites the instance creation of the final class
+        old_init(self, *args, **kwargs)
+        assert isinstance(self, _BaseTpcpObject)
+        # Check if any of the initial values has a "default parameter flag".
+        # If yes we replace it with a clone (in case of a tpcp object) or a deepcopy in case of other objects.
+        for k, v in self.get_params(deep=False).items():
+            if getattr(v, _DEFAULT_PARA_NAME, None):
+                cloned_object = gen_utils.clone(v)
+                # In case we made a deepcopy, we need to remove the default param.
+                try:
+                    delattr(cloned_object, _DEFAULT_PARA_NAME)
+                except AttributeError:
+                    pass
+                setattr(self, k, cloned_object)
+
+    return new_init
