@@ -24,7 +24,7 @@ _SINGLE_SCORE_TYPE = Union[Dict[str, np.ndarray], np.ndarray]  # noqa: invalid-n
 if TYPE_CHECKING:
     from tpcp import Dataset, SimplePipeline
     from tpcp.optimize import BaseOptimize
-    from tpcp.validation import Scorer
+    from tpcp.validate import Scorer
 
 
 class ScoreResults(TypedDict, total=False):
