@@ -178,16 +178,17 @@ def _is_dangerous_mutable(para: Parameter):
 
 
 def _replace_defaults_wrapper(old_init):
-    """A decorator inteded to wrap an init to create new instances of mutable defaults.
+    """Decorate an init to create new instances of mutable defaults.
 
     This should only be used in combiantion with `default` and will be applied as part of `__init_subclass`.
     Direct usage of this decorator should not be required.
     """
+
     @wraps(old_init)
     def new_init(self, *args, **kwargs):
-        # Overwriting call overwrites the instance creation of the final class
+        # call the old init.
         old_init(self, *args, **kwargs)
-        assert isinstance(self, _BaseTpcpObject)
+        assert isinstance(self, _BaseTpcpObject)  # For the type checker
         # Check if any of the initial values has a "default parameter flag".
         # If yes we replace it with a clone (in case of a tpcp object) or a deepcopy in case of other objects.
         for k, v in self.get_params(deep=False).items():
