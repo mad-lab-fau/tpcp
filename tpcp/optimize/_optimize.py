@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Dict, Iterator, List, Optional, Union
+from typing import Any, Callable, Dict, Iterator, List, Optional, Union, overload
 
 import numpy as np
 from joblib import Memory, Parallel, delayed
@@ -14,23 +14,25 @@ from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
 
-from tpcp import Dataset, OptimizablePipeline, SimplePipeline
+from tpcp import Dataset, OptimizablePipeline, Pipeline
+from tpcp._algorithm import BaseOptimize
+from tpcp._algorithm_utils import _check_safe_optimize
+from tpcp._base import get_param_names
+from tpcp._parameter import para
 from tpcp._utils._general import (
     _aggregate_final_results,
     _normalize_score_results,
     _prefix_para_dict,
     _split_hyper_and_pure_parameters,
-    safe_optimize,
 )
 from tpcp._utils._multiprocess import init_progressbar
 from tpcp._utils._score import _optimize_and_score, _score
-from tpcp.base import BaseOptimize
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.validate import Scorer
 from tpcp.validate._scorer import _ERROR_SCORE_TYPE, _validate_scorer
 
 
-class DummyOptimize(BaseOptimize):
+class DummyOptimize(BaseOptimize, _skip_validation=True):
     """Provide API compatibility for SimplePipelines in optimize wrappers.
 
     This is a simple dummy Optimizer, that will **not** optimize anything, but just provide the correct api so that
@@ -57,11 +59,11 @@ class DummyOptimize(BaseOptimize):
 
     """
 
-    pipeline: SimplePipeline
+    pipeline: Pipeline
 
-    optimized_pipeline_: SimplePipeline
+    optimized_pipeline_: Pipeline
 
-    def __init__(self, pipeline: SimplePipeline):  # noqa: super-init-not-called
+    def __init__(self, pipeline: Pipeline) -> None:   # noqa: super-init-not-called
         self.pipeline = pipeline
 
     def optimize(self, dataset: Dataset, **optimize_params):
@@ -103,13 +105,18 @@ class Optimize(BaseOptimize):
     Optimize will never modify the original pipeline, but will store a copy of the optimized pipeline as
     `optimized_pipeline_`.
 
-    The wrapper applies the same runtime checks as provided by :ref:`~tpcp.safe_optimize`.
+    If `safe_optimize` is True, the wrapper applies the same runtime checks as provided by
+    :func:`~tpcp.make_optimize_safe`.
 
     Parameters
     ----------
     pipeline
         The pipeline to optimize.
         The pipeline must implement `self_optimize` to optimize its own input parameters.
+    safe_optimize
+        If True, we add additional checks to make sure the `self_optimize` method of the pipeline is correctly
+        implemented.
+        See :func:`~tpcp.make_optimize_safe` for more info.
 
     Other Parameters
     ----------------
@@ -125,11 +132,13 @@ class Optimize(BaseOptimize):
     """
 
     pipeline: OptimizablePipeline
+    safe_optimize: bool
 
     optimized_pipeline_: OptimizablePipeline
 
-    def __init__(self, pipeline: OptimizablePipeline):  # noqa: super-init-not-called
+    def __init__(self, pipeline: OptimizablePipeline, safe_optimize: bool = False) -> None:
         self.pipeline = pipeline
+        self.safe_optimize = safe_optimize
 
     def optimize(self, dataset: Dataset, **optimize_params):
         """Run the self-optimization defined by the pipeline.
@@ -159,7 +168,12 @@ class Optimize(BaseOptimize):
             )
         # We clone just to make sure runs are independent
         pipeline = self.pipeline.clone()
-        optimized_pipeline = safe_optimize(pipeline.self_optimize)(pipeline, dataset, **optimize_params)
+        if self.safe_optimize is True:
+            # Ideally, the self_optimize method should already be wrapped by the user, but we do it again, just in case.
+            # `make_optimize_safe` has a safe-guard and does not apply the decorator twice
+            optimized_pipeline = _check_safe_optimize(pipeline, pipeline.self_optimize, dataset, **optimize_params)
+        else:
+            optimized_pipeline = pipeline.self_optimize(dataset, **optimize_params)
         # We clone again, just to be sure
         self.optimized_pipeline_ = optimized_pipeline.clone()
         return self
@@ -276,18 +290,17 @@ class GridSearch(BaseOptimize):
     best_score_: float
     multimetric_: bool
 
-    def __init__(  # noqa: super-init-not-called
+    def __init__(
         self,
-        pipeline: SimplePipeline,
+        pipeline: Pipeline,
         parameter_grid: ParameterGrid,
-        *,
         scoring: Optional[Union[Callable, Scorer]] = None,
         n_jobs: Optional[int] = None,
-        pre_dispatch: Union[int, str] = "n_jobs",
         return_optimized: Union[bool, str] = True,
+        pre_dispatch: Union[int, str] = "n_jobs",
         error_score: _ERROR_SCORE_TYPE = np.nan,
         progress_bar: bool = True,
-    ):
+    ) -> None:
         self.pipeline = pipeline
         self.parameter_grid = parameter_grid
         self.scoring = scoring
@@ -450,7 +463,7 @@ class GridSearchCV(BaseOptimize):
         An integer specifying the number of folds in a K-Fold cross-validation or a valid cross validation helper.
         The default (`None`) will result in a 5-fold cross validation.
         For further inputs check the sklearn documentation.
-    pure_parameter_names
+    pure_parameters
         .. warning: Do not use this option unless you fully understand it!
 
         A list of parameter names (named in the `parameter_grid`) that do not effect training aka are not
@@ -459,7 +472,13 @@ class GridSearchCV(BaseOptimize):
         repeated, if one of these parameters changes.
         However, setting it incorrectly can lead to hard to detect errors in the final results.
 
-        For more information on this approach see the :ref:`evaluation guide <algorithm_evaluation>`.
+        Instead of passing a list of names, you can also just set the value to `True`.
+        In this case all parameters of the provided pipeline that are marked as :func:`~tpcp.pure_parameter` are used.
+        Note, that pure parameters of nested objects are not considered, but only top-level attributes.
+        If you need to mark nested parameters as pure, use the first method and pass the names (with `__`) as part of
+        the list of names.
+
+        For more information on this approach see the :func:`evaluation guide <algorithm_evaluation>`.
     return_train_score
         If True the performance on the train score is returned in addition to the test score performance.
         Note, that this increases the runtime.
@@ -557,7 +576,7 @@ class GridSearchCV(BaseOptimize):
     scoring: Optional[Union[Callable, Scorer]]
     return_optimized: Union[bool, str]
     cv: Optional[Union[int, BaseCrossValidator, Iterator]]
-    pure_parameter_names: Optional[List[str]]
+    pure_parameters: Union[bool, List[str]]
     return_train_score: bool
     verbose: int
     n_jobs: Optional[int]
@@ -572,7 +591,7 @@ class GridSearchCV(BaseOptimize):
     multimetric_: bool
     final_optimize_time_: float
 
-    def __init__(  # noqa: super-init-not-called
+    def __init__(
         self,
         pipeline: OptimizablePipeline,
         parameter_grid: ParameterGrid,
@@ -580,20 +599,20 @@ class GridSearchCV(BaseOptimize):
         scoring: Optional[Union[Callable, Scorer]] = None,
         return_optimized: Union[bool, str] = True,
         cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
-        pure_parameter_names: Optional[List[str]] = None,
+        pure_parameters: Union[bool, List[str]] = False,
         return_train_score: bool = False,
         verbose: int = 0,
         n_jobs: Optional[int] = None,
         pre_dispatch: Union[int, str] = "n_jobs",
         error_score: _ERROR_SCORE_TYPE = np.nan,
-        progress_bar: bool = True,
-    ):
+        progress_bar: "bool" = True,
+    ) -> None:
         self.pipeline = pipeline
         self.parameter_grid = parameter_grid
         self.scoring = scoring
         self.return_optimized = return_optimized
         self.cv = cv
-        self.pure_parameter_names = pure_parameter_names
+        self.pure_parameters = pure_parameters
         self.return_train_score = return_train_score
         self.verbose = verbose
         self.n_jobs = n_jobs
@@ -615,8 +634,17 @@ class GridSearchCV(BaseOptimize):
         # For each para combi, we separate the pure parameters (parameters that do not effect the optimization) and
         # the hyperparameters.
         # This allows for massive caching optimizations in the `_optimize_and_score`.
+        if self.pure_parameters is False:
+            pure_parameters = []
+        elif self.pure_parameters is True:
+            #TODO: Fix this
+            # pure_parameters = get_param_names(type(self.pipeline), field_type="pure")
+            pass
+        else:
+            pure_parameters = self.pure_parameters
+
         parameters = list(self.parameter_grid)
-        split_parameters = _split_hyper_and_pure_parameters(parameters, self.pure_parameter_names)
+        split_parameters = _split_hyper_and_pure_parameters(parameters, pure_parameters)
         parameter_prefix = "pipeline__"
 
         # To enable the pure parameter performance improvement, we need to create a joblib cache in a temp dir that
@@ -625,7 +653,7 @@ class GridSearchCV(BaseOptimize):
         # might not be correctly invalidated, if GridSearchCv is called with a different pipeline or when the
         # pipeline itself is modified.
         tmp_dir_context = nullcontext()
-        if self.pure_parameter_names:
+        if pure_parameters:
             tmp_dir_context = TemporaryDirectory("joblib_tpcp_cache")
         with tmp_dir_context as cachedir:
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None

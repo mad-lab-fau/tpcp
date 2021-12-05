@@ -1,23 +1,24 @@
 """Base Classes for custom pipelines."""
-from typing import Dict, TypeVar, Union
+from typing import Dict, Tuple, TypeVar, Union
 
+from tpcp._algorithm import Algorithm
+from tpcp._algorithm_utils import make_action_safe, make_optimize_safe
 from tpcp._dataset import Dataset
-from tpcp._utils._general import safe_action
-from tpcp.base import BaseAlgorithm, Optimizable
 
-Self = TypeVar("Self", bound="SimplePipeline")
+Self = TypeVar("Self", bound="Pipeline")
 
 
-class SimplePipeline(BaseAlgorithm, safe=True):
+class Pipeline(Algorithm, _skip_validation=True):
     """Baseclass for all custom pipelines.
 
     To create your own custom pipeline, subclass this class and implement `run`.
     """
 
-    dataset_single: Dataset
+    _action_methods: Tuple[str, ...] = ("safe_run", "run")
 
-    _action_method = ("safe_run", "run")
+    datapoint: Dataset
 
+    @make_action_safe
     def run(self: Self, datapoint: Dataset) -> Self:
         """Run the pipeline.
 
@@ -38,7 +39,7 @@ class SimplePipeline(BaseAlgorithm, safe=True):
         """
         raise NotImplementedError()  # pragma: no cover
 
-    @safe_action
+    @make_action_safe
     def safe_run(self: Self, datapoint: Dataset) -> Self:
         """Run the pipeline with some additional checks.
 
@@ -91,7 +92,7 @@ class SimplePipeline(BaseAlgorithm, safe=True):
         raise NotImplementedError()  # pragma: no cover
 
 
-class OptimizablePipeline(SimplePipeline, Optimizable, safe=True):
+class OptimizablePipeline(Pipeline, _skip_validation=True):
     """Pipeline with custom ways to optimize and/or train input parameters.
 
     OptimizablePipelines are expected to implement a concrete way to train internal models or optimize parameters.
@@ -107,3 +108,30 @@ class OptimizablePipeline(SimplePipeline, Optimizable, safe=True):
     In any case, you should make sure that all optimized parameters are still there if you call `.clone()` on the
     optimized pipeline.
     """
+
+    @make_optimize_safe
+    def self_optimize(self: Self, dataset: Dataset, **kwargs) -> Self:
+        """Optimize the input parameter of the pipeline or algorithm using any logic.
+
+        This method can be used to adapt the input parameters (values provided in the init) based on any data driven
+        heuristic.
+
+        Note that the optimizations must only modify the input parameters (aka `self.clone` should retain the
+        optimization results).
+
+        Parameters
+        ----------
+        dataset
+            An instance of a :class:`tpcp.dataset.Dataset` containing one or multiple data points that can
+            be used for training.
+            The structure of the data and the available reference information will depend on the dataset.
+        kwargs
+            Additional parameter required for the optimization process.
+
+        Returns
+        -------
+        self
+            The class instance with optimized input parameters.
+
+        """
+        raise NotImplementedError()  # pragma: no cover

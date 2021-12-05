@@ -4,30 +4,28 @@ from unittest.mock import patch
 import pytest
 
 from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline
-from tpcp import Dataset, SimplePipeline, mdf
+from tpcp import Dataset, Pipeline, cf
+from tpcp._parameter import para
 
 
-class PipelineInputModify(SimplePipeline):
-    def __init__(self, test="a value"):
-        self.test = test
+class PipelineInputModify(Pipeline):
+    test = para("a value")
 
     def run(self, datapoint: Dataset):
         self.test = "another value"
         return self
 
 
-class PipelineInputModifyNested(SimplePipeline):
-    def __init__(self, pipe=mdf(PipelineInputModify())):
-        self.pipe = pipe
+class PipelineInputModifyNested(Pipeline):
+    pipe = para(cf(PipelineInputModify()))
 
     def run(self, datapoint: Dataset):
         self.pipe.run(datapoint)
         return self
 
 
-class PipelineNoOutput(SimplePipeline):
-    def __init__(self, test="a value"):
-        self.test = test
+class PipelineNoOutput(Pipeline):
+    test = para("a value")
 
     def run(self, datapoint: Dataset):
         self.not_a_output_paras = "something"

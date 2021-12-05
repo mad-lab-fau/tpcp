@@ -11,7 +11,7 @@ Classes
 .. currentmodule:: tpcp.optimize
 
 .. autosummary::
-   :toctree: generated/base
+   :toctree: generated/optimize
    :template: class_with_private.rst
 
     Optimize

@@ -1,7 +1,7 @@
 The pipeline base classes
 =========================
 
-.. automodule:: tpcp._pipelines
+.. automodule:: tpcp._pipeline
     :no-members:
     :no-inherited-members:
 
@@ -11,8 +11,8 @@ Classes
 .. currentmodule:: tpcp
 
 .. autosummary::
-   :toctree: generated/base
+   :toctree: generated/pipeline
    :template: class_with_private.rst
 
-    SimplePipeline
+    Pipeline
     OptimizablePipeline

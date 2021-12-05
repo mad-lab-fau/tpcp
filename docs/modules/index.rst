@@ -10,7 +10,8 @@ This is the API Reference for tpcp.
     :maxdepth: 1
 
     Dataset <dataset>
-    Custom Pipelines <pipelines>
+    Parameter and Custom Objects <parameter>
+    Custom Pipelines <pipeline>
+    Custom Algorithms <algorithm>
     Parameter Optimization <optimize>
-    Validation and Scoring <validation>
-    Utils <utils>
+    Validation and Scoring <validate>

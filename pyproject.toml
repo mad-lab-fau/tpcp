@@ -75,6 +75,8 @@ test = { cmd = "pytest --cov=tpcp --cov-report=term-missing --cov-report=xml", h
 docs = { "script" = "_tasks:task_docs()",  help = "Build the html docs using Sphinx." }
 bump_version = { "script" = "_tasks:task_update_version()" }
 
+ts = { "script" = "_tasks:generate_type_stub()"}
+
 [build-system]
 requires = ["poetry_core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
