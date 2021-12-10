@@ -85,21 +85,6 @@ def _replace_defaults_wrapper(old_init: callable):
     return new_init
 
 
-# def _collect_nested_annotations(cls: BaseTpcpObject, fields: List[attr.Attribute]):
-#     normal_fields, nested_fields = gen_utils.partition(lambda x: "__" in x.name, fields)
-#     cls.__nested_field_annotations__ = tuple(nested_fields)
-#     for f in cls.__nested_field_annotations__:
-#         if f.default != attr.NOTHING:
-#             raise ValidationError(
-#                 "Fields annotating nested parameters (aka fields with '__' in the name are not "
-#                 "allowed to have default values!"
-#                 "These fields are removed at runtime and are only there to mark nested objects as "
-#                 "hyper, optimizable, or pure parameter."
-#             )
-#         delattr(cls, f.name)
-#     return normal_fields
-
-
 class _BaseTpcpObject:
     # TODO: Rething the type of nested fields
     __field_annotations__: Tuple[Tuple[str, str], ...]
@@ -113,7 +98,9 @@ class _BaseTpcpObject:
         if _skip_validation is not True:
             _has_dangerous_mutable_default(fields, cls)
 
-        if cls.__init__ is not object.__init__ and any(isinstance(field.default, BaseFactory) for field in fields.values()):
+        if cls.__init__ is not object.__init__ and any(
+            isinstance(field.default, BaseFactory) for field in fields.values()
+        ):
             # In case we have fields that use a factory, we need to wrap the init to replace it
             cls.__init__ = _replace_defaults_wrapper(cls.__init__)
 
@@ -234,8 +221,8 @@ def get_param_names(cls: Type[_BaseTpcpObject]) -> List[str]:
     return sorted([p.name for p in parameters])
 
 
-def _has_all_defaults(fields, cls):
-    non_default_values = [f.name for f in fields if f.default is NOTHING]
+def _has_all_defaults(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]):
+    non_default_values = [k for k, f in fields.items() if f.default is inspect.Parameter.empty]
     if len(non_default_values) > 0:
         raise ValidationError(
             f"The class {cls.__name__} is expected to only have arguments with a proper default "
@@ -284,8 +271,7 @@ def _get_dangerous_mutable_types() -> Tuple[type, ...]:
 
 def _is_dangerous_mutable(field: inspect.Parameter):
     """Check if a parameter is one of the mutable objects "considered" dangerous."""
-    # TODO: NOTHING is not the correct check here anymore
-    if field.default is NOTHING or isinstance(field.default, BaseFactory):
+    if field.default is inspect.Parameter.empty or isinstance(field.default, BaseFactory):
         return False
     if isinstance(field.default, _get_dangerous_mutable_types()):
         return True

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Tuple, Union
 
 from tpcp._algorithm_utils import make_optimize_safe
-from tpcp._base import Algo, BaseTpcpObject
+from tpcp._base import Algo, BaseTpcpObject, _has_all_defaults, _get_init_defaults
 
 if TYPE_CHECKING:
     from tpcp import Dataset, Pipeline
@@ -58,18 +58,18 @@ class Algorithm(BaseTpcpObject, _skip_validation=True):
 
     _action_methods: Union[Tuple[str, ...], str]
 
-    # def __init_subclass__(cls, allow_non_defaults: bool = False, **kwargs):
-    #     """Initialize all algorithm subclasses.
-    #
-    #     Compared to all the normal checks, we also check, if all the input parameters have sensible defaults.
-    #     This is something we expect from algorithms, so that they can bve run without providing any parameters
-    #     explicitly.
-    #     """
-    #     super().__init_subclass__(**kwargs)
-    #
-    #     if cls._skip_validation is not True and allow_non_defaults is not True:
-    #         fields = attr.fields(cls)
-    #         _has_all_defaults(fields, cls)
+    def __init_subclass__(cls, _allow_non_defaults: bool = False, _skip_validation: bool = False, **kwargs):
+        """Initialize all algorithm subclasses.
+
+        Compared to all the normal checks, we also check, if all the input parameters have sensible defaults.
+        This is something we expect from algorithms, so that they can bve run without providing any parameters
+        explicitly.
+        """
+        super().__init_subclass__(**kwargs)
+
+        if _skip_validation is not True and _allow_non_defaults is not True:
+            fields = _get_init_defaults(cls)
+            _has_all_defaults(fields, cls)
 
 
 class OptimizableAlgorithm(Algorithm, _skip_validation=True):
@@ -103,11 +103,11 @@ class BaseOptimize(Algorithm, _skip_validation=True):
 
     optimized_pipeline_: Pipeline
 
-    # def __init_subclass__(cls, allow_non_defaults: bool = True, **kwargs):
-    #     """Initialize all Optimizer Subclasses."""
-    #     # Optimizers usually have the pipeline they optimize as first parameter.
-    #     # Therefore, this parameter is allowed to have no default.
-    #     super().__init_subclass__(allow_non_defaults=allow_non_defaults, **kwargs)
+    def __init_subclass__(cls, _allow_non_defaults: bool = True, **kwargs):
+        """Initialize all Optimizer Subclasses."""
+        # Optimizers usually have the pipeline they optimize as first parameter.
+        # Therefore, this parameter is allowed to have no default.
+        super().__init_subclass__(_allow_non_defaults=_allow_non_defaults, **kwargs)
 
     def optimize(self, dataset: Dataset, **optimize_params):
         """Apply some form of optimization on the the input parameters of the pipeline."""
