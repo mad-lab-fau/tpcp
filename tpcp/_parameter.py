@@ -1,7 +1,7 @@
 """Parameter helper functions to build Algorithm and Pipeline classes."""
 from functools import partial
 from inspect import cleandoc
-from typing import Any, Optional, Callable, List, Dict, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import attr
 
@@ -108,5 +108,3 @@ This has no negative side effect, besides disabling potential performance optimi
 """
 )
 purepara = pure_parameter
-
-

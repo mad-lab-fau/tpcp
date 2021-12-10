@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Dict, Iterator, List, Optional, Union, overload
+from typing import Any, Callable, Dict, Iterator, List, Optional, Union
 
 import numpy as np
 from joblib import Memory, Parallel, delayed
@@ -17,8 +17,6 @@ from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
 from tpcp import Dataset, OptimizablePipeline, Pipeline
 from tpcp._algorithm import BaseOptimize
 from tpcp._algorithm_utils import _check_safe_optimize
-from tpcp._base import get_param_names
-from tpcp._parameter import para
 from tpcp._utils._general import (
     _aggregate_final_results,
     _normalize_score_results,
@@ -63,7 +61,7 @@ class DummyOptimize(BaseOptimize, _skip_validation=True):
 
     optimized_pipeline_: Pipeline
 
-    def __init__(self, pipeline: Pipeline) -> None:   # noqa: super-init-not-called
+    def __init__(self, pipeline: Pipeline) -> None:  # noqa: super-init-not-called
         self.pipeline = pipeline
 
     def optimize(self, dataset: Dataset, **optimize_params):
@@ -637,7 +635,7 @@ class GridSearchCV(BaseOptimize):
         if self.pure_parameters is False:
             pure_parameters = []
         elif self.pure_parameters is True:
-            #TODO: Fix this
+            # TODO: Fix this
             # pure_parameters = get_param_names(type(self.pipeline), field_type="pure")
             pass
         else:

@@ -5,7 +5,7 @@ from typing import Any, Dict, Tuple
 import joblib
 import pytest
 
-from tpcp import Algorithm, clone, cf
+from tpcp import Algorithm, cf, clone
 from tpcp._algorithm_utils import (
     get_action_method,
     get_action_methods_names,
@@ -24,7 +24,9 @@ def _init_getter():
     return _fake_init
 
 
-def create_test_class(action_method_name, params=None, private_params=None, action_method_callable=None, **_) -> Algorithm:
+def create_test_class(
+    action_method_name, params=None, private_params=None, action_method_callable=None, **_
+) -> Algorithm:
     params = params or {}
     private_params = private_params or {}
 

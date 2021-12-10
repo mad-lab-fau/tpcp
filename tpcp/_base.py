@@ -10,7 +10,7 @@ import inspect
 import warnings
 from collections import defaultdict
 from functools import wraps
-from typing import Any, DefaultDict, Dict, List, Optional, Set, Tuple, TypeVar, Union, Type
+from typing import Any, DefaultDict, Dict, List, Optional, Set, Tuple, Type, TypeVar, Union
 
 import numpy as np
 
@@ -19,7 +19,7 @@ from tpcp.exceptions import MutableDefaultsError, ValidationError
 Algo = TypeVar("Algo", bound="_BaseTpcpObject")
 
 
-class _Nothing(object):
+class _Nothing:
     """Sentinel class to indicate the lack of a value when ``None`` is ambiguous.
 
     ``_Nothing`` is a singleton. There is only ever one of it.
@@ -63,8 +63,10 @@ def _get_init_defaults(cls: Type[_BaseTpcpObject]) -> Dict[str, inspect.Paramete
     defaults = {k: p for k, p in init_signature.parameters.items() if p.name != "self" and p.kind != p.VAR_KEYWORD}
     return defaults
 
+
 def _replace_defaults_wrapper(old_init: callable):
     """Decorate an init to create new instances of mutable defaults.
+
     This should only be used in combiantion with `default` and will be applied as part of `__init_subclass`.
     Direct usage of this decorator should not be required.
     """
@@ -77,9 +79,11 @@ def _replace_defaults_wrapper(old_init: callable):
         # Check if any of the initial values has a "default parameter flag".
         # If yes we replace it with a clone (in case of a tpcp object) or a deepcopy in case of other objects.
         for k, v in self.get_params(deep=False).items():
-            if isinstance(v, Factory):
+            if isinstance(v, BaseFactory):
                 setattr(self, k, v.get_value())
+
     return new_init
+
 
 # def _collect_nested_annotations(cls: BaseTpcpObject, fields: List[attr.Attribute]):
 #     normal_fields, nested_fields = gen_utils.partition(lambda x: "__" in x.name, fields)
@@ -99,20 +103,17 @@ def _replace_defaults_wrapper(old_init: callable):
 class _BaseTpcpObject:
     # TODO: Rething the type of nested fields
     __field_annotations__: Tuple[Tuple[str, str], ...]
-    _skip_validation: bool
 
     def __init_subclass__(cls, _skip_validation: bool = False, **kwargs):
         super().__init_subclass__(**kwargs)
         # Because we overwrite the value for each subclass, it is the facto not inheritable
-        cls._skip_validation = _skip_validation
-
         fields = _get_init_defaults(cls)
 
         # Validation
-        if cls._skip_validation is not True:
+        if _skip_validation is not True:
             _has_dangerous_mutable_default(fields, cls)
 
-        if any(isinstance(field.default, Factory) for field in fields.values()):
+        if cls.__init__ is not object.__init__ and any(isinstance(field.default, BaseFactory) for field in fields.values()):
             # In case we have fields that use a factory, we need to wrap the init to replace it
             cls.__init__ = _replace_defaults_wrapper(cls.__init__)
 
@@ -206,7 +207,7 @@ def get_annotated_fields(
     ...
 
 
-def get_param_names(cls: Type[_BaseTpcpObject]):
+def get_param_names(cls: Type[_BaseTpcpObject]) -> List[str]:
     """Get parameter names for the object.
 
     The parameters of an algorithm/pipeline are defined based on its `__init__` method.
@@ -215,10 +216,12 @@ def get_param_names(cls: Type[_BaseTpcpObject]):
     Notes
     -----
     Adopted based on `sklearn BaseEstimator._get_param_names`.
+
     Returns
     -------
     param_names
         List of parameter names of the algorithm
+
     """
     parameters = list(_get_init_defaults(cls).values())
     for p in parameters:
@@ -282,7 +285,7 @@ def _get_dangerous_mutable_types() -> Tuple[type, ...]:
 def _is_dangerous_mutable(field: inspect.Parameter):
     """Check if a parameter is one of the mutable objects "considered" dangerous."""
     # TODO: NOTHING is not the correct check here anymore
-    if field.default is NOTHING or isinstance(field.default, Factory):
+    if field.default is NOTHING or isinstance(field.default, BaseFactory):
         return False
     if isinstance(field.default, _get_dangerous_mutable_types()):
         return True
@@ -363,14 +366,14 @@ def clone(
     return new_object
 
 
-class Factory:
+class BaseFactory:
     """Baseclass for factories to circumvent mutable defaults."""
 
     def get_value(self):
         raise NotImplementedError()
 
 
-class CloneFactory(Factory):
+class CloneFactory(BaseFactory):
     """Init factory that creates a clone of the provided default values on instance initialisation.
 
     This can be used to make sure that each instance get there own version own copy of a mutable default of a class

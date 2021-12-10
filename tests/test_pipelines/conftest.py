@@ -2,7 +2,7 @@ from itertools import product
 
 import pandas as pd
 
-from tpcp import make_optimize_safe, cf
+from tpcp import cf, make_optimize_safe
 from tpcp._dataset import Dataset
 from tpcp._pipeline import OptimizablePipeline, Pipeline
 

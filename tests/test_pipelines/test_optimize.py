@@ -8,7 +8,6 @@ import pandas as pd
 import pytest
 from sklearn.model_selection import ParameterGrid, PredefinedSplit
 
-import tpcp._base
 from tests.mixins.test_algorithm_mixin import TestAlgorithmMixin
 from tests.test_pipelines.conftest import (
     DummyDataset,

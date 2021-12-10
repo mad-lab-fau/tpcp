@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 
 from tpcp._algorithm import BaseTpcpObject
-from tpcp._parameter import para
 
 Self = TypeVar("Self", bound="Dataset")
 

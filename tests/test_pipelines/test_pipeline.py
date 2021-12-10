@@ -5,7 +5,6 @@ import pytest
 
 from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline
 from tpcp import Dataset, Pipeline, cf
-from tpcp._parameter import para
 
 
 class PipelineInputModify(Pipeline):

@@ -4,11 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Tuple, Union
 
-import attr
-
 from tpcp._algorithm_utils import make_optimize_safe
-from tpcp._base import Algo, BaseTpcpObject, _has_all_defaults
-from tpcp._parameter import para
+from tpcp._base import Algo, BaseTpcpObject
 
 if TYPE_CHECKING:
     from tpcp import Dataset, Pipeline
