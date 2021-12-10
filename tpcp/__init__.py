@@ -1,7 +1,7 @@
 """tpcp - Tiny Pipelines for Complicated Problems."""
 from tpcp._algorithm import Algorithm, BaseTpcpObject, OptimizableAlgorithm
 from tpcp._algorithm_utils import get_action_params, get_results, make_action_safe, make_optimize_safe
-from tpcp._base import CloneFactory, cf, clone, get_param_names, BaseFactory
+from tpcp._base import BaseFactory, CloneFactory, cf, clone, get_param_names
 from tpcp._dataset import Dataset
 from tpcp._pipeline import OptimizablePipeline, Pipeline
 
@@ -23,5 +23,5 @@ __all__ = [
     "OptimizablePipeline",
     "get_param_names",
     "get_action_params",
-    "get_results"
+    "get_results",
 ]

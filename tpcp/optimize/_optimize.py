@@ -134,7 +134,9 @@ class Optimize(BaseOptimize):
 
     optimized_pipeline_: OptimizablePipeline
 
-    def __init__(self, pipeline: OptimizablePipeline, safe_optimize: bool = False) -> None:
+    def __init__(  # noqa: super-init-not-called
+        self, pipeline: OptimizablePipeline, safe_optimize: bool = False
+    ) -> None:
         self.pipeline = pipeline
         self.safe_optimize = safe_optimize
 
@@ -288,7 +290,7 @@ class GridSearch(BaseOptimize):
     best_score_: float
     multimetric_: bool
 
-    def __init__(
+    def __init__(  # noqa: super-init-not-called
         self,
         pipeline: Pipeline,
         parameter_grid: ParameterGrid,
@@ -589,7 +591,7 @@ class GridSearchCV(BaseOptimize):
     multimetric_: bool
     final_optimize_time_: float
 
-    def __init__(
+    def __init__(  # noqa: super-init-not-called
         self,
         pipeline: OptimizablePipeline,
         parameter_grid: ParameterGrid,
