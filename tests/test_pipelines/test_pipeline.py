@@ -9,7 +9,8 @@ from tpcp._parameter import para
 
 
 class PipelineInputModify(Pipeline):
-    test = para("a value")
+    def __init__(self, test="a value"):
+        self.test = test
 
     def run(self, datapoint: Dataset):
         self.test = "another value"
@@ -17,7 +18,8 @@ class PipelineInputModify(Pipeline):
 
 
 class PipelineInputModifyNested(Pipeline):
-    pipe = para(cf(PipelineInputModify()))
+    def __init__(self, pipe=cf(PipelineInputModify())):
+        self.pipe = pipe
 
     def run(self, datapoint: Dataset):
         self.pipe.run(datapoint)
@@ -25,7 +27,8 @@ class PipelineInputModifyNested(Pipeline):
 
 
 class PipelineNoOutput(Pipeline):
-    test = para("a value")
+    def __init__(self, test="a value"):
+        self.test = test
 
     def run(self, datapoint: Dataset):
         self.not_a_output_paras = "something"

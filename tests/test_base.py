@@ -255,7 +255,7 @@ def test_nested_mutable_algorithm_copy():
     assert (
         joblib.hash(test_instance.mutable.get_params())
         == joblib.hash(nested_instance.get_params())
-        == joblib.hash({k: f._default for k, f in nested_params.items()})
+        == joblib.hash({k: f for k, f in nested_params.items()})
     )
 
 

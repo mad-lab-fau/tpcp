@@ -31,7 +31,7 @@ class TestCrossValidate:
 
         assert mock.call_count == len(train)
         for expected, actual in zip(train, mock.call_args_list):
-            pd.testing.assert_frame_equal(ds[expected].index, actual[0][1].index)
+            pd.testing.assert_frame_equal(ds[expected].index, actual[0][0].index)
 
     def test_run_called(self):
         """Test that optimize of the pipeline is called correctly."""

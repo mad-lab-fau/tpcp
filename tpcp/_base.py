@@ -9,15 +9,14 @@ import copy
 import inspect
 import warnings
 from collections import defaultdict
+from functools import wraps
 from typing import Any, DefaultDict, Dict, List, Optional, Set, Tuple, TypeVar, Union, Type
 
 import numpy as np
 
-from tpcp._parameter import _is_tpcp_parameter_field
-from tpcp._utils import _general as gen_utils
-from tpcp.exceptions import MutableDefaultsError, PotentialUserErrorWarning, ValidationError
+from tpcp.exceptions import MutableDefaultsError, ValidationError
 
-Algo = TypeVar("Algo", bound="BaseTpcpObject")
+Algo = TypeVar("Algo", bound="_BaseTpcpObject")
 
 
 class _Nothing(object):
@@ -64,6 +63,23 @@ def _get_init_defaults(cls: Type[_BaseTpcpObject]) -> Dict[str, inspect.Paramete
     defaults = {k: p for k, p in init_signature.parameters.items() if p.name != "self" and p.kind != p.VAR_KEYWORD}
     return defaults
 
+def _replace_defaults_wrapper(old_init: callable):
+    """Decorate an init to create new instances of mutable defaults.
+    This should only be used in combiantion with `default` and will be applied as part of `__init_subclass`.
+    Direct usage of this decorator should not be required.
+    """
+
+    @wraps(old_init)
+    def new_init(self, *args, **kwargs):
+        # call the old init.
+        old_init(self, *args, **kwargs)
+        assert isinstance(self, _BaseTpcpObject)  # For the type checker
+        # Check if any of the initial values has a "default parameter flag".
+        # If yes we replace it with a clone (in case of a tpcp object) or a deepcopy in case of other objects.
+        for k, v in self.get_params(deep=False).items():
+            if isinstance(v, Factory):
+                setattr(self, k, v.get_value())
+    return new_init
 
 # def _collect_nested_annotations(cls: BaseTpcpObject, fields: List[attr.Attribute]):
 #     normal_fields, nested_fields = gen_utils.partition(lambda x: "__" in x.name, fields)
@@ -96,6 +112,11 @@ class _BaseTpcpObject:
         if cls._skip_validation is not True:
             _has_dangerous_mutable_default(fields, cls)
 
+        if any(isinstance(field.default, Factory) for field in fields.values()):
+            # In case we have fields that use a factory, we need to wrap the init to replace it
+            cls.__init__ = _replace_defaults_wrapper(cls.__init__)
+
+    # TODO: Make helper api
     def _get_params_without_nested_class(self) -> Dict[str, Any]:
         return {k: v for k, v in self.get_params().items() if not isinstance(v, _BaseTpcpObject)}
 
@@ -137,7 +158,7 @@ class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
 
 
 # TODO: Make public api
-def _get_params(instance: BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
+def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
     valid_fields = get_param_names(type(instance))
 
     out: Dict[str, Any] = {}
