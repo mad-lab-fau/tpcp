@@ -3,6 +3,16 @@ from tpcp._algorithm import Algorithm, BaseTpcpObject, OptimizableAlgorithm
 from tpcp._algorithm_utils import get_action_params, get_results, make_action_safe, make_optimize_safe
 from tpcp._base import BaseFactory, CloneFactory, cf, clone, get_param_names
 from tpcp._dataset import Dataset
+from tpcp._parameters import (
+    HyperParameter,
+    PureParameter,
+    HyperPara,
+    PurePara,
+    OptimizableParameter,
+    OptiPara,
+    Parameter,
+    Para,
+)
 from tpcp._pipeline import OptimizablePipeline, Pipeline
 
 __version__ = "0.3.1"
@@ -15,6 +25,14 @@ __all__ = [
     "cf",
     "CloneFactory",
     "BaseFactory",
+    "HyperParameter",
+    "HyperPara",
+    "PureParameter",
+    "PurePara",
+    "OptimizableParameter",
+    "OptiPara",
+    "Parameter",
+    "Para",
     "Algorithm",
     "OptimizableAlgorithm",
     "BaseTpcpObject",

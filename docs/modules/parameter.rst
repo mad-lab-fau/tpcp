@@ -1,24 +1,33 @@
 Parameter and Custom Objects
 ============================
 
+.. currentmodule:: tpcp
+
+Parameter Annotations
+---------------------
+
+.. autosummary::
+   :toctree: generated/parameter
+   :template: data.rst
+
+    HyperParameter
+    HyperPara
+    OptimizableParameter
+    OptiPara
+    PureParameter
+    PurePara
+    Parameter
+    Para
+
+
 Utility functions
 -----------------
-
-.. currentmodule:: tpcp
 
 .. autosummary::
    :toctree: generated/parameter
    :template: function.rst
 
     clone
-    parameter
-    para
-    hyper_parameter
-    hyperpara
-    optimizable_parameter
-    optipara
-    pure_parameter
-    purepara
     cf
 
 Utility classes
@@ -28,5 +37,6 @@ Utility classes
    :toctree: generated/utils
    :template: class.rst
 
-    CloneFactory
     BaseTpcpObject
+    CloneFactory
+    BaseFactory
