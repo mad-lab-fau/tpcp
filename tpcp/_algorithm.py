@@ -68,7 +68,7 @@ class Algorithm(BaseTpcpObject, _skip_validation=True):
         explicitly.
         """
         super().__init_subclass__(_skip_validation=_skip_validation, **kwargs)
-
+        # TODO: Remove that! This is a stupid restriction to enforce
         if _skip_validation is not True and _allow_non_defaults is not True:
             fields = _get_init_defaults(cls)
             _has_all_defaults(fields, cls)

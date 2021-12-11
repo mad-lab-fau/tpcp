@@ -13,7 +13,7 @@ from tpcp._algorithm_utils import (
     get_results,
     is_action_applied,
 )
-from tpcp.exceptions import MutableDefaultsError
+from tpcp.exceptions import MutableDefaultsError, ValidationError
 
 
 def _init_getter():
@@ -261,11 +261,11 @@ def test_nested_mutable_algorithm_copy():
     )
 
 
-# def test_invalid_parameter_names():
-#     # with pytest.raises(ValidationError) as e:
-#
-#     class Test(Algorithm):
-#         invalid__name ="bla"
-#
-#     Test()
-#     # assert "__" in str(e)
+def test_invalid_parameter_names():
+    with pytest.raises(ValidationError) as e:
+
+        class Test(Algorithm):
+            def __init__(self, invalid__name):
+                self.invalid__name = invalid__name
+
+    assert "double-underscore" in str(e)

@@ -4,14 +4,14 @@ from tpcp._algorithm_utils import get_action_params, get_results, make_action_sa
 from tpcp._base import BaseFactory, CloneFactory, cf, clone, get_param_names
 from tpcp._dataset import Dataset
 from tpcp._parameters import (
-    HyperParameter,
-    PureParameter,
     HyperPara,
-    PurePara,
+    HyperParameter,
     OptimizableParameter,
     OptiPara,
-    Parameter,
     Para,
+    Parameter,
+    PurePara,
+    PureParameter,
 )
 from tpcp._pipeline import OptimizablePipeline, Pipeline
 

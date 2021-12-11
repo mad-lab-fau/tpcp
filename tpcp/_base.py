@@ -7,14 +7,17 @@ from __future__ import annotations
 
 import copy
 import inspect
+import sys
 import warnings
 from collections import defaultdict
 from functools import wraps
 from typing import Any, DefaultDict, Dict, List, Set, Tuple, Type, TypeVar, Union
 
 import numpy as np
+from typing_extensions import Annotated, get_args, get_origin
 
-from tpcp.exceptions import MutableDefaultsError, ValidationError
+from tpcp._parameters import _ParaTypes
+from tpcp.exceptions import MutableDefaultsError, PotentialUserErrorWarning, ValidationError
 
 Algo = TypeVar("Algo", bound="_BaseTpcpObject")
 
@@ -85,18 +88,123 @@ def _replace_defaults_wrapper(old_init: callable):
     return new_init
 
 
+def _retry_eval_with_missing_locals(expression: str, globalns: Dict = None, localns: Dict = None):
+    globalns = globalns or {}
+    localns = localns or {}
+    # We make a copy to not overwrite the input dict
+    localns = {**localns}
+
+    # That seems scary :D Let's see if this causes any issues
+    # We use a value here instead of a "while True" to not get the program stuck in an endless loop.
+    for _ in range(100):
+        try:
+            val = eval(expression, globalns, localns)
+            break
+        except NameError as e:
+            missing = str(e).split("'")[1]
+            localns[missing] = None
+        except AttributeError as e:
+            if "'NoneType' object has no attribute 'GridSearch'" not in str(e):
+                raise e
+            raise RuntimeError(
+                "You ran into an edegecase of the builtin type resolver. "
+                f"This happens if you use a nested type annotation that is only valid during runtime. "
+                "This usually happens if you are using a `if TYPE_CHECKING:` guard for some of your imports to avoid "
+                "circular dependencies.\n"
+                "For most of these cases we have a built in workaround, but only if you provide the type directly and "
+                "not in an attribute notation:\n"
+                "\n"
+                "This is not allowed:"
+                "\n"
+                ">>> if TYPE_CHECKING:\n"
+                "...     import my\n"
+                ">>> MyClass:\n"
+                "...     para: my.custom_type\n"
+                "\n\n"
+                "This should work:\n"
+                ">>> if TYPE_CHECKING:\n"
+                "...     from my import custom_type\n"
+                ">>> MyClass:\n"
+                "...     para: custom_type\n"
+                "\n\n"
+                "And this as well:\n"
+                ">>> if TYPE_CHECKING:\n"
+                "...     import my\n"
+                "...     custom_type_var = my.custom_type\n"
+                ">>> MyClass:\n"
+                "...     para: custom_type_var\n"
+            )
+    else:
+        raise RuntimeError(
+            "Trying to resolve Parameter Type hints has resulted in an unexpected issue. "
+            f"We were trying to evaluate the expression: {expression} . "
+            "It seems like this expression contained forward references that could not be resolved. "
+            "This should not happen!"
+            "Please open an issue on Github, with an code example, that results in this issue. "
+            "Sry for the inconvenience that :)"
+        )
+    return val
+
+
+def _custom_get_type_hints(cls: _BaseTpcpObject) -> Dict[str, Any]:
+    """Extract type hints while avoiding issues with forward references."""
+    hints = {}
+    for base in reversed(cls.__mro__):
+        base_globals = sys.modules[base.__module__].__dict__
+        ann = base.__dict__.get("__annotations__", {})
+        for name, value in ann.items():
+            if value is None:
+                value = type(None)
+            elif isinstance(value, str):
+                # TODO: This does not check, if the str is a valid expression.
+                #   This might not be an issue, but could lead to obscure error messages.
+                value = _retry_eval_with_missing_locals(value, base_globals)
+            hints[name] = value
+    return hints
+
+
+def _extract_annotations(cls: _BaseTpcpObject, init_fields: Dict[str, inspect.Parameter]) -> Dict[str, _ParaTypes]:
+    cls_annotations = _custom_get_type_hints(cls)
+    para_annotations = {}
+    for k, v in cls_annotations.items():
+        if get_origin(v) is Annotated:
+            for annot in get_args(v)[1:]:
+                if isinstance(annot, _ParaTypes):
+                    para_annotations[k] = annot
+                    break
+        elif k in init_fields:
+            para_annotations[k] = _ParaTypes.SIMPLE
+    for k, v in para_annotations.items():
+        if "__" in k:
+            if v is _ParaTypes.SIMPLE:
+                warnings.warn(
+                    "Annotating a nested parameter (parameter like `nested_object__nest_para` as a simple "
+                    "Parameter has no effect and the entire line should be removed.",
+                    PotentialUserErrorWarning,
+                )
+        elif k not in init_fields:
+            raise ValueError(
+                f"The field '{k}' of {cls.__name__} was annotated as a `tpcp` (Hyper/Pure/Normal/Optimizable)-"
+                f"Parameter, but is not a parameter listed in the init! "
+                "Add the parameter to the init, if it is an actual parameter of your algorithm, or remove the "
+                "annotation."
+            )
+    return para_annotations
+
+
 class _BaseTpcpObject:
-    # TODO: Rething the type of nested fields
-    __field_annotations__: Tuple[Tuple[str, str], ...]
+    __field_annotations__: Dict[str, _ParaTypes]
 
     def __init_subclass__(cls, *, _skip_validation: bool = False, **kwargs):
         super().__init_subclass__(**kwargs)
-        # Because we overwrite the value for each subclass, it is the facto not inheritable
         fields = _get_init_defaults(cls)
+
+        cls.__field_annotations__ = _extract_annotations(cls, init_fields=fields)
 
         # Validation
         if _skip_validation is not True:
             _has_dangerous_mutable_default(fields, cls)
+            _has_invalid_name(fields, cls)
 
         if cls.__init__ is not object.__init__ and any(
             isinstance(field.default, BaseFactory) for field in fields.values()
@@ -245,6 +353,15 @@ def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Ty
             "Note, that we do not check for all cases of mutable objects. "
             f"At the moment, we check only for {_get_dangerous_mutable_types()}. "
             "To learn more about this topic, check TODO: LINK."
+        )
+
+
+def _has_invalid_name(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]):
+    invalid_names = [f for f in fields if "__" in f]
+    if len(invalid_names) > 0:
+        raise ValidationError(
+            f"The parameters {invalid_names} of {cls.__name__} have a double-underscore in their name. "
+            "This is not allowed, as it interferes with he nested naming conventions in tpcp."
         )
 
 
