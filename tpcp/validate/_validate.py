@@ -1,7 +1,4 @@
-"""Helper to validate/evaluate pipelines and Optimize.
-
-TODO: We might move this to evaluation utils
-"""
+"""Helper to validate/evaluate pipelines and Optimize."""
 
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 

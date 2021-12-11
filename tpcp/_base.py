@@ -206,10 +206,6 @@ class _BaseTpcpObject:
 class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
     """Baseclass for all tpcp objects."""
 
-    # TODO: Make helper api
-    def _get_params_without_nested_class(self) -> Dict[str, Any]:
-        return {k: v for k, v in self.get_params().items() if not isinstance(v, _BaseTpcpObject)}
-
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
         """Get parameters for this algorithm.
 
@@ -310,6 +306,10 @@ def get_param_names(cls: Type[_BaseTpcpObject]) -> List[str]:
             )
     # Extract and sort argument names excluding 'self'
     return sorted([p.name for p in parameters])
+
+
+def _get_params_without_nested_class(instance: BaseTpcpObject) -> Dict[str, Any]:
+    return {k: v for k, v in instance.get_params().items() if not isinstance(v, _BaseTpcpObject)}
 
 
 def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]) -> None:

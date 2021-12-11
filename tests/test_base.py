@@ -13,6 +13,7 @@ from tpcp._algorithm_utils import (
     get_results,
     is_action_applied,
 )
+from tpcp._base import _get_params_without_nested_class
 from tpcp.exceptions import MutableDefaultsError, ValidationError
 
 
@@ -208,8 +209,8 @@ def test_nested_clone():
     assert test_instance is not cloned_instance
     assert test_instance.nested_class is not cloned_instance.nested_class
 
-    params = test_instance._get_params_without_nested_class()
-    cloned_params = cloned_instance._get_params_without_nested_class()
+    params = _get_params_without_nested_class(test_instance)
+    cloned_params = _get_params_without_nested_class(cloned_instance)
 
     for k, v in params.items():
         assert cloned_params[k] == v
