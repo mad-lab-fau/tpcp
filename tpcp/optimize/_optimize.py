@@ -9,10 +9,11 @@ from tempfile import TemporaryDirectory
 from typing import Any, ContextManager, Dict, Iterator, List, Optional, TypeVar, Union
 
 import numpy as np
-from joblib import Memory, Parallel, delayed
+from joblib import Memory, delayed
 from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
+from tqdm.auto import tqdm
 
 from tpcp import Dataset, OptimizablePipeline, Pipeline
 from tpcp._algorithm import BaseOptimize
@@ -25,7 +26,7 @@ from tpcp._utils._general import (
     _prefix_para_dict,
     _split_hyper_and_pure_parameters,
 )
-from tpcp._utils._multiprocess import init_progressbar
+from tpcp._utils._multiprocess import TqdmParallel
 from tpcp._utils._score import _ERROR_SCORE_TYPE, _SCORE_CALLABLE, _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.validate import Scorer
@@ -339,29 +340,25 @@ class GridSearch(BaseOptimize):
         # itself.
         # If not explicitly changed the scorer is an instance of `Scorer` that wraps the actual `scoring`
         # function provided by the user.
-        with init_progressbar(
-            self.progress_bar,
-            n_jobs=self.n_jobs,
-            iterable=self.parameter_grid,
-            desc="Para Combos",
-            total=len(self.parameter_grid),
-        ) as wrapped_iterable:
-            parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
-            with parallel:
-                # Evaluate each parameter combination
-                results = parallel(
-                    delayed(_score)(
-                        self.pipeline.clone(),
-                        dataset,
-                        scoring,
-                        paras,
-                        return_parameters=True,
-                        return_data_labels=True,
-                        return_times=True,
-                        error_score=self.error_score,
-                    )
-                    for paras in wrapped_iterable
+        pbar: Optional[tqdm] = None
+        if self.progress_bar:
+            pbar = tqdm(total=len(self.parameter_grid), desc="Para Combos")
+        parallel = TqdmParallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch, pbar=pbar)
+        with parallel:
+            # Evaluate each parameter combination
+            results = parallel(
+                delayed(_score)(
+                    self.pipeline.clone(),
+                    dataset,
+                    scoring,
+                    paras,
+                    return_parameters=True,
+                    return_data_labels=True,
+                    return_times=True,
+                    error_score=self.error_score,
                 )
+                for paras in self.parameter_grid
+            )
         # We check here if all results are dicts. We only check the dtype of the first value, as the scorer should
         # have handled issues with non uniform cases already.
         first_test_score = results[0]["scores"]
@@ -657,6 +654,11 @@ class GridSearchCV(BaseOptimize):
         parameters = list(self.parameter_grid)
         split_parameters = _split_hyper_and_pure_parameters(parameters, pure_parameters)
         parameter_prefix = "pipeline__"
+        combinations = list(product(enumerate(split_parameters), enumerate(cv.split(dataset, groups=groups))))
+
+        pbar: Optional[tqdm] = None
+        if self.progress_bar:
+            pbar = tqdm(total=len(combinations), desc="Split-Para Combos")
 
         # To enable the pure parameter performance improvement, we need to create a joblib cache in a temp dir that
         # is deleted after the run.
@@ -668,37 +670,29 @@ class GridSearchCV(BaseOptimize):
             tmp_dir_context = TemporaryDirectory("joblib_tpcp_cache")
         with tmp_dir_context as cachedir:
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None
-            combinations = list(product(enumerate(split_parameters), enumerate(cv.split(dataset, groups=groups))))
-            with init_progressbar(
-                self.progress_bar,
-                n_jobs=self.n_jobs,
-                iterable=combinations,
-                desc="Split-Para Combos",
-                total=len(combinations),
-            ) as wrapped_iterable:
-                parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
-                # We use a similar structure to sklearns GridSearchCv here (see GridSearch for more info).
-                with parallel:
-                    # Evaluate each parameter combination
-                    out = parallel(
-                        delayed(_optimize_and_score)(
-                            optimizer.clone(),
-                            dataset,
-                            scoring,
-                            train,
-                            test,
-                            optimize_params=optimize_params,
-                            hyperparameters=_prefix_para_dict(hyper_paras, parameter_prefix),
-                            pure_parameters=_prefix_para_dict(pure_paras, parameter_prefix),
-                            return_train_score=self.return_train_score,
-                            return_parameters=False,
-                            return_data_labels=True,
-                            return_times=True,
-                            error_score=self.error_score,
-                            memory=tmp_cache,
-                        )
-                        for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in wrapped_iterable
+            parallel = TqdmParallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch, pbar=pbar)
+            # We use a similar structure to sklearns GridSearchCv here (see GridSearch for more info).
+            with parallel:
+                # Evaluate each parameter combination
+                out = parallel(
+                    delayed(_optimize_and_score)(
+                        optimizer.clone(),
+                        dataset,
+                        scoring,
+                        train,
+                        test,
+                        optimize_params=optimize_params,
+                        hyperparameters=_prefix_para_dict(hyper_paras, parameter_prefix),
+                        pure_parameters=_prefix_para_dict(pure_paras, parameter_prefix),
+                        return_train_score=self.return_train_score,
+                        return_parameters=False,
+                        return_data_labels=True,
+                        return_times=True,
+                        error_score=self.error_score,
+                        memory=tmp_cache,
                     )
+                    for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in combinations
+                )
         results = self._format_results(parameters, n_splits, out)
         self.cv_results_ = results
 
