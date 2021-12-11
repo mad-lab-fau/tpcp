@@ -1,37 +1,11 @@
-import inspect
 import platform
 import re
 import shutil
 import subprocess
 import sys
-from importlib import import_module
 from pathlib import Path
 
-import attr
-import numpy as np
-
 HERE = Path(__file__).parent
-
-
-def generate_type_stub():
-    cls_module_str = sys.argv[1]
-    module_name, cls_name = cls_module_str.rsplit(".", 1)
-    module = import_module(module_name)
-    cls = getattr(module, cls_name)
-    dynamic_signature = inspect.signature(cls.__init__)
-    str_signature = "("
-    for n, p in dynamic_signature.parameters.items():
-        tmp = f"{n}"
-        if p.annotation is not inspect._empty:
-            tmp += f": {p.annotation}"
-        if p.default is not inspect._empty:
-            val = p.default
-            if val is np.nan:
-                val = "np.nan"
-            tmp += f" = {val}"
-        str_signature += tmp + ", "
-    str_signature = str_signature[:-2] + ")"
-    print(f"    @overload\n    def __init__{str_signature} -> None:\n        ...")
 
 
 def task_docs():

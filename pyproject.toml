@@ -35,6 +35,7 @@ memory-profiler = "^0.58.0"
 matplotlib = "^3.4.3"
 toml = "^0.10.2"
 Sphinx = "^4.2.0"
+mypy = "^0.910"
 
 [tool.black]
 line-length = 120
@@ -75,7 +76,6 @@ test = { cmd = "pytest --cov=tpcp --cov-report=term-missing --cov-report=xml", h
 docs = { "script" = "_tasks:task_docs()",  help = "Build the html docs using Sphinx." }
 bump_version = { "script" = "_tasks:task_update_version()" }
 
-ts = { "script" = "_tasks:generate_type_stub()"}
 
 [build-system]
 requires = ["poetry_core>=1.0.0"]
