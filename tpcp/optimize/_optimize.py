@@ -640,9 +640,9 @@ class GridSearchCV(BaseOptimize):
         # For each para combi, we separate the pure parameters (parameters that do not effect the optimization) and
         # the hyperparameters.
         # This allows for massive caching optimizations in the `_optimize_and_score`.
-        pure_parameters: List[str]
+        pure_parameters: Optional[List[str]]
         if self.pure_parameters is False:
-            pure_parameters = []
+            pure_parameters = None
         elif self.pure_parameters is True:
             # TODO: Fix this
             # pure_parameters = get_param_names(type(self.pipeline), field_type="pure")

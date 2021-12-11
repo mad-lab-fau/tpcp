@@ -70,12 +70,6 @@ def _get_nested_paras(param_dict: Optional[Dict], nested_object_name="pipeline")
     return {k.split("__", 1)[1]: v for k, v in param_dict.items() if k.startswith(f"{nested_object_name}__")}
 
 
-def _get_nested_para_names(param_name_list: Optional[List], nested_object_name="pipeline") -> List[str]:
-    if not param_name_list:
-        return []
-    return [k.split("__", 1)[1] for k in param_name_list if k.startswith(f"{nested_object_name}__")]
-
-
 def _split_hyper_and_pure_parameters(
     param_dict: List[Dict], pure_parameters: Optional[List[str]]
 ) -> List[Tuple[Optional[Dict], Optional[Dict]]]:
@@ -103,11 +97,3 @@ def _split_hyper_and_pure_parameters(
                 tmp[k] = c.pop(k)
         split_param_dict.append((c or None, tmp or None))
     return split_param_dict
-
-
-def partition(condition, values):
-    """Split the values into two sets, based on the return value of the function."""
-    results = ([], [])
-    for item in values:
-        results[condition(item)].append(item)
-    return results
