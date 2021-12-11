@@ -11,15 +11,16 @@ import sys
 import warnings
 from collections import defaultdict
 from functools import wraps
-from typing import Any, DefaultDict, Dict, List, Set, Tuple, Type, TypeVar, Union
+from typing import Any, Callable, DefaultDict, Dict, Generic, List, Optional, Tuple, Type, TypeVar
 
 import numpy as np
-from typing_extensions import Annotated, get_args, get_origin
+from typing_extensions import Annotated, Literal, get_args, get_origin
 
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, PotentialUserErrorWarning, ValidationError
 
-Algo = TypeVar("Algo", bound="_BaseTpcpObject")
+T = TypeVar("T")
+BaseTpcpObjectObj_ = TypeVar("BaseTpcpObjectObj_", bound="BaseTpcpObject")
 
 
 class _Nothing:
@@ -30,20 +31,20 @@ class _Nothing:
     This implementation is taken from the attrs package.
     """
 
-    _singleton = None
+    _singleton: Optional[_Nothing] = None
 
-    def __new__(cls):
+    def __new__(cls) -> _Nothing:
         if _Nothing._singleton is None:
             _Nothing._singleton = super(_Nothing, cls).__new__(cls)
         return _Nothing._singleton
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "NOTHING"
 
-    def __bool__(self):
+    def __bool__(self) -> Literal[False]:
         return False
 
-    def __len__(self):
+    def __len__(self) -> Literal[0]:
         return 0  # __bool__ for Python 2
 
 
@@ -67,7 +68,7 @@ def _get_init_defaults(cls: Type[_BaseTpcpObject]) -> Dict[str, inspect.Paramete
     return defaults
 
 
-def _replace_defaults_wrapper(old_init: callable):
+def _replace_defaults_wrapper(old_init: Callable) -> Callable:
     """Decorate an init to create new instances of mutable defaults.
 
     This should only be used in combiantion with `default` and will be applied as part of `__init_subclass`.
@@ -75,10 +76,9 @@ def _replace_defaults_wrapper(old_init: callable):
     """
 
     @wraps(old_init)
-    def new_init(self, *args, **kwargs):
+    def new_init(self: BaseTpcpObject, *args: Any, **kwargs: Any) -> None:
         # call the old init.
         old_init(self, *args, **kwargs)
-        assert isinstance(self, _BaseTpcpObject)  # For the type checker
         # Check if any of the initial values has a "default parameter flag".
         # If yes we replace it with a clone (in case of a tpcp object) or a deepcopy in case of other objects.
         for k, v in self.get_params(deep=False).items():
@@ -88,7 +88,9 @@ def _replace_defaults_wrapper(old_init: callable):
     return new_init
 
 
-def _retry_eval_with_missing_locals(expression: str, globalns: Dict = None, localns: Dict = None):
+def _retry_eval_with_missing_locals(
+    expression: str, globalns: Optional[Dict[str, Any]] = None, localns: Optional[Dict[str, Any]] = None
+) -> Any:
     globalns = globalns or {}
     localns = localns or {}
     # We make a copy to not overwrite the input dict
@@ -98,7 +100,7 @@ def _retry_eval_with_missing_locals(expression: str, globalns: Dict = None, loca
     # We use a value here instead of a "while True" to not get the program stuck in an endless loop.
     for _ in range(100):
         try:
-            val = eval(expression, globalns, localns)
+            val = eval(expression, globalns, localns)  # noqa: eval-used
             break
         except NameError as e:
             missing = str(e).split("'")[1]
@@ -108,7 +110,7 @@ def _retry_eval_with_missing_locals(expression: str, globalns: Dict = None, loca
                 raise e
             raise RuntimeError(
                 "You ran into an edegecase of the builtin type resolver. "
-                f"This happens if you use a nested type annotation that is only valid during runtime. "
+                "This happens if you use a nested type annotation that is only valid during runtime. "
                 "This usually happens if you are using a `if TYPE_CHECKING:` guard for some of your imports to avoid "
                 "circular dependencies.\n"
                 "For most of these cases we have a built in workaround, but only if you provide the type directly and "
@@ -133,7 +135,7 @@ def _retry_eval_with_missing_locals(expression: str, globalns: Dict = None, loca
                 "...     custom_type_var = my.custom_type\n"
                 ">>> MyClass:\n"
                 "...     para: custom_type_var\n"
-            )
+            ) from e
     else:
         raise RuntimeError(
             "Trying to resolve Parameter Type hints has resulted in an unexpected issue. "
@@ -146,7 +148,7 @@ def _retry_eval_with_missing_locals(expression: str, globalns: Dict = None, loca
     return val
 
 
-def _custom_get_type_hints(cls: _BaseTpcpObject) -> Dict[str, Any]:
+def _custom_get_type_hints(cls: Type[_BaseTpcpObject]) -> Dict[str, Any]:
     """Extract type hints while avoiding issues with forward references."""
     hints = {}
     for base in reversed(cls.__mro__):
@@ -163,7 +165,9 @@ def _custom_get_type_hints(cls: _BaseTpcpObject) -> Dict[str, Any]:
     return hints
 
 
-def _extract_annotations(cls: _BaseTpcpObject, init_fields: Dict[str, inspect.Parameter]) -> Dict[str, _ParaTypes]:
+def _extract_annotations(
+    cls: Type[_BaseTpcpObject], init_fields: Dict[str, inspect.Parameter]
+) -> Dict[str, _ParaTypes]:
     cls_annotations = _custom_get_type_hints(cls)
     para_annotations = {}
     for k, v in cls_annotations.items():
@@ -174,28 +178,13 @@ def _extract_annotations(cls: _BaseTpcpObject, init_fields: Dict[str, inspect.Pa
                     break
         elif k in init_fields:
             para_annotations[k] = _ParaTypes.SIMPLE
-    for k, v in para_annotations.items():
-        if "__" in k:
-            if v is _ParaTypes.SIMPLE:
-                warnings.warn(
-                    "Annotating a nested parameter (parameter like `nested_object__nest_para` as a simple "
-                    "Parameter has no effect and the entire line should be removed.",
-                    PotentialUserErrorWarning,
-                )
-        elif k not in init_fields:
-            raise ValueError(
-                f"The field '{k}' of {cls.__name__} was annotated as a `tpcp` (Hyper/Pure/Normal/Optimizable)-"
-                f"Parameter, but is not a parameter listed in the init! "
-                "Add the parameter to the init, if it is an actual parameter of your algorithm, or remove the "
-                "annotation."
-            )
     return para_annotations
 
 
 class _BaseTpcpObject:
     __field_annotations__: Dict[str, _ParaTypes]
 
-    def __init_subclass__(cls, *, _skip_validation: bool = False, **kwargs):
+    def __init_subclass__(cls, *, _skip_validation: bool = False, **kwargs: Any):
         super().__init_subclass__(**kwargs)
         fields = _get_init_defaults(cls)
 
@@ -205,12 +194,17 @@ class _BaseTpcpObject:
         if _skip_validation is not True:
             _has_dangerous_mutable_default(fields, cls)
             _has_invalid_name(fields, cls)
+            _annotations_are_valid(fields, cls)
 
         if cls.__init__ is not object.__init__ and any(
             isinstance(field.default, BaseFactory) for field in fields.values()
         ):
             # In case we have fields that use a factory, we need to wrap the init to replace it
-            cls.__init__ = _replace_defaults_wrapper(cls.__init__)
+            setattr(cls, "__init__", _replace_defaults_wrapper(cls.__init__))
+
+
+class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
+    """Baseclass for all tpcp objects."""
 
     # TODO: Make helper api
     def _get_params_without_nested_class(self) -> Dict[str, Any]:
@@ -234,23 +228,19 @@ class _BaseTpcpObject:
         """
         return _get_params(self, deep)
 
-    def set_params(self: Algo, **params: Any) -> Algo:
+    def set_params(self: BaseTpcpObjectObj_, **params: Any) -> BaseTpcpObjectObj_:
         """Set the parameters of this Algorithm.
 
         To set parameters of nested objects use `nested_object_name__para_name=`.
         """
         return _set_params(self, **params)
 
-    def clone(self: Algo) -> Algo:
+    def clone(self: BaseTpcpObjectObj_) -> BaseTpcpObjectObj_:
         """Create a new instance of the class with all parameters copied over.
 
         This will create a new instance of the class itself and all nested objects
         """
         return clone(self, safe=True)
-
-
-class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
-    """Baseclass for all tpcp objects."""
 
 
 # TODO: Make public api
@@ -268,7 +258,7 @@ def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
     return out
 
 
-def _set_params(instance: Algo, **params: Any) -> Algo:
+def _set_params(instance: BaseTpcpObjectObj_, **params: Any) -> BaseTpcpObjectObj_:
     """Set the parameters of of a instance.
 
     To set parameters of nested objects use `nested_object_name__para_name=`.
@@ -322,16 +312,7 @@ def get_param_names(cls: Type[_BaseTpcpObject]) -> List[str]:
     return sorted([p.name for p in parameters])
 
 
-def _has_all_defaults(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]):
-    non_default_values = [k for k, f in fields.items() if f.default is inspect.Parameter.empty]
-    if len(non_default_values) > 0:
-        raise ValidationError(
-            f"The class {cls.__name__} is expected to only have arguments with a proper default "
-            f"value, but for the parameters {non_default_values}, no value was provided."
-        )
-
-
-def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]):
+def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]) -> None:
     mutable_defaults = []
 
     for name, field in fields.items():
@@ -356,7 +337,25 @@ def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Ty
         )
 
 
-def _has_invalid_name(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]):
+def _annotations_are_valid(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]) -> None:
+    for k, v in cls.__field_annotations__.items():
+        if "__" in k:
+            if v is _ParaTypes.SIMPLE:
+                warnings.warn(
+                    "Annotating a nested parameter (parameter like `nested_object__nest_para` as a simple "
+                    "Parameter has no effect and the entire line should be removed.",
+                    PotentialUserErrorWarning,
+                )
+        elif k not in fields:
+            raise ValueError(
+                f"The field '{k}' of {cls.__name__} was annotated as a `tpcp` (Hyper/Pure/Normal/Optimizable)-"
+                f"Parameter, but is not a parameter listed in the init! "
+                "Add the parameter to the init, if it is an actual parameter of your algorithm, or remove the "
+                "annotation."
+            )
+
+
+def _has_invalid_name(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]) -> None:
     invalid_names = [f for f in fields if "__" in f]
     if len(invalid_names) > 0:
         raise ValidationError(
@@ -370,7 +369,7 @@ def _get_dangerous_mutable_types() -> Tuple[type, ...]:
     return (_BaseTpcpObject, list, dict)
 
 
-def _is_dangerous_mutable(field: inspect.Parameter):
+def _is_dangerous_mutable(field: inspect.Parameter) -> bool:
     """Check if a parameter is one of the mutable objects "considered" dangerous."""
     if field.default is inspect.Parameter.empty or isinstance(field.default, BaseFactory):
         return False
@@ -383,15 +382,11 @@ def _is_dangerous_mutable(field: inspect.Parameter):
     return False
 
 
-def _is_builtin_class_instance(obj):
+def _is_builtin_class_instance(obj: Any) -> bool:
     return type(obj).__module__ == "builtins"
 
 
-def clone(
-    algorithm: Union[BaseTpcpObject, List[BaseTpcpObject], Set[BaseTpcpObject], Tuple[BaseTpcpObject]],
-    *,
-    safe: bool = False,
-):
+def clone(algorithm: T, *, safe: bool = False) -> T:
     """Construct a new algorithm object with the same parameters.
 
     This is a modified version from sklearn and the original was published under a BSD-3 license and the original file
@@ -417,7 +412,7 @@ def clone(
 
     """
     if algorithm is NOTHING:
-        return NOTHING
+        return algorithm
     # XXX: not handling dictionaries
     if isinstance(algorithm, (list, tuple, set, frozenset)):
         return type(algorithm)([clone(a, safe=safe) for a in algorithm])  # noqa: to-many-function-args
@@ -456,7 +451,7 @@ def clone(
 class BaseFactory:
     """Baseclass for factories to circumvent mutable defaults."""
 
-    def get_value(self):
+    def get_value(self) -> Any:
         """Provide the value generated by the factory.
 
         This method will be called every time a new instance of a class is created.
@@ -464,7 +459,7 @@ class BaseFactory:
         raise NotImplementedError()
 
 
-class CloneFactory(BaseFactory):
+class CloneFactory(BaseFactory, Generic[T]):
     """Init factory that creates a clone of the provided default values on instance initialisation.
 
     This can be used to make sure that each instance get there own version own copy of a mutable default of a class
@@ -472,16 +467,15 @@ class CloneFactory(BaseFactory):
     Under the hood this uses :func:`~tpcp.clone`.
     """
 
-    def __init__(self, default_value):  # noqa: super-init-not-called
+    def __init__(self, default_value: T):
         self.default_value = default_value
-        self.takes_self = False
 
-    def get_value(self):
+    def get_value(self) -> T:
         """Clone the default value for each instance."""
         return clone(self.default_value)
 
 
-def cf(default_value: Any) -> CloneFactory:  # noqa: invalid-name
+def cf(default_value: T) -> CloneFactory[T]:  # noqa: invalid-name
     """Wrap mutable default value with the `CloneFactory`.
 
     This is basically an alias for :class:`~tpcp.CloneFactory`

@@ -1,3 +1,4 @@
+"""Type annotations to indicate the usecase of specific parameters."""
 from enum import Enum, auto
 from inspect import cleandoc
 from typing import TypeVar
@@ -18,7 +19,7 @@ Parameter = Annotated[T, _ParaTypes.SIMPLE]
 Parameter.__doc__ = cleandoc(
     """Mark class attribute as a simple parameter for an algorithm or pipeline.
 
-Generally this is not required, as all parameters listed in the init and not annotated by any other fields types, 
+Generally this is not required, as all parameters listed in the init and not annotated by any other fields types,
 are considered plain parameters.
 However, if you want to be explicit you can use this type annotation.
 """
@@ -39,7 +40,7 @@ HyperPara = HyperParameter
 PureParameter = Annotated[T, _ParaTypes.PURE]
 PureParameter.__doc__ = cleandoc(
     """Mark a class attribute as pure parameter for an algorithm or pipeline.
-    
+
 Compared to normal parameters (:func:`~tpcp.parameter`), pure parameters must only be specified for optimizable
 Algorithms or Pipelines.
 Pure parameters are expected to **not** influence the outcome of self optimize.

@@ -6,7 +6,7 @@ import types
 import warnings
 from functools import wraps
 from inspect import isclass
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Type, TypeVar, Union, cast
 
 import joblib
 
@@ -14,11 +14,15 @@ from tpcp.exceptions import PotentialUserErrorWarning
 
 if TYPE_CHECKING:
     from tpcp import Algorithm, OptimizableAlgorithm, OptimizablePipeline
-    from tpcp._base import Algo
+    from tpcp._algorithm import Algorithm_
 
+    Optimizable_ = TypeVar("Optimizable_", OptimizablePipeline, OptimizableAlgorithm)
 
 ACTION_METHOD_INDICATOR = "__tpcp_action_method"
 OPTIMIZE_METHOD_INDICATOR = "__tpcp_optmize_method"
+
+
+R = TypeVar("R")
 
 
 def get_action_method(instance: Algorithm, method_name: Optional[str] = None) -> Callable:
@@ -39,7 +43,7 @@ def get_action_method(instance: Algorithm, method_name: Optional[str] = None) ->
     return getattr(instance, method_name)
 
 
-def get_action_methods_names(instance_or_cls: Union[Type[Algorithm], Algorithm]) -> Tuple[str]:
+def get_action_methods_names(instance_or_cls: Union[Type[Algorithm], Algorithm]) -> Tuple[str, ...]:
     """Get the names of all action methods of a class.
 
     This basically returns `instance_or_cls._action_method`, but ensures that the return type is a tuple.
@@ -48,7 +52,11 @@ def get_action_methods_names(instance_or_cls: Union[Type[Algorithm], Algorithm])
     if isinstance(method_names, str):
         method_names = (method_names,)
     if not isinstance(method_names, tuple) and len(method_names) == 0:
-        name = instance_or_cls.__name__ if isclass(instance_or_cls) else type(instance_or_cls).__name__
+        if isclass(instance_or_cls):
+            instance_or_cls = cast(Type[Algorithm], instance_or_cls)
+            name = instance_or_cls.__name__
+        else:
+            name = type(instance_or_cls).__name__
         raise ValueError(f"`_action_methods` of {name} must either be a string or a tuple of strings.")
     return method_names
 
@@ -112,15 +120,16 @@ def is_action_applied(instance: Algorithm) -> bool:
     return True
 
 
-def _check_safe_run(algorithm: Algo, old_method: Callable, *args, **kwargs) -> Algo:
+def _check_safe_run(algorithm: Algorithm_, old_method: Callable, *args: Any, **kwargs: Any) -> Algorithm_:
     """Run the pipeline and check that run behaved as expected."""
     before_paras = algorithm.get_params()
     before_paras_hash = joblib.hash(before_paras)
+    output: Algorithm_
     if hasattr(old_method, "__self__"):
         # In this case the method is already bound and we do not need to pass the algo as first argument
-        output: Algo = old_method(*args, **kwargs)
+        output = old_method(*args, **kwargs)
     else:
-        output: Algo = old_method(algorithm, *args, **kwargs)
+        output = old_method(algorithm, *args, **kwargs)
     after_paras = algorithm.get_params()
     after_paras_hash = joblib.hash(after_paras)
     if not before_paras_hash == after_paras_hash:
@@ -149,7 +158,7 @@ def _check_safe_run(algorithm: Algo, old_method: Callable, *args, **kwargs) -> A
     return output
 
 
-def make_action_safe(action_method: Callable):
+def make_action_safe(action_method: Callable[..., R]) -> Callable[..., R]:
     """Mark a method as a "action" and apply a set of runtime checks to prevent implementation errors.
 
     This decorator marks a method as action.
@@ -184,7 +193,7 @@ def make_action_safe(action_method: Callable):
         return action_method
 
     @wraps(action_method)
-    def safe_wrapped(self: Algorithm, *args, **kwargs):
+    def safe_wrapped(self: Algorithm_, *args: Any, **kwargs: Any) -> Algorithm_:
         if action_method.__name__ not in get_action_methods_names(self):
             raise ValueError(
                 "The `make_action_safe` decorator can only be applied to the action methods "
@@ -199,14 +208,15 @@ def make_action_safe(action_method: Callable):
     return safe_wrapped
 
 
-def _check_safe_optimize(algorithm: Algo, old_method: Callable, *args, **kwargs) -> Algo:
+def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: Any, **kwargs: Any) -> Optimizable_:
     # record the hash of the pipeline to make an educated guess if the optimization works
     before_hash = joblib.hash(algorithm)
+    optimized_algorithm: Optimizable_
     if hasattr(old_method, "__self__"):
         # In this case the method is already bound and we do not need to pass the algo as first argument
-        optimized_algorithm: Algo = old_method(*args, **kwargs)
+        optimized_algorithm = old_method(*args, **kwargs)
     else:
-        optimized_algorithm: Algo = old_method(algorithm, *args, **kwargs)
+        optimized_algorithm = old_method(algorithm, *args, **kwargs)
     if not isinstance(optimized_algorithm, type(algorithm)):
         raise ValueError(
             "Calling `self_optimize` did not return an instance of the algorithm/pipeline itself! "
@@ -238,7 +248,7 @@ def _check_safe_optimize(algorithm: Algo, old_method: Callable, *args, **kwargs)
     return optimized_algorithm
 
 
-def make_optimize_safe(self_optimize_method: Callable):
+def make_optimize_safe(self_optimize_method: Callable[..., R]) -> Callable[..., R]:
     """Apply a set of runtime checks to a custom `self_optimize` method to prevent implementation errors.
 
     The following things are checked:
@@ -277,7 +287,7 @@ def make_optimize_safe(self_optimize_method: Callable):
         return self_optimize_method
 
     @wraps(self_optimize_method)
-    def safe_wrapped(self: Union[OptimizablePipeline, OptimizableAlgorithm], *args, **kwargs):
+    def safe_wrapped(self: Optimizable_, *args: Any, **kwargs: Any) -> Optimizable_:
         if self_optimize_method.__name__ != "self_optimize":
             raise ValueError(
                 "The `safe_optimize` decorator is only meant for the `self_optimize` method, but you applied it to "

@@ -76,6 +76,16 @@ test = { cmd = "pytest --cov=tpcp --cov-report=term-missing --cov-report=xml", h
 docs = { "script" = "_tasks:task_docs()",  help = "Build the html docs using Sphinx." }
 bump_version = { "script" = "_tasks:task_update_version()" }
 
+[tool.mypy]
+[[tool.mypy.overrides]]
+module = [
+    "joblib.*",
+    "pandas.*",
+    "tqdm.*",
+    "sklearn.*",
+    "scipy.*",
+]
+ignore_missing_imports = true
 
 [build-system]
 requires = ["poetry_core>=1.0.0"]

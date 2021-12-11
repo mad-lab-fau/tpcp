@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import numbers
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import joblib
 import numpy as np
@@ -15,17 +15,19 @@ from joblib import Memory
 from typing_extensions import Literal, TypedDict
 
 from tpcp._base import clone
+from tpcp._dataset import Dataset
+from tpcp._pipeline import Pipeline
 from tpcp._utils._general import _get_nested_paras
+
+if TYPE_CHECKING:
+    from tpcp.optimize import BaseOptimize
+    from tpcp.validate import Scorer
 
 _ERROR_SCORE_TYPE = Union[Literal["raise"], float]  # noqa: invalid-name
 _SCORE_TYPE = List[Union[Dict[str, float], float]]  # noqa: invalid-name
 _AGG_SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
 _SINGLE_SCORE_TYPE = Union[Dict[str, np.ndarray], np.ndarray]  # noqa: invalid-name
-
-if TYPE_CHECKING:
-    from tpcp import Dataset, Pipeline
-    from tpcp.optimize import BaseOptimize
-    from tpcp.validate import Scorer
+_SCORE_CALLABLE = Callable[[Pipeline, Dataset], Tuple[Dict[str, float], float]]  # noqa: invalid-name
 
 
 class ScoreResults(TypedDict, total=False):

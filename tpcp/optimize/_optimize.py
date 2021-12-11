@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Dict, Iterator, List, Optional, Union
+from typing import Any, ContextManager, Dict, Iterator, List, Optional, TypeVar, Union
 
 import numpy as np
 from joblib import Memory, Parallel, delayed
@@ -24,10 +24,15 @@ from tpcp._utils._general import (
     _split_hyper_and_pure_parameters,
 )
 from tpcp._utils._multiprocess import init_progressbar
-from tpcp._utils._score import _optimize_and_score, _score
+from tpcp._utils._score import _ERROR_SCORE_TYPE, _SCORE_CALLABLE, _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.validate import Scorer
-from tpcp.validate._scorer import _ERROR_SCORE_TYPE, _validate_scorer
+from tpcp.validate._scorer import _validate_scorer
+
+DummyOptimize_ = TypeVar("DummyOptimize_", bound="DummyOptimize")
+Optimize_ = TypeVar("Optimize_", bound="Optimize")
+GridSearch_ = TypeVar("GridSearch_", bound="GridSearch")
+GridSearchCv_ = TypeVar("GridSearchCv_", bound="GridSearchCV")
 
 
 class DummyOptimize(BaseOptimize, _skip_validation=True):
@@ -64,7 +69,7 @@ class DummyOptimize(BaseOptimize, _skip_validation=True):
     def __init__(self, pipeline: Pipeline) -> None:  # noqa: super-init-not-called
         self.pipeline = pipeline
 
-    def optimize(self, dataset: Dataset, **optimize_params):
+    def optimize(self: DummyOptimize_, dataset: Dataset, **optimize_params: Any) -> DummyOptimize_:
         """Run the "dummy" optimization.
 
         Parameters
@@ -140,7 +145,7 @@ class Optimize(BaseOptimize):
         self.pipeline = pipeline
         self.safe_optimize = safe_optimize
 
-    def optimize(self, dataset: Dataset, **optimize_params):
+    def optimize(self: Optimize_, dataset: Dataset, **optimize_params: Any) -> Optimize_:
         """Run the self-optimization defined by the pipeline.
 
         The optimized version of the pipeline is stored as `self.optimized_pipeline_`.
@@ -167,7 +172,7 @@ class Optimize(BaseOptimize):
                 "To use `Optimize` with a pipeline, the pipeline needs to implement a `self_optimize` method."
             )
         # We clone just to make sure runs are independent
-        pipeline = self.pipeline.clone()
+        pipeline: OptimizablePipeline = self.pipeline.clone()
         if self.safe_optimize is True:
             # Ideally, the self_optimize method should already be wrapped by the user, but we do it again, just in case.
             # `make_optimize_safe` has a safe-guard and does not apply the decorator twice
@@ -277,7 +282,7 @@ class GridSearch(BaseOptimize):
     """
 
     parameter_grid: ParameterGrid
-    scoring: Optional[Union[Callable, Scorer]]
+    scoring: Optional[Union[_SCORE_CALLABLE, Scorer]]
     n_jobs: Optional[int]
     return_optimized: Union[bool, str]
     pre_dispatch: Union[int, str]
@@ -285,7 +290,7 @@ class GridSearch(BaseOptimize):
     progress_bar: bool
 
     gs_results_: Dict[str, Any]
-    best_params_: Dict
+    best_params_: Dict[str, Any]
     best_index_: int
     best_score_: float
     multimetric_: bool
@@ -294,7 +299,7 @@ class GridSearch(BaseOptimize):
         self,
         pipeline: Pipeline,
         parameter_grid: ParameterGrid,
-        scoring: Optional[Union[Callable, Scorer]] = None,
+        scoring: Optional[Union[_SCORE_CALLABLE, Scorer]] = None,
         n_jobs: Optional[int] = None,
         return_optimized: Union[bool, str] = True,
         pre_dispatch: Union[int, str] = "n_jobs",
@@ -310,7 +315,7 @@ class GridSearch(BaseOptimize):
         self.error_score = error_score
         self.progress_bar = progress_bar
 
-    def optimize(self, dataset: Dataset, **_):
+    def optimize(self: GridSearch_, dataset: Dataset, **_: Any) -> GridSearch_:
         """Run the GridSearch over the dataset and find the best parameter combination.
 
         Parameters
@@ -573,7 +578,7 @@ class GridSearchCV(BaseOptimize):
 
     pipeline: OptimizablePipeline
     parameter_grid: ParameterGrid
-    scoring: Optional[Union[Callable, Scorer]]
+    scoring: Optional[Union[_SCORE_CALLABLE, Scorer]]
     return_optimized: Union[bool, str]
     cv: Optional[Union[int, BaseCrossValidator, Iterator]]
     pure_parameters: Union[bool, List[str]]
@@ -585,7 +590,7 @@ class GridSearchCV(BaseOptimize):
     progress_bar: bool
 
     cv_results_: Dict[str, Any]
-    best_params_: Dict
+    best_params_: Dict[str, Any]
     best_index_: int
     best_score_: float
     multimetric_: bool
@@ -596,7 +601,7 @@ class GridSearchCV(BaseOptimize):
         pipeline: OptimizablePipeline,
         parameter_grid: ParameterGrid,
         *,
-        scoring: Optional[Union[Callable, Scorer]] = None,
+        scoring: Optional[Union[_SCORE_CALLABLE, Scorer]] = None,
         return_optimized: Union[bool, str] = True,
         cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
         pure_parameters: Union[bool, List[str]] = False,
@@ -620,7 +625,8 @@ class GridSearchCV(BaseOptimize):
         self.error_score = error_score
         self.progress_bar = progress_bar
 
-    def optimize(self, dataset: Dataset, *, groups=None, **optimize_params):  # noqa: arguments-differ
+    def optimize(self: GridSearchCv_, dataset: Dataset, *, groups=None, **optimize_params) -> GridSearchCv_:  # noqa:
+        # arguments-differ
         self.dataset = dataset
         scoring = _validate_scorer(self.scoring, self.pipeline)
 
@@ -634,6 +640,7 @@ class GridSearchCV(BaseOptimize):
         # For each para combi, we separate the pure parameters (parameters that do not effect the optimization) and
         # the hyperparameters.
         # This allows for massive caching optimizations in the `_optimize_and_score`.
+        pure_parameters: List[str]
         if self.pure_parameters is False:
             pure_parameters = []
         elif self.pure_parameters is True:
@@ -641,6 +648,7 @@ class GridSearchCV(BaseOptimize):
             # pure_parameters = get_param_names(type(self.pipeline), field_type="pure")
             pass
         else:
+            assert isinstance(self.pure_parameters, list)
             pure_parameters = self.pure_parameters
 
         parameters = list(self.parameter_grid)
@@ -652,7 +660,7 @@ class GridSearchCV(BaseOptimize):
         # We only allow a temporary cache here, because the method that is cached internally is generic and the cache
         # might not be correctly invalidated, if GridSearchCv is called with a different pipeline or when the
         # pipeline itself is modified.
-        tmp_dir_context = nullcontext()
+        tmp_dir_context: Union[ContextManager[None], TemporaryDirectory] = nullcontext()
         if pure_parameters:
             tmp_dir_context = TemporaryDirectory("joblib_tpcp_cache")
         with tmp_dir_context as cachedir:
@@ -770,7 +778,7 @@ class GridSearchCV(BaseOptimize):
         # Use one MaskedArray and mask all the places where the param is not
         # applicable for that candidate. Use defaultdict as each candidate may
         # not contain all the params
-        param_results = defaultdict(
+        param_results: Dict = defaultdict(
             partial(
                 MaskedArray,
                 np.empty(
@@ -808,7 +816,7 @@ class GridSearchCV(BaseOptimize):
         return results
 
 
-def _validate_return_optimized(return_optimized, multi_metric, results):
+def _validate_return_optimized(return_optimized, multi_metric, results) -> None:
     """Check if `return_optimize` fits to the multimetric output of the scorer."""
     if multi_metric is True:
         # In a multimetric case, return_optimized must either be False or a string

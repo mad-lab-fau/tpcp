@@ -1,6 +1,6 @@
 """Some helper to handle mutliprocess progressbars."""
 import contextlib
-from typing import ContextManager, Iterable
+from typing import Any, ContextManager, Iterable
 
 import joblib
 from tqdm.auto import tqdm
@@ -8,7 +8,7 @@ from tqdm.std import tqdm as tqdm_base
 
 
 @contextlib.contextmanager
-def tqdm_joblib(tqdm_object: tqdm_base, iterable: Iterable):
+def tqdm_joblib(tqdm_object: tqdm_base, iterable: Iterable[Any]):
     """Context manager to patch joblib to report into tqdm progress bar given as argument.
 
     Modified based on: https://stackoverflow.com/a/58936697/3707545

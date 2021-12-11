@@ -6,7 +6,7 @@ import pytest
 from numpydoc.docscrape import NumpyDocString
 
 from tpcp._algorithm_utils import get_action_method, get_action_params, get_results
-from tpcp._base import Algo, get_param_names
+from tpcp._base import BaseTpcpObjectObj_, get_param_names
 
 
 class TestAlgorithmMixin:
@@ -14,7 +14,7 @@ class TestAlgorithmMixin:
     __test__ = False
 
     @pytest.fixture()
-    def after_action_instance(self) -> Algo:
+    def after_action_instance(self) -> BaseTpcpObjectObj_:
         pass
 
     def test_init(self):
