@@ -18,7 +18,9 @@ Parameter = Annotated[T, _ParaTypes.SIMPLE]
 Parameter.__doc__ = cleandoc(
     """Mark class attribute as a simple parameter for an algorithm or pipeline.
 
-All attributes marked this way, will be included in the automatically generated `__init__`.
+Generally this is not required, as all parameters listed in the init and not annotated by any other fields types, 
+are considered plain parameters.
+However, if you want to be explicit you can use this type annotation.
 """
 )
 Para = Parameter
@@ -28,7 +30,6 @@ HyperParameter.__doc__ = cleandoc(
 
 Compared to normal parameters (:func:`~tpcp.parameter`), hyper-parameters must only be specified for optimizable
 Algorithms or Pipelines.
-Like simple parameters these parameters are included in the `__init__`.
 Hyper-Parameter are expected to change the outcome of the `self_optimize` method, but not change themself during the
 optimization procedure.
 This information can be used for internal checks and performance optimizations.
@@ -41,7 +42,6 @@ PureParameter.__doc__ = cleandoc(
     
 Compared to normal parameters (:func:`~tpcp.parameter`), pure parameters must only be specified for optimizable
 Algorithms or Pipelines.
-Like simple parameters these parameters are included in the `__init__`.
 Pure parameters are expected to **not** influence the outcome of self optimize.
 This information can be used for internal checks and performance optimizations.
 These are most typically used in pipelines with multiple steps, that have an initial ML part that can be optimized
@@ -60,7 +60,6 @@ OptimizableParameter.__doc__ = cleandoc(
 
 Compared to normal parameters (:func:`~tpcp.parameter`), optimizable parameters must only be specified for optimizable
 Algorithms or Pipelines.
-Like simple parameters these parameters are included in the `__init__`.
 Optimizable parameters are expected to be modified when calling `self_optimize`.
 This information can be used for internal checks and performance optimizations.
 Further, this means there default values will likely be overwritten.
