@@ -11,7 +11,7 @@ import sys
 import warnings
 from collections import defaultdict
 from functools import wraps
-from typing import Any, Callable, DefaultDict, Dict, Generic, List, Optional, Tuple, Type, TypeVar
+from typing import Any, Callable, DefaultDict, Dict, Generic, List, Optional, Tuple, Type, TypeVar, Union
 
 import numpy as np
 from typing_extensions import Annotated, Literal, get_args, get_origin
@@ -306,6 +306,12 @@ def get_param_names(cls: Type[_BaseTpcpObject]) -> List[str]:
             )
     # Extract and sort argument names excluding 'self'
     return sorted([p.name for p in parameters])
+
+
+def _get_annotated_fields_of_type(
+    instance_or_cls: Union[Type[BaseTpcpObject], BaseTpcpObject], field_type: _ParaTypes
+) -> List[str]:
+    return [k for k, v in instance_or_cls.__field_annotations__.items() if v == field_type]
 
 
 def _get_params_without_nested_class(instance: BaseTpcpObject) -> Dict[str, Any]:

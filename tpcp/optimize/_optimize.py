@@ -17,6 +17,8 @@ from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
 from tpcp import Dataset, OptimizablePipeline, Pipeline
 from tpcp._algorithm import BaseOptimize
 from tpcp._algorithm_utils import _check_safe_optimize
+from tpcp._base import _get_annotated_fields_of_type
+from tpcp._parameters import _ParaTypes
 from tpcp._utils._general import (
     _aggregate_final_results,
     _normalize_score_results,
@@ -644,12 +646,13 @@ class GridSearchCV(BaseOptimize):
         if self.pure_parameters is False:
             pure_parameters = None
         elif self.pure_parameters is True:
-            # TODO: Fix this
-            # pure_parameters = get_param_names(type(self.pipeline), field_type="pure")
-            pass
-        else:
-            assert isinstance(self.pure_parameters, list)
+            pure_parameters = _get_annotated_fields_of_type(self.pipeline, _ParaTypes.PURE)
+        elif isinstance(self.pure_parameters, list):
             pure_parameters = self.pure_parameters
+        else:
+            raise ValueError(
+                "`self.pure_parameters` must either be a List of field names (nested are allowed) or " "True/False."
+            )
 
         parameters = list(self.parameter_grid)
         split_parameters = _split_hyper_and_pure_parameters(parameters, pure_parameters)

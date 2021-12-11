@@ -444,7 +444,8 @@ class TestGridSearchCV:
         # Final optimize was called with all the data.
         assert len(mock.call_args_list[-1][0][1]) == 5
 
-    def test_pure_parameters(self):
+    @pytest.mark.parametrize("pure_paras,call_count", ((False, 6 * 2), (True, 2 * 2), (["para_1"], 2 * 2)))
+    def test_pure_parameters(self, pure_paras, call_count):
         optimized_pipe = DummyOptimizablePipeline()
         optimized_pipe.optimized = True
         ds = DummyDataset()
@@ -458,30 +459,16 @@ class TestGridSearchCV:
                 scoring=dummy_single_score_func,
                 cv=2,
                 return_optimized=False,
+                pure_parameters=pure_paras,
             ).optimize(ds)
 
-        assert mock.call_count == 12  # 6 para combis * 2 Cv
-
-        # Now with caching
-        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
-            mock.__name__ = "self_optimize"
-            DummyOptimizablePipeline.self_optimize = make_optimize_safe(DummyOptimizablePipeline.self_optimize)
-            GridSearchCV(
-                DummyOptimizablePipeline(),
-                ParameterGrid({"para_1": [1, 2, 3], "para_2": [0, 1]}),
-                scoring=dummy_single_score_func,
-                cv=2,
-                pure_parameters=["para_1"],
-                return_optimized=False,
-            ).optimize(ds)
-
-        assert mock.call_count == 4  # 2 hyper-para combis * 2 Cv
+        assert mock.call_count == call_count
 
     def test_pure_parameters_cache(self):
         """Test that pure parameter cache is deleted after run."""
         # We just run our test twice. If the cache is not delted, the second run should fail.
-        self.test_pure_parameters()
-        self.test_pure_parameters()
+        self.test_pure_parameters(True, 4)
+        self.test_pure_parameters(True, 4)
 
     def test_pure_parameter_modified_error(self):
         optimized_pipe = DummyOptimizablePipeline()
@@ -522,7 +509,7 @@ class TestGridSearchCV:
                 )
                 assert result["optimizer"].optimized_pipeline_.para_1 == "some_value"
                 assert result["optimizer"].optimized_pipeline_.para_2 == "some_other_value"
-                assert result["optimizer"].optimized_pipeline_.optimized is True
+                assert result["optimizer"].optimized_pipeline_.optimized == "some_other_value"
 
 
 class TestOptimize:

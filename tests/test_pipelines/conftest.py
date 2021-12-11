@@ -1,8 +1,9 @@
 from itertools import product
+from typing import Dict
 
 import pandas as pd
 
-from tpcp import cf, make_optimize_safe
+from tpcp import HyperParameter, OptimizableParameter, PureParameter, cf, make_optimize_safe
 from tpcp._dataset import Dataset
 from tpcp._pipeline import OptimizablePipeline, Pipeline
 
@@ -15,6 +16,10 @@ class DummyPipeline(Pipeline):
 
 
 class DummyOptimizablePipeline(OptimizablePipeline):
+    optimized: OptimizableParameter[bool]
+    para_1: PureParameter
+    para_2: HyperParameter
+
     def __init__(self, para_1=None, para_2=None, optimized=False):
         self.para_1 = para_1
         self.para_2 = para_2
@@ -22,7 +27,7 @@ class DummyOptimizablePipeline(OptimizablePipeline):
 
     @make_optimize_safe
     def self_optimize(self, dataset: Dataset, **kwargs):
-        self.optimized = True
+        self.optimized = self.para_2
         return self
 
 
@@ -31,7 +36,10 @@ class MutableCustomClass:
 
 
 class MutableParaPipeline(OptimizablePipeline):
-    def __init__(self, para_normal=3, para_mutable=cf({}), optimized=False):
+    optimized: OptimizableParameter[bool]
+    para_mutable: OptimizableParameter[bool]
+
+    def __init__(self, para_normal=3, para_mutable: Dict = cf(MutableCustomClass()), optimized=False):
         self.para_normal = para_normal
         self.para_mutable = para_mutable
         self.optimized = optimized
