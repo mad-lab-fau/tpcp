@@ -217,12 +217,18 @@ def _get_nested_opti_paras(algorithm: Algorithm, opti_para_names: List[str]) -> 
     for p, v in paras.items():
         if p in opti_para_names:
             optimizable_paras[p] = v
+        # For each optimizable parameter, we also add all childs, as they are also allowed to change,
+        # if the parent is allowed to.
+        elif any(p.startswith(o + "__") for o in opti_para_names):
+            optimizable_paras[p] = v
         else:
             other_paras[p] = v
     # We need to exclude "parent" objects, when a nested para is marked as optimizable
+    # Because, if the nested para changes, the parent para will change as well, and we can not do anything about it.
     for p in optimizable_paras:
         parent_name = p.rsplit("__", 1)[0]
         other_paras.pop(parent_name, None)
+
     return optimizable_paras, other_paras
 
 
@@ -265,6 +271,11 @@ def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: A
         for k, v in other_paras.items():
             if joblib.hash(v) != joblib.hash(after_other_paras[k]):
                 changed_paras.append(k)
+        changed_paras = sorted(changed_paras)
+        removed_paras = set(other_paras) - set(after_other_paras)
+        added_paras = set(after_other_paras) - set(other_paras)
+        changed_paras.extend([f"{p} (removed)" for p in sorted(removed_paras)])
+        changed_paras.extend([f"{p} (added)" for p in sorted(added_paras)])
         raise RuntimeError(
             "Optimizing the pipeline has modified the following parameters, that were not marked as optimizable: "
             f"{changed_paras}. "
