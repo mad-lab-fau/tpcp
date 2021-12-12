@@ -16,10 +16,11 @@ from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
 from tqdm.auto import tqdm
 
 from tpcp import Dataset, OptimizablePipeline, Pipeline
-from tpcp._algorithm import BaseOptimize
 from tpcp._algorithm_utils import _check_safe_optimize
 from tpcp._base import _get_annotated_fields_of_type
-from tpcp._parameters import _ParaTypes
+from tpcp._optimize import BaseOptimize
+from tpcp._parameters import Parameter, _ParaTypes
+from tpcp._pipeline import OptimizablePipeline_, Pipeline_
 from tpcp._utils._general import (
     _aggregate_final_results,
     _normalize_score_results,
@@ -65,7 +66,7 @@ class DummyOptimize(BaseOptimize, _skip_validation=True):
 
     """
 
-    pipeline: Pipeline
+    pipeline: Parameter[Pipeline]
 
     optimized_pipeline_: Pipeline
 
@@ -137,7 +138,7 @@ class Optimize(BaseOptimize):
 
     """
 
-    pipeline: OptimizablePipeline
+    pipeline: Parameter[OptimizablePipeline]
     safe_optimize: bool
 
     optimized_pipeline_: OptimizablePipeline

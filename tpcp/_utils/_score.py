@@ -20,14 +20,14 @@ from tpcp._pipeline import Pipeline
 from tpcp._utils._general import _get_nested_paras
 
 if TYPE_CHECKING:
-    from tpcp.optimize import BaseOptimize
+    from tpcp._optimize import BaseOptimize
     from tpcp.validate import Scorer
 
 _ERROR_SCORE_TYPE = Union[Literal["raise"], float]  # noqa: invalid-name
 _SCORE_TYPE = List[Union[Dict[str, float], float]]  # noqa: invalid-name
 _AGG_SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
 _SINGLE_SCORE_TYPE = Union[Dict[str, np.ndarray], np.ndarray]  # noqa: invalid-name
-_SCORE_CALLABLE = Callable[[Pipeline, Dataset], Tuple[Dict[str, float], float]]  # noqa: invalid-name
+_SCORE_CALLABLE = Callable[[Pipeline, Dataset], Union[Dict[str, float], float]]  # noqa: invalid-name
 
 
 class ScoreResults(TypedDict, total=False):

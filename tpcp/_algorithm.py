@@ -6,13 +6,8 @@ from typing import TYPE_CHECKING, Any, Tuple, TypeVar, Union
 
 from tpcp._algorithm_utils import make_optimize_safe
 from tpcp._base import BaseTpcpObject
-from tpcp._parameters import Parameter
-
-if TYPE_CHECKING:
-    from tpcp import Dataset, Pipeline
 
 Algorithm_ = TypeVar("Algorithm_", bound="Algorithm")
-BaseOptimize_ = TypeVar("BaseOptimize_", bound="BaseOptimize")
 
 
 class Algorithm(BaseTpcpObject, _skip_validation=True):
@@ -53,26 +48,3 @@ class OptimizableAlgorithm(Algorithm, _skip_validation=True):
 
         """
         raise NotImplementedError()
-
-
-class BaseOptimize(Algorithm, _skip_validation=True):
-    """Base class for all optimizer."""
-
-    _action_methods: Union[Tuple[str, ...], str] = "optimize"
-
-    pipeline: Parameter[Pipeline]
-
-    dataset: Dataset
-
-    optimized_pipeline_: Pipeline
-
-    def optimize(self: BaseOptimize_, dataset: Dataset, **optimize_params: Any) -> BaseOptimize_:
-        """Apply some form of optimization on the the input parameters of the pipeline."""
-        raise NotImplementedError()
-
-    def run(self: BaseOptimize_, datapoint: Dataset) -> BaseOptimize_:
-        """Run the optimized pipeline.
-
-        This is a wrapper to contain API compatibility with `SimplePipeline`.
-        """
-        return self.optimized_pipeline_.run(datapoint)

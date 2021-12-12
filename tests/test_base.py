@@ -5,6 +5,7 @@ from typing import Any, Dict, Tuple
 import joblib
 import pytest
 
+from tests.conftest import _get_params_without_nested_class
 from tpcp import Algorithm, cf, clone
 from tpcp._algorithm_utils import (
     get_action_method,
@@ -13,7 +14,6 @@ from tpcp._algorithm_utils import (
     get_results,
     is_action_applied,
 )
-from tpcp._base import _get_params_without_nested_class
 from tpcp.exceptions import MutableDefaultsError, ValidationError
 
 

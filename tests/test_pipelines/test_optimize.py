@@ -21,7 +21,7 @@ from tests.test_pipelines.conftest import (
     dummy_single_score_func,
 )
 from tpcp import clone, make_optimize_safe
-from tpcp._algorithm import BaseOptimize
+from tpcp._optimize import BaseOptimize
 from tpcp._utils._score import _optimize_and_score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.optimize import DummyOptimize, GridSearch, GridSearchCV, Optimize

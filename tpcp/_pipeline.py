@@ -5,8 +5,8 @@ from tpcp._algorithm import Algorithm
 from tpcp._algorithm_utils import make_action_safe, make_optimize_safe
 from tpcp._dataset import Dataset
 
-PipelineObj_ = TypeVar("PipelineObj_", bound="Pipeline")
-OptimizablePipelineObj_ = TypeVar("OptimizablePipelineObj_", bound="OptimizablePipeline")
+Pipeline_ = TypeVar("Pipeline_", bound="Pipeline")
+OptimizablePipeline_ = TypeVar("OptimizablePipeline_", bound="OptimizablePipeline")
 
 
 class Pipeline(Algorithm, _skip_validation=True):
@@ -20,7 +20,7 @@ class Pipeline(Algorithm, _skip_validation=True):
     datapoint: Dataset
 
     @make_action_safe
-    def run(self: PipelineObj_, datapoint: Dataset) -> PipelineObj_:
+    def run(self: Pipeline_, datapoint: Dataset) -> Pipeline_:
         """Run the pipeline.
 
         Note, that it is usually preferred to use `safe_run` on custom pipelines instead of `run`, as `safe_run` can
@@ -41,7 +41,7 @@ class Pipeline(Algorithm, _skip_validation=True):
         raise NotImplementedError()  # pragma: no cover
 
     @make_action_safe
-    def safe_run(self: PipelineObj_, datapoint: Dataset) -> PipelineObj_:
+    def safe_run(self: Pipeline_, datapoint: Dataset) -> Pipeline_:
         """Run the pipeline with some additional checks.
 
         It is preferred to use this method over `run`, as it can catch some simple implementation errors of custom
@@ -111,7 +111,7 @@ class OptimizablePipeline(Pipeline, _skip_validation=True):
     """
 
     @make_optimize_safe
-    def self_optimize(self: OptimizablePipelineObj_, dataset: Dataset, **kwargs) -> OptimizablePipelineObj_:
+    def self_optimize(self: OptimizablePipeline_, dataset: Dataset, **kwargs) -> OptimizablePipeline_:
         """Optimize the input parameter of the pipeline or algorithm using any logic.
 
         This method can be used to adapt the input parameters (values provided in the init) based on any data driven

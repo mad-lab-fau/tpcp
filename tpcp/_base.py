@@ -314,10 +314,6 @@ def _get_annotated_fields_of_type(
     return [k for k, v in instance_or_cls.__field_annotations__.items() if v == field_type]
 
 
-def _get_params_without_nested_class(instance: BaseTpcpObject) -> Dict[str, Any]:
-    return {k: v for k, v in instance.get_params().items() if not isinstance(v, _BaseTpcpObject)}
-
-
 def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]) -> None:
     mutable_defaults = []
 
@@ -381,10 +377,6 @@ def _is_dangerous_mutable(field: inspect.Parameter) -> bool:
         return False
     if isinstance(field.default, _get_dangerous_mutable_types()):
         return True
-    # We check for built ins after the mutable types, as some builtins are mutables from the list
-    if _is_builtin_class_instance(field.default) or field.default in (np.nan,):
-        return False
-    warnings.warn("Custom Object type is used! It can not be determined if it is mutable default.", UserWarning)
     return False
 
 

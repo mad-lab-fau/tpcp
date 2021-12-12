@@ -8,7 +8,7 @@ from sklearn.model_selection import BaseCrossValidator, check_cv
 from tqdm.auto import tqdm
 
 from tpcp import Dataset
-from tpcp._algorithm import BaseOptimize
+from tpcp._optimize import BaseOptimize
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results
 from tpcp._utils._multiprocess import TqdmParallel
 from tpcp._utils._score import _ERROR_SCORE_TYPE, _optimize_and_score
