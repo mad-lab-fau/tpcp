@@ -12,7 +12,9 @@ import warnings
 from collections import defaultdict
 from functools import wraps
 from types import MethodWrapperType
-from typing import Any, Callable, DefaultDict, Dict, Generic, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Callable, DefaultDict, Dict, Generic, List, Optional, Tuple, Type, TypeVar, Union, Iterable
+
+from typing_extensions import Annotated, Literal, get_args, get_origin
 
 from typing_extensions import Annotated, Literal, get_args, get_origin
 
@@ -323,9 +325,11 @@ def get_param_names(cls: Type[_BaseTpcpObject]) -> List[str]:
 
 
 def _get_annotated_fields_of_type(
-    instance_or_cls: Union[Type[BaseTpcpObject], BaseTpcpObject], field_type: _ParaTypes
+    instance_or_cls: Union[Type[BaseTpcpObject], BaseTpcpObject], field_type: Union[_ParaTypes, Iterable[_ParaTypes]]
 ) -> List[str]:
-    return [k for k, v in instance_or_cls.__field_annotations__.items() if v == field_type]
+    if isinstance(field_type, _ParaTypes):
+        field_type = [field_type]
+    return [k for k, v in instance_or_cls.__field_annotations__.items() if v in field_type]
 
 
 def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]) -> None:

@@ -6,10 +6,12 @@ import types
 import warnings
 from functools import wraps
 from inspect import isclass
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Type, TypeVar, Union, cast, List
 
 import joblib
 
+from tpcp._base import _get_annotated_fields_of_type
+from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import PotentialUserErrorWarning
 
 if TYPE_CHECKING:
@@ -208,9 +210,28 @@ def make_action_safe(action_method: Callable[..., R]) -> Callable[..., R]:
     return safe_wrapped
 
 
+def _get_nested_opti_paras(algorithm: Algorithm, opti_para_names: List[str]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    paras = algorithm.get_params(deep=True)
+    optimizable_paras = {}
+    other_paras = {}
+    for p, v in paras.items():
+        if p in opti_para_names:
+            optimizable_paras[p] = v
+        else:
+            other_paras[p] = v
+    # We need to exclude "parent" objects, when a nested para is marked as optimizable
+    for p in optimizable_paras:
+        parent_name = p.rsplit("__", 1)[0]
+        other_paras.pop(parent_name, None)
+    return optimizable_paras, other_paras
+
+
 def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: Any, **kwargs: Any) -> Optimizable_:
     # record the hash of the pipeline to make an educated guess if the optimization works
-    before_hash = joblib.hash(algorithm)
+    opti_para_names = _get_annotated_fields_of_type(algorithm, _ParaTypes.OPTI)
+    optimizable_paras, other_paras = _get_nested_opti_paras(algorithm, opti_para_names)
+    before_hash_optimizable = joblib.hash(optimizable_paras)
+    before_hash_other = joblib.hash(other_paras)
     optimized_algorithm: Optimizable_
     if hasattr(old_method, "__self__"):
         # In this case the method is already bound and we do not need to pass the algo as first argument
@@ -227,21 +248,36 @@ def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: A
     # The first hash records any changes to the object.
     # The second hash only records changes to the parameters, because everything else is removed by clone.
     # Hence, if we see differences between the hashes, other things besides the parameters are changed.
-    # TODO: Update to only use pure parameters in this check! (or rather add additional check just for pure parameters
     after_hash = joblib.hash(optimized_algorithm)
     after_hash_after_clone = joblib.hash(optimized_algorithm.clone())
     if after_hash_after_clone != after_hash:
-        # TODO: Can we make that more precise and point to the attributes that have changed?
         raise RuntimeError(
             "Optimizing seems to have changed class attributes that are not parameters (i.e. not provided in the "
             "`__init__`). "
             "This can lead to unexpected issues!"
         )
-    if before_hash == after_hash:
+    after_optimizable_paras, after_other_paras = _get_nested_opti_paras(algorithm, opti_para_names)
+    after_hash_optimizable = joblib.hash(after_optimizable_paras)
+    after_hash_other = joblib.hash(after_other_paras)
+    if before_hash_other != after_hash_other:
+        # In this case we raise an error anyway, so lets go deep:
+        changed_paras = []
+        for k, v in other_paras.items():
+            if joblib.hash(v) != joblib.hash(after_other_paras[k]):
+                changed_paras.append(k)
+        raise RuntimeError(
+            "Optimizing the pipeline has modified the following parameters, that were not marked as optimizable: "
+            f"{changed_paras}. "
+            "Double check the implementation of `self_optimize` and either mark the changing parameters as "
+            "optimizable by adding `OptiPara`/`OptimizableParameter` as type annotation or make sure that they are not "
+            "accidentally modified in your implementation."
+        )
+    if before_hash_optimizable == after_hash_optimizable:
         # If the hash didn't change the object didn't change.
         # Something might have gone wrong.
         warnings.warn(
-            "Optimizing the algorithm doesn't seem to have changed the parameters of the algorithm. "
+            "Optimizing the algorithm doesn't seem to have changed any of the parameters marked as optimizable "
+            f"({optimizable_paras}). "
             "This could indicate an implementation error of the `self_optimize` method.",
             PotentialUserErrorWarning,
         )
