@@ -29,3 +29,6 @@ Functions
 
     make_action_safe
     make_optimize_safe
+    get_param_names
+    get_action_params
+    get_results
