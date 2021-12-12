@@ -1,9 +1,5 @@
-Custom Algorithms
-=================
-
-.. automodule:: tpcp._algorithm
-    :no-members:
-    :no-inherited-members:
+Custom Algorithms and Pipelines
+===============================
 
 Classes
 -------
@@ -16,6 +12,8 @@ Classes
 
     Algorithm
     OptimizableAlgorithm
+    Pipeline
+    OptimizablePipeline
 
 
 Functions
