@@ -144,7 +144,7 @@ class Optimize(BaseOptimize):
     optimized_pipeline_: OptimizablePipeline
 
     def __init__(  # noqa: super-init-not-called
-        self, pipeline: OptimizablePipeline, safe_optimize: bool = False
+        self, pipeline: OptimizablePipeline, safe_optimize: bool = True
     ) -> None:
         self.pipeline = pipeline
         self.safe_optimize = safe_optimize
