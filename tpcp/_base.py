@@ -11,13 +11,12 @@ import sys
 import warnings
 from collections import defaultdict
 from functools import wraps
+from types import MethodWrapperType
 from typing import Any, Callable, DefaultDict, Dict, Generic, List, Optional, Tuple, Type, TypeVar, Union
-
-import numpy as np
-from typing_extensions import Annotated, Literal, get_args, get_origin
 
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, PotentialUserErrorWarning, ValidationError
+from typing_extensions import Annotated, Literal, get_args, get_origin
 
 T = TypeVar("T")
 BaseTpcpObjectObj_ = TypeVar("BaseTpcpObjectObj_", bound="BaseTpcpObject")
@@ -57,7 +56,7 @@ Sentinel to indicate the lack of a value when ``None`` is ambiguous.
 def _get_init_defaults(cls: Type[_BaseTpcpObject]) -> Dict[str, inspect.Parameter]:
     # fetch the constructor or the original constructor before deprecation wrapping if any
     init = cls.__init__
-    if init is object.__init__:
+    if init is object.__init__ or isinstance(init, MethodWrapperType):
         # No explicit constructor to introspect
         return {}
 
