@@ -1,7 +1,10 @@
-from typing import Any, Dict, Generic, Tuple, TypeVar, Union, cast
+"""Baseclass for optimizers.
+
+This is in a separate file to avoid circular imports.
+"""
+from typing import Any, Dict, Tuple, TypeVar, Union
 
 from tpcp import Algorithm, Dataset, Parameter, Pipeline
-from tpcp._pipeline import Pipeline_
 
 BaseOptimize_ = TypeVar("BaseOptimize_", bound="BaseOptimize")
 

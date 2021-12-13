@@ -20,7 +20,6 @@ from tpcp._algorithm_utils import _check_safe_optimize
 from tpcp._base import _get_annotated_fields_of_type
 from tpcp._optimize import BaseOptimize
 from tpcp._parameters import Parameter, _ParaTypes
-from tpcp._pipeline import OptimizablePipeline_, Pipeline_
 from tpcp._utils._general import (
     _aggregate_final_results,
     _normalize_score_results,

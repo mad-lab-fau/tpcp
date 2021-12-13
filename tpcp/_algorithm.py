@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Tuple, TypeVar, Union
+from typing import Any, Tuple, TypeVar, Union
 
 from tpcp._algorithm_utils import make_optimize_safe
 from tpcp._base import BaseTpcpObject

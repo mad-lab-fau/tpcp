@@ -14,9 +14,10 @@ from functools import wraps
 from types import MethodWrapperType
 from typing import Any, Callable, DefaultDict, Dict, Generic, List, Optional, Tuple, Type, TypeVar, Union
 
+from typing_extensions import Annotated, Literal, get_args, get_origin
+
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, PotentialUserErrorWarning, ValidationError
-from typing_extensions import Annotated, Literal, get_args, get_origin
 
 T = TypeVar("T")
 BaseTpcpObjectObj_ = TypeVar("BaseTpcpObjectObj_", bound="BaseTpcpObject")
