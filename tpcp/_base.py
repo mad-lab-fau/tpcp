@@ -239,6 +239,7 @@ class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
         return clone(self, safe=True)
 
     def __repr__(self):
+        """Provide generic representation for the object based on all parameters."""
         class_name = type(self).__name__
         paras = self.get_params(deep=False)
         result = [class_name, "("]
