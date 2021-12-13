@@ -2,4 +2,4 @@
 from tpcp._optimize import BaseOptimize
 from tpcp.optimize._optimize import DummyOptimize, GridSearch, GridSearchCV, Optimize
 
-__all__ = ["GridSearch", "GridSearchCV", "Optimize", "DummyOptimize"]
+__all__ = ["GridSearch", "GridSearchCV", "Optimize", "DummyOptimize", "BaseOptimize"]
