@@ -11,7 +11,7 @@ Classes
 .. currentmodule:: tpcp.validate
 
 .. autosummary::
-   :toctree: generated/base
+   :toctree: generated/validate
    :template: class_with_private.rst
 
    Scorer
@@ -21,7 +21,7 @@ Functions
 .. currentmodule:: tpcp.validate
 
 .. autosummary::
-   :toctree: generated/base
+   :toctree: generated/validate
    :template: function.rst
 
     cross_validate

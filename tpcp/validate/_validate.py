@@ -1,20 +1,18 @@
-"""Helper to validate/evaluate pipelines and Optimize.
-
-TODO: We might move this to evaluation utils
-"""
+"""Helper to validate/evaluate pipelines and Optimize."""
 
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
-from joblib import Parallel, delayed
+from joblib import delayed
 from sklearn.model_selection import BaseCrossValidator, check_cv
+from tqdm.auto import tqdm
 
 from tpcp import Dataset
+from tpcp._optimize import BaseOptimize
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results
-from tpcp._utils._multiprocess import init_progressbar
-from tpcp._utils._score import _optimize_and_score
-from tpcp.base import BaseOptimize
-from tpcp.validate._scorer import _ERROR_SCORE_TYPE, _validate_scorer
+from tpcp._utils._multiprocess import TqdmParallel
+from tpcp._utils._score import _ERROR_SCORE_TYPE, _optimize_and_score
+from tpcp.validate._scorer import _validate_scorer
 
 
 def cross_validate(
@@ -141,32 +139,28 @@ def cross_validate(
     splits = list(cv.split(dataset, groups=groups))
     # We clone the estimator to make sure that all the folds are
     # independent, and that it is pickle-able.
-    with init_progressbar(
-        progress_bar,
-        n_jobs=n_jobs,
-        iterable=splits,
-        desc="CV Folds",
-        total=len(splits),
-    ) as wrapped_iterable:
-        parallel = Parallel(n_jobs=n_jobs, verbose=verbose, pre_dispatch=pre_dispatch)
-        results = parallel(
-            delayed(_optimize_and_score)(
-                optimizable.clone(),
-                dataset,
-                scoring,
-                train,
-                test,
-                optimize_params={**_propagate_groups(propagate_groups, groups, train), **optimize_params},
-                hyperparameters=None,
-                pure_parameters=None,
-                return_train_score=return_train_score,
-                return_times=True,
-                return_data_labels=True,
-                return_optimizer=return_optimizer,
-                error_score=error_score,
-            )
-            for train, test in wrapped_iterable
+    pbar: Optional[tqdm] = None
+    if progress_bar:
+        pbar = tqdm(desc="CV Folds", total=len(splits))
+    parallel = TqdmParallel(n_jobs=n_jobs, verbose=verbose, pre_dispatch=pre_dispatch, pbar=pbar)
+    results = parallel(
+        delayed(_optimize_and_score)(
+            optimizable.clone(),
+            dataset,
+            scoring,
+            train,
+            test,
+            optimize_params={**_propagate_groups(propagate_groups, groups, train), **optimize_params},
+            hyperparameters=None,
+            pure_parameters=None,
+            return_train_score=return_train_score,
+            return_times=True,
+            return_data_labels=True,
+            return_optimizer=return_optimizer,
+            error_score=error_score,
         )
+        for train, test in splits
+    )
 
     results = _aggregate_final_results(results)
     score_results = {}

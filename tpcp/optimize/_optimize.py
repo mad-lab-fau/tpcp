@@ -6,31 +6,40 @@ from contextlib import nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Dict, Iterator, List, Optional, Union
+from typing import Any, ContextManager, Dict, Iterator, List, Optional, TypeVar, Union
 
-import joblib
 import numpy as np
-from joblib import Memory, Parallel, delayed
+from joblib import Memory, delayed
 from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
+from tqdm.auto import tqdm
 
-from tpcp import Dataset, OptimizablePipeline, SimplePipeline
+from tpcp import Dataset, OptimizablePipeline, Pipeline
+from tpcp._algorithm_utils import _check_safe_optimize
+from tpcp._base import _get_annotated_fields_of_type
+from tpcp._optimize import BaseOptimize
+from tpcp._parameters import Parameter, _ParaTypes
+from tpcp._pipeline import OptimizablePipeline_, Pipeline_
 from tpcp._utils._general import (
     _aggregate_final_results,
     _normalize_score_results,
     _prefix_para_dict,
     _split_hyper_and_pure_parameters,
 )
-from tpcp._utils._multiprocess import init_progressbar
-from tpcp._utils._score import _optimize_and_score, _score
-from tpcp.base import BaseOptimize
+from tpcp._utils._multiprocess import TqdmParallel
+from tpcp._utils._score import _ERROR_SCORE_TYPE, _SCORE_CALLABLE, _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.validate import Scorer
-from tpcp.validate._scorer import _ERROR_SCORE_TYPE, _validate_scorer
+from tpcp.validate._scorer import _validate_scorer
+
+DummyOptimize_ = TypeVar("DummyOptimize_", bound="DummyOptimize")
+Optimize_ = TypeVar("Optimize_", bound="Optimize")
+GridSearch_ = TypeVar("GridSearch_", bound="GridSearch")
+GridSearchCv_ = TypeVar("GridSearchCv_", bound="GridSearchCV")
 
 
-class DummyOptimize(BaseOptimize):
+class DummyOptimize(BaseOptimize, _skip_validation=True):
     """Provide API compatibility for SimplePipelines in optimize wrappers.
 
     This is a simple dummy Optimizer, that will **not** optimize anything, but just provide the correct api so that
@@ -57,14 +66,14 @@ class DummyOptimize(BaseOptimize):
 
     """
 
-    pipeline: SimplePipeline
+    pipeline: Parameter[Pipeline]
 
-    optimized_pipeline_: SimplePipeline
+    optimized_pipeline_: Pipeline
 
-    def __init__(self, pipeline: SimplePipeline):  # noqa: super-init-not-called
+    def __init__(self, pipeline: Pipeline) -> None:  # noqa: super-init-not-called
         self.pipeline = pipeline
 
-    def optimize(self, dataset: Dataset, **optimize_params):
+    def optimize(self: DummyOptimize_, dataset: Dataset, **optimize_params: Any) -> DummyOptimize_:
         """Run the "dummy" optimization.
 
         Parameters
@@ -103,11 +112,18 @@ class Optimize(BaseOptimize):
     Optimize will never modify the original pipeline, but will store a copy of the optimized pipeline as
     `optimized_pipeline_`.
 
+    If `safe_optimize` is True, the wrapper applies the same runtime checks as provided by
+    :func:`~tpcp.make_optimize_safe`.
+
     Parameters
     ----------
     pipeline
         The pipeline to optimize.
         The pipeline must implement `self_optimize` to optimize its own input parameters.
+    safe_optimize
+        If True, we add additional checks to make sure the `self_optimize` method of the pipeline is correctly
+        implemented.
+        See :func:`~tpcp.make_optimize_safe` for more info.
 
     Other Parameters
     ----------------
@@ -122,14 +138,18 @@ class Optimize(BaseOptimize):
 
     """
 
-    pipeline: OptimizablePipeline
+    pipeline: Parameter[OptimizablePipeline]
+    safe_optimize: bool
 
     optimized_pipeline_: OptimizablePipeline
 
-    def __init__(self, pipeline: OptimizablePipeline):  # noqa: super-init-not-called
+    def __init__(  # noqa: super-init-not-called
+        self, pipeline: OptimizablePipeline, safe_optimize: bool = True
+    ) -> None:
         self.pipeline = pipeline
+        self.safe_optimize = safe_optimize
 
-    def optimize(self, dataset: Dataset, **optimize_params):
+    def optimize(self: Optimize_, dataset: Dataset, **optimize_params: Any) -> Optimize_:
         """Run the self-optimization defined by the pipeline.
 
         The optimized version of the pipeline is stored as `self.optimized_pipeline_`.
@@ -155,27 +175,16 @@ class Optimize(BaseOptimize):
             raise ValueError(
                 "To use `Optimize` with a pipeline, the pipeline needs to implement a `self_optimize` method."
             )
-        # record the hash of the pipeline to make an educated guess if the optimization works
-        pipeline = self.pipeline.clone()
-        before_hash = joblib.hash(pipeline)
-        optimized_pipeline = pipeline.self_optimize(dataset, **optimize_params)
-        if not isinstance(optimized_pipeline, pipeline.__class__):
-            raise ValueError(
-                "Calling `self_optimize` did not return an instance of the pipeline itself! "
-                "Normally this method should return `self`."
-            )
-        # We clone the optimized pipeline again, to make sure that only changes to the input parameters are kept.
-        optimized_pipeline = optimized_pipeline.clone()
-        after_hash = joblib.hash(optimized_pipeline)
-        if before_hash == after_hash:
-            # If the hash didn't change the object didn't change.
-            # Something might have gone wrong.
-            warnings.warn(
-                "Optimizing the pipeline doesn't seem to have changed the parameters of the pipeline. "
-                "This could indicate an implementation error of the `self_optimize` method.",
-                PotentialUserErrorWarning,
-            )
-        self.optimized_pipeline_ = optimized_pipeline
+        # We clone just to make sure runs are independent
+        pipeline: OptimizablePipeline = self.pipeline.clone()
+        if self.safe_optimize is True:
+            # Ideally, the self_optimize method should already be wrapped by the user, but we do it again, just in case.
+            # `make_optimize_safe` has a safe-guard and does not apply the decorator twice
+            optimized_pipeline = _check_safe_optimize(pipeline, pipeline.self_optimize, dataset, **optimize_params)
+        else:
+            optimized_pipeline = pipeline.self_optimize(dataset, **optimize_params)
+        # We clone again, just to be sure
+        self.optimized_pipeline_ = optimized_pipeline.clone()
         return self
 
 
@@ -277,7 +286,7 @@ class GridSearch(BaseOptimize):
     """
 
     parameter_grid: ParameterGrid
-    scoring: Optional[Union[Callable, Scorer]]
+    scoring: Optional[Union[_SCORE_CALLABLE, Scorer]]
     n_jobs: Optional[int]
     return_optimized: Union[bool, str]
     pre_dispatch: Union[int, str]
@@ -285,23 +294,22 @@ class GridSearch(BaseOptimize):
     progress_bar: bool
 
     gs_results_: Dict[str, Any]
-    best_params_: Dict
+    best_params_: Dict[str, Any]
     best_index_: int
     best_score_: float
     multimetric_: bool
 
     def __init__(  # noqa: super-init-not-called
         self,
-        pipeline: SimplePipeline,
+        pipeline: Pipeline,
         parameter_grid: ParameterGrid,
-        *,
-        scoring: Optional[Union[Callable, Scorer]] = None,
+        scoring: Optional[Union[_SCORE_CALLABLE, Scorer]] = None,
         n_jobs: Optional[int] = None,
-        pre_dispatch: Union[int, str] = "n_jobs",
         return_optimized: Union[bool, str] = True,
+        pre_dispatch: Union[int, str] = "n_jobs",
         error_score: _ERROR_SCORE_TYPE = np.nan,
         progress_bar: bool = True,
-    ):
+    ) -> None:
         self.pipeline = pipeline
         self.parameter_grid = parameter_grid
         self.scoring = scoring
@@ -311,7 +319,7 @@ class GridSearch(BaseOptimize):
         self.error_score = error_score
         self.progress_bar = progress_bar
 
-    def optimize(self, dataset: Dataset, **_):
+    def optimize(self: GridSearch_, dataset: Dataset, **_: Any) -> GridSearch_:
         """Run the GridSearch over the dataset and find the best parameter combination.
 
         Parameters
@@ -333,29 +341,25 @@ class GridSearch(BaseOptimize):
         # itself.
         # If not explicitly changed the scorer is an instance of `Scorer` that wraps the actual `scoring`
         # function provided by the user.
-        with init_progressbar(
-            self.progress_bar,
-            n_jobs=self.n_jobs,
-            iterable=self.parameter_grid,
-            desc="Para Combos",
-            total=len(self.parameter_grid),
-        ) as wrapped_iterable:
-            parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
-            with parallel:
-                # Evaluate each parameter combination
-                results = parallel(
-                    delayed(_score)(
-                        self.pipeline.clone(),
-                        dataset,
-                        scoring,
-                        paras,
-                        return_parameters=True,
-                        return_data_labels=True,
-                        return_times=True,
-                        error_score=self.error_score,
-                    )
-                    for paras in wrapped_iterable
+        pbar: Optional[tqdm] = None
+        if self.progress_bar:
+            pbar = tqdm(total=len(self.parameter_grid), desc="Para Combos")
+        parallel = TqdmParallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch, pbar=pbar)
+        with parallel:
+            # Evaluate each parameter combination
+            results = parallel(
+                delayed(_score)(
+                    self.pipeline.clone(),
+                    dataset,
+                    scoring,
+                    paras,
+                    return_parameters=True,
+                    return_data_labels=True,
+                    return_times=True,
+                    error_score=self.error_score,
                 )
+                for paras in self.parameter_grid
+            )
         # We check here if all results are dicts. We only check the dtype of the first value, as the scorer should
         # have handled issues with non uniform cases already.
         first_test_score = results[0]["scores"]
@@ -464,7 +468,7 @@ class GridSearchCV(BaseOptimize):
         An integer specifying the number of folds in a K-Fold cross-validation or a valid cross validation helper.
         The default (`None`) will result in a 5-fold cross validation.
         For further inputs check the sklearn documentation.
-    pure_parameter_names
+    pure_parameters
         .. warning: Do not use this option unless you fully understand it!
 
         A list of parameter names (named in the `parameter_grid`) that do not effect training aka are not
@@ -473,7 +477,13 @@ class GridSearchCV(BaseOptimize):
         repeated, if one of these parameters changes.
         However, setting it incorrectly can lead to hard to detect errors in the final results.
 
-        For more information on this approach see the :ref:`evaluation guide <algorithm_evaluation>`.
+        Instead of passing a list of names, you can also just set the value to `True`.
+        In this case all parameters of the provided pipeline that are marked as :func:`~tpcp.pure_parameter` are used.
+        Note, that pure parameters of nested objects are not considered, but only top-level attributes.
+        If you need to mark nested parameters as pure, use the first method and pass the names (with `__`) as part of
+        the list of names.
+
+        For more information on this approach see the :func:`evaluation guide <algorithm_evaluation>`.
     return_train_score
         If True the performance on the train score is returned in addition to the test score performance.
         Note, that this increases the runtime.
@@ -568,10 +578,10 @@ class GridSearchCV(BaseOptimize):
 
     pipeline: OptimizablePipeline
     parameter_grid: ParameterGrid
-    scoring: Optional[Union[Callable, Scorer]]
+    scoring: Optional[Union[_SCORE_CALLABLE, Scorer]]
     return_optimized: Union[bool, str]
     cv: Optional[Union[int, BaseCrossValidator, Iterator]]
-    pure_parameter_names: Optional[List[str]]
+    pure_parameters: Union[bool, List[str]]
     return_train_score: bool
     verbose: int
     n_jobs: Optional[int]
@@ -580,7 +590,7 @@ class GridSearchCV(BaseOptimize):
     progress_bar: bool
 
     cv_results_: Dict[str, Any]
-    best_params_: Dict
+    best_params_: Dict[str, Any]
     best_index_: int
     best_score_: float
     multimetric_: bool
@@ -591,23 +601,23 @@ class GridSearchCV(BaseOptimize):
         pipeline: OptimizablePipeline,
         parameter_grid: ParameterGrid,
         *,
-        scoring: Optional[Union[Callable, Scorer]] = None,
+        scoring: Optional[Union[_SCORE_CALLABLE, Scorer]] = None,
         return_optimized: Union[bool, str] = True,
         cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
-        pure_parameter_names: Optional[List[str]] = None,
+        pure_parameters: Union[bool, List[str]] = False,
         return_train_score: bool = False,
         verbose: int = 0,
         n_jobs: Optional[int] = None,
         pre_dispatch: Union[int, str] = "n_jobs",
         error_score: _ERROR_SCORE_TYPE = np.nan,
-        progress_bar: bool = True,
-    ):
+        progress_bar: "bool" = True,
+    ) -> None:
         self.pipeline = pipeline
         self.parameter_grid = parameter_grid
         self.scoring = scoring
         self.return_optimized = return_optimized
         self.cv = cv
-        self.pure_parameter_names = pure_parameter_names
+        self.pure_parameters = pure_parameters
         self.return_train_score = return_train_score
         self.verbose = verbose
         self.n_jobs = n_jobs
@@ -615,7 +625,8 @@ class GridSearchCV(BaseOptimize):
         self.error_score = error_score
         self.progress_bar = progress_bar
 
-    def optimize(self, dataset: Dataset, *, groups=None, **optimize_params):  # noqa: arguments-differ
+    def optimize(self: GridSearchCv_, dataset: Dataset, *, groups=None, **optimize_params) -> GridSearchCv_:  # noqa:
+        # arguments-differ
         self.dataset = dataset
         scoring = _validate_scorer(self.scoring, self.pipeline)
 
@@ -629,51 +640,60 @@ class GridSearchCV(BaseOptimize):
         # For each para combi, we separate the pure parameters (parameters that do not effect the optimization) and
         # the hyperparameters.
         # This allows for massive caching optimizations in the `_optimize_and_score`.
+        pure_parameters: Optional[List[str]]
+        if self.pure_parameters is False:
+            pure_parameters = None
+        elif self.pure_parameters is True:
+            pure_parameters = _get_annotated_fields_of_type(self.pipeline, _ParaTypes.PURE)
+        elif isinstance(self.pure_parameters, list):
+            pure_parameters = self.pure_parameters
+        else:
+            raise ValueError(
+                "`self.pure_parameters` must either be a List of field names (nested are allowed) or " "True/False."
+            )
+
         parameters = list(self.parameter_grid)
-        split_parameters = _split_hyper_and_pure_parameters(parameters, self.pure_parameter_names)
+        split_parameters = _split_hyper_and_pure_parameters(parameters, pure_parameters)
         parameter_prefix = "pipeline__"
+        combinations = list(product(enumerate(split_parameters), enumerate(cv.split(dataset, groups=groups))))
+
+        pbar: Optional[tqdm] = None
+        if self.progress_bar:
+            pbar = tqdm(total=len(combinations), desc="Split-Para Combos")
 
         # To enable the pure parameter performance improvement, we need to create a joblib cache in a temp dir that
         # is deleted after the run.
         # We only allow a temporary cache here, because the method that is cached internally is generic and the cache
         # might not be correctly invalidated, if GridSearchCv is called with a different pipeline or when the
         # pipeline itself is modified.
-        tmp_dir_context = nullcontext()
-        if self.pure_parameter_names:
+        tmp_dir_context: Union[ContextManager[None], TemporaryDirectory] = nullcontext()
+        if pure_parameters:
             tmp_dir_context = TemporaryDirectory("joblib_tpcp_cache")
         with tmp_dir_context as cachedir:
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None
-            combinations = list(product(enumerate(split_parameters), enumerate(cv.split(dataset, groups=groups))))
-            with init_progressbar(
-                self.progress_bar,
-                n_jobs=self.n_jobs,
-                iterable=combinations,
-                desc="Split-Para Combos",
-                total=len(combinations),
-            ) as wrapped_iterable:
-                parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch)
-                # We use a similar structure to sklearns GridSearchCv here (see GridSearch for more info).
-                with parallel:
-                    # Evaluate each parameter combination
-                    out = parallel(
-                        delayed(_optimize_and_score)(
-                            optimizer.clone(),
-                            dataset,
-                            scoring,
-                            train,
-                            test,
-                            optimize_params=optimize_params,
-                            hyperparameters=_prefix_para_dict(hyper_paras, parameter_prefix),
-                            pure_parameters=_prefix_para_dict(pure_paras, parameter_prefix),
-                            return_train_score=self.return_train_score,
-                            return_parameters=False,
-                            return_data_labels=True,
-                            return_times=True,
-                            error_score=self.error_score,
-                            memory=tmp_cache,
-                        )
-                        for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in wrapped_iterable
+            parallel = TqdmParallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch, pbar=pbar)
+            # We use a similar structure to sklearns GridSearchCv here (see GridSearch for more info).
+            with parallel:
+                # Evaluate each parameter combination
+                out = parallel(
+                    delayed(_optimize_and_score)(
+                        optimizer.clone(),
+                        dataset,
+                        scoring,
+                        train,
+                        test,
+                        optimize_params=optimize_params,
+                        hyperparameters=_prefix_para_dict(hyper_paras, parameter_prefix),
+                        pure_parameters=_prefix_para_dict(pure_paras, parameter_prefix),
+                        return_train_score=self.return_train_score,
+                        return_parameters=False,
+                        return_data_labels=True,
+                        return_times=True,
+                        error_score=self.error_score,
+                        memory=tmp_cache,
                     )
+                    for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in combinations
+                )
         results = self._format_results(parameters, n_splits, out)
         self.cv_results_ = results
 
@@ -756,7 +776,7 @@ class GridSearchCV(BaseOptimize):
         # Use one MaskedArray and mask all the places where the param is not
         # applicable for that candidate. Use defaultdict as each candidate may
         # not contain all the params
-        param_results = defaultdict(
+        param_results: Dict = defaultdict(
             partial(
                 MaskedArray,
                 np.empty(
@@ -794,7 +814,7 @@ class GridSearchCV(BaseOptimize):
         return results
 
 
-def _validate_return_optimized(return_optimized, multi_metric, results):
+def _validate_return_optimized(return_optimized, multi_metric, results) -> None:
     """Check if `return_optimize` fits to the multimetric output of the scorer."""
     if multi_metric is True:
         # In a multimetric case, return_optimized must either be False or a string

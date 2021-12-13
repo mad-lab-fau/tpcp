@@ -4,10 +4,10 @@ from unittest.mock import patch
 import pytest
 
 from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline
-from tpcp import Dataset, SimplePipeline, mdf
+from tpcp import Dataset, Pipeline, cf
 
 
-class PipelineInputModify(SimplePipeline):
+class PipelineInputModify(Pipeline):
     def __init__(self, test="a value"):
         self.test = test
 
@@ -16,8 +16,8 @@ class PipelineInputModify(SimplePipeline):
         return self
 
 
-class PipelineInputModifyNested(SimplePipeline):
-    def __init__(self, pipe=mdf(PipelineInputModify())):
+class PipelineInputModifyNested(Pipeline):
+    def __init__(self, pipe=cf(PipelineInputModify())):
         self.pipe = pipe
 
     def run(self, datapoint: Dataset):
@@ -25,7 +25,7 @@ class PipelineInputModifyNested(SimplePipeline):
         return self
 
 
-class PipelineNoOutput(SimplePipeline):
+class PipelineNoOutput(Pipeline):
     def __init__(self, test="a value"):
         self.test = test
 
@@ -34,13 +34,15 @@ class PipelineNoOutput(SimplePipeline):
         return self
 
 
+# TODO: Test with algorithms and not just pipeline
+# TODO: Test double apply
 class TestSafeRun:
     @pytest.mark.parametrize("pipe", (PipelineInputModify, PipelineInputModifyNested))
     def test_modify_input_paras_simple(self, pipe):
         with pytest.raises(ValueError) as e:
             pipe().safe_run(DummyDataset()[0])
 
-        assert "Running the pipeline did modify the parameters of the pipeline." in str(e)
+        assert f"Running `safe_run` of {pipe.__name__} did modify the parameters of the algorithm" in str(e)
 
     def test_no_self_return(self):
         pipe = DummyOptimizablePipeline()
@@ -48,13 +50,13 @@ class TestSafeRun:
         with pytest.raises(ValueError) as e:
             pipe.safe_run(DummyDataset()[0])
 
-        assert "The `run` method of the pipeline must return `self`" in str(e)
+        assert "The `safe_run` method of DummyOptimizablePipeline must return `self`" in str(e)
 
     def test_no_output(self):
         with pytest.raises(ValueError) as e:
             PipelineNoOutput().safe_run(DummyDataset()[0])
 
-        assert "Running the pipeline did not set any results on the output." in str(e)
+        assert "Running the `safe_run` method of PipelineNoOutput " in str(e)
 
     def test_output(self):
         pipe = DummyOptimizablePipeline()

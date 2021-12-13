@@ -13,7 +13,7 @@ from tpcp._utils._score import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SCORE_TYPE, 
 from tpcp.exceptions import ScorerFailed
 
 if TYPE_CHECKING:
-    from tpcp._pipelines import SimplePipeline
+    from tpcp._pipeline import Pipeline
 
 
 class Scorer:
@@ -34,7 +34,7 @@ class Scorer:
         self._score_func = score_func
 
     def __call__(
-        self, pipeline: SimplePipeline, data: Dataset, error_score: _ERROR_SCORE_TYPE
+        self, pipeline: Pipeline, data: Dataset, error_score: _ERROR_SCORE_TYPE
     ) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
         """Score the pipeline with the provided data.
 
@@ -53,7 +53,7 @@ class Scorer:
         return float(np.mean(scores))
 
     def _score(
-        self, pipeline: SimplePipeline, data: Dataset, error_score: _ERROR_SCORE_TYPE
+        self, pipeline: Pipeline, data: Dataset, error_score: _ERROR_SCORE_TYPE
     ) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
         scores = []
         for d in data:
@@ -91,14 +91,14 @@ def _validate_score_return_val(value: _SINGLE_SCORE_TYPE):
     )
 
 
-def _passthrough_scoring(pipeline: SimplePipeline, datapoint: Dataset):
+def _passthrough_scoring(pipeline: Pipeline, datapoint: Dataset):
     """Call the score method of the pipeline to score the input."""
     return pipeline.score(datapoint)
 
 
 def _validate_scorer(
     scoring: Optional[Union[Callable, Scorer]],
-    pipeline: SimplePipeline,
+    pipeline: Pipeline,
     base_class: Type[Scorer] = Scorer,
 ) -> Scorer:
     """Convert the provided scoring method into a valid scorer object."""

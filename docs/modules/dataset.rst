@@ -11,7 +11,7 @@ Classes
 .. currentmodule:: tpcp
 
 .. autosummary::
-   :toctree: generated/base
+   :toctree: generated/dataset
    :template: class_with_private.rst
 
     Dataset

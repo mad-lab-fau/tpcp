@@ -26,6 +26,8 @@ class TestCrossValidate:
         cv = KFold(n_splits=len(ds))
         train, test = zip(*cv.split(ds))
         with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=pipeline) as mock:
+            mock.__name__ = "self_optimize"
+            mock.__self__ = "bla"  # We simulate a bound method
             cross_validate(Optimize(pipeline), ds, cv=cv, scoring=lambda x, y: 1)
 
         assert mock.call_count == len(train)

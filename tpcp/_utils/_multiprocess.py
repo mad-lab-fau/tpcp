@@ -1,46 +1,51 @@
 """Some helper to handle mutliprocess progressbars."""
-import contextlib
-from typing import ContextManager, Iterable
 
 import joblib
-from tqdm.auto import tqdm
-from tqdm.std import tqdm as tqdm_base
 
 
-@contextlib.contextmanager
-def tqdm_joblib(tqdm_object: tqdm_base, iterable: Iterable):
-    """Context manager to patch joblib to report into tqdm progress bar given as argument.
+class TqdmParallel(joblib.Parallel):
+    """Parallel Backend that can use a tqdm bar to display progress."""
 
-    Modified based on: https://stackoverflow.com/a/58936697/3707545
-    """
+    def __init__(
+        self,
+        n_jobs=None,
+        backend=None,
+        verbose=0,
+        timeout=None,
+        pre_dispatch="2 * n_jobs",
+        batch_size="auto",
+        temp_folder=None,
+        max_nbytes="1M",
+        mmap_mode="r",
+        prefer=None,
+        require=None,
+        pbar=None,
+    ):
+        self.pbar = pbar
+        super().__init__(
+            n_jobs,
+            backend,
+            verbose,
+            timeout,
+            pre_dispatch,
+            batch_size,
+            temp_folder,
+            max_nbytes,
+            mmap_mode,
+            prefer,
+            require,
+        )
 
-    class _TqdmBatchCompletionCallback(joblib.parallel.BatchCompletionCallBack):
-        def __call__(self, *args, **kwargs):
-            tqdm_object.update(n=self.batch_size)
-            return super().__call__(*args, **kwargs)
+    def __call__(self, *args, **kwargs):
+        if self.pbar:
+            with self.pbar:
+                return joblib.Parallel.__call__(self, *args, **kwargs)
+        else:
+            return joblib.Parallel.__call__(self, *args, **kwargs)
 
-    old_batch_callback = joblib.parallel.BatchCompletionCallBack
-    joblib.parallel.BatchCompletionCallBack = _TqdmBatchCompletionCallback
-    try:
-        yield iterable
-    finally:
-        joblib.parallel.BatchCompletionCallBack = old_batch_callback
-        tqdm_object.close()
-
-
-@contextlib.contextmanager
-def tqdm_dummy(tqdm_object: tqdm_base):
-    """Context manager to simply return the tqdm object."""
-    try:
-        yield tqdm_object
-    finally:
-        tqdm_object.close()
-
-
-def init_progressbar(progress_bar: bool, n_jobs, iterable, **kwargs) -> ContextManager:
-    """Create a multiprocess context manager to create a progress bar."""
-    if progress_bar is False:
-        return contextlib.nullcontext()
-    if n_jobs == 1:
-        return tqdm_dummy(tqdm(iterable, **kwargs))
-    return tqdm_joblib(tqdm(**kwargs), iterable)
+    def print_progress(self):
+        """Update the tqdm bar after batch completion."""
+        if self.pbar:
+            self.pbar.n = self.n_completed_tasks
+            self.pbar.refresh()
+        super().print_progress()

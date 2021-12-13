@@ -9,5 +9,9 @@ class ScorerFailed(UserWarning):
     """A warning indicating that a scorer failed."""
 
 
-class MutableDefaultsError(Exception):
+class ValidationError(Exception):
+    """An error indicating that data-object does not comply with the guidelines."""
+
+
+class MutableDefaultsError(ValidationError):
     """An exception raised whenever, issues because of mutable default parameters occur/are expected."""

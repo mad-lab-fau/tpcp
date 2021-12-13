@@ -1,24 +1,26 @@
 """Base Classes for custom pipelines."""
-from typing import Dict, TypeVar, Union
+from typing import Dict, Tuple, TypeVar, Union
 
+from tpcp._algorithm import Algorithm
+from tpcp._algorithm_utils import make_action_safe, make_optimize_safe
 from tpcp._dataset import Dataset
-from tpcp._utils._general import _check_safe_run
-from tpcp.base import BaseAlgorithm, Optimizable
 
-Self = TypeVar("Self", bound="SimplePipeline")
+Pipeline_ = TypeVar("Pipeline_", bound="Pipeline")
+OptimizablePipeline_ = TypeVar("OptimizablePipeline_", bound="OptimizablePipeline")
 
 
-class SimplePipeline(BaseAlgorithm, safe=True):
+class Pipeline(Algorithm, _skip_validation=True):
     """Baseclass for all custom pipelines.
 
     To create your own custom pipeline, subclass this class and implement `run`.
     """
 
-    dataset_single: Dataset
+    _action_methods: Tuple[str, ...] = ("safe_run", "run")
 
-    _action_method = ("safe_run", "run")
+    datapoint: Dataset
 
-    def run(self: Self, datapoint: Dataset) -> Self:
+    @make_action_safe
+    def run(self: Pipeline_, datapoint: Dataset) -> Pipeline_:
         """Run the pipeline.
 
         Note, that it is usually preferred to use `safe_run` on custom pipelines instead of `run`, as `safe_run` can
@@ -38,7 +40,8 @@ class SimplePipeline(BaseAlgorithm, safe=True):
         """
         raise NotImplementedError()  # pragma: no cover
 
-    def safe_run(self: Self, datapoint: Dataset) -> Self:
+    @make_action_safe
+    def safe_run(self: Pipeline_, datapoint: Dataset) -> Pipeline_:
         """Run the pipeline with some additional checks.
 
         It is preferred to use this method over `run`, as it can catch some simple implementation errors of custom
@@ -63,7 +66,7 @@ class SimplePipeline(BaseAlgorithm, safe=True):
             The class instance with all result attributes populated
 
         """
-        return _check_safe_run(self, datapoint)
+        return self.run(datapoint)
 
     def score(self, datapoint: Dataset) -> Union[float, Dict[str, float]]:
         """Calculate performance of the pipeline on a datapoint with reference information.
@@ -90,7 +93,7 @@ class SimplePipeline(BaseAlgorithm, safe=True):
         raise NotImplementedError()  # pragma: no cover
 
 
-class OptimizablePipeline(SimplePipeline, Optimizable, safe=True):
+class OptimizablePipeline(Pipeline, _skip_validation=True):
     """Pipeline with custom ways to optimize and/or train input parameters.
 
     OptimizablePipelines are expected to implement a concrete way to train internal models or optimize parameters.
@@ -106,3 +109,30 @@ class OptimizablePipeline(SimplePipeline, Optimizable, safe=True):
     In any case, you should make sure that all optimized parameters are still there if you call `.clone()` on the
     optimized pipeline.
     """
+
+    @make_optimize_safe
+    def self_optimize(self: OptimizablePipeline_, dataset: Dataset, **kwargs) -> OptimizablePipeline_:
+        """Optimize the input parameter of the pipeline or algorithm using any logic.
+
+        This method can be used to adapt the input parameters (values provided in the init) based on any data driven
+        heuristic.
+
+        Note that the optimizations must only modify the input parameters (aka `self.clone` should retain the
+        optimization results).
+
+        Parameters
+        ----------
+        dataset
+            An instance of a :class:`tpcp.dataset.Dataset` containing one or multiple data points that can
+            be used for training.
+            The structure of the data and the available reference information will depend on the dataset.
+        kwargs
+            Additional parameter required for the optimization process.
+
+        Returns
+        -------
+        self
+            The class instance with optimized input parameters.
+
+        """
+        raise NotImplementedError()  # pragma: no cover
