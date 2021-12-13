@@ -18,7 +18,7 @@ scikit-learn = "^1"
 numpy = "^1"
 pandas = "^1"
 tqdm = "^4.62.3"
-typing-extensions = "^4.0.1"
+typing-extensions = ">=3.7"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.1"
