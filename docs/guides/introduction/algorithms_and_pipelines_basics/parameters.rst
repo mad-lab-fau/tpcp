@@ -18,7 +18,7 @@ The initialization of objects in `tpcp` never has side effects (with the excepti
 This means all parameters will be added to the instance using the same name and without modification.
 
 Potential validation of parameters is only performed when the algorithm is actually run.
-This also means we can modify the parameters, until we perform the actual run.
+This also means we can modify the parameters, until we apply the algorithm to data.
 In general this should be done using the `set_params` methode:
 
 .. code-block:: python
