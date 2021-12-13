@@ -238,6 +238,19 @@ class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
         """
         return clone(self, safe=True)
 
+    def __repr__(self):
+        class_name = type(self).__name__
+        paras = self.get_params(deep=False)
+        result = [class_name, "("]
+        first = True
+        for name, para in paras.items():
+            if first:
+                first = False
+            else:
+                result.append(", ")
+            result.extend((name, "=", repr(para)))
+        return "".join(result) + ")"
+
 
 # TODO: Make public api
 def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
