@@ -197,12 +197,13 @@ def make_action_safe(action_method: Callable[..., R]) -> Callable[..., R]:
     @wraps(action_method)
     def safe_wrapped(self: Algorithm_, *args: Any, **kwargs: Any) -> Algorithm_:
         if action_method.__name__ not in get_action_methods_names(self):
-            raise ValueError(
-                "The `make_action_safe` decorator can only be applied to the action methods "
+            warnings.warn(
+                "The `make_action_safe` decorator should only be applied to an action methods "
                 f"({get_action_methods_names(self)} for {type(self)}) of an algorithm or methods. "
                 f"To register an action method add the following to the class definition of {type(self)}:\n\n"
                 f"`    _action_methods = ({action_method.__name__},)`\n\n"
-                "Or append it to the tuple, if it already exists."
+                "Or append it to the tuple, if it already exists.",
+                PotentialUserErrorWarning,
             )
         return _check_safe_run(self, action_method, *args, **kwargs)
 
@@ -336,9 +337,10 @@ def make_optimize_safe(self_optimize_method: Callable[..., R]) -> Callable[..., 
     @wraps(self_optimize_method)
     def safe_wrapped(self: Optimizable_, *args: Any, **kwargs: Any) -> Optimizable_:
         if self_optimize_method.__name__ != "self_optimize":
-            raise ValueError(
-                "The `safe_optimize` decorator is only meant for the `self_optimize` method, but you applied it to "
-                f"the `{self_optimize_method.__name__}` method"
+            warnings.warn(
+                "The `make_optimize_safe` decorator is only meant for the `self_optimize` method, but you applied it to "
+                f"the `{self_optimize_method.__name__}` method",
+                PotentialUserErrorWarning,
             )
         return _check_safe_optimize(self, self_optimize_method, *args, **kwargs)
 
