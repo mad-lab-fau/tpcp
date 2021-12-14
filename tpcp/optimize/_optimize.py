@@ -143,7 +143,7 @@ class Optimize(BaseOptimize):
     optimized_pipeline_: OptimizablePipeline
 
     def __init__(  # noqa: super-init-not-called
-        self, pipeline: OptimizablePipeline, safe_optimize: bool = True
+        self, pipeline: OptimizablePipeline, *, safe_optimize: bool = True
     ) -> None:
         self.pipeline = pipeline
         self.safe_optimize = safe_optimize
@@ -302,6 +302,7 @@ class GridSearch(BaseOptimize):
         self,
         pipeline: Pipeline,
         parameter_grid: ParameterGrid,
+        *,
         scoring: Optional[Union[_SCORE_CALLABLE, Scorer]] = None,
         n_jobs: Optional[int] = None,
         return_optimized: Union[bool, str] = True,
@@ -504,6 +505,10 @@ class GridSearchCV(BaseOptimize):
         If a numeric value is given, a Warning is raised.
     progress_bar
         True/False to enable/disable a tqdm progressbar.
+    safe_optimize
+        If True, we add additional checks to make sure the `self_optimize` method of the pipeline is correctly
+        implemented.
+        See :func:`~tpcp.make_optimize_safe` for more info.
 
     Other Parameters
     ----------------
@@ -587,6 +592,7 @@ class GridSearchCV(BaseOptimize):
     pre_dispatch: Union[int, str]
     error_score: _ERROR_SCORE_TYPE
     progress_bar: bool
+    safe_optimize: bool
 
     cv_results_: Dict[str, Any]
     best_params_: Dict[str, Any]
@@ -609,7 +615,8 @@ class GridSearchCV(BaseOptimize):
         n_jobs: Optional[int] = None,
         pre_dispatch: Union[int, str] = "n_jobs",
         error_score: _ERROR_SCORE_TYPE = np.nan,
-        progress_bar: "bool" = True,
+        progress_bar: bool = True,
+        safe_optimize: bool = True,
     ) -> None:
         self.pipeline = pipeline
         self.parameter_grid = parameter_grid
@@ -623,6 +630,7 @@ class GridSearchCV(BaseOptimize):
         self.pre_dispatch = pre_dispatch
         self.error_score = error_score
         self.progress_bar = progress_bar
+        self.safe_optimize = safe_optimize
 
     def optimize(self: GridSearchCv_, dataset: Dataset, *, groups=None, **optimize_params) -> GridSearchCv_:  # noqa:
         # arguments-differ
@@ -634,7 +642,7 @@ class GridSearchCV(BaseOptimize):
 
         # We need to wrap our pipeline for a consistent interface.
         # In the future we might be able to allow objects with optimizer Interface as input directly.
-        optimizer = Optimize(self.pipeline)
+        optimizer = Optimize(self.pipeline, safe_optimize=self.safe_optimize)
 
         # For each para combi, we separate the pure parameters (parameters that do not effect the optimization) and
         # the hyperparameters.
