@@ -12,9 +12,7 @@ import warnings
 from collections import defaultdict
 from functools import wraps
 from types import MethodWrapperType
-from typing import Any, Callable, DefaultDict, Dict, Generic, List, Optional, Tuple, Type, TypeVar, Union, Iterable
-
-from typing_extensions import Annotated, Literal, get_args, get_origin
+from typing import Any, Callable, DefaultDict, Dict, Generic, Iterable, List, Optional, Tuple, Type, TypeVar, Union
 
 from typing_extensions import Annotated, Literal, get_args, get_origin
 

@@ -7,7 +7,7 @@ import warnings
 from functools import wraps
 from inspect import isclass
 from pickle import PicklingError
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Type, TypeVar, Union, cast, List
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
 
 import joblib
 
@@ -352,8 +352,8 @@ def make_optimize_safe(self_optimize_method: Callable[..., R]) -> Callable[..., 
     def safe_wrapped(self: Optimizable_, *args: Any, **kwargs: Any) -> Optimizable_:
         if self_optimize_method.__name__ != "self_optimize":
             warnings.warn(
-                "The `make_optimize_safe` decorator is only meant for the `self_optimize` method, but you applied it to "
-                f"the `{self_optimize_method.__name__}` method",
+                "The `make_optimize_safe` decorator is only meant for the `self_optimize` method, but you applied it "
+                f"to the `{self_optimize_method.__name__}` method.",
                 PotentialUserErrorWarning,
             )
         try:

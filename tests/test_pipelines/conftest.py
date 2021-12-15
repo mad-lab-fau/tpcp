@@ -31,8 +31,6 @@ class DummyOptimizablePipeline(OptimizablePipeline):
         return self
 
 
-
-
 class MutableCustomClass:
     test: str
 

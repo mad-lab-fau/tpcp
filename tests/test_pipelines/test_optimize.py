@@ -534,7 +534,6 @@ class TestOptimize:
         # The id must been different, indicating that `optimize` correctly called clone on the output
         assert id(result.optimized_pipeline_) != id(optimized_pipe)
 
-
     def test_mutable_inputs(self):
         """Test how mutable inputs are handled.
 

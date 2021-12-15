@@ -5,16 +5,16 @@ import pytest
 
 from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline
 from tpcp import (
-    make_optimize_safe,
-    OptimizablePipeline,
-    OptimizableParameter,
-    PureParameter,
-    HyperParameter,
     Dataset,
-    make_action_safe,
-    Pipeline,
-    cf,
+    HyperParameter,
+    OptimizableParameter,
+    OptimizablePipeline,
     Parameter,
+    Pipeline,
+    PureParameter,
+    cf,
+    make_action_safe,
+    make_optimize_safe,
 )
 from tpcp.exceptions import PotentialUserErrorWarning
 
