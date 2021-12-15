@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import joblib
 import pytest
 
 from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline
@@ -13,6 +14,7 @@ from tpcp import (
     make_action_safe,
     Pipeline,
     cf,
+    Parameter,
 )
 from tpcp.exceptions import PotentialUserErrorWarning
 
@@ -99,7 +101,7 @@ class TestSafeAction:
         with pytest.raises(ValueError) as e:
             make_action_safe(pipe.run)(pipe(), DummyDataset()[0])
 
-        assert f"Running `safe_run` of {pipe.__name__} did modify the parameters of the algorithm" in str(e)
+        assert f"Running `run` of {pipe.__name__} did modify the parameters of the algorithm" in str(e)
 
     def test_no_self_return(self):
         pipe = DummyActionPipelineUnsafe
@@ -198,3 +200,139 @@ class TestSafeOptimize:
                 DummyOptimizablePipelineUnsafe().self_optimize(ds)
 
         assert "Calling `self_optimize` did not return an instance" in str(e.value)
+
+    class PipelineNoOptiParas(OptimizablePipeline):
+        para: Parameter[int]
+
+        def __init__(self, para=3):
+            self.para = para
+
+    def test_no_opti_para(self):
+        with pytest.raises(ValueError) as e:
+            make_optimize_safe(self.PipelineNoOptiParas.self_optimize)(self.PipelineNoOptiParas(), DummyDataset())
+        assert f"No parameter of {self.PipelineNoOptiParas.__name__} was marked as optimizable" in str(e)
+
+    class PipelineModifyOtherParas(OptimizablePipeline):
+        para: Parameter[int]
+        opti_para: OptimizableParameter[int]
+
+        def __init__(self, para=3, opti_para: int = 0):
+            self.para = para
+            self.opti_para = opti_para
+
+        def self_optimize(self, dataset: Dataset, **kwargs):
+            self.opti_para += 1
+            self.para += 1
+            return self
+
+    def test_non_opti_para_changed(self):
+
+        with pytest.raises(RuntimeError) as e:
+            make_optimize_safe(self.PipelineModifyOtherParas.self_optimize)(
+                self.PipelineModifyOtherParas(), DummyDataset()
+            )
+
+        assert "optimizable: ['para']" in str(e.value)
+
+    class PipelineModifyNestedParas(OptimizablePipeline):
+        para: Parameter[int]
+        opti_para: OptimizableParameter[int]
+        nested: Parameter[DummyOptimizablePipelineUnsafe]
+
+        def __init__(
+            self, para=3, opti_para: int = 0, nested: DummyActionPipelineUnsafe = cf(DummyActionPipelineUnsafe())
+        ):
+            self.para = para
+            self.opti_para = opti_para
+            self.nested = nested
+
+        def self_optimize(self, dataset: Dataset, **kwargs):
+            self.opti_para += 1
+            self.nested.para_1 = "bla"
+            return self
+
+    def test_nested_opti_para(self):
+
+        with pytest.raises(RuntimeError) as e:
+            make_optimize_safe(self.PipelineModifyNestedParas.self_optimize)(
+                self.PipelineModifyNestedParas(), DummyDataset()
+            )
+
+        assert "optimizable: ['nested__para_1']" in str(e.value)
+
+    class PipelineModifyNestedParasSpecific(OptimizablePipeline):
+        para: Parameter[int]
+        opti_para: OptimizableParameter[int]
+        nested__para_1: OptimizableParameter
+
+        def __init__(self, para=3, opti_para: int = 0, nested: Pipeline = cf(DummyActionPipelineUnsafe())):
+            self.para = para
+            self.opti_para = opti_para
+            self.nested = nested
+
+        def self_optimize(self, dataset: Dataset, **kwargs):
+            self.opti_para += 1
+            self.nested.para_1 = "bla"
+            self.nested.para_2 = "shouldn't change"
+            return self
+
+    def test_nested_opti_para_specific(self):
+
+        with pytest.raises(RuntimeError) as e:
+            make_optimize_safe(self.PipelineModifyNestedParasSpecific.self_optimize)(
+                self.PipelineModifyNestedParasSpecific(), DummyDataset()
+            )
+
+        assert "optimizable: ['nested__para_2']" in str(e.value)
+
+    class PipelineModifyNestedParasDeleted(OptimizablePipeline):
+        para: Parameter[int]
+        opti_para: OptimizableParameter[int]
+        nested__para_1: OptimizableParameter
+
+        def __init__(self, para=3, opti_para: int = 0, nested: Pipeline = cf(DummyActionPipelineUnsafe())):
+            self.para = para
+            self.opti_para = opti_para
+            self.nested = nested
+
+        def self_optimize(self, dataset: Dataset, **kwargs):
+            self.opti_para += 1
+            # We completely switch the nested class
+            self.nested = PipelineInputModify()
+            return self
+
+    def test_nested_opti_para_deleted(self):
+        with pytest.raises(RuntimeError) as e:
+            # We just run it and expect no error
+            make_optimize_safe(self.PipelineModifyNestedParasDeleted.self_optimize)(
+                self.PipelineModifyNestedParasDeleted(), DummyDataset()
+            )
+
+        # The fact that "nested (added)" is shown in the error is not entirely correct, but the logic to find the
+        # changed paras, is already complicated enough and the error messsage is verbose enough, so we will just
+        # leave it.
+        assert (
+            "['nested__optimized (removed)', 'nested__para_2 (removed)', 'nested (added)', 'nested__test (added)']"
+            in str(e.value)
+        )
+
+    class PipelineModifyNestedParasWorks(OptimizablePipeline):
+        para: Parameter[int]
+        opti_para: OptimizableParameter[int]
+        nested__para_1: OptimizableParameter
+
+        def __init__(self, para=3, opti_para: int = 0, nested: Pipeline = cf(DummyActionPipelineUnsafe())):
+            self.para = para
+            self.opti_para = opti_para
+            self.nested = nested
+
+        def self_optimize(self, dataset: Dataset, **kwargs):
+            self.opti_para += 1
+            self.nested.para_1 = "bla"
+            return self
+
+    def test_nested_opti_para_works(self):
+        # We just run it and expect no error
+        make_optimize_safe(self.PipelineModifyNestedParasWorks.self_optimize)(
+            self.PipelineModifyNestedParasWorks(), DummyDataset()
+        )

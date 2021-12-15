@@ -6,6 +6,7 @@ import types
 import warnings
 from functools import wraps
 from inspect import isclass
+from pickle import PicklingError
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Type, TypeVar, Union, cast, List
 
 import joblib
@@ -237,6 +238,12 @@ def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: A
     # record the hash of the pipeline to make an educated guess if the optimization works
     opti_para_names = _get_annotated_fields_of_type(algorithm, _ParaTypes.OPTI)
     optimizable_paras, other_paras = _get_nested_opti_paras(algorithm, opti_para_names)
+    if len(optimizable_paras) == 0:
+        raise ValueError(
+            f"No parameter of {type(algorithm).__name__} was marked as optimizable. "
+            "Mark at least one; parameter with the `OptiPara`/`OptimizablePara` annotation to use "
+            "`self_optimize`."
+        )
     before_hash_optimizable = joblib.hash(optimizable_paras)
     before_hash_other = joblib.hash(other_paras)
     optimized_algorithm: Optimizable_
@@ -263,18 +270,25 @@ def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: A
             "`__init__`). "
             "This can lead to unexpected issues!"
         )
+    # Now we need to check, which parameters have been modified.
+    # We only expect/allow parameters that are marked as "Optimizable".
+    # Therefore, we calculate the hash of all other parameters and check if they have changed.
+    # We also consider parameter changed, that did not exist or were completely removed.
+    # Most of the complicated magic here is in _get_nested_opti_paras.
+    # It takes care of including and excluding the correct parameters in the other list, even if nested paras are
+    # marked as "Optimizable"
     after_optimizable_paras, after_other_paras = _get_nested_opti_paras(algorithm, opti_para_names)
     after_hash_optimizable = joblib.hash(after_optimizable_paras)
     after_hash_other = joblib.hash(after_other_paras)
     if before_hash_other != after_hash_other:
         # In this case we raise an error anyway, so lets go deep:
-        changed_paras = []
-        for k, v in other_paras.items():
-            if joblib.hash(v) != joblib.hash(after_other_paras[k]):
-                changed_paras.append(k)
-        changed_paras = sorted(changed_paras)
         removed_paras = set(other_paras) - set(after_other_paras)
         added_paras = set(after_other_paras) - set(other_paras)
+        changed_paras = []
+        for k in set(other_paras) - set(removed_paras):
+            if joblib.hash(other_paras[k]) != joblib.hash(after_other_paras[k]):
+                changed_paras.append(k)
+        changed_paras = sorted(changed_paras)
         changed_paras.extend([f"{p} (removed)" for p in sorted(removed_paras)])
         changed_paras.extend([f"{p} (added)" for p in sorted(added_paras)])
         raise RuntimeError(
@@ -342,7 +356,17 @@ def make_optimize_safe(self_optimize_method: Callable[..., R]) -> Callable[..., 
                 f"the `{self_optimize_method.__name__}` method",
                 PotentialUserErrorWarning,
             )
-        return _check_safe_optimize(self, self_optimize_method, *args, **kwargs)
+        try:
+            return _check_safe_optimize(self, self_optimize_method, *args, **kwargs)
+        except PicklingError as e:
+            raise ValueError(
+                "We had trouble hashing your class instance."
+                "This is required to run the safety checks for the optimize method. "
+                "This usually happens, if your pipeline or algorithm or one of its parameters is based "
+                "on a dynamically defined class (e.g. a class defined within a function). "
+                "Try defining your classes on a module level. "
+                "If this is not possible for you, you need to disable the safety checks."
+            ) from e
 
     setattr(safe_wrapped, OPTIMIZE_METHOD_INDICATOR, True)
     return safe_wrapped
