@@ -534,47 +534,6 @@ class TestOptimize:
         # The id must been different, indicating that `optimize` correctly called clone on the output
         assert id(result.optimized_pipeline_) != id(optimized_pipe)
 
-    @pytest.mark.parametrize("output,warn", (({}, True), (dict(optimized=True), False)))
-    def test_optimize_warns(self, output, warn):
-        optimized_pipe = DummyOptimizablePipeline()
-        for k, v in output.items():
-            setattr(optimized_pipe, k, v)
-        ds = DummyDataset()
-        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
-            mock.__name__ = "self_optimize"
-            DummyOptimizablePipeline.self_optimize = make_optimize_safe(DummyOptimizablePipeline.self_optimize)
-            warning = PotentialUserErrorWarning if warn else None
-            with pytest.warns(warning) as w:
-                Optimize(DummyOptimizablePipeline()).optimize(ds)
-
-            if len(w) > 0:
-                assert "Optimizing the algorithm doesn't seem to have changed" in str(w[0])
-
-    @pytest.mark.parametrize("output", (dict(some_random_para_="val"), dict(optimized=True, some_random_para_="val")))
-    def test_other_para_modified_error(self, output):
-        optimized_pipe = DummyOptimizablePipeline()
-        for k, v in output.items():
-            setattr(optimized_pipe, k, v)
-        ds = DummyDataset()
-        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
-            mock.__name__ = "self_optimize"
-            DummyOptimizablePipeline.self_optimize = make_optimize_safe(DummyOptimizablePipeline.self_optimize)
-            with pytest.raises(RuntimeError) as e:
-                Optimize(DummyOptimizablePipeline()).optimize(ds)
-
-        assert "Optimizing seems to have changed class attributes that are not parameters" in str(e.value)
-
-    def test_optimize_error(self):
-        ds = DummyDataset()
-        # return anything that is not of the optimizer class
-        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value="some_value") as mock:
-            mock.__name__ = "self_optimize"
-            DummyOptimizablePipeline.self_optimize = make_optimize_safe(DummyOptimizablePipeline.self_optimize)
-            with pytest.raises(ValueError) as e:
-                Optimize(DummyOptimizablePipeline()).optimize(ds)
-
-        assert "Calling `self_optimize` did not return an instance" in str(e.value)
-
     def test_mutable_inputs(self):
         """Test how mutable inputs are handled.
 

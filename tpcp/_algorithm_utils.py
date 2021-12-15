@@ -6,10 +6,13 @@ import types
 import warnings
 from functools import wraps
 from inspect import isclass
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Type, TypeVar, Union, cast
+from pickle import PicklingError
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
 
 import joblib
 
+from tpcp._base import _get_annotated_fields_of_type
+from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import PotentialUserErrorWarning
 
 if TYPE_CHECKING:
@@ -195,12 +198,13 @@ def make_action_safe(action_method: Callable[..., R]) -> Callable[..., R]:
     @wraps(action_method)
     def safe_wrapped(self: Algorithm_, *args: Any, **kwargs: Any) -> Algorithm_:
         if action_method.__name__ not in get_action_methods_names(self):
-            raise ValueError(
-                "The `make_action_safe` decorator can only be applied to the action methods "
+            warnings.warn(
+                "The `make_action_safe` decorator should only be applied to an action methods "
                 f"({get_action_methods_names(self)} for {type(self)}) of an algorithm or methods. "
                 f"To register an action method add the following to the class definition of {type(self)}:\n\n"
                 f"`    _action_methods = ({action_method.__name__},)`\n\n"
-                "Or append it to the tuple, if it already exists."
+                "Or append it to the tuple, if it already exists.",
+                PotentialUserErrorWarning,
             )
         return _check_safe_run(self, action_method, *args, **kwargs)
 
@@ -208,9 +212,40 @@ def make_action_safe(action_method: Callable[..., R]) -> Callable[..., R]:
     return safe_wrapped
 
 
+def _get_nested_opti_paras(algorithm: Algorithm, opti_para_names: List[str]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    paras = algorithm.get_params(deep=True)
+    optimizable_paras = {}
+    other_paras = {}
+    for p, v in paras.items():
+        if p in opti_para_names:
+            optimizable_paras[p] = v
+        # For each optimizable parameter, we also add all childs, as they are also allowed to change,
+        # if the parent is allowed to.
+        elif any(p.startswith(o + "__") for o in opti_para_names):
+            optimizable_paras[p] = v
+        else:
+            other_paras[p] = v
+    # We need to exclude "parent" objects, when a nested para is marked as optimizable
+    # Because, if the nested para changes, the parent para will change as well, and we can not do anything about it.
+    for p in optimizable_paras:
+        parent_name = p.rsplit("__", 1)[0]
+        other_paras.pop(parent_name, None)
+
+    return optimizable_paras, other_paras
+
+
 def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: Any, **kwargs: Any) -> Optimizable_:
     # record the hash of the pipeline to make an educated guess if the optimization works
-    before_hash = joblib.hash(algorithm)
+    opti_para_names = _get_annotated_fields_of_type(algorithm, _ParaTypes.OPTI)
+    optimizable_paras, other_paras = _get_nested_opti_paras(algorithm, opti_para_names)
+    if len(optimizable_paras) == 0:
+        raise ValueError(
+            f"No parameter of {type(algorithm).__name__} was marked as optimizable. "
+            "Mark at least one; parameter with the `OptiPara`/`OptimizablePara` annotation to use "
+            "`self_optimize`."
+        )
+    before_hash_optimizable = joblib.hash(optimizable_paras)
+    before_hash_other = joblib.hash(other_paras)
     optimized_algorithm: Optimizable_
     if hasattr(old_method, "__self__"):
         # In this case the method is already bound and we do not need to pass the algo as first argument
@@ -227,21 +262,48 @@ def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: A
     # The first hash records any changes to the object.
     # The second hash only records changes to the parameters, because everything else is removed by clone.
     # Hence, if we see differences between the hashes, other things besides the parameters are changed.
-    # TODO: Update to only use pure parameters in this check! (or rather add additional check just for pure parameters
     after_hash = joblib.hash(optimized_algorithm)
     after_hash_after_clone = joblib.hash(optimized_algorithm.clone())
     if after_hash_after_clone != after_hash:
-        # TODO: Can we make that more precise and point to the attributes that have changed?
         raise RuntimeError(
             "Optimizing seems to have changed class attributes that are not parameters (i.e. not provided in the "
             "`__init__`). "
             "This can lead to unexpected issues!"
         )
-    if before_hash == after_hash:
+    # Now we need to check, which parameters have been modified.
+    # We only expect/allow parameters that are marked as "Optimizable".
+    # Therefore, we calculate the hash of all other parameters and check if they have changed.
+    # We also consider parameter changed, that did not exist or were completely removed.
+    # Most of the complicated magic here is in _get_nested_opti_paras.
+    # It takes care of including and excluding the correct parameters in the other list, even if nested paras are
+    # marked as "Optimizable"
+    after_optimizable_paras, after_other_paras = _get_nested_opti_paras(algorithm, opti_para_names)
+    after_hash_optimizable = joblib.hash(after_optimizable_paras)
+    after_hash_other = joblib.hash(after_other_paras)
+    if before_hash_other != after_hash_other:
+        # In this case we raise an error anyway, so lets go deep:
+        removed_paras = set(other_paras) - set(after_other_paras)
+        added_paras = set(after_other_paras) - set(other_paras)
+        changed_paras = []
+        for k in set(other_paras) - set(removed_paras):
+            if joblib.hash(other_paras[k]) != joblib.hash(after_other_paras[k]):
+                changed_paras.append(k)
+        changed_paras = sorted(changed_paras)
+        changed_paras.extend([f"{p} (removed)" for p in sorted(removed_paras)])
+        changed_paras.extend([f"{p} (added)" for p in sorted(added_paras)])
+        raise RuntimeError(
+            "Optimizing the pipeline has modified the following parameters, that were not marked as optimizable: "
+            f"{changed_paras}. "
+            "Double check the implementation of `self_optimize` and either mark the changing parameters as "
+            "optimizable by adding `OptiPara`/`OptimizableParameter` as type annotation or make sure that they are not "
+            "accidentally modified in your implementation."
+        )
+    if before_hash_optimizable == after_hash_optimizable:
         # If the hash didn't change the object didn't change.
         # Something might have gone wrong.
         warnings.warn(
-            "Optimizing the algorithm doesn't seem to have changed the parameters of the algorithm. "
+            "Optimizing the algorithm doesn't seem to have changed any of the parameters marked as optimizable "
+            f"({optimizable_paras}). "
             "This could indicate an implementation error of the `self_optimize` method.",
             PotentialUserErrorWarning,
         )
@@ -289,11 +351,22 @@ def make_optimize_safe(self_optimize_method: Callable[..., R]) -> Callable[..., 
     @wraps(self_optimize_method)
     def safe_wrapped(self: Optimizable_, *args: Any, **kwargs: Any) -> Optimizable_:
         if self_optimize_method.__name__ != "self_optimize":
-            raise ValueError(
-                "The `safe_optimize` decorator is only meant for the `self_optimize` method, but you applied it to "
-                f"the `{self_optimize_method.__name__}` method"
+            warnings.warn(
+                "The `make_optimize_safe` decorator is only meant for the `self_optimize` method, but you applied it "
+                f"to the `{self_optimize_method.__name__}` method.",
+                PotentialUserErrorWarning,
             )
-        return _check_safe_optimize(self, self_optimize_method, *args, **kwargs)
+        try:
+            return _check_safe_optimize(self, self_optimize_method, *args, **kwargs)
+        except PicklingError as e:
+            raise ValueError(
+                "We had trouble hashing your class instance."
+                "This is required to run the safety checks for the optimize method. "
+                "This usually happens, if your pipeline or algorithm or one of its parameters is based "
+                "on a dynamically defined class (e.g. a class defined within a function). "
+                "Try defining your classes on a module level. "
+                "If this is not possible for you, you need to disable the safety checks."
+            ) from e
 
     setattr(safe_wrapped, OPTIMIZE_METHOD_INDICATOR, True)
     return safe_wrapped
