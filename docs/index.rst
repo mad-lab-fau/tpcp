@@ -11,6 +11,7 @@ tpcp Docu Overview
    modules/index.rst
    auto_examples/index.rst
    Changelog <CHANGELOG.md>
+   guides/introduction/algorithms_pipelines_datasets.rst
 
 Indices and tables
 ==================
