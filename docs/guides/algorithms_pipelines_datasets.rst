@@ -73,7 +73,7 @@ In tpcp we call this glueing code Pipeline.
     Some pipelines might additionally define a `self_optmize` method that is able to "train" certain input parameters
     based on provided data.
 
-.. figure:: ../../diagrams/algos_simple.svg
+.. figure:: ../diagrams/algos_simple.svg
 
     In a simple case, a single pipeline can interface between all available Datasets and all Algorithms, because they
     share a common interface.
@@ -86,7 +86,7 @@ algorithms.
 This means, you will often end up with multiple pipelines (even within a single project) that connect one data interface
 (that might be shared by multiple datasets) with multiple algorithm interfaces for different types of analysis.
 
-.. figure:: ../../diagrams/algos_complicated.svg
+.. figure:: ../diagrams/algos_complicated.svg
 
    Pipelines act as glueing code for one Dataset interface with one or multiple Algorithm interfaces to perform one
    specific analysis.
