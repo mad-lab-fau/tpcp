@@ -9,7 +9,7 @@ Therefore, we attempt to have a unified interface for all these cases.
 This is achieved, by defining "optimization" as any form of datadriven optimization of the "parameters"
 (see :ref:`parameters`) specified in the `__init__` of an algorithm.
 This optimization can be performed via *internal* optimization implemented in a `self_optimize` method on the pipeline
-or via external optimization like the :ref:`~tpcp.optimization.GridSearch` wrapper.
+or via external optimization like the :class:`~tpcp.optimize.GridSearch` wrapper.
 
 .. code-block:: python
 
@@ -22,7 +22,7 @@ or via external optimization like the :ref:`~tpcp.optimization.GridSearch` wrapp
     >>> my_optimized_pipeline.val1
     "optimized_value_2"
 
-For pipelines that implement a `self_optimize` method, it is recommended to use the :ref:`~tpcp.optimization.Optimize`
+For pipelines that implement a `self_optimize` method, it is recommended to use the :class:`~tpcp.optimize.Optimize`
 wrapper instead of calling `self_optimize` directly.
 
 .. code-block:: python

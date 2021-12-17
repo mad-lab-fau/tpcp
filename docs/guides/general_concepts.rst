@@ -39,9 +39,6 @@ This also allows us to set nested parameters, if the nested objects support a `s
     >>> my_algo.nested_algo_para.nested_para
     new_nested_value
 
-
-
-
 Results
 -------
 
@@ -97,5 +94,4 @@ This means they are deleted when you run the pipeline again, or if you create a 
     Traceback (most recent call last):
         ...
     AttributeError: 'MyAlgo' object has no attribute 'detected_events_'
-
 
