@@ -14,6 +14,9 @@ from functools import wraps
 from types import MethodWrapperType
 from typing import Any, Callable, DefaultDict, Dict, Generic, Iterable, List, Optional, Tuple, Type, TypeVar, Union
 
+import numpy as np
+import pandas as pd
+from sklearn.base import BaseEstimator
 from typing_extensions import Annotated, Literal, get_args, get_origin
 
 from tpcp._parameters import _ParaTypes
@@ -384,7 +387,7 @@ def _has_invalid_name(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpO
 
 def _get_dangerous_mutable_types() -> Tuple[type, ...]:
     # TODO: Update this list or even make it a white list?
-    return (_BaseTpcpObject, list, dict)
+    return _BaseTpcpObject, list, dict, np.ndarray, pd.DataFrame, BaseEstimator
 
 
 def _is_dangerous_mutable(field: inspect.Parameter) -> bool:
