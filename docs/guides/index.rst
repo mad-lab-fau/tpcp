@@ -6,7 +6,7 @@ I am new here. What is all of this?
 ===================================
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
     algorithms_pipelines_datasets
     general_concepts
