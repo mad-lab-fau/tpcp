@@ -24,9 +24,10 @@ Looping over multiple recordings and/or participants should be something handled
         ...
 
 If multiple algorithms can be used equivalently (e.g. two algorithms to detect R-Peaks in an ECG signal), you should
-ensure that the interface of the algorithms is identical or at least as similar as possible, so that your gluing code
+ensure that the interfaces of the algorithms are identical or at least as similar as possible, so that your gluing code
 requires minimal modification when changing algorithms.
-To make this idea of a shared interface easier, we represent Algorithms as classes in tpcp.
+To make this idea of a shared interface easier, we represent Algorithms as classes in tpcp that get all there algorithm
+specific configuration via the init.
 
 .. note::
     **Algorithms** are simple classes that get configuration parameters during initialisation and that have an "action"
@@ -41,7 +42,7 @@ interface to your data for your glueing code independent of the actual format an
 To make writing glueing code as simple as possible, it is a good idea to follow some form of standards with the loaded
 data.
 This could be standards that are designed for yourself, for your work group, or your entire scientific field.
-The only important thing is that you are consistent, when even you write data loading code.
+The only important thing is that you are consistent, whenever you write data loading code.
 As an example, you should always provide data in the same units after loading and represent it with the same (ideally
 simple) data structure (e.g. 3D Acceleration is always a numpy array of shape 3xn with axis order x,y,z and all values
 in m/s).
@@ -78,8 +79,8 @@ In tpcp we call this glueing code Pipeline.
     In a simple case, a single pipeline can interface between all available Datasets and all Algorithms, because they
     share a common interface.
 
-However, it is usually impossible to produce the exact same data interface for all different datasets, even within the
-same domain.
+However, it is usually impossible to produce the exact same data interface for multiple different datasets, even within
+the same domain.
 Datasets might have different measurement procedures and different measurement modalities.
 In the same way, you might have different types of analysis you want ot perform and hence, require the use of different
 algorithms.
