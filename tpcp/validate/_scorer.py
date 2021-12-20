@@ -7,6 +7,7 @@ from traceback import format_exc
 from typing import TYPE_CHECKING, Callable, Optional, Tuple, Type, Union
 
 import numpy as np
+from optuna import Trial
 
 from tpcp._dataset import Dataset
 from tpcp._utils._score import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SCORE_TYPE, _SINGLE_SCORE_TYPE
@@ -47,6 +48,35 @@ class Scorer:
 
         """
         return self._score(pipeline=pipeline, data=data, error_score=error_score)
+
+    def call_optuna(
+        self, pipeline: Pipeline, data: Dataset, error_score: _ERROR_SCORE_TYPE, trial: Trial, transform_score: Callable
+    ):
+        from optuna.trial import TrialState
+        scores = []
+        for i, d in enumerate(data):
+            try:
+                # We need to clone here again, to make sure that the run for each data point is truly independent.
+                score = self._score_func(pipeline.clone(), d)
+            except Exception:  # noqa: broad-except
+                if error_score == "raise":
+                    raise
+                score = error_score
+                warnings.warn(
+                    f"Scoring failed for data point: {d.groups}. "
+                    f"The score of this data point will be set to {error_score}. Details: \n"
+                    f"{format_exc()}",
+                    ScorerFailed,
+                )
+            # We check that the scorer returns only numeric values.
+            _validate_score_return_val(score)
+            trial.report(transform_score(score), i)
+            scores.append(score)
+            if trial.should_prune():
+                # We return all scores up until the pruning
+                return _aggregate_scores(scores, self.aggregate), TrialState.PRUNED
+
+        return _aggregate_scores(scores, self.aggregate), TrialState.COMPLETE
 
     def aggregate(self, scores: np.ndarray) -> float:  # noqa: no-self-use
         """Aggregate the scores of each data point."""
