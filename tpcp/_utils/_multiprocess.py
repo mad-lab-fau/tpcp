@@ -55,18 +55,29 @@ class TqdmParallel(joblib.Parallel):
 
 
 class CustomLokyPool:
-    def __init__(self, n_jobs: int, timeout: Optional[float] = None):
+
+    def __init__(self, n_jobs: int, timeout: Optional[float] = None, pbar=None):
         self.pool = None
+        self.pbar = pbar
         if n_jobs != 1:
             self.pool = get_reusable_executor(max_workers=n_jobs, timeout=timeout)
+        self.n_completed_tasks = 0
+
+    def _update_pbar(self, _):
+        self.n_completed_tasks += 1
+        if self.pbar:
+            self.pbar.n = self.n_completed_tasks
+            self.pbar.refresh()
 
     def submit(self, task, callback):
         if self.pool:
             future = self.pool.submit(task())
             future.add_done_callback(callback)
+            future.add_done_callback(self._update_pbar)
         else:
             fn, args, kwargs = task()
             result = fn(*args, **kwargs)
             result_fu = Future()
             result_fu.set_result(result)
             callback(result_fu)
+            self._update_pbar()
