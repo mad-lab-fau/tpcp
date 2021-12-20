@@ -366,7 +366,7 @@ class GridSearch(BaseOptimize):
         self.multimetric_ = isinstance(first_test_score, dict)
         _validate_return_optimized(self.return_optimized, self.multimetric_, first_test_score)
 
-        results = self._format_results(
+        results = _format_gs_results(
             list(self.parameter_grid),
             results,
         )
@@ -385,51 +385,52 @@ class GridSearch(BaseOptimize):
 
         return self
 
-    def _format_results(self, candidate_params, out):  # noqa: no-self-use
-        """Format the final result dict.
 
-        This function is adapted based on sklearns `BaseSearchCV`
-        """
-        n_candidates = len(candidate_params)
-        out = _aggregate_final_results(out)
+def _format_gs_results(candidate_params, out):
+    """Format the final result dict.
 
-        results = {}
+    This function is adapted based on sklearns `BaseSearchCV`
+    """
+    n_candidates = len(candidate_params)
+    out = _aggregate_final_results(out)
 
-        scores_dict = _normalize_score_results(out["scores"])
-        single_scores_dict = _normalize_score_results(out["single_scores"])
-        for c, v in scores_dict.items():
-            results[c] = v
-            results[f"rank_{c}"] = np.asarray(rankdata(-v, method="min"), dtype=np.int32)
-            results[f"single_{c}"] = single_scores_dict[c]
+    results = {}
 
-        results["data_labels"] = out["data_labels"]
-        results["score_time"] = out["score_time"]
+    scores_dict = _normalize_score_results(out["scores"])
+    single_scores_dict = _normalize_score_results(out["single_scores"])
+    for c, v in scores_dict.items():
+        results[c] = v
+        results[f"rank_{c}"] = np.asarray(rankdata(-v, method="min"), dtype=np.int32)
+        results[f"single_{c}"] = single_scores_dict[c]
 
-        # Use one MaskedArray and mask all the places where the param is not
-        # applicable for that candidate. Use defaultdict as each candidate may
-        # not contain all the params
-        param_results = defaultdict(
-            partial(
-                MaskedArray,
-                np.empty(
-                    n_candidates,
-                ),
-                mask=True,
-                dtype=object,
-            )
+    results["data_labels"] = out["data_labels"]
+    results["score_time"] = out["score_time"]
+
+    # Use one MaskedArray and mask all the places where the param is not
+    # applicable for that candidate. Use defaultdict as each candidate may
+    # not contain all the params
+    param_results = defaultdict(
+        partial(
+            MaskedArray,
+            np.empty(
+                n_candidates,
+            ),
+            mask=True,
+            dtype=object,
         )
-        for cand_idx, params in enumerate(candidate_params):
-            for name, value in params.items():
-                # An all masked empty array gets created for the key
-                # `"param_%s" % name` at the first occurrence of `name`.
-                # Setting the value at an index also unmasks that index
-                param_results[f"param_{name}"][cand_idx] = value
+    )
+    for cand_idx, params in enumerate(candidate_params):
+        for name, value in params.items():
+            # An all masked empty array gets created for the key
+            # `"param_%s" % name` at the first occurrence of `name`.
+            # Setting the value at an index also unmasks that index
+            param_results[f"param_{name}"][cand_idx] = value
 
-        results.update(param_results)
-        # Store a list of param dicts at the key 'params'
-        results["params"] = candidate_params
+    results.update(param_results)
+    # Store a list of param dicts at the key 'params'
+    results["params"] = candidate_params
 
-        return results
+    return results
 
 
 class GridSearchCV(BaseOptimize):
