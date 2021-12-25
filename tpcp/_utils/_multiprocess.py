@@ -1,8 +1,10 @@
 """Some helper to handle mutliprocess progressbars."""
-from concurrent.futures import Future
+from concurrent.futures import Future, wait
 from typing import Optional
+from uuid import uuid4
 
 import joblib
+from joblib._parallel_backends import LokyBackend, SequentialBackend, FallbackToBackend
 from joblib.externals.loky import get_reusable_executor
 
 
@@ -55,29 +57,42 @@ class TqdmParallel(joblib.Parallel):
 
 
 class CustomLokyPool:
-
-    def __init__(self, n_jobs: int, timeout: Optional[float] = None, pbar=None):
-        self.pool = None
+    def __init__(self, n_jobs: int, pbar=None):
         self.pbar = pbar
-        if n_jobs != 1:
-            self.pool = get_reusable_executor(max_workers=n_jobs, timeout=timeout)
+        self._backend = LokyBackend()
+        self._n_jobs = n_jobs
+        self.n_jobs = self._backend.effective_n_jobs(self._n_jobs)
         self.n_completed_tasks = 0
+        self._id = uuid4().hex
 
-    def _update_pbar(self, _):
+    def _update_pbar(self, _=None):
         self.n_completed_tasks += 1
         if self.pbar:
             self.pbar.n = self.n_completed_tasks
             self.pbar.refresh()
 
-    def submit(self, task, callback):
-        if self.pool:
-            future = self.pool.submit(task())
-            future.add_done_callback(callback)
-            future.add_done_callback(self._update_pbar)
-        else:
-            fn, args, kwargs = task()
-            result = fn(*args, **kwargs)
-            result_fu = Future()
-            result_fu.set_result(result)
-            callback(result_fu)
+    def submit(self, task) -> Future:
+        fn, args, kwargs = task
+
+        def _callback(ft):
             self._update_pbar()
+
+        return self._backend.apply_async(lambda: fn(*args, **kwargs), _callback)
+
+    def __enter__(self):
+        self._initialize_backend()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._backend.terminate()
+
+    def _initialize_backend(self):
+        """Build a process or thread pool and return the number of workers"""
+        try:
+            n_jobs = self._backend.configure(n_jobs=self._n_jobs, parallel=self)
+        except FallbackToBackend as e:
+            # Recursively initialize the backend in case of requested fallback.
+            self._backend = e.backend
+            n_jobs = self._initialize_backend()
+
+        return n_jobs

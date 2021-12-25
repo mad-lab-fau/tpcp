@@ -7,7 +7,6 @@ from traceback import format_exc
 from typing import TYPE_CHECKING, Callable, Optional, Tuple, Type, Union
 
 import numpy as np
-from optuna import Trial
 
 from tpcp._dataset import Dataset
 from tpcp._utils._score import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SCORE_TYPE, _SINGLE_SCORE_TYPE
@@ -15,6 +14,7 @@ from tpcp.exceptions import ScorerFailed
 
 if TYPE_CHECKING:
     from tpcp._pipeline import Pipeline
+    from optuna import Trial
 
 
 class Scorer:
@@ -53,6 +53,7 @@ class Scorer:
         self, pipeline: Pipeline, data: Dataset, error_score: _ERROR_SCORE_TYPE, trial: Trial, transform_score: Callable
     ):
         from optuna.trial import TrialState
+
         scores = []
         for i, d in enumerate(data):
             try:
@@ -74,9 +75,9 @@ class Scorer:
             scores.append(score)
             if trial.should_prune():
                 # We return all scores up until the pruning
-                return _aggregate_scores(scores, self.aggregate), TrialState.PRUNED
+                return (*_aggregate_scores(scores, self.aggregate), TrialState.PRUNED)
 
-        return _aggregate_scores(scores, self.aggregate), TrialState.COMPLETE
+        return (*_aggregate_scores(scores, self.aggregate), TrialState.COMPLETE)
 
     def aggregate(self, scores: np.ndarray) -> float:  # noqa: no-self-use
         """Aggregate the scores of each data point."""

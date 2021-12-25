@@ -1,10 +1,12 @@
-from concurrent.futures import Future
+from concurrent.futures import Future, wait, FIRST_COMPLETED
 from typing import TypeVar, Any, Callable, Union, Optional, Dict
 
 import numpy as np
 from joblib import delayed
+from joblib._parallel_backends import ImmediateResult
 from optuna import Trial, Study, create_study, samplers
 from optuna.trial import TrialState
+from tqdm import tqdm
 
 from tpcp import Dataset, Pipeline, clone
 from tpcp._optimize import BaseOptimize
@@ -34,6 +36,7 @@ class OptunaSearch(BaseOptimize):
         n_jobs: Optional[int] = None,
         return_optimized: Union[bool, str] = True,
         error_score: _ERROR_SCORE_TYPE = np.nan,
+        progress_bar: bool = True,
     ) -> None:
         self.pipeline = pipeline
         self.search_space_creator = search_space_creator
@@ -44,8 +47,12 @@ class OptunaSearch(BaseOptimize):
         #  TODO: Replace return optimized with rank function or similar
         self.return_optimized = return_optimized
         self.error_score = error_score
+        self.progress_bar = progress_bar
 
     def optimize(self: OptunaSearch_, dataset: Dataset, **optimize_params: Any) -> OptunaSearch_:
+
+        self.dataset = dataset
+
         if self.study is None:
             # TODO: Random seed hadnling
             sampler = samplers.TPESampler()
@@ -61,38 +68,61 @@ class OptunaSearch(BaseOptimize):
         else:
             transform_score = lambda x: x
 
-        pool = CustomLokyPool(n_jobs=self.n_jobs)
+        pbar: Optional[tqdm] = None
+        if self.progress_bar:
+            pbar = tqdm(total=self.n_trials, desc="Para Combos")
+
+        n_jobs = self.n_jobs or 1
+        pool = CustomLokyPool(n_jobs=n_jobs, pbar=pbar)
         results = []
         tested_params = []
-        with pool:
-            for _ in range(self.n_trials):
-                trial = self.study_.ask()
-                params = self.search_space_creator(trial)
-                p = clone(self.pipeline).set_params(**params)
-                task = delayed(_score)(
-                    pipeline=p,
-                    dataset=self.dataset,
-                    scorer=scoring,
-                    parameters=params,
-                    error_score=self.error_score,
-                    trial=trial,
-                    transform_score=transform_score,
-                    return_parameters=True,
-                    return_data_labels=True,
-                    return_times=True,
-                )
 
-                def callback(result: Future):
-                    result = result.result()
+        def create_task():
+            trial = self.study_.ask()
+            params = self.search_space_creator(trial)
+            p = clone(self.pipeline).set_params(**params)
+            task = delayed(_score)(
+                pipeline=p,
+                dataset=dataset,
+                scorer=scoring,
+                parameters=params,
+                error_score=self.error_score,
+                trial=trial,
+                transform_score=transform_score,
+                return_parameters=True,
+                return_data_labels=True,
+                return_times=True,
+            )
+            return task, trial
+
+        # TODO: Warning here, if there are many workers, but small number of trials? This might not result in what
+        #  your expect
+        n_initial = min(pool.n_jobs, self.n_trials)
+
+        running_params = {}
+        with pool:
+            # First we start n trials based on the number of n workers
+            for _ in range(n_initial):
+                task, trial = create_task()
+                running_params[pool.submit(task)] = trial
+
+            # Then we wait until one of the tasks completes and check if we want to start a new one.
+            while running_params:
+                done, running = wait(running_params, return_when=FIRST_COMPLETED)
+                for ft in done:
+                    result = ft.get()
+                    finished_trail = running_params[ft]
                     state = result["state"]
                     if state == TrialState.COMPLETE:
-                        self.study_.tell(trial, transform_score(result["scores"]))
+                        self.study_.tell(finished_trail, transform_score(result["scores"]))
                     else:
-                        self.study_.tell(trial, None, state=state)
+                        self.study_.tell(finished_trail, None, state=state)
                     results.append(result)
                     tested_params.append(result["parameters"])
-
-                pool.submit(task, callback)
+                    del running_params[ft]
+                if len(results) + len(running) < self.n_trials:
+                    task, trial = create_task()
+                    running_params[pool.submit(task)] = trial
 
         first_test_score = results[0]["scores"]
         self.multimetric_ = isinstance(first_test_score, dict)
@@ -111,7 +141,3 @@ class OptunaSearch(BaseOptimize):
         self.gs_results_ = results
 
         return self
-
-
-class OptunaSearchCV(BaseOptimize):
-    pass
