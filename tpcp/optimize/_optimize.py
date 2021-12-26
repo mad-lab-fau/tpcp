@@ -16,7 +16,7 @@ from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
 from tqdm.auto import tqdm
 
 from tpcp import Dataset, OptimizablePipeline, Pipeline
-from tpcp._algorithm_utils import _check_safe_optimize
+from tpcp._algorithm_utils import OPTIMIZE_METHOD_INDICATOR, _check_safe_optimize
 from tpcp._base import _get_annotated_fields_of_type
 from tpcp._optimize import BaseOptimize
 from tpcp._parameters import Parameter, _ParaTypes
@@ -177,9 +177,11 @@ class Optimize(BaseOptimize):
         # We clone just to make sure runs are independent
         pipeline: OptimizablePipeline = self.pipeline.clone()
         if self.safe_optimize is True:
-            # Ideally, the self_optimize method should already be wrapped by the user, but we do it again, just in case.
-            # `make_optimize_safe` has a safeguard and does not apply the decorator twice
-            optimized_pipeline = _check_safe_optimize(pipeline, pipeline.self_optimize, dataset, **optimize_params)
+            # We check here, if the pipeline already has the safe decorator and if yes just call it.
+            if getattr(pipeline.self_optimize, OPTIMIZE_METHOD_INDICATOR, False) is True:
+                optimized_pipeline = pipeline.self_optimize(dataset, **optimize_params)
+            else:
+                optimized_pipeline = _check_safe_optimize(pipeline, pipeline.self_optimize, dataset, **optimize_params)
         else:
             optimized_pipeline = pipeline.self_optimize(dataset, **optimize_params)
         # We clone again, just to be sure

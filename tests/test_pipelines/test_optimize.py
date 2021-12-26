@@ -20,6 +20,7 @@ from tests.test_pipelines.conftest import (
     dummy_multi_score_func,
     dummy_single_score_func,
 )
+from tests.test_safe_decorator import DummyOptimizablePipelineUnsafe
 from tpcp import clone, make_optimize_safe
 from tpcp._optimize import BaseOptimize
 from tpcp._utils._score import _optimize_and_score
@@ -551,6 +552,42 @@ class TestOptimize:
         mutable_instance.test = True
         assert joblib.hash(mutable_instance) == joblib.hash(opt.optimized_pipeline_.para_mutable)
         assert joblib.hash(p.para_mutable) != joblib.hash(opt.optimized_pipeline_.para_mutable)
+
+    @pytest.mark.parametrize("use_safe", (True, False))
+    def test_safe_optimize(self, use_safe):
+        """Test that we can disable the safe check.
+
+        We basically create a pipeline that is not safe and check if an error is raised or not.
+        """
+        optimized_pipe = DummyOptimizablePipelineUnsafe()
+        ds = DummyDataset()
+        with patch.object(DummyOptimizablePipelineUnsafe, "self_optimize", return_value=optimized_pipe) as mock:
+            mock.__name__ = "self_optimize"
+            warning = PotentialUserErrorWarning if use_safe else None
+            with pytest.warns(warning) as w:
+                Optimize(DummyOptimizablePipelineUnsafe(), safe_optimize=use_safe).optimize(ds)
+
+            if use_safe:
+                assert "Optimizing the algorithm doesn't seem to have changed" in str(w[0])
+            else:
+                assert len(w) == 0
+
+    @pytest.mark.parametrize("wrap", (True, False))
+    def test_double_wrap(self, wrap):
+        """Test that we do not check twice"""
+        optimized_pipe = DummyOptimizablePipelineUnsafe()
+        ds = DummyDataset()
+        with patch.object(DummyOptimizablePipelineUnsafe, "self_optimize", return_value=optimized_pipe) as mock:
+            mock.__name__ = "self_optimize"
+            if wrap:
+                DummyOptimizablePipelineUnsafe.self_optimize = make_optimize_safe(
+                    DummyOptimizablePipelineUnsafe.self_optimize
+                )
+            with pytest.warns(PotentialUserErrorWarning) as w:
+                Optimize(DummyOptimizablePipelineUnsafe()).optimize(ds)
+
+            # If we double wrap, the warning should appear twice
+            assert len(w) == 1
 
 
 class TestDummyOptimize:
