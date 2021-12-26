@@ -40,9 +40,10 @@ def cross_validate(
     Parameters
     ----------
     optimizable
-        A optimizable class instance like `GridSearch`/`GridSearchCV` or a pipeline wrapped in an `Optimize` object.
+        A optimizable class instance like :class:`~tpcp.GridSearch`/:class:`~tpcp.GridSearchCV` or a
+        :class:`~tpcp.Pipeline` wrapped in an `Optimize` object (:class:`~tpcp.OptimizablePipeline`).
     dataset
-        A tpctpcpet containing all information.
+        A :class:`~tpcp.Dataset` containing all information.
     groups
         Group labels for samples used by the cross validation helper, in case a grouped CV is used (e.g.
         :class:`~sklearn.model_selection.GroupKFold`).
@@ -53,9 +54,11 @@ def cross_validate(
         This function should return either a single score or a dictionary of scores.
         If scoring is `None` the default `score` method of the optimizable is used instead.
     cv
-        An integer specifying the number of folds in a K-Fold cross-validation or a valid cross validation helper.
+        An integer specifying the number of folds in a K-Fold cross validation or a valid cross validation helper.
         The default (`None`) will result in a 5-fold cross validation.
-        For further inputs check the sklearn documentation.
+        For further inputs check the `sklearn`
+        `documentation
+        <https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_validate.html>`_.
     n_jobs
         Number of jobs to run in parallel.
         One job is created per CV fold.
@@ -66,11 +69,10 @@ def cross_validate(
     optimize_params
         Additional parameter that are forwarded to the `optimize` method.
     propagate_groups
-        In case your optimizable is a cross-validation based optimize (e.g. `GridSearchCv`) and you are using a grouped
-        cross validation, you probably want to use the same grouped CV for the outer and the inner cross validation.
-        If `propagate_groups` is True, the group labels belonging to the training of each fold are passed to the
-        `optimize` method of the optimizable.
-        This only has an effect, if `groups` are specified.
+        In case your optimizable is a cross validation based optimize (e.g. :class:`~tpcp.GridSearchCv`) and you are
+        using a grouped cross validation, you probably want to use the same grouped CV for the outer and the inner
+        cross validation. If `propagate_groups` is True, the group labels belonging to the training of each fold are
+        passed to the `optimize` method of the optimizable. This only has an effect if `groups` are specified.
     pre_dispatch
         The number of jobs that should be pre dispatched.
         For an explanation see the documentation of :class:`~joblib.Parallel`.
@@ -86,7 +88,7 @@ def cross_validate(
         If set to ‘raise’, the error is raised.
         If a numeric value is given, a Warning is raised.
     progress_bar
-        True/False to enable/disable a tqdm progressbar.
+        True/False to enable/disable a `tqdm` progress bar.
 
     Returns
     -------
@@ -99,8 +101,8 @@ def cross_validate(
 
         test_score / test_{scorer-name}
             The aggregated value of a score over all data-points.
-            If a single score is used for scoring, than the generic name "score" is used.
-            Otherwise multiple columns with the name of the respective scorer exist.
+            If a single score is used for scoring, then the generic name "score" is used.
+            Otherwise, multiple columns with the name of the respective scorer exist.
         test_single_score / test_single_{scorer-name}
             The individual scores per datapoint per fold.
             This is a list of values with the `len(train_set)`.
@@ -110,7 +112,7 @@ def cross_validate(
         train_score / train_{scorer-name}
             Results for train set of each fold.
         train_single_score / train_single_{scorer-name}
-            Results for individual datapoints in the train set of each fold
+            Results for individual data points in the train set of each fold
         train_data_labels
            The data labels for the train set.
         optimize_time

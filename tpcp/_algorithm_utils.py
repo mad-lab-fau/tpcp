@@ -22,14 +22,14 @@ if TYPE_CHECKING:
     Optimizable_ = TypeVar("Optimizable_", OptimizablePipeline, OptimizableAlgorithm)
 
 ACTION_METHOD_INDICATOR = "__tpcp_action_method"
-OPTIMIZE_METHOD_INDICATOR = "__tpcp_optmize_method"
+OPTIMIZE_METHOD_INDICATOR = "__tpcp_optimize_method"
 
 
 R = TypeVar("R")
 
 
 def get_action_method(instance: Algorithm, method_name: Optional[str] = None) -> Callable:
-    """Get the action method for a Algorithm.
+    """Get the action method for an Algorithm.
 
     If method_name is None, the primary action method is returned (the one listed first in `Algorithm._action_methods`).
     Otherwise, the action method belonging to the respective name is returned.
@@ -68,14 +68,15 @@ def get_action_params(instance: Algorithm) -> Dict[str, Any]:
     """Get all "Action Params" / "Other Parameters" of the Algorithm.
 
     Action params are all parameters passed as input to the action method.
-    Note, we do not magically set these values on the algorithm instance, but the developer of the algorithms, must
+
+    Note: We do not magically set these values on the algorithm instance. Instead, the developer of the algorithms must
     implement the algorithm to follow this convention.
 
-    In general, this function is not that useful, but might be used for debugging purposes.
+    In general, this function is not that useful but might be used for debugging purposes.
 
     Returns
     -------
-    params
+    params : dict
         Parameter names mapped to their values.
 
     """
@@ -97,7 +98,7 @@ def get_results(instance: Algorithm) -> Dict[str, Any]:
 
     Returns
     -------
-    params
+    params : dict
         Parameter names mapped to their values.
 
     Raises
@@ -140,10 +141,11 @@ def _check_safe_run(algorithm: Algorithm_, old_method: Callable, *args: Any, **k
             f"Running `{old_method.__name__}` of {type(algorithm).__name__} did modify the parameters of the "
             "algorithm. "
             "This must not happen to make sure individual runs of the algorithm/pipeline are independent.\n\n"
-            "This usually happens, when you use an algorithm object or other mutable objects as a parameter to your "
+            "This usually happens when you use an algorithm object or other mutable objects as a parameter to your "
             "algorithm/pipeline. "
-            "In this case, make sure you call `algo_object.clone()` or more general `clone(mutable_input) on the "
-            f"within the `{old_method.__name__}` method before modifying the mutable or running the nested algorithm."
+            "In this case, make sure you call `algo_object.clone()` or more general `clone(mutable_input)` on the "
+            f"object within the `{old_method.__name__}` method before modifying the mutable or running the nested "
+            "algorithm."
         )
     if not isinstance(output, type(algorithm)):
         raise ValueError(
@@ -162,7 +164,7 @@ def _check_safe_run(algorithm: Algorithm_, old_method: Callable, *args: Any, **k
 
 
 def make_action_safe(action_method: Callable[..., R]) -> Callable[..., R]:
-    """Mark a method as a "action" and apply a set of runtime checks to prevent implementation errors.
+    """Mark a method as an "action" and apply a set of runtime checks to prevent implementation errors.
 
     This decorator marks a method as action.
     Each algorithm is expected to have at least one action method.
@@ -176,7 +178,7 @@ def make_action_safe(action_method: Callable[..., R]) -> Callable[..., R]:
         - All result attributes must have a trailing `_` in their name
         - The action method must not modify the input parameters of the pipeline
 
-    In general we recommend to just apply this decorator to all custom action methods.
+    In general, we recommend to just apply this decorator to all custom action methods.
     The runtime overhead is usually small enough to not make a difference.
 
     Examples
@@ -199,7 +201,7 @@ def make_action_safe(action_method: Callable[..., R]) -> Callable[..., R]:
     def safe_wrapped(self: Algorithm_, *args: Any, **kwargs: Any) -> Algorithm_:
         if action_method.__name__ not in get_action_methods_names(self):
             warnings.warn(
-                "The `make_action_safe` decorator should only be applied to an action methods "
+                "The `make_action_safe` decorator should only be applied to an action method "
                 f"({get_action_methods_names(self)} for {type(self)}) of an algorithm or methods. "
                 f"To register an action method add the following to the class definition of {type(self)}:\n\n"
                 f"`    _action_methods = ({action_method.__name__},)`\n\n"
@@ -219,7 +221,7 @@ def _get_nested_opti_paras(algorithm: Algorithm, opti_para_names: List[str]) -> 
     for p, v in paras.items():
         if p in opti_para_names:
             optimizable_paras[p] = v
-        # For each optimizable parameter, we also add all childs, as they are also allowed to change,
+        # For each optimizable parameter, we also add all children, as they are also allowed to change,
         # if the parent is allowed to.
         elif any(p.startswith(o + "__") for o in opti_para_names):
             optimizable_paras[p] = v
@@ -255,7 +257,7 @@ def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: A
     if not isinstance(optimized_algorithm, type(algorithm)):
         raise ValueError(
             "Calling `self_optimize` did not return an instance of the algorithm/pipeline itself! "
-            "Normally this method should return `self`."
+            "Normally, this method should return `self`."
         )
     # We calculate the hash afterwards twice.
     # Once directly after the optimization and once after cloning.
@@ -320,12 +322,12 @@ def make_optimize_safe(self_optimize_method: Callable[..., R]) -> Callable[..., 
         - The `self_optimize` method should modify at least one of the input parameters (this doesn't raise an error,
           but just a warning).
 
-    In general we recommend to just apply this decorator to all custom `self_optimize` methods.
+    In general, we recommend to just apply this decorator to all custom `self_optimize` methods.
     The runtime overhead is usually small enough to not make a difference.
 
     The only execption are custom pipelines that you only optimize using the :class:`~tpcp.optimize.Optimize` wrapper.
     This wrapper will apply the same runtime checks anyway.
-    However, it doesn't hurt to apply it decorator as well.
+    However, it doesn't hurt to apply it as decorator as well.
     We make sure that the cheks will still only be performed once.
 
     Examples
@@ -344,7 +346,7 @@ def make_optimize_safe(self_optimize_method: Callable[..., R]) -> Callable[..., 
 
     """
     if getattr(self_optimize_method, OPTIMIZE_METHOD_INDICATOR, False) is True:
-        # It seems like the decorator was already applied and we do not want to apply it multiple times and run
+        # It seems like the decorator was already applied, and we do not want to apply it multiple times and run
         # duplicated checks.
         return self_optimize_method
 

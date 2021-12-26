@@ -21,7 +21,7 @@ class Algorithm(BaseTpcpObject, _skip_validation=True):
     Attributes
     ----------
     _action_method
-        The name of the action method used by the Childclass
+        The name of the action method used by the child class
 
     """
 
@@ -35,11 +35,12 @@ class OptimizableAlgorithm(Algorithm, _skip_validation=True):
     def self_optimize(self: Algorithm_, *args: Any, **kwargs: Any) -> Algorithm_:
         """Optimize the input parameter of the algorithm using any logic.
 
-        This method can be used to adapt the input parameters (values provided in the init) based on any data driven
+        This method can be used to adapt the input parameters (values provided in the init) based on any data-driven
         heuristic.
 
-        Note that the optimizations must only modify the input parameters that are marked as
-        `optiparas`/`optimizable_parameters`.
+        .. note::
+            The optimizations must **only** modify the input parameters that are marked as
+            `optiparas`/`optimizable_parameters`.
 
         Returns
         -------

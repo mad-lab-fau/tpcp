@@ -74,7 +74,7 @@ def _get_init_defaults(cls: Type[_BaseTpcpObject]) -> Dict[str, inspect.Paramete
 def _replace_defaults_wrapper(old_init: Callable) -> Callable:
     """Decorate an init to create new instances of mutable defaults.
 
-    This should only be used in combiantion with `default` and will be applied as part of `__init_subclass`.
+    This should only be used in combination with `default` and will be applied as part of `__init_subclass`.
     Direct usage of this decorator should not be required.
     """
 
@@ -112,7 +112,7 @@ def _retry_eval_with_missing_locals(
             if "'NoneType' object has no attribute 'GridSearch'" not in str(e):
                 raise e
             raise RuntimeError(
-                "You ran into an edegecase of the builtin type resolver. "
+                "You ran into an edge case of the builtin type resolver. "
                 "This happens if you use a nested type annotation that is only valid during runtime. "
                 "This usually happens if you are using a `if TYPE_CHECKING:` guard for some of your imports to avoid "
                 "circular dependencies.\n"
@@ -145,8 +145,8 @@ def _retry_eval_with_missing_locals(
             f"We were trying to evaluate the expression: {expression} . "
             "It seems like this expression contained forward references that could not be resolved. "
             "This should not happen!"
-            "Please open an issue on Github, with an code example, that results in this issue. "
-            "Sry for the inconvenience that :)"
+            "Please open an issue on GitHub with an code example that results in this issue. "
+            "Sry for the inconvenience :)"
         )
     return val
 
@@ -161,7 +161,7 @@ def _custom_get_type_hints(cls: Type[_BaseTpcpObject]) -> Dict[str, Any]:
             if value is None:
                 value = type(None)
             elif isinstance(value, str):
-                # TODO: This does not check, if the str is a valid expression.
+                # TODO: This does not check if the str is a valid expression.
                 #   This might not be an issue, but could lead to obscure error messages.
                 value = _retry_eval_with_missing_locals(value, base_globals)
             hints[name] = value
@@ -263,7 +263,7 @@ def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
     for key in valid_fields:
         value = getattr(instance, key)
-        # This is a little bit of magic, that also gets the parameters of nested sklearn classifiers.
+        # This is a little magic, that also gets the parameters of nested sklearn classifiers.
         if deep and hasattr(value, "get_params"):
             deep_items = value.get_params(deep=True).items()
             out.update((key + "__" + k, val) for k, val in deep_items)
@@ -272,7 +272,7 @@ def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
 
 
 def _set_params(instance: BaseTpcpObjectObj_, **params: Any) -> BaseTpcpObjectObj_:
-    """Set the parameters of of a instance.
+    """Set the parameters of an instance.
 
     To set parameters of nested objects use `nested_object_name__para_name=`.
     """
@@ -306,7 +306,7 @@ def get_param_names(cls: Type[_BaseTpcpObject]) -> List[str]:
 
     Notes
     -----
-    Adopted based on `sklearn BaseEstimator._get_param_names`.
+    Adopted based on :meth:`sklearn.base.BaseEstimator._get_param_names`.
 
     Returns
     -------
@@ -318,7 +318,7 @@ def get_param_names(cls: Type[_BaseTpcpObject]) -> List[str]:
     for p in parameters:
         if p.kind == p.VAR_POSITIONAL:
             raise RuntimeError(
-                "tpcp-algorithms and pipeline should always specify their parameters in the signature of their "
+                "tpcp algorithms and pipelines should always specify their parameters in the signature of their "
                 f"__init__ (no varargs). {cls} doesn't follow this convention."
             )
     # Extract and sort argument names excluding 'self'
@@ -338,7 +338,7 @@ def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Ty
 
     for name, field in fields.items():
         if _is_dangerous_mutable(field):
-            # We do not raise an error right here, but wait until we checked everything to provide a more helpfull
+            # We do not raise an error right here, but wait until we checked everything to provide a more helpful
             # error message.
             mutable_defaults.append(name)
 
@@ -371,7 +371,7 @@ def _annotations_are_valid(fields: Dict[str, inspect.Parameter], cls: Type[_Base
             raise ValueError(
                 f"The field '{k}' of {cls.__name__} was annotated as a `tpcp` (Hyper/Pure/Normal/Optimizable)-"
                 f"Parameter, but is not a parameter listed in the init! "
-                "Add the parameter to the init, if it is an actual parameter of your algorithm, or remove the "
+                "Add the parameter to the init if it is an actual parameter of your algorithm, or remove the "
                 "annotation."
             )
 
@@ -436,7 +436,7 @@ def clone(algorithm: T, *, safe: bool = False) -> T:
     # Compared to sklearn, we check specifically for _BaseSerializable and not just if `get_params` is defined on the
     # object.
     # Due to the way algorithms/pipelines in tpcp work, they need to inherit from _BaseSerializable.
-    # Therefore, we check explicitly for that, as we do not want to accidentally treat an sklearn algo (or similar) as
+    # Therefore, we check explicitly for that, as we do not want to accidentally treat a sklearn algo (or similar) as
     # algorithm
     if not isinstance(algorithm, BaseTpcpObject):
         if not safe:
@@ -479,7 +479,7 @@ class BaseFactory:
 class CloneFactory(BaseFactory, Generic[T]):
     """Init factory that creates a clone of the provided default values on instance initialisation.
 
-    This can be used to make sure that each instance get there own version own copy of a mutable default of a class
+    This can be used to make sure that each instance get their own version own copy of a mutable default of a class
     init.
     Under the hood this uses :func:`~tpcp.clone`.
     """

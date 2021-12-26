@@ -73,12 +73,12 @@ def _get_nested_paras(param_dict: Optional[Dict], nested_object_name="pipeline")
 def _split_hyper_and_pure_parameters(
     param_dict: List[Dict], pure_parameters: Optional[List[str]]
 ) -> List[Tuple[Optional[Dict], Optional[Dict]]]:
-    """Split a list of parameters in hyper parameters and pure parameters.
+    """Split a list of parameters in hyperparameters and pure parameters.
 
-    For each dictionary in the list, this separates the pure parameters (names provided in input) from all hyper
-    parameters (remaining parameters).
+    For each dictionary in the list, this separates the pure parameters (names provided in input) from all
+    hyperparameters (remaining parameters).
     If either the none of the pure parameters is present in a parameter dict or all parameters are pure parameters,
-    the pure or the hyper parameters are `None`.
+    the pure or the hyperparameters are `None`.
 
     Returns
     -------
@@ -90,7 +90,7 @@ def _split_hyper_and_pure_parameters(
         return [(c, None) for c in param_dict]
     split_param_dict = []
     for c in param_dict:
-        c = copy.copy(c)  # Otherwise we remove elements from the actual parameter list that is passed as input.
+        c = copy.copy(c)  # Otherwise, we remove elements from the actual parameter list that is passed as input.
         tmp = {}
         for k in list(c.keys()):
             if k in pure_parameters:

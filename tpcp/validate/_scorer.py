@@ -115,7 +115,7 @@ def _validate_scorer(
     if isinstance(scoring, base_class):
         return scoring
     if callable(scoring):
-        # We wrap the scorer, unless the user already supplied a instance of the Scorer class (or subclass)
+        # We wrap the scorer, unless the user already supplied an instance of the Scorer class (or subclass)
         return base_class(scoring)
     raise ValueError("A valid scorer must either be a instance of `Scorer` (or subclass), None, or a callable.")
 
@@ -123,7 +123,7 @@ def _validate_scorer(
 def _aggregate_scores(scores: _SCORE_TYPE, agg_method: Callable) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
     """Invert result dict of and apply aggregation method to each score output."""
     # We need to go through all scores and check if one is a dictionary.
-    # Otherwise it might be possible that the values were caused by an error and hence did not return a dict as
+    # Otherwise, it might be possible that the values were caused by an error and hence did not return a dict as
     # expected.
     for s in scores:
         if isinstance(s, dict):
@@ -135,7 +135,7 @@ def _aggregate_scores(scores: _SCORE_TYPE, agg_method: Callable) -> Tuple[_AGG_S
     agg_scores = {}
     # Invert the dict and calculate the mean per score:
     for key in score_names:
-        # If the the scorer raised an error, there will only be a single value. This value will be used for all
+        # If the scorer raised an error, there will only be a single value. This value will be used for all
         # scores then
         score_array = np.asarray([score[key] if isinstance(score, dict) else score for score in scores])
         inv_scores[key] = score_array

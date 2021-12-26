@@ -100,7 +100,7 @@ def _score(
             Calculated scores for each individual data point
         score_time : float
             Time required to score the dataset
-        data : List
+        data : list
             List of data point labels used
         parameters : dict or None
             The parameters that have been evaluated.

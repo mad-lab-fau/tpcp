@@ -21,7 +21,7 @@ class BaseOptimize(Algorithm, _skip_validation=True):
     optimized_pipeline_: Pipeline
 
     def optimize(self: BaseOptimize_, dataset: Dataset, **optimize_params: Any) -> BaseOptimize_:
-        """Apply some form of optimization on the the input parameters of the pipeline."""
+        """Apply some form of optimization on the input parameters of the pipeline."""
         raise NotImplementedError()
 
     def run(self, datapoint: Dataset) -> Pipeline:

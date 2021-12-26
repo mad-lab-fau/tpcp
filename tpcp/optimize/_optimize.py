@@ -41,15 +41,16 @@ GridSearchCv_ = TypeVar("GridSearchCv_", bound="GridSearchCV")
 class DummyOptimize(BaseOptimize, _skip_validation=True):
     """Provide API compatibility for SimplePipelines in optimize wrappers.
 
-    This is a simple dummy Optimizer, that will **not** optimize anything, but just provide the correct api so that
-    pipelines that do not have the possibility to be optimizes can be passed to wrappers like `cross_validate`.
+    This is a simple dummy Optimizer that will **not** optimize anything, but just provide the correct API so that
+    pipelines that do not have the possibility to be optimized can be passed to wrappers like
+    :func:`tpcp.validate.cross_validate`.
 
 
     Parameters
     ----------
     pipeline
         The pipeline to wrap.
-        It will not optimized in any way, but simple copied to `self.optimized_pipeline_` if optimize is called.
+        It will not be optimized in any way, but simply copied to `self.optimized_pipeline_` if `optimize` is called.
 
     Other Parameters
     ----------------
@@ -61,7 +62,7 @@ class DummyOptimize(BaseOptimize, _skip_validation=True):
     ----------
     optimized_pipeline_
         The optimized version of the pipeline.
-        In case of this class, this is just a unmodified clone of the input pipeline.
+        In case of this class, this is just an unmodified clone of the input pipeline.
 
     """
 
@@ -91,9 +92,9 @@ class DummyOptimize(BaseOptimize, _skip_validation=True):
         self.dataset = dataset
         if hasattr(self.pipeline, "self_optimize"):
             warnings.warn(
-                "You are using `DummyOptimize` with a pipeline that implements `self_optimize` and hence indicates, "
+                "You are using `DummyOptimize` with a pipeline that implements `self_optimize` and, hence, indicates "
                 "that the pipeline can be optimized. "
-                "`DummmyOptimize` does never call this method and skips any optimization steps! "
+                "`DummyOptimize` does never call this method and skips any optimization steps! "
                 "Use `Optimize` if you actually want to optimize your pipeline.",
                 PotentialUserErrorWarning,
             )
@@ -106,7 +107,7 @@ class Optimize(BaseOptimize):
 
     This is a simple wrapper for pipelines that already implement a `self_optimize` method.
     This wrapper can be used to ensure that these algorithms can be optimized with the same interface as other
-    optimization methods and can hence be used in methods like cross-validation.
+    optimization methods and can hence be used in methods like :func:`tpcp.validate.cross_validate`.
 
     Optimize will never modify the original pipeline, but will store a copy of the optimized pipeline as
     `optimized_pipeline_`.
@@ -117,8 +118,7 @@ class Optimize(BaseOptimize):
     Parameters
     ----------
     pipeline
-        The pipeline to optimize.
-        The pipeline must implement `self_optimize` to optimize its own input parameters.
+        The pipeline to optimize. The pipeline must implement `self_optimize` to optimize its own input parameters.
     safe_optimize
         If True, we add additional checks to make sure the `self_optimize` method of the pipeline is correctly
         implemented.
@@ -178,7 +178,7 @@ class Optimize(BaseOptimize):
         pipeline: OptimizablePipeline = self.pipeline.clone()
         if self.safe_optimize is True:
             # Ideally, the self_optimize method should already be wrapped by the user, but we do it again, just in case.
-            # `make_optimize_safe` has a safe-guard and does not apply the decorator twice
+            # `make_optimize_safe` has a safeguard and does not apply the decorator twice
             optimized_pipeline = _check_safe_optimize(pipeline, pipeline.self_optimize, dataset, **optimize_params)
         else:
             optimized_pipeline = pipeline.self_optimize(dataset, **optimize_params)
@@ -188,20 +188,22 @@ class Optimize(BaseOptimize):
 
 
 class GridSearch(BaseOptimize):
-    """Perform a GridSearch over various parameters.
+    """Perform a grid search over various parameters.
 
-    This scores the pipeline for every combination of data-points in the provided dataset and parameter combinations
+    This scores the pipeline for every combination of data points in the provided dataset and parameter combinations
     in the `parameter_grid`.
-    The scores over the entire dataset are then aggregated for each para combination.
-    By default this aggregation is a simple average.
+    The scores over the entire dataset are then aggregated for each parameter combination.
+    By default, this aggregation is a simple average.
 
-    Note, that this is different to how GridSearch works in many other cases:
-    Usually, the performance parameter would be calculated on all data-points at once.
-    Here, each data-point represents an entire participant or gait-recording (depending on the dataset).
-    Therefore, the pipeline and the scoring method are expected to provide a result/score per data-point in the dataset.
-    Note, that it is still open to your interpretation, what you consider a datapoint in the context of your analysis.
-    The run method of the pipeline can still process multiple e.g. gaittests in a loop and generate a single output,
-    if you consider a single participant one datapoint.
+    .. note::
+        This is different to how grid search works in many other cases:
+        Usually, the performance parameter would be calculated on all data points at once.
+        Here, each data point represents an entire participant or recording (depending on the dataset).
+        Therefore, the pipeline and the scoring method are expected to provide a result/score per data point
+        in the dataset.
+        Note that it is still open to your interpretation what you consider a "data point" in the context of your
+        analysis. The `run` method of the pipeline can still process multiple data points, e.g., gait tests, in a loop
+        and generate a single output if you consider a single participant *one data point*.
 
     Parameters
     ----------
@@ -214,17 +216,17 @@ class GridSearch(BaseOptimize):
         This function should return either a single score or a dictionary of scores.
         If scoring is `None` the default `score` method of the pipeline is used instead.
 
-        .. note:: If scoring returns a dictionary, `return_optimized` must be set to the name of the score that
-                  should be used for ranking.
+        Note that if scoring returns a dictionary, `return_optimized` must be set to the name of the score that
+        should be used for ranking.
     n_jobs
         The number of processes that should be used to parallelize the search.
-        None means 1, -1 means as many as logical processing cores.
+        `None` means 1 while -1 means as many as logical processing cores.
     pre_dispatch
         The number of jobs that should be pre dispatched.
         For an explanation see the documentation of :class:`~sklearn.model_selection.GridSearchCV`
     return_optimized
         If True, a pipeline object with the overall best params is created and stored as `optimized_pipeline_`.
-        If `scoring` returns returns a dictionary of score values, this must be a str corresponding to the name of the
+        If `scoring` returns a dictionary of score values, this must be a `str` corresponding to the name of the
         score that should be used to rank the results.
         If False, the respective result attributes will not be populated.
         If multiple parameter combinations have the same score, the one tested first will be used.
@@ -234,7 +236,7 @@ class GridSearch(BaseOptimize):
         If set to ‘raise’, the error is raised.
         If a numeric value is given, a Warning is raised.
     progress_bar
-        True/False to enable/disable a tqdm progressbar.
+        True/False to enable/disable a tqdm progress bar.
 
     Other Parameters
     ----------------
@@ -245,7 +247,7 @@ class GridSearch(BaseOptimize):
     ----------
     gs_results_
         A dictionary summarizing all results of the gridsearch.
-        The format of this dictionary is designed to be directly passed into the `pd.DataFrame` constructor.
+        The format of this dictionary is designed to be directly passed into the :class:`~pd.DataFrame` constructor.
         Each column then represents the result for one set of parameters
 
         The dictionary contains the following entries:
@@ -256,16 +258,16 @@ class GridSearch(BaseOptimize):
             A dictionary representing all parameters
         score / {scorer-name}
             The aggregated value of a score over all data-points.
-            If a single score is used for scoring, than the generic name "score" is used.
-            Otherwise multiple columns with the name of the respective scorer exist
+            If a single score is used for scoring, then the generic name "score" is used.
+            Otherwise, multiple columns with the name of the respective scorer exist
         rank_score / rank_{scorer-name}
             A sorting for each score from the highest to the lowest value
         single_score / single_{scorer-name}
-            The individual scores per datapoint for each parameter combination.
+            The individual scores per data point for each parameter combination.
             This is a list of values with the `len(dataset)`.
         data_labels
             A list of data labels in the order the single score values are provided.
-            These can be used to associate the `single_score` values with a certain data-point.
+            These can be used to associate the `single_score` values with a certain data point.
     optimized_pipeline_
         An instance of the input pipeline with the best parameter set.
         This is only available if `return_optimized` is not False.
@@ -320,7 +322,7 @@ class GridSearch(BaseOptimize):
         self.progress_bar = progress_bar
 
     def optimize(self: GridSearch_, dataset: Dataset, **_: Any) -> GridSearch_:
-        """Run the GridSearch over the dataset and find the best parameter combination.
+        """Run the grid search over the dataset and find the best parameter combination.
 
         Parameters
         ----------
@@ -331,19 +333,19 @@ class GridSearch(BaseOptimize):
         self.dataset = dataset
         scoring = _validate_scorer(self.scoring, self.pipeline)
 
-        # We use a similar structure as sklearns GridSearchCV here, but instead of calling something equivalent to
+        # We use a similar structure as sklearn's GridSearchCV here, but instead of calling something equivalent to
         # `fit_score`, we call `score`, which just applies and scores the pipeline on the entirety of our dataset as
         # we do not need a "train" step.
-        # Our main loop just loops over all parameter combis and the `_score` function then applies the para combi to
-        # the pipeline and scores the resulting pipeline on the dataset, by passing the entire dataset and the
-        # pipeline to the scorer.
-        # Looping over the individual datapoints in the dataset and aggregating the scores is handled by the scorer
+        # Our main loop just loops over all parameter combinations and the `_score` function then applies the parameter
+        # combination to the pipeline and scores the resulting pipeline on the dataset, by passing the entire dataset
+        # and the pipeline to the scorer.
+        # Looping over the individual data points in the dataset and aggregating the scores is handled by the scorer
         # itself.
         # If not explicitly changed the scorer is an instance of `Scorer` that wraps the actual `scoring`
         # function provided by the user.
         pbar: Optional[tqdm] = None
         if self.progress_bar:
-            pbar = tqdm(total=len(self.parameter_grid), desc="Para Combos")
+            pbar = tqdm(total=len(self.parameter_grid), desc="Parameter Combinations")
         parallel = TqdmParallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch, pbar=pbar)
         with parallel:
             # Evaluate each parameter combination
@@ -361,7 +363,7 @@ class GridSearch(BaseOptimize):
                 for paras in self.parameter_grid
             )
         # We check here if all results are dicts. We only check the dtype of the first value, as the scorer should
-        # have handled issues with non uniform cases already.
+        # have handled issues with non-uniform cases already.
         first_test_score = results[0]["scores"]
         self.multimetric_ = isinstance(first_test_score, dict)
         _validate_return_optimized(self.return_optimized, self.multimetric_, first_test_score)
@@ -388,7 +390,7 @@ class GridSearch(BaseOptimize):
     def _format_results(self, candidate_params, out):  # noqa: no-self-use
         """Format the final result dict.
 
-        This function is adapted based on sklearns `BaseSearchCV`
+        This function is adapted based on sklearn's `BaseSearchCV`
         """
         n_candidates = len(candidate_params)
         out = _aggregate_final_results(out)
@@ -433,12 +435,12 @@ class GridSearch(BaseOptimize):
 
 
 class GridSearchCV(BaseOptimize):
-    """Exhaustive (Hyper)Parameter search using a cross validation based score to optimize pipeline parameters.
+    """Exhaustive (hyper)parameter search using a cross validation based score to optimize pipeline parameters.
 
     This class follows as much as possible the interface of :func:`~sklearn.model_selection.GridSearchCV`.
-    If the tpcp documentation is missing some information, the respective documentation of sklearn might be helpful.
+    If the `tpcp` documentation is missing some information, the respective documentation of `sklearn` might be helpful.
 
-    Compared to the sklearn implementation this method uses a couple of tpcp specific optimizations and
+    Compared to the `sklearn` implementation this method uses a couple of `tpcp`-specific optimizations and
     quality-of-life improvements.
 
     Parameters
@@ -455,31 +457,33 @@ class GridSearchCV(BaseOptimize):
         .. note:: If scoring returns a dictionary, `return_optimized` must be set to the name of the score that
                   should be used for ranking.
     return_optimized
-        If True, a pipeline object with the overall best params is created  and reoptimized using all provided data
+        If True, a pipeline object with the overall best parameters is created and re-optimized using all provided data
         as input.
         The optimized pipeline object is stored as `optimized_pipeline_`.
-        If `scoring` returns returns a dictionary of score values, this must be a str corresponding to the name of the
+        If `scoring` returns a dictionary of score values, this must be a str corresponding to the name of the
         score that should be used to rank the results.
         If False, the respective result attributes will not be populated.
         If multiple parameter combinations have the same mean score over all CV folds, the one tested first will be
         used.
         Otherwise, higher mean values are always considered better.
     cv
-        An integer specifying the number of folds in a K-Fold cross-validation or a valid cross validation helper.
+        An integer specifying the number of folds in a K-Fold cross validation or a valid cross validation helper.
         The default (`None`) will result in a 5-fold cross validation.
-        For further inputs check the sklearn documentation.
+        For further inputs check the `sklearn`
+        `documentation <https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html>`_.
     pure_parameters
-        .. warning: Do not use this option unless you fully understand it!
+        .. warning::
+            Do not use this option unless you fully understand it!
 
-        A list of parameter names (named in the `parameter_grid`) that do not effect training aka are not
-        Hyperparameters.
+        A list of parameter names (named in the `parameter_grid`) that do not affect training aka are not
+        hyperparameters.
         This information can be used for massive performance improvements, as the training does not need to be
-        repeated, if one of these parameters changes.
-        However, setting it incorrectly can lead to hard to detect errors in the final results.
+        repeated if one of these parameters changes.
+        However, setting it incorrectly can lead detect errors that are very hard to detect in the final results.
 
         Instead of passing a list of names, you can also just set the value to `True`.
         In this case all parameters of the provided pipeline that are marked as :func:`~tpcp.pure_parameter` are used.
-        Note, that pure parameters of nested objects are not considered, but only top-level attributes.
+        Note that pure parameters of nested objects are not considered, but only top-level attributes.
         If you need to mark nested parameters as pure, use the first method and pass the names (with `__`) as part of
         the list of names.
 
@@ -490,12 +494,12 @@ class GridSearchCV(BaseOptimize):
         If `True`, the fields `train_score`, and `train_score_single` are available in the results.
     verbose
         Control the verbosity of information printed during the optimization (larger number -> higher verbosity).
-        At the moment this will only effect the caching done, when `pure_parameter_names` are provided.
+        At the moment this will only affect the caching done, when `pure_parameter_names` are provided.
     n_jobs
         The number of parallel jobs.
         The default (`None`) means 1 job at the time, hence, no parallel computing.
         -1 means as many as logical processing cores.
-        One job is created per cv + para combi combintion.
+        One job is created per cv + para combi combination.
     pre_dispatch
         The number of jobs that should be pre dispatched.
         For an explanation see the documentation of :class:`~sklearn.model_selection.GridSearchCV`
@@ -539,9 +543,9 @@ class GridSearchCV(BaseOptimize):
         split{n}_test_score / split{n}_test_{scorer_name}
             The performance on the test set in fold n.
         split{n}_test_single_score / split{n}_test_single_{scorer_name}
-            The performance in fold n on every single datapoint in the test set.
+            The performance in fold n on every single data point in the test set.
         split{n}_test_data_labels
-            The ids of the datapoints used in the test set of fold n.
+            The ids of the data points used in the test set of fold n.
         mean_train_score / mean_train_{scorer_name}
             The average train score over all folds.
         std_train_score / std_train_{scorer_name}
@@ -553,7 +557,7 @@ class GridSearchCV(BaseOptimize):
         split{n}_train_single_score / split{n}_train_single_{scorer_name}
             The performance in fold n on every single datapoint in the train set.
         split{n}_train_data_labels
-            The ids of the datapoints used in the train set of fold n.
+            The ids of the data points used in the train set of fold n.
         mean_{optimize/score}_time
             Average time over all folds spent for optimization and scoring, respectively.
         std_{optimize/score}_time
@@ -644,7 +648,7 @@ class GridSearchCV(BaseOptimize):
         # In the future we might be able to allow objects with optimizer Interface as input directly.
         optimizer = Optimize(self.pipeline, safe_optimize=self.safe_optimize)
 
-        # For each para combi, we separate the pure parameters (parameters that do not effect the optimization) and
+        # For each para combi, we separate the pure parameters (parameters that do not affect the optimization) and
         # the hyperparameters.
         # This allows for massive caching optimizations in the `_optimize_and_score`.
         pure_parameters: Optional[List[str]]
@@ -679,7 +683,7 @@ class GridSearchCV(BaseOptimize):
         with tmp_dir_context as cachedir:
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None
             parallel = TqdmParallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch, pbar=pbar)
-            # We use a similar structure to sklearns GridSearchCv here (see GridSearch for more info).
+            # We use a similar structure to sklearn's GridSearchCV here (see GridSearch for more info).
             with parallel:
                 # Evaluate each parameter combination
                 out = parallel(
@@ -726,7 +730,7 @@ class GridSearchCV(BaseOptimize):
     def _format_results(self, candidate_params, n_splits, out, more_results=None):  # noqa: MC0001
         """Format the final result dict.
 
-        This function is adapted based on sklearns `BaseSearchCV`.
+        This function is adapted based on sklearn's `BaseSearchCV`.
         """
         n_candidates = len(candidate_params)
         out = _aggregate_final_results(out)
@@ -796,7 +800,7 @@ class GridSearchCV(BaseOptimize):
         for cand_idx, params in enumerate(candidate_params):
             for name, value in params.items():
                 # An all masked empty array gets created for the key
-                # `"param_{name}` at the first occurrence of `name`.
+                # `"param_{name}"` at the first occurrence of `name`.
                 # Setting the value at an index also unmasks that index
                 param_results[f"param_{name}"][cand_idx] = value
 
