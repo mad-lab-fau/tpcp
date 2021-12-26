@@ -94,7 +94,7 @@ class TestSafeAction:
             make_action_safe(test_func)(DummyActionPipelineUnsafe(), ds)
 
         if warn:
-            assert "The `make_action_safe` decorator should only be applied to an action methods" in str(w[0])
+            assert "The `make_action_safe` decorator should only be applied to an action method" in str(w[0])
 
     @pytest.mark.parametrize("pipe", (PipelineInputModify, PipelineInputModifyNested))
     def test_modify_input_paras_simple(self, pipe):
