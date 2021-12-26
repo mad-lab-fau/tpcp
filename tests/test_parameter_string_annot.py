@@ -77,7 +77,7 @@ def test_import_forward_error():
                 self.custom_annotated = custom_annotated
                 self.normal_no_annot = normal_no_annot
 
-    assert "You ran into an edegecase" in str(e)
+    assert "You ran into an edge case" in str(e)
 
 
 def test_test_str_based_forward():
