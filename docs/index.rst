@@ -13,7 +13,7 @@ tpcp Docu Overview
    auto_examples/index.rst
    Changelog <CHANGELOG.md>
 
-Indices and tables
+Indices and Tables
 ==================
 
 * :ref:`genindex`

@@ -1,15 +1,15 @@
 Optimization and Training
 =========================
 
-In tpcp, we use the term *Optimization* as a wrapper term for any form of data driven parameter optimization.
-This can be traditional ML training of model weights, black-box optimizations of hyper-parameters or a simple Gridsearch
+In `tpcp`, we use the term *Optimization* as a wrapper term for any form of data-driven parameter optimization.
+This can be traditional ML training of model weights, black-box optimizations of hyperparameters or a simple grid search
 of thresholds in classical algorithms.
 Therefore, we attempt to have a unified interface for all these cases.
 
-This is achieved, by defining "optimization" as any form of datadriven optimization of the "parameters"
+This is achieved by defining "optimization" as any form of data-driven optimization of the "parameters"
 (see :ref:`parameters`) specified in the `__init__` of an algorithm.
 This optimization can be performed via *internal* optimization implemented in a `self_optimize` method on the pipeline
-or via external optimization like the :class:`~tpcp.optimize.GridSearch` wrapper.
+or via *external* optimization like the :class:`~tpcp.optimize.GridSearch` wrapper.
 
 .. code-block:: python
 
