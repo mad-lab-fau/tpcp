@@ -144,7 +144,7 @@ for outer, group in enumerate(grouped_subset):
 # Splitting
 # ---------
 # If you are evaluating algorithms, it is often important to split your data into a train and a test set, or multiple
-# distinct sets for a cross-validation.
+# distinct sets for a cross validation.
 #
 # The `Dataset` objects directly support the `sklearn` helper functions for this.
 # For example, to split our subset into training and testing we can do the following:
@@ -162,7 +162,7 @@ print("Train:\n", train, end="\n\n")
 print("Test:\n", test)
 
 # %%
-# In the same way you can use the dataset (grouped or not) with the cross-validation helper functions
+# In the same way you can use the dataset (grouped or not) with the cross validation helper functions
 # (KFold is just an example, all should work):
 from sklearn.model_selection import KFold
 

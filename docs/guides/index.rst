@@ -27,6 +27,6 @@ Optimization and Validation
 .. toctree::
     :maxdepth: 1
 
-    Opti... what? - A introduction to algorithm optimization and validation
+    Opti... what? - An introduction to algorithm optimization and validation
     Parameter optimization and training of Pipelines <optimization>
     Validation of algorithms and pipelines

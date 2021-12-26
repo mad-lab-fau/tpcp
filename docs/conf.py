@@ -37,7 +37,7 @@ project = info["name"]
 author = ", ".join(info["authors"])
 release = info["version"]
 
-copyright = "2021 - {}, MaD-Lab FAU, Digital Health and Gait-Analysis Group".format(datetime.now().year)
+copyright = "2021 - {}, MaD Lab, FAU, Digital Health and Gait Analysis Group".format(datetime.now().year)
 
 # -- Copy the README and Changelog and fix image path --------------------------------------
 HERE = Path(__file__).parent
