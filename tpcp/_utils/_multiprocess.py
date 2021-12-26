@@ -1,4 +1,4 @@
-"""Some helper to handle mutliprocess progressbars."""
+"""Some helper to handle multiprocess progressbars."""
 
 import joblib
 

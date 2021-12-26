@@ -12,8 +12,8 @@ Self = TypeVar("Self", bound="Dataset")
 class Dataset(BaseTpcpObject, _skip_validation=True):
     """Baseclass for tpcp Dataset objects.
 
-    This class provides fundamental functionality like iteration, getting subsets and compatibility with sklearn's
-    cross validation helper.
+    This class provides fundamental functionality like iteration, getting subsets, and compatibility with `sklearn`'s
+    cross validation helpers.
 
     For more information check out the examples and user guides on datasets.
 
@@ -24,8 +24,8 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
         For examples see below.
     subset_index
         For all classes that inherit from this class, subset_index **must** be None.
-        The subset_index **must** be created in the method __create_index.
-        If the base class is used, then the index the dataset should represent **must** be a pd.Dataframe
+        The subset_index **must** be created in the method `__create_index`.
+        If the base class is used, then the index the dataset should represent **must** be a :class:`~pd.Dataframe`
         containig the index.
         For examples see below.
 
@@ -36,7 +36,7 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
         This returns either the `subset_index` or the base index returned by `create_index`.
     grouped_index
         The index, but all groupby columns are represented as MultiIndex.
-        Note, that the order can be different as the order of index.
+        Note that the order can be different as the order of index.
     groups
         Returns all possible combinations based on the specified `groupby` columns.
         If `groupby` is None, this returns the row indices.
@@ -54,7 +54,7 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
     >>> import pandas as pd
     >>> from itertools import product
     >>>
-    >>> from tpcp.dataset import Dataset
+    >>> from tpcp import Dataset
     >>>
     >>> test_index = pd.DataFrame(
     ...     list(product(("patient_1", "patient_2", "patient_3"), ("test_1", "test_2"), ("1", "2"))),
@@ -80,7 +80,7 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
        11  patient_3  test_2     2
 
     We can loop over the dataset.
-    By default we will loop over each row.
+    By default, we will loop over each row.
 
     >>> for r in dataset[:2]:
     ...     print(r)
@@ -130,7 +130,7 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
        patient_1 test_2  patient_1  test_2     1
                  test_2  patient_1  test_2     2
 
-    To iterate over the unique values of a specific the "iter_level" function:
+    To iterate over the unique values of a specific level use the "iter_level" function:
 
     >>> for r in list(grouped_dataset.iter_level("patient"))[:2]:
     ...     print(r)  # doctest: +NORMALIZE_WHITESPACE
@@ -164,9 +164,11 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
        patient_2 test_1  patient_2  test_1     2
                  test_2  patient_2  test_2     2
 
-    If we want to use datasets in combination with `sklearn.model_selection.GroupKFold`, we can generate valid group
-    labels as follows.
-    Note, that you usually don't want to use that in combination with `self.groupby`.
+    If we want to use datasets in combination with :class:`~sklearn.model_selection.GroupKFold`, we can generate
+    valid group labels as follows.
+
+    .. note::
+        You usually don't want to use that in combination with `self.groupby`.
 
     >>> # We are using the ungrouped dataset again!
     >>> group_labels = dataset.create_group_labels(["patient", "test"])
@@ -232,7 +234,7 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
 
     @property
     def grouped_index(self) -> pd.DataFrame:
-        """Return the the index with the `groupby` columns set as multiindex."""
+        """Return the index with the `groupby` columns set as multiindex."""
         if self.groupby_cols is None:
             groupby_cols = self.index.columns.to_list()
         else:
@@ -282,14 +284,15 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
     ) -> Self:
         """Get a subset of the dataset.
 
-        Note that all arguments are mutable exclusive!
+        .. note::
+            All arguments are mutable exclusive!
 
         Parameters
         ----------
         groups
             A valid row locator or slice that can be passed to `self.grouped_index.loc[locator, :]`.
             This basically needs to be a subset of `self.groups`.
-            Note, that this is the only indexer that works on the grouped index.
+            Note that this is the only indexer that works on the grouped index.
             All other indexers work on the pure index.
         index
             `pd.DataFrame` that is a valid subset of the current dataset index.
@@ -297,14 +300,14 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
             bool-map that is used to index the current index-dataframe.
             The list **must** be of same length as the number of rows in the index.
         **kwargs
-            The key **must** be the name of a index column.
+            The key **must** be the name of an index column.
             The value is a list containing strings that correspond to the categories that should be kept.
             For examples see above.
 
         Returns
         -------
         subset
-            New dataset object filtered by specified parameter.
+            New dataset object filtered by specified parameters.
 
         """
         if (
@@ -431,19 +434,20 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
                 groupby_cols = self.index.columns.to_list()
             raise ValueError(
                 f"The data value {property_name} of dataset {self.__class__.__name__} can only be accessed if there is"
-                f" only a single combination of the columns {groupby_cols} left in a data-subset"
+                f" only a single combination of the columns {groupby_cols} left in a data subset"
             )
 
     def create_group_labels(self, label_cols: Union[str, List[str]]):
         """Generate a list of labels for each group/row in the dataset.
 
-        Note that this has a different usecase than the dataset-wide groupby.
-        Using `groupby` reduces the effective size of the dataset to the number of groups.
-        This method produces a group label for each group/row that is already in the dataset, without changing the
-        dataset.
+        .. note::
+            This has a different use case than the dataset-wide groupby.
+            Using `groupby` reduces the effective size of the dataset to the number of groups.
+            This method produces a group label for each group/row that is already in the dataset, without changing the
+            dataset.
 
-        The output of this method can be used in combination with `sklearn.model_selection.GroupKFold` as the group
-        label.
+        The output of this method can be used in combination with :class:`~sklearn.model_selection.GroupKFold` as
+        the group label.
 
         Parameters
         ----------

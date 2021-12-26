@@ -23,8 +23,9 @@ class Pipeline(Algorithm, _skip_validation=True):
     def run(self: Pipeline_, datapoint: Dataset) -> Pipeline_:
         """Run the pipeline.
 
-        Note, that it is usually preferred to use `safe_run` on custom pipelines instead of `run`, as `safe_run` can
-        catch certain implementation errors of the run method.
+        .. note::
+            It is usually preferred to use `safe_run` on custom pipelines instead of `run`, as `safe_run` can
+            catch certain implementation errors of the run method.
 
         Parameters
         ----------
@@ -112,13 +113,14 @@ class OptimizablePipeline(Pipeline, _skip_validation=True):
 
     @make_optimize_safe
     def self_optimize(self: OptimizablePipeline_, dataset: Dataset, **kwargs) -> OptimizablePipeline_:
-        """Optimize the input parameter of the pipeline or algorithm using any logic.
+        """Optimize the input parameters of the pipeline or algorithm using any logic.
 
         This method can be used to adapt the input parameters (values provided in the init) based on any data driven
         heuristic.
 
-        Note that the optimizations must only modify the input parameters (aka `self.clone` should retain the
-        optimization results).
+        .. note::
+            The optimizations must only modify the input parameters (aka `self.clone` should retain the optimization
+            results).
 
         Parameters
         ----------
@@ -127,7 +129,7 @@ class OptimizablePipeline(Pipeline, _skip_validation=True):
             be used for training.
             The structure of the data and the available reference information will depend on the dataset.
         kwargs
-            Additional parameter required for the optimization process.
+            Additional parameters required for the optimization process.
 
         Returns
         -------
