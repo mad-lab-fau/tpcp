@@ -19,106 +19,102 @@ authors:
 affiliations:
   - name: Machine Learning and Data Analytics Lab (MaD Lab), Department Artificial Intelligence in Biomedical Engineering (AIBE), Friedrich-Alexander-Universität Erlangen-Nürnberg (FAU)  
     index: 1
-  - name: Chair of Health Psychology, Friedrich-Alexander-Universität Erlangen-Nürnberg (FAU)  
-    index: 2
 date: 01 January 2022
 bibliography: paper.bib
 ---
 
-## Summary
+# Summary
 
-During algorithm development and analysis researchers regularly use software libraries developed for their specific domain.
-With such libraries complex analysis tasks can often be reduced to a couple of lines of codes.
-This not only reduces the amount of implementation required, but also prevents errors.
+During algorithm development and analysis researchers, regularly use software libraries developed for their specific domain.
+With such libraries, complex analysis tasks can often be reduced to a couple of lines of code.
+This not only reduces the amount of implementation required but also prevents errors.
 
 The best developer experience is usually achieved when the entire analysis can be represented with the tools provided by a specific library.
-For example, when an entire machine learning pipeline is represented by a Scikit-Learn pipeline [@Pedregosa2011a], it is extremely easy to switch out and train algorithms and, even if the user might not be aware of the issue, train/test leaks and other methodological errors at various stages in the analysis are automatically prevented.
+For example, when an entire machine learning pipeline is represented by a `scikit-learn` pipeline [@Pedregosa2011a], it is extremely easy to switch out and train algorithms. Furthermore, train/test leaks and other methodological errors at various stages in the analysis are automatically prevented – even if the user might not be aware of the issue.
 
 However, if the performed analysis gets too complex, too specific to an application domain, or requires the use of tooling and algorithms from multiple frameworks, developers lose a lot of the benefits provided by individual frameworks.
 In turn, the required skill level and the chance of methodological error rise.
 
-With _tpcp_, we attempt to provide tooling and structure for algorithm development and evaluation that is independent of the frameworks required for the algorithm implementation.
+With `tpcp` we attempt to provide tooling and structure for algorithm development and evaluation that is independent of the frameworks required for the algorithm implementation.
 
-## Statement of need
+# Statement of Need
 
-To better understand the need of _tpcp_, we want to provide two examples from application fields:
+To better understand the need for `tpcp`, we want to provide two examples from application fields:
 
 
-The first example is a comparison of sleep analysis algorithms.
-In the field of sleep analysis traditional the literature provides heuristic algorithms, traditional ML algorithms and Deep Learning approaches.
-When one attempt to compare multiple algorithms, it is not possible to use just a single high-level framework.
-Heuristic algorithms, will most likely be implemented without specific frameworks, ML approaches are most likely based on scikit-learn [@Pedregosa2011a], and Deep Learning approaches based on tensorflow [@tensorflow2015-whitepaper] or PyTorch [@Paske2019].
-Further, the required data are usually multimodal time series with multiple recordings per participants.
-Some algorithms just require a subset of this data, which further complicates the overall data handling and potential cross-validations for algorithms evaluation.
-Without _tpcp_, researchers would most likely develop their own set of helper functions to load and handle the data, to split data in train and test sets, and to perform a cross validation.
-Then they would create their own wrapper to define a unified interface for all algorithms, so that they can compare all of them in a similar manner.
-All of this requires understanding of machine learning, to implement the train-test split and cross-validation, and extensive experience in the programming language of choice to design and implement and algorithm interface.
+The first example is a comparison of different algorithms for sleep/wake detection based on wearable sensor data. These algorithms can either be heuristic, rule-based algorithms, "traditional" machine learning (ML) algorithms, as well as deep learning (DL) approaches.
+When one attempts to compare multiple algorithms, it is not possible to use just a single high-level framework.
+Heuristic algorithms will most likely be implemented without specific frameworks, ML approaches are most likely based on [`scikit-learn`](https://scikit-learn.org/stable/) [@Pedregosa2011a], and Deep Learning approaches based on [`tensorflow`](https://www.tensorflow.org/) [@tensorflow2015-whitepaper] or [`PyTorch`](https://pytorch.org/) [@Paske2019].
+Further, the required data are usually multimodal time series (e.g., motion, cardiac, and respiratory data). Some algorithms might just require a subset of these modalities, which further complicates the overall data handling and potential cross-validations for algorithms evaluation.
+Additionally, a window-wise prediction of sleep and wake is desired.
+
+Without `tpcp`, researchers would most likely develop their own set of helper functions to load and handle the data, to split data in train and test sets, and to perform cross-validation.
+Afterwards, they would need to create their own wrapper to define a unified interface for all algorithms so that they can compare all of them in a similar manner.
+All of this requires a profound understanding of machine learning to implement the train-test split and cross-validation, as well as extensive experience in the programming language of choice to design and implement an algorithm interface.
 
 The second example is a comparison of stride detection algorithms based on IMU data recently published in [@Roth2021a].
-The authors compared a custom Hidden Markov Model implemented using Pomegranate [@Schreiber2017] with an implementation of a template matching algorithm based on [@Barth2013].
-In their data two recordings were available per participant - one in a controlled lab setting and one from an unsupervised recording at home.
+The authors compared a custom Hidden Markov Model implemented using [`pomegranate`](https://pomegranate.readthedocs.io/en/latest/) [@Schreiber2017] with an implementation of a template matching algorithm based on [@Barth2013].
+In their data, two recordings were available per participant – one in a controlled lab setting and one from an unsupervised recording at home.
 As part of their analysis, the authors wanted to show that it is sufficient to train algorithms based on the lab data without labeled data from the home environment required.
-The overall approach leads to a set of challenges:
-Neither algorithm fit in the realm of any of the typical algorithm frameworks and again custom helpers were required to come up with uniform interfaces to train and run the algorithms.
-Further, the requirements for which data was used during training and testing, is something that cannot be easily abstracted by any of the existing frameworks, even if all algorithms could be implemented in it.
+The overall approach leads to a set of challenges: Neither algorithm fit in the realm of any of the typical algorithm frameworks. Thus, custom helpers were required again to come up with uniform interfaces for training and running the algorithms. Further, the requirements for which data were used during training and testing is something that cannot be easily abstracted by any of the existing frameworks, even if all algorithms could be implemented in it.
 
-While both examples could (and have been) solved using additional custom tooling, the loss of a framework to support and guide the implementation, raises the required software engineering skill and required understanding of the evaluation procedure.
+While both examples could be (and have been) solved using additional custom tooling, the loss of a framework to support and guide the implementation raises the required software engineering skill and required understanding of the evaluation procedure.
 Further, developing custom algorithm interfaces and tooling for each analysis makes it difficult to reuse algorithms and pipelines across projects, as interfaces are likely to differ.
-With _tpcp_, we provide opinionated helpers to support data handling and evaluation via cross validation, as well as, interfaces that can guide the development of custom data analysis pipelines, independent of the underlying algorithms.
-This should ensure a more straight forward software development process and should simplify reuse of tooling and algorithms across projects.
+With `tpcp`, we provide opinionated helpers to support data handling and evaluation via cross-validation, as well as interfaces that can guide the development of custom data analysis pipelines, independent of the underlying algorithms.
+This should ensure a more straightforward software development process and should simplify the reuse of tooling and algorithms across projects.
 
-However, compared to a more specialized framework (e.g. sklearn), _tpcp_ will always require more implementation from developer side and can never provide an interface that is equally simple.
-This means, if an analysis could be done in the context of an already existing specialized library, this library should be used over _tpcp_.
-However, if an analysis spans multiple domains or requires flexibility that specialized frameworks cannot provide, _tpcp_ provides an alternative that should be considered before switching to fully custom tooling.
+However, compared to a more specialized framework (e.g. `scikit-learn`), `tpcp` will always require more implementation from the developer side and can never provide an interface that is equally simple.
+This means, if an analysis could be done in the context of an already existing specialized library, this library should be used over `tpcp`.
+However, if an analysis spans multiple domains or requires flexibility that specialized frameworks cannot provide, `tpcp` provides an alternative that should be considered before switching to fully custom tooling.
 
 # Provided Functionality
 
-The package _tpcp_ provides three things:
+The package `tpcp` provides three things:
 
-1. Helper to create object-oriented dataset accessors
-1. Helper to implement own algorithms and pipelines in an object-oriented fashion
-1. Tools for Parameter optimization and algorithm evaluation that work with the other structures
+1. Helper to create object-oriented **dataset** accessors
+1. Helper to implement own **algorithms** and **pipelines** in an object-oriented fashion
+1. Tools for **parameter optimization** and **algorithm evaluation** that work with the other structures
 
-Beyond that the documentation of _tpcp_ attempts to provide fundamental information and recipes on how to approach algorithm development and algorithm evaluation.
+Beyond that, the documentation of `tpcp` attempts to provide fundamental information and recipes on how to approach algorithm development and algorithm evaluation.
 
 ## Algorithms
 
-In _tpcp_, we do not provide any specific algorithm implementations, but only very simple base classes to build algorithms with a scikit-learn inspired interface.
-Using this object-oriented interface to implement algorithms, ensures comparable interfaces for similar algorithms.
-Using this part of _tpcp_ is completely optional (i.e., all other features are completely independent of the algorithm implementation), but following our recommendations can simplify the integration with other parts of _tpcp_.
+In `tpcp`, we do not provide any specific algorithm implementations, but only very simple base classes to build algorithms with a `scikit-learn` inspired interface.
+Using this object-oriented interface to implement algorithms ensures comparable interfaces for similar algorithms.
+Using this part of `tpcp` is completely optional (i.e., all other features are completely independent of the algorithm implementation), but following our recommendations can simplify the integration with other parts of `tpcp`.
 
 
 ## Datasets
 
-In cases, where data points cannot be expressed by a simple feature vector, data loading and handling require non-negligible code complexity.
-Data is usually spread over multiple files and databases and requires data transformations on load.
+In cases where data points cannot be expressed by a simple feature vector, data loading and handling require non-negligible code complexity.
+Data is usually spread over multiple files and databases and requires data transformations during the loading process.
 Therefore, the resulting data structures are unlikely to be compatible with existing algorithms.
-Hence, researchers need to implement code abstractions of their datasets, often in form of helper functions.
-With the `tpcp.Dataset` implementation we suggest an alternative interface to diverse data structures, by implementing data access using Python classes.
-Inspired by pytorch datasets, their structure can be iterated, filtered, and split and are compatible with other tooling provided in _tpcp_.
+Hence, researchers need to implement code abstractions of their datasets, often in the form of helper functions.
+With the `tpcp.Dataset` implementation, we suggest an alternative interface to diverse data structures by implementing data access using Python classes.
+Inspired by `pytorch` datasets, their structure can be iterated, filtered, and split. Further, they are compatible with other tooling provided in `tpcp`.
 
 
 ## Pipelines
 
-For any analysis, we need to interface the data with the algorithms.
-In _tpcp_, we call this gluing code Pipelines.
-Many specialized frameworks are able to completely remove any of this gluing code, as the data structures and the algorithm interfaces are strictly defined and hence, algorithms can directly interface with the data.
-In _tpcp_ we allow more flexibility, to have different data and algorithm interfaces depending on the application and algorithm types.
+For any analysis, we need to bring the data together with the algorithms.
+In `tpcp`, we call this "gluing code" Pipelines.
+Many specialized frameworks are able to completely remove any of this gluing code as the data structures and the algorithm interfaces are strictly defined and, hence, algorithms can directly interface with the data.
+In `tpcp` we allow more flexibility to have different data and algorithm interfaces depending on the application and algorithm types.
 Therefore, we need Pipelines to connect the reusable Dataset and Algorithm interfaces for a specific analysis.
-Pipelines also provide a fixed and unified interface that utility methods in _tpcp_ can use.
+Pipelines also provide a fixed and unified interface that utility methods in `tpcp` can use.
 
 
 ## Parameter Optimization and Evaluation Tools
 
-To handle the often complex task of evaluation and Parameter Optimization, _tpcp_ provides a re-implementation of the core evaluation (`cross_validate`) and parameter optimization (`GridSearch`, `GridSearchCV`) methods of scikit-learn, that work with Pipeline and Dataset objects.
+To handle the often complex task of evaluation and Parameter Optimization, `tpcp` provides a re-implementation of the core evaluation (`cross_validate`) and parameter optimization (`GridSearch`, `GridSearchCV`) methods of `scikit-learn` that work with `Pipeline` and `Dataset` objects.
 This means that independent of the frameworks required for the algorithms, reliable tooling for these critical parts of most data-analysis pipelines can be used.
 
 # Availability
 
-The software is available as a pip installable package (`pip install tpcp`) and via github (https://github.com/mad-lab-fau/tpcp). Documentation can be found via readthedocs (https://tpcp.readthedocs.io).
+The software is available as a pip installable package (`pip install tpcp`) and via [GitHub](https://github.com/mad-lab-fau/tpcp). Documentation can be found via [Read the Docs](https://tpcp.readthedocs.io).
 
 # Acknowledgments
 
-Most of _tpcp_ was created in reaction to problems and issues we ran into during our day-to-day work at the MaD-Lab Erlangen and teaching Signal Analysis and Machine Learning to our students.
-Therefore, we would like to thank all students and Lab Members that engaged in our various discussions and brainstorming sessions about evaluation approaches for obscure algorithms and design for the algorithm interface.
+Most of `tpcp` was created in reaction to problems and issues we ran into during our day-to-day work at the Machine Learning and Data Analytics Lab (MaD Lab) of Friedrich-Alexander-Universität Erlangen-Nürnberg and teaching signal analysis and machine learning to our students.
+Therefore, we would like to thank all students and MaD Lab members that engaged in our various discussions and brainstorming sessions about evaluation approaches for obscure algorithms and design for the algorithm interface.
 
