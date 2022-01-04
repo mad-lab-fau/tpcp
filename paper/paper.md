@@ -42,10 +42,10 @@ With `tpcp` we attempt to provide tooling and structure for algorithm developmen
 To better understand the need for `tpcp`, we want to provide two examples from application fields:
 
 
-The first example is a comparison of different algorithms for sleep/wake detection based on wearable sensor data. These algorithms can either be heuristic, rule-based algorithms, "traditional" machine learning (ML) algorithms, as well as deep learning (DL) approaches.
+The first example is a comparison of different algorithms for sleep/wake detection based on wearable sensor data. These algorithms can either be heuristic, rule-based algorithms, "traditional" machine learning (ML) algorithms, as well as deep learning (DL) approaches [@Palotti2019].
 When one attempts to compare multiple algorithms, it is not possible to use just a single high-level framework.
 Heuristic algorithms will most likely be implemented without specific frameworks, ML approaches are most likely based on [`scikit-learn`](https://scikit-learn.org/stable/) [@Pedregosa2011a], and Deep Learning approaches based on [`tensorflow`](https://www.tensorflow.org/) [@tensorflow2015-whitepaper] or [`PyTorch`](https://pytorch.org/) [@Paske2019].
-Further, the required data are usually multimodal time series (e.g., motion, cardiac, and respiratory data). Some algorithms might just require a subset of these modalities, which further complicates the overall data handling and potential cross-validations for algorithms evaluation.
+Further, the required data are usually multimodal time series (e.g., motion and cardiac data) [@Zhai2020a]. Some algorithms might just require a subset of these modalities, which further complicates the overall data handling and potential cross-validations for algorithms evaluation.
 Additionally, a window-wise prediction of sleep and wake is desired.
 
 Without `tpcp`, researchers would most likely develop their own set of helper functions to load and handle the data, to split data in train and test sets, and to perform cross-validation.
