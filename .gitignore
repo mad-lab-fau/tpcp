@@ -313,3 +313,6 @@ poetry.lock
 
 # Just a folder for local tests
 _debug_test
+
+# joss paper compile output
+paper/paper.pdf
