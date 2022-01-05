@@ -5,22 +5,22 @@ tags:
   - Machine Learning
   - Data Analysis
 authors:
-  - name: Arne Küderle^[corresponding author]  
+  - name: Arne Küderle^[corresponding author]   
     orcid: 0000-0002-5686-281X  
     affiliation: 1
-  - name: Robert Richer
+  - name: Robert Richer  
     orcid: 0000-0003-0272-5403  
     affiliation: 1
   - name: Raul Sîmpetru  
     affiliation: 1
- - name: Bjoern M. Eskofier  
+  - name: Bjoern M. Eskofier  
     orcid: 0000-0002-0417-0336  
     affiliation: 1
 affiliations:
   - name: Machine Learning and Data Analytics Lab (MaD Lab), Department Artificial Intelligence in Biomedical Engineering (AIBE), Friedrich-Alexander-Universität Erlangen-Nürnberg (FAU)  
     index: 1
 date: 01 January 2022
-bibliography: paper.bib
+bibliography: tpcp.bib
 ---
 
 # Summary
@@ -77,12 +77,12 @@ The package `tpcp` provides three things:
 
 Beyond that, the documentation of `tpcp` attempts to provide fundamental information and recipes on how to approach algorithm development and algorithm evaluation.
 
+
 ## Algorithms
 
 In `tpcp`, we do not provide any specific algorithm implementations, but only very simple base classes to build algorithms with a `scikit-learn` inspired interface.
 Using this object-oriented interface to implement algorithms ensures comparable interfaces for similar algorithms.
 Using this part of `tpcp` is completely optional (i.e., all other features are completely independent of the algorithm implementation), but following our recommendations can simplify the integration with other parts of `tpcp`.
-
 
 ## Datasets
 
@@ -91,8 +91,7 @@ Data is usually spread over multiple files and databases and requires data trans
 Therefore, the resulting data structures are unlikely to be compatible with existing algorithms.
 Hence, researchers need to implement code abstractions of their datasets, often in the form of helper functions.
 With the `tpcp.Dataset` implementation, we suggest an alternative interface to diverse data structures by implementing data access using Python classes.
-Inspired by `pytorch` datasets, their structure can be iterated, filtered, and split. Further, they are compatible with other tooling provided in `tpcp`.
-
+Inspired by `pytorch` datasets, they provide a common interface and their structure can be iterated, filtered, and split. Further, they are compatible with other tooling provided in `tpcp`.
 
 ## Pipelines
 
@@ -100,9 +99,21 @@ For any analysis, we need to bring the data together with the algorithms.
 In `tpcp`, we call this "gluing code" Pipelines.
 Many specialized frameworks are able to completely remove any of this gluing code as the data structures and the algorithm interfaces are strictly defined and, hence, algorithms can directly interface with the data.
 In `tpcp` we allow more flexibility to have different data and algorithm interfaces depending on the application and algorithm types.
-Therefore, we need Pipelines to connect the reusable Dataset and Algorithm interfaces for a specific analysis.
+Therefore, we need Pipelines to connect the reusable Dataset and Algorithm interfaces for a specific analysis (\autoref{fig:algo_simple}, \autoref{fig:algo_complex}).
 Pipelines also provide a fixed and unified interface that utility methods in `tpcp` can use.
 
+
+\begin{figure}[!h]
+\includegraphics[width=0.9\textwidth]{img/algos_simple.pdf}
+\caption{Simple case with a single Pipeline: The Pipeline can interface between all available Datasets and all Algorithms because they share a common interface.}
+\label{fig:algo_simple}
+\end{figure}
+
+\begin{figure}[!h]
+\includegraphics[width=0.9\textwidth]{img/algos_complex.pdf}
+\caption{A more complex case: Pipelines act as gluing code for one Dataset interface with one or multiple Algorithm interfaces to perform one specific analysis.}
+\label{fig:algo_complex}
+\end{figure}
 
 ## Parameter Optimization and Evaluation Tools
 
