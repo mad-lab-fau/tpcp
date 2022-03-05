@@ -1,8 +1,8 @@
 r"""
-.. _custom_dataset:
+.. _custom_dataset_basics:
 
-Custom Dataset
-==============
+Custom Dataset - Basics
+=======================
 
 Datasets represent a set of recordings that should all be processed in the same way.
 For example the data of multiple participants in a study, multiple days of recording, or multiple tests.
