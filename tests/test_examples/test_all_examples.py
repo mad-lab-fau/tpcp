@@ -27,5 +27,5 @@ def test_real_life_dataset():
 def test_qrs_algorithm():
     from examples.algorithms._01_algorithms_qrs_detection import algorithm
 
-    assert algorithm.min_r_peak_height_over_baseline == 1.1639645141095776
-    assert_array_equal(algorithm.r_peak_positions_[:3], [16, 284, 562])
+    assert algorithm.min_r_peak_height_over_baseline == 1.1229521656012118
+    assert_array_equal(algorithm.r_peak_positions_[:3], [197, 459, 708])
