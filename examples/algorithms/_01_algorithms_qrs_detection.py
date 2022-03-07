@@ -27,7 +27,7 @@ For more general information have a look at the general documentation page :ref:
 
 Implementing QRS-Detection
 --------------------------
-In general the our QRS-Detection will have two steps:
+In general our QRS-Detection will have two steps:
 
 1. High-pass filter the data to remove baseline drift. We will use a Butterworth filter for that.
 2. Apply a peak finding strategy to find the (hopefully dominant) R-peaks.
