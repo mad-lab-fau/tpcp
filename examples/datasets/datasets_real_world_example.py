@@ -1,12 +1,12 @@
 r"""
-.. _custom_dataset_basics:
+.. _custom_dataset_ecg:
 
 Custom Dataset - A real world example
 =====================================
 
 To better understand how you would actually use tpcp datasets, we are going to build a dataset class for an actual
 dataset.
-We are going to use a subset of the ["MIT-BIH Arrhythmia Database"](https://physionet.org/content/mitdb/1.0.0/).
+We are going to use a subset of the `MIT-BIH Arrhythmia Database <https://physionet.org/content/mitdb/1.0.0/>`_.
 The actual content of the data is not relevant, but it has a couple of key characteristics that are typical for such
 datasets:
 
@@ -21,6 +21,7 @@ If you want to see other real-life implementations of tpcp-datasets you can also
 - https://github.com/mad-lab-fau/sensor_position_dataset_helper/blob/master/sensor_position_dataset_helper/tpcp_dataset.py
 - https://github.com/mad-lab-fau/cft-analysis/tree/main/cft_analysis/datasets
 
+If you just want the final implementation, without all the explanation, check :ref:`custom_dataset_final_ecg`.
 
 """
 
