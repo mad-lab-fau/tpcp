@@ -9,6 +9,6 @@ The full database can be accessed on [Physionet](https://physionet.org/content/m
 The data here was converted from the original files into csv-files or pickle files to make them easier to read without 
 additional tools.
 
-This is example data to show general capibilities of the tcpc library and should not be used as actual test data for any
+This is example data to show general capabilities of the tcpc library and should not be used as actual test data for any
 ECG related algorithms.
 Use the original database for that!
