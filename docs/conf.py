@@ -7,7 +7,6 @@
 # -- Path setup --------------------------------------------------------------
 
 import os
-
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -18,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 import toml
+from sphinx_gallery.sorting import ExplicitOrder
 
 HERE = Path(__file__)
 
@@ -153,6 +153,12 @@ sphinx_gallery_conf = {
     "filename_pattern": re.escape(os.sep),
     "remove_config_comments": True,
     "show_memory": True,
+    "subsection_order": ExplicitOrder(
+        [
+            "../examples/datasets",
+            "../examples/algorithms",
+        ]
+    ),
 }
 
 
