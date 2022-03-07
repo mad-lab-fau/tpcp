@@ -10,9 +10,9 @@ def test_custom_dataset():
 
 
 def test_real_life_dataset():
-    from examples.datasets._02_datasets_real_world_example import ECGExampleData
+    from examples.datasets._02_datasets_real_world_example import ECGExampleData, data_path
 
-    dataset = ECGExampleData(data_path=Path("../../example_data/ecg_mit_bih_arrhythmia/data"))
+    dataset = ECGExampleData(data_path=data_path)
     assert dataset.index.shape == (12, 2)
 
     # Just test that accessing them does not produce any errors
