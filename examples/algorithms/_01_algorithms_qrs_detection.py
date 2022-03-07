@@ -23,7 +23,7 @@ However, algorithm subclasses provide a structured way to implement new algorith
 structure to follow.
 Further they allow the setting of nested parameters (e.g. when used as parameters to pipelines) and can benefit from
 other tooling in tpcp (e.g. cloning).
-For more general information have a look at the general documentation page :ref:`datasets_algorithms_pipelines`_.
+For more general information have a look at the general documentation page :ref:`datasets_algorithms_pipelines`.
 
 Implementing QRS-Detection
 --------------------------
