@@ -176,7 +176,7 @@ class QRSDetector(Algorithm):
         return signal.sosfiltfilt(sos, ecg_signal)
 
 
-class OptimizablePanTompkins(QRSDetector, OptimizableAlgorithm):
+class OptimizableQrsDetector(QRSDetector, OptimizableAlgorithm):
     min_r_peak_height_over_baseline: OptimizableParameter[float]
     r_peak_match_tolerance_s: HyperParameter[float]
 

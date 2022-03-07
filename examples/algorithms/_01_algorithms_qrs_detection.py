@@ -196,7 +196,7 @@ from examples.algorithms.algorithms_qrs_detection_final import match_events_with
 from tpcp import HyperParameter, OptimizableAlgorithm, OptimizableParameter, make_optimize_safe
 
 
-class OptimizablePanTompkins(QRSDetector, OptimizableAlgorithm):
+class OptimizableQrsDetector(QRSDetector, OptimizableAlgorithm):
     min_r_peak_height_over_baseline: OptimizableParameter[float]
     r_peak_match_tolerance_s: HyperParameter[float]
 
@@ -257,7 +257,7 @@ train_data = example_data[:2]
 train_ecg_data = [d.data["ecg"] for d in train_data]
 train_r_peaks = [d.r_peak_positions_["r_peak_position"] for d in train_data]
 
-algorithm = OptimizablePanTompkins()
+algorithm = OptimizableQrsDetector()
 algorithm = algorithm.self_optimize(train_ecg_data, train_r_peaks, train_data.sampling_rate_hz)
 
 # %%
