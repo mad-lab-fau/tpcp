@@ -6,8 +6,8 @@ Custom Dataset - Basics
 
 Datasets represent a set of recordings that should all be processed in the same way.
 For example the data of multiple participants in a study, multiple days of recording, or multiple tests.
-The goal of datasets is to provide a consistent interface to access the raw data, meta data, and potential reference
-information in an object oriented way.
+The goal of datasets is to provide a consistent interface to access the raw data, metadata, and potential reference
+information in an object-oriented way.
 It is up to you to define, what is considered a single "data-point" for your dataset.
 Note, that datasets can be arbitrarily nested (e.g. multiple participants with multiple recordings).
 
