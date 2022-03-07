@@ -49,7 +49,9 @@ from tpcp import Dataset
 HERE = Path(__file__).parent
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 
-participant_ids = [f.name.split("_")[0] for f in data_path.glob("*_all.csv")]
+# Note that we sort the files explicitly, as the file order might depend on the operating system.
+# Otherwise, the ordering of our dataset might not be reproducible
+participant_ids = [f.name.split("_")[0] for f in sorted(data_path.glob("*_all.csv"))]
 
 
 # %%
@@ -73,6 +75,9 @@ data_index
 # Now that we know how to create our index, we will integrate this logic into our dataset.
 # Note, that we do not want to hardcode the dataset path and hence, turn it into a parameter of the dataset.
 # The rest of the logic stays the same and goes into the `create_index` method.
+#
+# .. note:: Note that we sort the files explicitly, as the file order might depend on the operating system.
+#           Otherwise, the ordering of our dataset might not be reproducible.
 
 
 class ECGExampleData(Dataset):
@@ -89,7 +94,7 @@ class ECGExampleData(Dataset):
         super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
 
     def create_index(self) -> pd.DataFrame:
-        participant_ids = [f.name.split("_")[0] for f in self.data_path.glob("*_all.csv")]
+        participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
         patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
         return pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
 
@@ -151,7 +156,7 @@ class ECGExampleData(Dataset):
         return pd.read_pickle(self.data_path / f"{p_id}.pk.gz")
 
     def create_index(self) -> pd.DataFrame:
-        participant_ids = [f.name.split("_")[0] for f in self.data_path.glob("*_all.csv")]
+        participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
         patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
         return pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
 
@@ -248,7 +253,7 @@ class ECGExampleData(Dataset):
         return r_peaks
 
     def create_index(self) -> pd.DataFrame:
-        participant_ids = [f.name.split("_")[0] for f in self.data_path.glob("*_all.csv")]
+        participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
         patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
         return pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
 
@@ -367,6 +372,6 @@ class ECGExampleData(Dataset):
         return r_peaks
 
     def create_index(self) -> pd.DataFrame:
-        participant_ids = [f.name.split("_")[0] for f in self.data_path.glob("*_all.csv")]
+        participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
         patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
         return pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
