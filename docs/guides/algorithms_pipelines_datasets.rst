@@ -1,4 +1,4 @@
-.. _datasets_algorithms_pipelines
+.. _datasets_algorithms_pipelines:
 
 The fundamental components: Datasets, Algorithms, and Pipelines
 ===============================================================

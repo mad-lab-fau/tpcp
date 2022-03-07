@@ -18,8 +18,9 @@ These characteristics typically make working with such a dataset a little cumber
 In the following we want to explore how we can create a tpcp dataset for it, to make future work with the data easier.
 
 If you want to see other real-life implementations of tpcp-datasets you can also check out:
-- https://github.com/mad-lab-fau/sensor_position_dataset_helper/blob/master/sensor_position_dataset_helper/tpcp_dataset.py
-- https://github.com/mad-lab-fau/cft-analysis/tree/main/cft_analysis/datasets
+
+* https://github.com/mad-lab-fau/sensor_position_dataset_helper/blob/master/sensor_position_dataset_helper/tpcp_dataset.py
+* https://github.com/mad-lab-fau/cft-analysis/tree/main/cft_analysis/datasets
 
 If you just want the final implementation, without all the explanation, check :ref:`custom_dataset_final_ecg`.
 
