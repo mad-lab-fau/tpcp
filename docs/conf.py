@@ -17,7 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 import toml
-from sphinx_gallery.sorting import ExplicitOrder
+from sphinx_gallery.sorting import ExplicitOrder, FileNameSortKey
 
 HERE = Path(__file__)
 
@@ -159,6 +159,7 @@ sphinx_gallery_conf = {
             "../examples/algorithms",
         ]
     ),
+    "within_subsection_order": FileNameSortKey
 }
 
 
