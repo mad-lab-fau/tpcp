@@ -46,7 +46,8 @@ from typing import List, Optional, Union
 
 from tpcp import Dataset
 
-data_path = Path("../../example_data/ecg_mit_bih_arrhythmia/data")
+HERE = Path(__file__).parent
+data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 
 participant_ids = [f.name.split("_")[0] for f in data_path.glob("*_all.csv")]
 

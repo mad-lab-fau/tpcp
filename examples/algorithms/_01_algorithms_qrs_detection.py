@@ -129,7 +129,9 @@ from pathlib import Path
 from examples.datasets.datasets_final_ecg import ECGExampleData
 
 # Loading the data
-example_data = ECGExampleData(Path("../../example_data/ecg_mit_bih_arrhythmia/data"))
+HERE = Path(__file__).parent
+data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
+example_data = ECGExampleData(data_path)
 ecg_data = example_data[0].data["ecg"]
 
 # Initialize the algorithm
