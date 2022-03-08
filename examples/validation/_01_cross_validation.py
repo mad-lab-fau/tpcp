@@ -38,8 +38,8 @@ example_data = ECGExampleData(data_path)
 # Pipeline
 import pandas as pd
 
-from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf
 from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDetector
+from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf
 
 
 class MyPipeline(OptimizablePipeline):
@@ -66,6 +66,7 @@ class MyPipeline(OptimizablePipeline):
 
         self.r_peak_positions_ = algo.r_peak_positions_
         return self
+
 
 # %%
 # The Scorer
@@ -118,7 +119,9 @@ from tpcp.validate import cross_validate
 pipe = MyPipeline()
 optimizable_pipe = Optimize(pipe)
 
-results = cross_validate(optimizable_pipe, example_data, scoring=score, cv=cv, return_optimizer=True, return_train_score=True)
+results = cross_validate(
+    optimizable_pipe, example_data, scoring=score, cv=cv, return_optimizer=True, return_train_score=True
+)
 result_df = pd.DataFrame(results)
 result_df
 
