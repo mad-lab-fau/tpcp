@@ -61,7 +61,7 @@ example_data = ECGExampleData(data_path)
 # For the final GridSearch, we need an instance of the pipeline object.
 import pandas as pd
 
-from examples.algorithms.algorithms_qrs_detection_final import QRSDetector, match_events_with_reference
+from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
 from tpcp import Parameter, Pipeline, cf
 
 
@@ -110,12 +110,13 @@ pipe = MyPipeline()
 # In this case we compare the identified R-peaks with the reference and identify which R-peaks were correctly
 # found within a certain margin around the reference points
 # Based on these matches, we calculate the precision, the recall, and the f1-score using some helper functions.
+from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference
 
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
-    # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally.
-    # However, if you are using this function manually, it is a good idea to clone the pipeline before scoring.
+    # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
+    # will clone it again.
     pipeline = pipeline.safe_run(datapoint)
     tolerance_s = 0.02  # We just use 20 ms for this example
     matches_events, _ = match_events_with_reference(
@@ -175,6 +176,6 @@ print("Paras of optimized Pipeline:", gs.optimized_pipeline_.get_params())
 # To run the optimized pipeline, we can directly use the `run`/`safe_run` method on the GridSearch object.
 # This makes it possible to use the `GridSearch` as a replacement for your pipeline object with minimal code changes.
 #
-# If you would try to call `run`/`safe_run` (or `score` for that matter), before the optimization, an error is raised.
+# If you tried to call `run`/`safe_run` (or `score` for that matter), before the optimization, an error is raised.
 r_peaks = gs.safe_run(example_data[0]).r_peak_positions_
 r_peaks

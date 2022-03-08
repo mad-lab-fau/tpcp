@@ -1,6 +1,6 @@
 # This is needed to avoid plots to open
 import matplotlib
-from numpy.testing import assert_array_equal, assert_almost_equal
+from numpy.testing import assert_almost_equal, assert_array_equal
 
 matplotlib.use("Agg")
 
@@ -38,3 +38,10 @@ def test_gridsearch():
 
     assert_array_equal(r_peaks[:3], [77, 370, 663])
     assert_almost_equal(results["f1_score"], [0.58380606, 0.57964556, 0.5699779])
+
+
+def test_gridsearchcv():
+    from examples.parameter_optimization._03_gridsearch_cv import r_peaks, results
+
+    assert_array_equal(r_peaks[:3], [77, 370, 663])
+    assert_almost_equal(results["mean_test_f1_score"], [0.7241103, 0.723562, 0.7273862])
