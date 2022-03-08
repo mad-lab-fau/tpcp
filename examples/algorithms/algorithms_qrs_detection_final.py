@@ -77,6 +77,13 @@ def match_events_with_reference(
     if len(events) == 0 or len(reference) == 0:
         return np.array([]), np.array([])
 
+    events = events.squeeze()
+    reference = reference.squeeze()
+    assert np.ndim(events) == 1, "Events must be a 1D-array"
+    assert np.ndim(reference) == 1, "Reference must be a 1D-array"
+    events = np.atleast_2d(events).T
+    reference = np.atleast_2d(reference).T
+
     right_tree = cKDTree(reference)
     left_tree = cKDTree(events)
 
@@ -137,7 +144,7 @@ class QRSDetector(Algorithm):
         self,
         max_heart_rate_bpm: float = 200.0,
         min_r_peak_height_over_baseline: float = 1.0,
-        high_pass_filter_cutoff_hz: float = 0.5,
+        high_pass_filter_cutoff_hz: float = 1,
     ):
         self.max_heart_rate_bpm = max_heart_rate_bpm
         self.min_r_peak_height_over_baseline = min_r_peak_height_over_baseline
