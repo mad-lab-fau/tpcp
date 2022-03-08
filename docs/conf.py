@@ -158,7 +158,6 @@ sphinx_gallery_conf = {
         [
             "../examples/datasets",
             "../examples/algorithms",
-            "../examples/pipelines",
             "../examples/parameter_optimization",
             "../examples/validation"
         ]
