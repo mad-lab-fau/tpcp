@@ -57,3 +57,10 @@ To make `tpcp` easy to use, we try to focus on a couple of key ideas:
 - Provide what is difficult, allow to change everything else:
   `tpcp` implements complicated constructs like cross validation and grid search and, whenever possible, tries to catch obvious errors in your approach.
   However, for the actual algorithm and dataset you are free to do whatever is required to solve your current research question.
+
+## Projects that use tpcp
+
+#### Datasets
+
+- [sensor_position_dataset_helper](https://github.com/mad-lab-fau/sensor_position_dataset_helper/blob/master/sensor_position_dataset_helper/tpcp_dataset.py)
+- [cold-face-test-analysis](https://github.com/mad-lab-fau/cft-analysis/tree/main/cft_analysis/datasets)
