@@ -49,4 +49,5 @@ def test_gridsearchcv():
 
 def test_cross_validate():
     from examples.validation._01_cross_validation import results
+
     assert_almost_equal(results["test_f1_score"], [0.5440936, 0.7202062, 0.9266753])
