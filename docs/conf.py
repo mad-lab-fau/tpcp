@@ -130,7 +130,7 @@ html_theme_options = {
 # intersphinx configuration
 intersphinx_module_mapping = {
     "numpy": ("https://numpy.org/doc/stable/", None),
-    "scipy": ("https://docs.scipy.org/doc/scipy/reference/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy-1.8.0/html-scipyorg/", None),
     "matplotlib": ("https://matplotlib.org/", None),
     "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", None),
     "sklearn": ("https://scikit-learn.org/stable/", None),
@@ -159,7 +159,8 @@ sphinx_gallery_conf = {
             "../examples/datasets",
             "../examples/algorithms",
             "../examples/pipelines",
-            "../examples/parameter_optimization"
+            "../examples/parameter_optimization",
+            "../examples/validation"
         ]
     ),
     "within_subsection_order": FileNameSortKey,
