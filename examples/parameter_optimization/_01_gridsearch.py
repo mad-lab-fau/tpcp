@@ -97,7 +97,7 @@ pipe = MyPipeline()
 # If you want to calculate multiple performance measures, you can also return a dictionary of such values.
 # In any case, the performance for a specific parameter combination in the GridSearch will be calculated as the mean
 # over all datapoints.
-# (Note, if you want to change this, you can create custom subclasses of :ref:`~tpcp.validate.Scorer`).
+# (Note, if you want to change this, you can create custom subclasses of :class:`~tpcp.validate.Scorer`).
 #
 # A typical score function will first call `safe_run` (which calls `run` internally) on the pipeline and then
 # compare the output with some reference.

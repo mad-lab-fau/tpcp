@@ -36,7 +36,6 @@ except NameError:
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
 
-from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDetector
 
 # %%
 # The Pipeline
@@ -70,6 +69,7 @@ from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDet
 #    As all (nested) input parameters change the output of the `self_optimize` method.
 #    Todo: Full dedicated example for `PureParameter`
 from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf
+from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDetector
 
 
 class MyPipeline(OptimizablePipeline):
