@@ -145,6 +145,7 @@ If a parameter is a list or a tuple of other values, we will iterate through the
 
 Mutable Defaults
 ----------------
+.. _mutable_defaults:
 
 .. warning::
     Whenever you use `list`, `dicts`, `np.arrays`, `pd.Dataframe` or other `mutable <https://www.geeksforgeeks.org/mutable-vs-immutable-objects-in-python>`_ container types,
