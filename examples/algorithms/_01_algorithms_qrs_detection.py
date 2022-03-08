@@ -129,7 +129,10 @@ from pathlib import Path
 from examples.datasets.datasets_final_ecg import ECGExampleData
 
 # Loading the data
-HERE = Path(__file__).parent
+try:
+    HERE = Path(__file__).parent
+except NameError:
+    HERE = Path(".").resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
 ecg_data = example_data[0].data["ecg"]
@@ -225,8 +228,8 @@ class OptimizableQrsDetector(QRSDetector, OptimizableAlgorithm):
             # Determine the label for each peak, by matching them with our ground truth
             labels = np.zeros(potential_peaks.shape)
             matches, _ = match_events_with_reference(
-                events=np.atleast_2d(potential_peaks).T,
-                reference=np.atleast_2d(p.to_numpy().astype(int)).T,
+                events=potential_peaks,
+                reference=p.to_numpy().astype(int),
                 tolerance=self.r_peak_match_tolerance_s * sampling_rate_hz,
                 one_to_one=True,
             )

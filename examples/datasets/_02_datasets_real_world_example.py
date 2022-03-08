@@ -46,7 +46,10 @@ from typing import List, Optional, Union
 
 from tpcp import Dataset
 
-HERE = Path(__file__).parent
+try:
+    HERE = Path(__file__).parent
+except NameError:
+    HERE = Path(".").resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 
 # Note that we sort the files explicitly, as the file order might depend on the operating system.
@@ -96,7 +99,14 @@ class ECGExampleData(Dataset):
     def create_index(self) -> pd.DataFrame:
         participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
         patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
-        return pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        df = pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        # Some additional checks to avoid common issues
+        if len(df) == 0:
+            raise ValueError(
+                "The dataset is empty. Are you sure you selected the correct folder? Current folder is: "
+                f"{self.data_path}"
+            )
+        return df
 
 
 ECGExampleData(data_path=data_path)
@@ -158,7 +168,14 @@ class ECGExampleData(Dataset):
     def create_index(self) -> pd.DataFrame:
         participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
         patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
-        return pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        df = pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        # Some additional checks to avoid common issues
+        if len(df) == 0:
+            raise ValueError(
+                "The dataset is empty. Are you sure you selected the correct folder? Current folder is: "
+                f"{self.data_path}"
+            )
+        return df
 
 
 # %%
@@ -255,7 +272,14 @@ class ECGExampleData(Dataset):
     def create_index(self) -> pd.DataFrame:
         participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
         patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
-        return pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        df = pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        # Some additional checks to avoid common issues
+        if len(df) == 0:
+            raise ValueError(
+                "The dataset is empty. Are you sure you selected the correct folder? Current folder is: "
+                f"{self.data_path}"
+            )
+        return df
 
 
 dataset = ECGExampleData(data_path=data_path)
@@ -374,4 +398,11 @@ class ECGExampleData(Dataset):
     def create_index(self) -> pd.DataFrame:
         participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
         patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
-        return pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        df = pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        # Some additional checks to avoid common issues
+        if len(df) == 0:
+            raise ValueError(
+                "The dataset is empty. Are you sure you selected the correct folder? Current folder is: "
+                f"{self.data_path}"
+            )
+        return df

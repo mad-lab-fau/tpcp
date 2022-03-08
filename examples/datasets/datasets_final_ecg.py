@@ -99,4 +99,10 @@ class ECGExampleData(Dataset):
     def create_index(self) -> pd.DataFrame:
         participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
         patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
-        return pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        df = pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        if len(df) == 0:
+            raise ValueError(
+                "The dataset is empty. Are you sure you selected the correct folder? Current folder is: "
+                f"{self.data_path}"
+            )
+        return df
