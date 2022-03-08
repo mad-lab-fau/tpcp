@@ -139,7 +139,7 @@ ecg_data = example_data[0].data["ecg"]
 
 # Initialize the algorithm
 algorithm = QRSDetector()
-algorithm.detect(ecg_data, example_data.sampling_rate_hz)
+algorithm = algorithm.detect(ecg_data, example_data.sampling_rate_hz)
 
 # Visualize the results
 import matplotlib.pyplot as plt
@@ -276,7 +276,7 @@ print(
 test_data = example_data[3]
 test_ecg_data = test_data.data["ecg"]
 
-algorithm.detect(test_ecg_data, test_data.sampling_rate_hz)
+algorithm = algorithm.detect(test_ecg_data, test_data.sampling_rate_hz)
 
 # Visualize the results
 plt.figure()
