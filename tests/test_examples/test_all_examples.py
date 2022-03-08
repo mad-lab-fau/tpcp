@@ -1,6 +1,6 @@
 # This is needed to avoid plots to open
 import matplotlib
-from numpy.testing import assert_array_equal
+from numpy.testing import assert_array_equal, assert_almost_equal
 
 matplotlib.use("Agg")
 
@@ -31,3 +31,10 @@ def test_qrs_algorithm():
 
     assert algorithm.min_r_peak_height_over_baseline == 1.1229521656012118
     assert_array_equal(algorithm.r_peak_positions_[:3], [197, 459, 708])
+
+
+def test_gridsearch():
+    from examples.parameter_optimization._01_gridsearch import r_peaks, results
+
+    assert_array_equal(r_peaks[:3], [77, 370, 663])
+    assert_almost_equal(results["f1_score"], [0.58380606, 0.57964556, 0.5699779])
