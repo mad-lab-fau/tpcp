@@ -36,9 +36,6 @@ except NameError:
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
 
-
-from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDetector
-
 # %%
 # The Pipeline
 # ------------
@@ -47,29 +44,9 @@ from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDet
 # Here we are going to create an optimizable pipeline that wraps the optimizable version of the QRS detector we
 # developed in :ref:`custom_algorithms_qrs_detection`.
 #
-# An optimzable pipeline usaully needs the following things:
-#
-# 1. It needs to be a subclass of :class:`~tpcp.OptimizablePipeline`.
-# 2. It needs to have a `run` method that runs all the algorithmic steps and stores the results as class attributes.
-#    The `run` method should expect only a single data point (in our case a single recording of one sensor) as input.
-# 3. It needs to have an `self_optimize` method, that performs a data-driven optimization of one or more input
-#    parameters.
-#    This method is expected to return `self` and is only allowed to modify parameters marked as `OptimizableParameter`
-#    using the class-level typehints (more below)
-# 4. A `init` that defines all parameters that should be adjustable. Note, that the names in the function signature of
-#    the `init` method, **must** match the corresponding attribute names (e.g. `max_cost` -> `self.max_cost`).
-#    If you want to adjust multiple parameters that all belong to the same algorithm, it might also be convenient to
-#    just pass the algorithm as a parameter. However, keep potential issues with mutable defaults in mind (:ref:`more
-#    info <mutable_defaults>`). As `OptimizableQrsDetector` is a tpcp-algorithm class, we can do that in our case.
-# 5. At least one of the input parameters must be marked as `OptimizableParameter` in the class-level typehints.
-#    If parameters are nested tpcp objects you can use the `__` syntax to mark nested values as optimizable.
-#    Note, that you always need to mark the parameters you want to optimize in the current pipeline.
-#    Annotations in nested objects are not considered.
-#    The more precise you are with these annotations, the more help the runtime checks in tpcp can provide.
-# 6. (Optionally) Mark parameters as `PureParameter` using the type annotations. This can be used by GridSearchCv to
-#    apply some performance optimizations. However, be careful with that! In our case, there are not `PureParameters`,
-#    As all (nested) input parameters change the output of the `self_optimize` method.
+# For more information about the pipeline below check :ref:`optimize_pipelines`.
 #    Todo: Full dedicated example for `PureParameter`
+from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDetector
 from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf
 
 

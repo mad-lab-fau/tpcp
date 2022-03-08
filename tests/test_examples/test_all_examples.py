@@ -40,6 +40,13 @@ def test_gridsearch():
     assert_almost_equal(results["f1_score"], [0.58380606, 0.57964556, 0.5699779])
 
 
+def test_optimizable_pipeline():
+    from examples.parameter_optimization._02_optimizable_pipelines import optimized_results, results
+
+    assert len(results.r_peak_positions_) == 30
+    assert len(optimized_results.r_peak_positions_) == 429
+
+
 def test_gridsearchcv():
     from examples.parameter_optimization._03_gridsearch_cv import r_peaks, results
 
