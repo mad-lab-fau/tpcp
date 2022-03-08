@@ -1,6 +1,10 @@
-from pathlib import Path
 
+# This is needed to avoid plots to open
+import matplotlib
 from numpy.testing import assert_array_equal
+
+matplotlib.use("Agg")
+
 
 
 def test_custom_dataset():
