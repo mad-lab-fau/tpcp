@@ -3,6 +3,7 @@ General Concepts
 
 Parameters
 ----------
+.. _parameters:
 
 Parameters define the behavior of an algorithm or a pipeline.
 They are knobs you can turn to make the analysis behave like you want to.
