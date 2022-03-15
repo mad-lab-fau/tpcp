@@ -22,8 +22,8 @@ poetry add tpcp
 ## Why?
 
 Evaluating Algorithms - in particular when they contain machine learning - is hard.
-Besides understanding required steps (cross validation, bias, overfitting, ...), you need to implement the required 
-concepts and make them work together with your algorithms and data.
+Besides understanding required concepts (cross validation, bias, overfitting, ...), you need to implement the required 
+steps and make them work together with your algorithms and data.
 If you are doing something "regular" like training an SVM on tabular data, amazing libraries like [sklearn](https://scikit-learn.org), 
 [tslearn](https://github.com/tslearn-team/tslearn), [pytorch](https://pytorch.org), and many others, have your back.
 By using their built-in tools (e.g. `sklearn.evaluation.GridSearchCV`) you prevent implementation errors, and you are
