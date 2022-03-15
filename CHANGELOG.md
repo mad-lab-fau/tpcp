@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (https://github.com/mad-lab-fau/tpcp/pull/9)
 - All tpcp objects now have a basic representation that is automatically generated based on their parameters
   (https://github.com/mad-lab-fau/tpcp/pull/13)
+- Added algo optimization and evaluation guide and improved docs overall
+  (https://github.com/mad-lab-fau/tpcp/pull/26)
+- Added examples for all fundamental concepts
+  (https://github.com/mad-lab-fau/tpcp/pull/23)
 
 ## [0.4.0] - 2021-12-13
 
