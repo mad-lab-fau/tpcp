@@ -109,8 +109,8 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
 # Data Splitting
 # --------------
 # Like with a normal cross validation, we need to decide on the number of folds and type of splits.
-# In `tpcp` we support all cross validation iterators provided in :ref:`sklearn
-# <https://scikit-learn.org/stable/modules/cross_validation.html#cross-validation-iterators>`.
+# In `tpcp` we support all cross validation iterators provided in
+# `sklearn <https://scikit-learn.org/stable/modules/cross_validation.html#cross-validation-iterators>`__.
 #
 # To keep the runtime low for this example, we are going to use a 2-fold CV.
 from sklearn.model_selection import KFold
