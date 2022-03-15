@@ -11,22 +11,12 @@ I am new here. What is all of this?
     algorithms_pipelines_datasets
     general_concepts
 
-Building your analysis
-======================
-
-.. toctree::
-    :maxdepth: 1
-
-    Datasets
-    Algorithms
-    Pipelines
-
 Optimization and Validation
 ===========================
 
 .. toctree::
     :maxdepth: 1
 
-    Opti... what? - An introduction to algorithm optimization and validation
+    Opti... what? - An introduction to algorithm optimization and validation <algorithm_evaluation>
     Parameter optimization and training of Pipelines <optimization>
     Validation of algorithms and pipelines
