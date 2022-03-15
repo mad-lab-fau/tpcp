@@ -101,9 +101,17 @@ class OptimizablePipeline(Pipeline, _skip_validation=True):
     This should not be a reimplementation of GridSearch or similar methods.
     For this :class:`tpcp.pipelines.GridSearch` should be used directly.
 
-    It is important that `self_optimize` only modifies input parameters of the pipeline.
-    This means, if a parameter is optimized, by `self_optimize` it should be named in the `__init__` and should be
-    exportable when calling `pipeline.get_params`.
+    It is important that `self_optimize` only modifies input parameters of the pipeline that are marked as
+    `OptimizableParameter`.
+    This means, if a parameter is optimized, by `self_optimize` it should be named in the `__init__`, should be
+    exportable when calling `pipeline.get_params` and should be annotated using the `OptimizableParameter` type hint on
+    class level.
+    For the sake of documentation (and potential automatic checks) in the future, it also makes sense to add the
+    `HyperParameter` type annotation to all parameters that act as hyper parameters for the optimization performed in
+    `self_optimize`.
+    To learn more about parameter annotations check this `example <optimize_pipelines>`_ and this `
+    guide <optimization>`_ in the docs.
+
     It is also possible to optimize nested parameters.
     For example, if the input of the pipeline is an algorithm or another pipeline on its own, all parameters of these
     objects can be modified as well.
