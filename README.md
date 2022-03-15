@@ -19,7 +19,6 @@ Or add it to your project with [poetry](https://python-poetry.org/):
 poetry add tpcp
 ```
 
-
 ## Why?
 
 Evaluating Algorithms - in particular when they contain machine learning - is hard.
@@ -64,3 +63,43 @@ To make `tpcp` easy to use, we try to focus on a couple of key ideas:
 
 - [sensor_position_dataset_helper](https://github.com/mad-lab-fau/sensor_position_dataset_helper/blob/master/sensor_position_dataset_helper/tpcp_dataset.py)
 - [cold-face-test-analysis](https://github.com/mad-lab-fau/cft-analysis/tree/main/cft_analysis/datasets)
+
+## Dev Setup
+
+We are using [poetry](https://python-poetry.org/) to manage dependencies and 
+[poethepoet](https://github.com/nat-n/poethepoet) to run and manage dev tasks.
+
+To set up the dev environment run the following commands:
+
+```
+git clone https://github.com/mad-lab-fau/tpcp
+cd tpcp
+poetry install  # This might take a while
+```
+
+Afterwards you can start to develop and change things.
+If you want to run tests, format your code, build the docs, ..., you can run one of the following `poethepoet` commands
+
+```
+CONFIGURED TASKS
+  format         
+  lint           Lint all files with Prospector.
+  check          Check all potential format and linting issues.
+  test           Run Pytest with coverage.
+  docs           Build the html docs using Sphinx.
+  bump_version   
+```
+
+by calling
+
+```
+poetry run poe <command name>
+````
+
+If you installed `poethepoet` globally, you can skip the `poetry run` part at the beginning.
+
+## Contribution
+
+The entire development is managed via [GitHub](https://github.com/mad-lab-fau/tpcp).
+If you run into any issues, want to discuss certain decisions, want to contribute features or feature requests, just 
+reach out to us by [opening a new issue](https://github.com/mad-lab-fau/tpcp/issues/new/choose).
