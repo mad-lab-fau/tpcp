@@ -15,7 +15,7 @@ This means we can modify them when creating a new instance:
     >>> my_algo.para_1
     value1
 
-The initialization of objects in `tpcp` never has side effects (with the exceptions of mutable handling TODO: link).
+The initialization of objects in `tpcp` never has side effects (with the exceptions of `mutable handling <mutable_defaults>`_).
 This means all parameters will be added to the instance using the same name and without modification.
 
 Potential validation of parameters is only performed when the algorithm is actually run.
@@ -38,6 +38,14 @@ This also allows us to set nested parameters if the nested objects support a `se
     value1_new
     >>> my_algo.nested_algo_para.nested_para
     nested_value_new
+
+It is important to understand that in `tpcp` everything can/is a parameter.
+This includes simple threshold parameters or entire sklearn/pytorch models.
+The latter becomes important, when we are talking about optimizing algorithms.
+Because only parameters exposed in the init can be optimized in tpcp.
+This means, if you want to use tpcp to train a neuronal network, some data structure representing the network must be
+one of the parameters.
+You can learn more about that in the `optimization guide <optimization>`_.
 
 Results
 -------
