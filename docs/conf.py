@@ -40,7 +40,20 @@ release = info["version"]
 
 copyright = "2021 - {}, MaD Lab, FAU, Digital Health and Gait Analysis Group".format(datetime.now().year)
 
-# -- Copy the README and Changelog and fix image path --------------------------------------
+# -- Copy the README and Changelog and fix links --------------------------------------
+
+
+def convert_github_links(base_url, text):
+    regex = base_url + r"/(pull|issues|commit)/(\w+)"
+
+    def substitute(matchobj):
+        if matchobj.group(1) == "commit":
+            return "[{}]({})".format(matchobj.group(2)[:5], matchobj.group(0))
+        return "[#{}]({})".format(matchobj.group(2), matchobj.group(0))
+
+    return re.sub(regex, substitute, text)
+
+
 HERE = Path(__file__).parent
 with (HERE.parent / "README.md").open() as f:
     out = f.read()
@@ -50,7 +63,7 @@ with (HERE / "README.md").open("w+") as f:
 with (HERE.parent / "CHANGELOG.md").open() as f:
     out = f.read()
 with (HERE / "CHANGELOG.md").open("w+") as f:
-    f.write(out)
+    f.write(convert_github_links(URL, out))
 
 # -- General configuration ---------------------------------------------------
 
@@ -159,7 +172,7 @@ sphinx_gallery_conf = {
             "../examples/datasets",
             "../examples/algorithms",
             "../examples/parameter_optimization",
-            "../examples/validation"
+            "../examples/validation",
         ]
     ),
     "within_subsection_order": FileNameSortKey,
