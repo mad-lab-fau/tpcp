@@ -77,8 +77,8 @@ def match_events_with_reference(
     if len(events) == 0 or len(reference) == 0:
         return np.array([]), np.array([])
 
-    events = events.squeeze()
-    reference = reference.squeeze()
+    events = np.atleast_1d(events.squeeze())
+    reference = np.atleast_1d(reference.squeeze())
     assert np.ndim(events) == 1, "Events must be a 1D-array"
     assert np.ndim(reference) == 1, "Reference must be a 1D-array"
     events = np.atleast_2d(events).T
