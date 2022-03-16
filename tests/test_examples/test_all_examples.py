@@ -29,7 +29,7 @@ def test_real_life_dataset():
 def test_qrs_algorithm():
     from examples.algorithms._01_algorithms_qrs_detection import algorithm
 
-    assert algorithm.min_r_peak_height_over_baseline == 1.1229521656012118
+    assert algorithm.min_r_peak_height_over_baseline == 0.5434583752370183
     assert_array_equal(algorithm.r_peak_positions_[:3], [197, 459, 708])
 
 
@@ -37,24 +37,24 @@ def test_gridsearch():
     from examples.parameter_optimization._01_gridsearch import r_peaks, results
 
     assert_array_equal(r_peaks[:3], [77, 370, 663])
-    assert_almost_equal(results["f1_score"], [0.58380606, 0.57964556, 0.5699779])
+    assert_almost_equal(results["f1_score"], [0.7198637, 0.7169006, 0.7089728])
 
 
 def test_optimizable_pipeline():
     from examples.parameter_optimization._02_optimizable_pipelines import optimized_results, results
 
     assert len(results.r_peak_positions_) == 30
-    assert len(optimized_results.r_peak_positions_) == 429
+    assert len(optimized_results.r_peak_positions_) == 393
 
 
 def test_gridsearchcv():
     from examples.parameter_optimization._03_gridsearch_cv import r_peaks, results
 
     assert_array_equal(r_peaks[:3], [77, 370, 663])
-    assert_almost_equal(results["mean_test_f1_score"], [0.7241103, 0.723562, 0.7273862])
+    assert_almost_equal(results["mean_test_f1_score"], [0.8640027, 0.861629, 0.8655343])
 
 
 def test_cross_validate():
     from examples.validation._01_cross_validation import results
 
-    assert_almost_equal(results["test_f1_score"], [0.5440936, 0.7202062, 0.9266753])
+    assert_almost_equal(results["test_f1_score"], [0.9770585, 0.7108303, 0.9250665])
