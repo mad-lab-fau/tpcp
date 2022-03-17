@@ -4,7 +4,7 @@ from __future__ import annotations
 import numbers
 import warnings
 from traceback import format_exc
-from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Type, TypeVar, Union, Sequence
 
 import numpy as np
 
@@ -61,7 +61,7 @@ class Scorer:
         """
         return self._score(pipeline=pipeline, data=data, error_score=error_score)
 
-    def aggregate(self, scores: np.ndarray) -> float:  # noqa: no-self-use
+    def aggregate(self, scores: Sequence[float]) -> float:  # noqa: no-self-use
         """Aggregate the scores of each data point."""
         return float(np.mean(scores))
 
@@ -136,7 +136,7 @@ def _validate_scorer(
 
 
 def aggregate_scores(
-    scores: List[_SCORE_TYPE], agg_method: Callable[[List[float]], float]
+    scores: Sequence[_SCORE_TYPE], agg_method: Callable[[Sequence[float]], float]
 ) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
     """Invert result dict of and apply aggregation method to each score output.
 
