@@ -4,7 +4,7 @@ from __future__ import annotations
 import numbers
 import warnings
 from traceback import format_exc
-from typing import TYPE_CHECKING, Callable, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Type, TypeVar, Union
 
 import numpy as np
 
@@ -15,6 +15,8 @@ from tpcp.exceptions import ScorerFailed
 if TYPE_CHECKING:
     from tpcp._pipeline import Pipeline
 
+Scorer_ = TypeVar("Scorer_", bound="Scorer")
+
 
 class Scorer:
     """A scorer to score multiple data points of a dataset and average the results.
@@ -23,15 +25,26 @@ class Scorer:
     ----------
     score_func
         The callable that is used to score each data point
+    single_score_callback
+        Callback function that is called after each datapoint that is scored.
+        It gets the scorer itself, the datapoint index, the dataset, and list of all results of the `score_func` so far
+        as inputs.
     kwargs
         Additional arguments that might be used by the scorer.
         These are ignored for the base scorer.
 
     """
 
-    def __init__(self, score_func: _SCORE_CALLABLE, **kwargs):
-        self._kwargs = kwargs
+    def __init__(
+        self: Scorer_,
+        score_func: _SCORE_CALLABLE,
+        *,
+        single_score_callback: Optional[Callable[[Scorer_, int, Dataset, List[_SCORE_TYPE]], None]] = None,
+        **kwargs,
+    ):
+        self.kwargs = kwargs
         self._score_func = score_func
+        self._single_score_callback = single_score_callback
 
     def __call__(
         self, pipeline: Pipeline, data: Dataset, error_score: _ERROR_SCORE_TYPE
@@ -56,7 +69,7 @@ class Scorer:
         self, pipeline: Pipeline, data: Dataset, error_score: _ERROR_SCORE_TYPE
     ) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
         scores = []
-        for d in data:
+        for i, d in enumerate(data):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
                 score = self._score_func(pipeline.clone(), d)
@@ -73,10 +86,12 @@ class Scorer:
             # We check that the scorer returns only numeric values.
             _validate_score_return_val(score)
             scores.append(score)
-        return _aggregate_scores(scores, self.aggregate)
+            if self._single_score_callback:
+                self._single_score_callback(self, i, data, scores)
+        return aggregate_scores(scores, self.aggregate)
 
 
-def _validate_score_return_val(value: _SINGLE_SCORE_TYPE):
+def _validate_score_return_val(value: _SCORE_TYPE):
     """We expect a scorer to return either a numeric value or a dictionary of such values."""
     if isinstance(value, numbers.Number):
         return
@@ -120,7 +135,7 @@ def _validate_scorer(
     raise ValueError("A valid scorer must either be a instance of `Scorer` (or subclass), None, or a callable.")
 
 
-def _aggregate_scores(scores: _SCORE_TYPE, agg_method: Callable) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
+def aggregate_scores(scores: List[_SCORE_TYPE], agg_method: Callable) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
     """Invert result dict of and apply aggregation method to each score output."""
     # We need to go through all scores and check if one is a dictionary.
     # Otherwise, it might be possible that the values were caused by an error and hence did not return a dict as
