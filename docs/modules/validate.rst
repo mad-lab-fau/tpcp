@@ -25,3 +25,4 @@ Functions
    :template: function.rst
 
     cross_validate
+    aggregate_scores

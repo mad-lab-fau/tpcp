@@ -135,8 +135,37 @@ def _validate_scorer(
     raise ValueError("A valid scorer must either be a instance of `Scorer` (or subclass), None, or a callable.")
 
 
-def aggregate_scores(scores: List[_SCORE_TYPE], agg_method: Callable) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
-    """Invert result dict of and apply aggregation method to each score output."""
+def aggregate_scores(
+    scores: List[_SCORE_TYPE], agg_method: Callable[[List[float]], float]
+) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
+    """Invert result dict of and apply aggregation method to each score output.
+
+    Parameters
+    ----------
+    scores
+        A list of either numeric values or dicts with numeric values. We expect all dicts to have the same structure
+        in the latter case.
+        If dicts and numeric values are mixed, we assume that the single numeric values should indicate a scoring
+        error for this data point.
+        In this case, the single value will be replaced by a dict having the same shape as all other dicts provided,
+        but with all values being the value provided.
+    agg_method
+        A callable that can take a list of numeric values and returns a single value.
+        It will be called on the list of scores provided.
+        In case `scores` is a list of dicts, it will be called on the list of values
+
+    Returns
+    -------
+    aggregated_scores
+        If `scores` was a list of numeric values this will simply be the result of `agg_method(scores)`.
+        If `scores` was a list of dicts, this will also be a dict, where `agg_method` was applied across all values
+        with the respective dict key.
+    single_scores
+        If `scores` was a list of numeric values, this is simply `scores`.
+        If `scores` was a list of dicts, this is the inverted dict (aka a dict of lists) with the original scores
+        values.
+
+    """
     # We need to go through all scores and check if one is a dictionary.
     # Otherwise, it might be possible that the values were caused by an error and hence did not return a dict as
     # expected.
