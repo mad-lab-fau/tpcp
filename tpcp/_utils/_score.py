@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from tpcp.validate import Scorer
 
 _ERROR_SCORE_TYPE = Union[Literal["raise"], float]  # noqa: invalid-name
-_SCORE_TYPE = List[Union[Dict[str, float], float]]  # noqa: invalid-name
+_SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
 _AGG_SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
 _SINGLE_SCORE_TYPE = Union[Dict[str, np.ndarray], np.ndarray]  # noqa: invalid-name
 

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Type, TypeVar
 import numpy as np
 
 from tpcp._dataset import Dataset
-from tpcp._utils._score import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SCORE_CALLABLE, _SCORE_TYPE, _SINGLE_SCORE_TYPE
+from tpcp._utils._score import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SCORE_TYPE, _SINGLE_SCORE_TYPE, ScoreCallable
 from tpcp.exceptions import ScorerFailed
 
 if TYPE_CHECKING:
@@ -37,7 +37,7 @@ class Scorer:
 
     def __init__(
         self: Scorer_,
-        score_func: _SCORE_CALLABLE,
+        score_func: ScoreCallable,
         *,
         single_score_callback: Optional[Callable[[Scorer_, int, Dataset, List[_SCORE_TYPE]], None]] = None,
         **kwargs,
