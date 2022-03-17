@@ -43,7 +43,7 @@ You are very much encouraged to read through the Optuna documentation and create
 # Checkout the other examples to learn more about them.
 # We will simply copy the code over create an instance of both objects to be used later.
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union, Tuple
 
 import pandas as pd
 
@@ -359,19 +359,19 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize):
             # Then we apply these parameters to the pipeline
             pipeline = pipeline.set_params(**trial.params)
 
-            def single_score_callback(_: Scorer, step: int, partial_dataset: Dataset, single_scores: List[float]):
+            def single_score_callback(*, step: int, dataset: Dataset, scores: Tuple[float], **_):
                 # We need to report the new score value.
                 # This will call the pruner internally and then tell us, if we should stop
-                trial.report(float(single_scores[step]), step)
+                trial.report(float(scores[step]), step)
                 if trial.should_prune():
                     # Apparently our last value was bad and we should abort.
                     # However, before we do so, we will save the scores so far as debug information
-                    trial.set_user_attr("single_scores", single_scores)
-                    trial.set_user_attr("data_labels", partial_dataset[: step + 1].groups)
+                    trial.set_user_attr("single_scores", scores)
+                    trial.set_user_attr("data_labels", dataset[: step + 1].groups)
                     # and finally we abort the trial
                     raise TrialPruned(
-                        f"Pruned at datapoint {step} ({partial_dataset[step].groups[0]}) with value "
-                        f"{single_scores[step]}."
+                        f"Pruned at datapoint {step} ({dataset[step].groups[0]}) with value "
+                        f"{scores[step]}."
                     )
 
             # We wrap the score function with a scorer to avoid writing our own for-loop to aggregate the results.
