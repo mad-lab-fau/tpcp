@@ -19,3 +19,12 @@ Classes
     GridSearchCV
     DummyOptimize
     BaseOptimize
+
+Optuna Interface
+----------------
+
+.. autosummary::
+   :toctree: generated/optimize
+   :template: class_with_private.rst
+
+    optuna.CustomOptunaOptimize
