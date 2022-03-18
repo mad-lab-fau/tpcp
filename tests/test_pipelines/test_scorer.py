@@ -1,3 +1,4 @@
+from typing import Sequence
 from unittest.mock import Mock
 
 import numpy as np
@@ -27,7 +28,7 @@ class TestScorerCalls:
         mock_score_func = Mock(return_value=1)
         scorer = Scorer(mock_score_func)
         pipe = DummyOptimizablePipeline()
-        scorer(pipeline=pipe, data=DummyDataset(), error_score=np.nan)
+        scorer(pipeline=pipe, dataset=DummyDataset(), error_score=np.nan)
 
         assert mock_score_func.call_count == len(DummyDataset())
         for call, d in zip(mock_score_func.call_args_list, DummyDataset()):
@@ -136,6 +137,42 @@ class TestScorer:
         with pytest.raises(ValueError) as e:
             scorer(pipe, data, error_score)
         assert "The scoring function must return" in str(e.value)
+
+    def test_kwargs_passed(self):
+        kwargs = {"a": 3, "b": "test"}
+        scorer = Scorer(lambda x: x, **kwargs)
+        assert kwargs == scorer.kwargs
+
+    def test_callback_called(self):
+        mock_score_func = Mock(return_value=1)
+        mock_callback = Mock()
+        scorer = Scorer(mock_score_func, single_score_callback=mock_callback)
+
+        pipe = DummyOptimizablePipeline()
+        scorer(pipeline=pipe, dataset=DummyDataset(), error_score=np.nan)
+
+        assert mock_callback.call_count == len(DummyDataset())
+        for call, i in zip(mock_callback.call_args_list, range(len(DummyDataset()))):
+            assert call[0] == tuple()
+            kwargs = call[1]
+            assert kwargs.pop("scorer") == scorer
+            assert kwargs.pop("scores") == (1,) * (i + 1)
+            assert kwargs.pop("pipeline") == pipe
+            assert kwargs.pop("dataset").groups == DummyDataset().groups
+            assert kwargs.pop("step") == i
+            assert np.isnan(kwargs.pop("error_score"))
+            assert kwargs == {}
+
+    def test_documented_callback_signature_valid(self):
+        def callback(*, step: int, scores: Sequence[float], **_):
+            assert isinstance(step, int)
+            assert len(scores) == step + 1
+
+        mock_score_func = Mock(return_value=1)
+        scorer = Scorer(mock_score_func, single_score_callback=callback)
+
+        pipe = DummyOptimizablePipeline()
+        scorer(pipeline=pipe, dataset=DummyDataset(), error_score=np.nan)
 
 
 def _dummy_func(x):
