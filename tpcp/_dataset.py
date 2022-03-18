@@ -1,5 +1,5 @@
 """Base class for all datasets."""
-from typing import Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, overload, cast, Dict
+from typing import Dict, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, cast, overload
 
 import numpy as np
 import pandas as pd
@@ -342,9 +342,9 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
             # This is not strictly required, but avoids user error
             _assert_all_in_df(self.index, cleaned_kwargs)
 
-            subset_index = self.index.loc[self.index[list(cleaned_kwargs.keys())].isin(cleaned_kwargs).all(axis=1)].reset_index(
-                drop=True
-            )
+            subset_index = self.index.loc[
+                self.index[list(cleaned_kwargs.keys())].isin(cleaned_kwargs).all(axis=1)
+            ].reset_index(drop=True)
             if len(subset_index) == 0:
                 raise KeyError(f"No datapoint in the dataset matched the following filter: {cleaned_kwargs}")
 
