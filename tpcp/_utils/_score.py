@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, TypeVa
 import joblib
 import numpy as np
 from joblib import Memory
-from typing_extensions import Literal, Protocol, TypedDict
+from typing_extensions import Literal, TypedDict
 
 from tpcp._base import clone
 from tpcp._dataset import Dataset
@@ -25,17 +25,7 @@ if TYPE_CHECKING:
 _ERROR_SCORE_TYPE = Union[Literal["raise"], float]  # noqa: invalid-name
 _SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
 _AGG_SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
-_SINGLE_SCORE_TYPE = Union[Dict[str, np.ndarray], np.ndarray]  # noqa: invalid-name
-
-Dataset_contra = TypeVar("Dataset_contra", bound=Dataset, contravariant=True)  # noqa: invalid-name
-Pipeline_contra = TypeVar("Pipeline_contra", bound=Pipeline, contravariant=True)  # noqa: invalid-name
-
-
-class ScoreCallable(Protocol[Pipeline_contra, Dataset_contra]):
-    """Protocol for functions and classes that are allowed as scorer."""
-
-    def __call__(self, pipeline: Pipeline_contra, datapoint: Dataset_contra) -> Union[Dict[str, float], float]:
-        ...
+_SINGLE_SCORE_TYPE = Union[Dict[str, List[float]], List[float]]  # noqa: invalid-name
 
 
 class _ScoreResults(TypedDict, total=False):

@@ -46,7 +46,7 @@ class TestScorer:
         agg, single = scorer(pipe, data, np.nan)
         assert len(single) == len(data)
         # Our Dummy scorer, returns the groupname of the dataset
-        assert all(single == data.groups)
+        assert all(np.array(single) == data.groups)
         assert agg == np.mean(data.groups)
 
     def test_score_return_val_multi_score(self):
@@ -59,9 +59,9 @@ class TestScorer:
             assert len(v) == len(data)
             # Our Dummy scorer, returns the groupname of the dataset
             if k == "score_2":
-                assert all(v == np.array(data.groups) + 1)
+                assert all(np.array(v) == np.array(data.groups) + 1)
             else:
-                assert all(v == data.groups)
+                assert all(np.array(v) == data.groups)
         assert isinstance(agg, dict)
         for k, v in agg.items():
             if k == "score_2":
@@ -86,8 +86,8 @@ class TestScorer:
 
         assert len(single) == len(data)
         nan_vals = np.isnan(single)
-        assert all(nan_vals == np.isnan(expected))
-        assert all(single[~nan_vals] == expected[~nan_vals])
+        assert all(np.array(nan_vals) == np.isnan(expected))
+        assert all(np.array(single)[~nan_vals] == expected[~nan_vals])
 
         # agg should become nan if a single value is nan
         if sum(nan_vals) > 0:
@@ -108,8 +108,8 @@ class TestScorer:
         for v in single.values():
             assert len(v) == len(data)
             nan_vals = np.isnan(v)
-            assert all(nan_vals == np.isnan(expected))
-            assert all(v[~nan_vals] == expected[~nan_vals])
+            assert all(np.array(nan_vals) == np.isnan(expected))
+            assert all(np.array(v)[~nan_vals] == expected[~nan_vals])
 
         for v in agg.values():
             # agg should become nan if a single value is nan

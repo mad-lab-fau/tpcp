@@ -88,7 +88,7 @@ class TestCrossValidate:
             assert r["test_score"] == i
             all_ids.remove(i)
             assert r["train_data_labels"] == all_ids
-            assert all(r["train_data_labels"] == r["train_single_score"])
+            assert all(np.array(r["train_data_labels"]) == np.array(r["train_single_score"]))
             assert r["train_score"] == np.mean(all_ids)
 
     @pytest.mark.parametrize(
