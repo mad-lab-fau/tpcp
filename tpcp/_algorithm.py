@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Tuple, TypeVar, Union
 
+from typing_extensions import Self
+
 from tpcp._algorithm_utils import make_optimize_safe
 from tpcp._base import BaseTpcpObject
 
@@ -20,8 +22,8 @@ class Algorithm(BaseTpcpObject, _skip_validation=True):
 
     Attributes
     ----------
-    _action_method
-        The name of the action method used by the child class
+    _action_methods
+        The name(s) of the action method used by the child class
 
     """
 
@@ -32,7 +34,7 @@ class OptimizableAlgorithm(Algorithm, _skip_validation=True):
     """Base class for algorithms with distinct parameter optimization."""
 
     @make_optimize_safe
-    def self_optimize(self: Algorithm_, *args: Any, **kwargs: Any) -> Algorithm_:
+    def self_optimize(self, *args: Any, **kwargs: Any) -> Self:
         """Optimize the input parameter of the algorithm using any logic.
 
         This method can be used to adapt the input parameters (values provided in the init) based on any data-driven
