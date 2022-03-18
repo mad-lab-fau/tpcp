@@ -1,3 +1,8 @@
+try:
+    import optuna
+except ImportError:
+    raise ImportError("To use the tpcp Optuna interface, you first need to install optuna (`pip install optuna`)")
+
 from typing import Any, Callable, Dict, Optional, Sequence, TypeVar, Union
 
 import numpy as np
@@ -13,7 +18,21 @@ CustomOptunaOptimize_ = TypeVar("CustomOptunaOptimize_", bound="CustomOptunaOpti
 
 
 class CustomOptunaOptimize(BaseOptimize):
-    """Base class for custom Optuna wrapper.
+    """Base class for custom Optuna optimizer.
+
+    This provides a relatively simple tpcp compatible interface to Optuna.
+    You basically need to subclass this class and implement the `create_objective` method to return the objective
+    function you want to optimize.
+    The only difference to a normal objective function in Optuna is, that your objective here should expect a
+    pipeline and a dataset object as second and third argument (see Example).
+    If there are parameters you want to make customizable (e.g. which metric to optimize for), expose them in the
+    `__init__` of your subclass.
+
+    Depending on your usecase, your custom optimizers can be single use with a bunch of "hard-coded" logic, or you can
+    try to make them more general, by exposing certain configurability.
+
+    Parameters
+    ----------
 
 
     Example
@@ -36,6 +55,7 @@ class CustomOptunaOptimize(BaseOptimize):
     >>> opti = opti.optimize(MyDataset())
 
     """
+
     pipeline: Parameter[Pipeline]
     study: Parameter[Study]
 
@@ -71,6 +91,7 @@ class CustomOptunaOptimize(BaseOptimize):
         These changes are made to make the output comparable to the output of :class:`~tpcp.optimize.GridSearch` and
         :class:`~tpcp.optimize.GridSearchCV`.
         """
+
         def rename_param_columns(name: str):
             param_start = "params_"
             if name.startswith(param_start):
@@ -125,6 +146,8 @@ class CustomOptunaOptimize(BaseOptimize):
         self.study_ = self.study
 
         # TODO: expose remaining parameters
+        # TODO: Write tests for new scorer functions
+        # TODO: Add test for example
         self.study_.optimize(objective, n_trials=self.n_trials, timeout=self.timeout)
 
         if self.return_optimized:
