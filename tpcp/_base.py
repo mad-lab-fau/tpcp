@@ -17,7 +17,7 @@ from typing import Any, Callable, DefaultDict, Dict, Generic, Iterable, List, Op
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
-from typing_extensions import Annotated, Literal, get_args, get_origin
+from typing_extensions import Annotated, Literal, Self, get_args, get_origin
 
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, PotentialUserErrorWarning, ValidationError
@@ -227,14 +227,14 @@ class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
         """
         return _get_params(self, deep)
 
-    def set_params(self: BaseTpcpObjectObj_, **params: Any) -> BaseTpcpObjectObj_:
+    def set_params(self: Self, **params: Any) -> Self:
         """Set the parameters of this Algorithm.
 
         To set parameters of nested objects use `nested_object_name__para_name=`.
         """
         return _set_params(self, **params)
 
-    def clone(self: BaseTpcpObjectObj_) -> BaseTpcpObjectObj_:
+    def clone(self) -> Self:
         """Create a new instance of the class with all parameters copied over.
 
         This will create a new instance of the class itself and all nested objects

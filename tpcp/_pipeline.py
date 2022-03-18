@@ -1,17 +1,17 @@
 """Base Classes for custom pipelines."""
-from typing import Dict, Tuple, TypeVar, Union
+from typing import Dict, Generic, Tuple, TypeVar, Union
 
 from typing_extensions import Self
 
 from tpcp._algorithm import Algorithm
 from tpcp._algorithm_utils import make_action_safe, make_optimize_safe
-from tpcp._dataset import Dataset
+from tpcp._dataset import Dataset_
 
 Pipeline_ = TypeVar("Pipeline_", bound="Pipeline")
 OptimizablePipeline_ = TypeVar("OptimizablePipeline_", bound="OptimizablePipeline")
 
 
-class Pipeline(Algorithm, _skip_validation=True):
+class Pipeline(Algorithm, Generic[Dataset_], _skip_validation=True):
     """Baseclass for all custom pipelines.
 
     To create your own custom pipeline, subclass this class and implement `run`.
@@ -19,10 +19,10 @@ class Pipeline(Algorithm, _skip_validation=True):
 
     _action_methods: Tuple[str, ...] = ("safe_run", "run")
 
-    datapoint: Dataset
+    datapoint: Dataset_
 
     @make_action_safe
-    def run(self, datapoint: Dataset) -> Self:
+    def run(self, datapoint: Dataset_) -> Self:
         """Run the pipeline.
 
         .. note::
@@ -44,7 +44,7 @@ class Pipeline(Algorithm, _skip_validation=True):
         raise NotImplementedError()  # pragma: no cover
 
     @make_action_safe
-    def safe_run(self, datapoint: Dataset) -> Self:
+    def safe_run(self, datapoint: Dataset_) -> Self:
         """Run the pipeline with some additional checks.
 
         It is preferred to use this method over `run`, as it can catch some simple implementation errors of custom
@@ -71,7 +71,7 @@ class Pipeline(Algorithm, _skip_validation=True):
         """
         return self.run(datapoint)
 
-    def score(self, datapoint: Dataset) -> Union[float, Dict[str, float]]:
+    def score(self, datapoint: Dataset_) -> Union[float, Dict[str, float]]:
         """Calculate performance of the pipeline on a datapoint with reference information.
 
         This is an optional method and does not need to be implemented in many cases.
@@ -96,7 +96,7 @@ class Pipeline(Algorithm, _skip_validation=True):
         raise NotImplementedError()  # pragma: no cover
 
 
-class OptimizablePipeline(Pipeline, _skip_validation=True):
+class OptimizablePipeline(Pipeline[Dataset_], _skip_validation=True):
     """Pipeline with custom ways to optimize and/or train input parameters.
 
     OptimizablePipelines are expected to implement a concrete way to train internal models or optimize parameters.
@@ -122,7 +122,7 @@ class OptimizablePipeline(Pipeline, _skip_validation=True):
     """
 
     @make_optimize_safe
-    def self_optimize(self, dataset: Dataset, **kwargs) -> Self:
+    def self_optimize(self, dataset: Dataset_, **kwargs) -> Self:
         """Optimize the input parameters of the pipeline or algorithm using any logic.
 
         This method can be used to adapt the input parameters (values provided in the init) based on any data driven

@@ -65,7 +65,7 @@ from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
 from tpcp import Parameter, Pipeline, cf
 
 
-class MyPipeline(Pipeline):
+class MyPipeline(Pipeline[ECGExampleData]):
     algorithm: Parameter[QRSDetector]
 
     r_peak_positions_: pd.Series
@@ -76,7 +76,7 @@ class MyPipeline(Pipeline):
     def run(self, datapoint: ECGExampleData):
         # Note: We need to clone the algorithm instance, to make sure we don't leak any data between runs.
         algo = self.algorithm.clone()
-        algo.detect(datapoint.data, datapoint.sampling_rate_hz)
+        algo.detect(datapoint.data["ecg"], datapoint.sampling_rate_hz)
 
         self.r_peak_positions_ = algo.r_peak_positions_
         return self

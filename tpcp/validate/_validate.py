@@ -163,7 +163,7 @@ def cross_validate(
         )
         for train, test in splits
     )
-
+    assert results is not None  # For the typechecker
     results = _aggregate_final_results(results)
     score_results = {}
     # Fix the formatting of all the score results

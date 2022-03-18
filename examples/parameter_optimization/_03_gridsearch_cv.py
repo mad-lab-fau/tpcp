@@ -17,6 +17,7 @@ tuning hyperparameters <https://scikit-learn.org/stable/modules/grid_search.html
 import random
 
 import pandas as pd
+from typing_extensions import Self
 
 random.seed(1)  # We set the random seed for repeatable results
 
@@ -36,6 +37,8 @@ except NameError:
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
 
+from typing import Any
+
 # %%
 # The Pipeline
 # ------------
@@ -47,10 +50,10 @@ example_data = ECGExampleData(data_path)
 # For more information about the pipeline below check :ref:`optimize_pipelines`.
 #    Todo: Full dedicated example for `PureParameter`
 from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDetector
-from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf
+from tpcp import Dataset, OptimizableParameter, OptimizablePipeline, Parameter, cf
 
 
-class MyPipeline(OptimizablePipeline):
+class MyPipeline(OptimizablePipeline[ECGExampleData]):
     algorithm: Parameter[OptimizableQrsDetector]
     algorithm__min_r_peak_height_over_baseline: OptimizableParameter[float]
 
@@ -59,7 +62,7 @@ class MyPipeline(OptimizablePipeline):
     def __init__(self, algorithm: OptimizableQrsDetector = cf(OptimizableQrsDetector())):
         self.algorithm = algorithm
 
-    def self_optimize(self, dataset: ECGExampleData, **kwargs):
+    def self_optimize(self, dataset: ECGExampleData, **kwargs: Any):
         ecg_data = [d.data["ecg"] for d in dataset]
         r_peaks = [d.r_peak_positions_["r_peak_position"] for d in dataset]
         # Note: We need to clone the algorithm instance, to make sure we don't leak any data between runs.
@@ -67,10 +70,10 @@ class MyPipeline(OptimizablePipeline):
         self.algorithm = algo.self_optimize(ecg_data, r_peaks, dataset.sampling_rate_hz)
         return self
 
-    def run(self, datapoint: ECGExampleData):
+    def run(self, datapoint: ECGExampleData) -> Self:
         # Note: We need to clone the algorithm instance, to make sure we don't leak any data between runs.
         algo = self.algorithm.clone()
-        algo.detect(datapoint.data, datapoint.sampling_rate_hz)
+        algo.detect(datapoint.data["ecg"], datapoint.sampling_rate_hz)
 
         self.r_peak_positions_ = algo.r_peak_positions_
         return self
@@ -78,16 +81,17 @@ class MyPipeline(OptimizablePipeline):
 
 pipe = MyPipeline()
 
-
 # %%
 # The Scorer
 # ----------
 # The scorer is identical to the scoring function used in the other examples.
 # The F1-score is still the most important parameter for our comparison.
+from typing import Any, Dict
+
 from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference
 
 
-def score(pipeline: MyPipeline, datapoint: ECGExampleData):
+def score(pipeline: MyPipeline, datapoint: ECGExampleData) -> Dict[str, float]:
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
     # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
     # will clone it again.

@@ -61,7 +61,7 @@ from examples.datasets.datasets_final_ecg import ECGExampleData
 from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf
 
 
-class MyPipeline(OptimizablePipeline):
+class MyPipeline(OptimizablePipeline[ECGExampleData]):
     algorithm: Parameter[OptimizableQrsDetector]
     algorithm__min_r_peak_height_over_baseline: OptimizableParameter[float]
 
@@ -81,7 +81,7 @@ class MyPipeline(OptimizablePipeline):
     def run(self, datapoint: ECGExampleData):
         # Note: We need to clone the algorithm instance, to make sure we don't leak any data between runs.
         algo = self.algorithm.clone()
-        algo.detect(datapoint.data, datapoint.sampling_rate_hz)
+        algo.detect(datapoint.data["ecg"], datapoint.sampling_rate_hz)
 
         self.r_peak_positions_ = algo.r_peak_positions_
         return self
@@ -110,6 +110,7 @@ except NameError:
     HERE = Path(".").resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
+
 train_set, test_set = train_test_split(example_data, train_size=0.7, random_state=0)
 # We only want a single dataset in the test set
 test_set = test_set[0]
