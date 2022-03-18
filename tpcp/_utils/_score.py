@@ -5,14 +5,13 @@ The original code is licenced under BSD-3: https://github.com/scikit-learn/sciki
 
 from __future__ import annotations
 
-import numbers
 import time
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import joblib
 import numpy as np
 from joblib import Memory
-from typing_extensions import Literal, TypedDict
+from typing_extensions import Literal, Protocol, TypedDict
 
 from tpcp._base import clone
 from tpcp._dataset import Dataset
@@ -27,7 +26,16 @@ _ERROR_SCORE_TYPE = Union[Literal["raise"], float]  # noqa: invalid-name
 _SCORE_TYPE = List[Union[Dict[str, float], float]]  # noqa: invalid-name
 _AGG_SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
 _SINGLE_SCORE_TYPE = Union[Dict[str, np.ndarray], np.ndarray]  # noqa: invalid-name
-_SCORE_CALLABLE = Callable[[Pipeline, Dataset], Union[Dict[str, float], float]]  # noqa: invalid-name
+
+Dataset_contra = TypeVar("Dataset_contra", bound=Dataset, contravariant=True)  # noqa: invalid-name
+Pipeline_contra = TypeVar("Pipeline_contra", bound=Pipeline, contravariant=True)  # noqa: invalid-name
+
+
+class ScoreCallable(Protocol[Pipeline_contra, Dataset_contra]):
+    """Protocol for functions and classes that are allowed as scorer."""
+
+    def __call__(self, pipeline: Pipeline_contra, datapoint: Dataset_contra) -> Union[Dict[str, float], float]:
+        ...
 
 
 class ScoreResults(TypedDict, total=False):
@@ -106,7 +114,7 @@ def _score(
             The parameters that have been evaluated.
 
     """
-    if not isinstance(error_score, numbers.Number) and error_score != "raise":
+    if not isinstance(error_score, float) and error_score != "raise":
         raise ValueError(
             "error_score must be the string 'raise' or a numeric value. "
             "(Hint: if using 'raise', please make sure that it has been spelled correctly.)"
@@ -188,11 +196,9 @@ def _optimize_and_score(  # noqa: too-many-branches
     agg_scores, single_scores = scorer(optimizer.optimized_pipeline_, test_set, error_score)
     score_time = time.time() - optimize_time - start_time
 
-    if return_train_score:
-        train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set, error_score)
-
     result: OptimizeScoreResults = {"test_scores": agg_scores, "test_single_scores": single_scores}
     if return_train_score:
+        train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set, error_score)
         result["train_scores"] = train_agg_scores
         result["train_single_scores"] = train_single_scores
     if return_times:

@@ -7,6 +7,8 @@ from typing_extensions import Self
 
 from tpcp._base import BaseTpcpObject
 
+Dataset_ = TypeVar("Dataset_", bound="Dataset")
+
 
 class Dataset(BaseTpcpObject, _skip_validation=True):
     """Baseclass for tpcp Dataset objects.
@@ -257,7 +259,7 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
 
         return self.clone().set_params(subset_index=self.grouped_index.loc[multi_index].reset_index(drop=True))
 
-    def groupby(self, groupby_cols: Optional[Union[List[str], str]]):
+    def groupby(self, groupby_cols: Optional[Union[List[str], str]]) -> Self:
         """Return a copy of the dataset grouped by the specified columns.
 
         Each unique group represents a single data point in the resulting dataset.

@@ -262,7 +262,7 @@ class CustomDataset(Dataset):
 
 class CustomDataset(Dataset):
     @property
-    def data(self) -> pd.DataFrame:
+    def data(self) -> str:
         # Note that we need to make our checks from the least restrictive to the most restrictive (if there is only a
         # single trail, there is only just a single recording).
         if self.is_single(["participant", "recording"]):
@@ -279,7 +279,7 @@ class CustomDataset(Dataset):
         return 204.8
 
     @property
-    def segmented_stride_list_(self) -> pd.DataFrame:
+    def segmented_stride_list_(self) -> str:
         # We use assert here, as we don't have multiple options.
         # (We could also used `None` for the `groupby_cols` here)
         self.assert_is_single(["participant", "recording", "trial"], "segmented_stride_list_")

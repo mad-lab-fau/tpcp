@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
-from typing import Any, ContextManager, Dict, Iterator, List, Optional, TypeVar, Union
+from typing import Any, ContextManager, Dict, Iterator, List, Optional, Union
 
 import numpy as np
 from joblib import Memory, delayed
@@ -14,12 +14,15 @@ from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
 from tqdm.auto import tqdm
+from typing_extensions import Self
 
-from tpcp import Dataset, OptimizablePipeline, Pipeline
+from tpcp import OptimizablePipeline
 from tpcp._algorithm_utils import OPTIMIZE_METHOD_INDICATOR, _check_safe_optimize
 from tpcp._base import _get_annotated_fields_of_type
+from tpcp._dataset import Dataset_
 from tpcp._optimize import BaseOptimize
 from tpcp._parameters import Parameter, _ParaTypes
+from tpcp._pipeline import OptimizablePipeline_, Pipeline_
 from tpcp._utils._general import (
     _aggregate_final_results,
     _normalize_score_results,
@@ -27,18 +30,13 @@ from tpcp._utils._general import (
     _split_hyper_and_pure_parameters,
 )
 from tpcp._utils._multiprocess import TqdmParallel
-from tpcp._utils._score import _ERROR_SCORE_TYPE, _SCORE_CALLABLE, _optimize_and_score, _score
+from tpcp._utils._score import _ERROR_SCORE_TYPE, ScoreCallable, _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.validate import Scorer
 from tpcp.validate._scorer import _validate_scorer
 
-DummyOptimize_ = TypeVar("DummyOptimize_", bound="DummyOptimize")
-Optimize_ = TypeVar("Optimize_", bound="Optimize")
-GridSearch_ = TypeVar("GridSearch_", bound="GridSearch")
-GridSearchCv_ = TypeVar("GridSearchCv_", bound="GridSearchCV")
 
-
-class DummyOptimize(BaseOptimize, _skip_validation=True):
+class DummyOptimize(BaseOptimize[Pipeline_, Dataset_], _skip_validation=True):
     """Provide API compatibility for SimplePipelines in optimize wrappers.
 
     This is a simple dummy Optimizer that will **not** optimize anything, but just provide the correct API so that
@@ -66,14 +64,14 @@ class DummyOptimize(BaseOptimize, _skip_validation=True):
 
     """
 
-    pipeline: Parameter[Pipeline]
+    pipeline: Parameter[Pipeline_]
 
-    optimized_pipeline_: Pipeline
+    optimized_pipeline_: Pipeline_
 
-    def __init__(self, pipeline: Pipeline) -> None:  # noqa: super-init-not-called
+    def __init__(self, pipeline: Pipeline_) -> None:  # noqa: super-init-not-called
         self.pipeline = pipeline
 
-    def optimize(self: DummyOptimize_, dataset: Dataset, **optimize_params: Any) -> DummyOptimize_:
+    def optimize(self, dataset: Dataset_, **optimize_params: Any) -> Self:
         """Run the "dummy" optimization.
 
         Parameters
@@ -102,7 +100,7 @@ class DummyOptimize(BaseOptimize, _skip_validation=True):
         return self
 
 
-class Optimize(BaseOptimize):
+class Optimize(BaseOptimize[OptimizablePipeline_, Dataset_]):
     """Run a generic self-optimization on the pipeline.
 
     This is a simple wrapper for pipelines that already implement a `self_optimize` method.
@@ -137,18 +135,18 @@ class Optimize(BaseOptimize):
 
     """
 
-    pipeline: Parameter[OptimizablePipeline]
+    pipeline: Parameter[OptimizablePipeline_]
     safe_optimize: bool
 
-    optimized_pipeline_: OptimizablePipeline
+    optimized_pipeline_: OptimizablePipeline_
 
     def __init__(  # noqa: super-init-not-called
-        self, pipeline: OptimizablePipeline, *, safe_optimize: bool = True
+        self, pipeline: OptimizablePipeline_, *, safe_optimize: bool = True
     ) -> None:
         self.pipeline = pipeline
         self.safe_optimize = safe_optimize
 
-    def optimize(self: Optimize_, dataset: Dataset, **optimize_params: Any) -> Optimize_:
+    def optimize(self, dataset: Dataset_, **optimize_params: Any) -> Self:
         """Run the self-optimization defined by the pipeline.
 
         The optimized version of the pipeline is stored as `self.optimized_pipeline_`.
@@ -189,7 +187,7 @@ class Optimize(BaseOptimize):
         return self
 
 
-class GridSearch(BaseOptimize):
+class GridSearch(BaseOptimize[Pipeline_, Dataset_]):
     """Perform a grid search over various parameters.
 
     This scores the pipeline for every combination of data points in the provided dataset and parameter combinations
@@ -289,7 +287,7 @@ class GridSearch(BaseOptimize):
     """
 
     parameter_grid: ParameterGrid
-    scoring: Optional[Union[_SCORE_CALLABLE, Scorer]]
+    scoring: Optional[Union[ScoreCallable[Pipeline_, Dataset_], Scorer]]
     n_jobs: Optional[int]
     return_optimized: Union[bool, str]
     pre_dispatch: Union[int, str]
@@ -304,10 +302,10 @@ class GridSearch(BaseOptimize):
 
     def __init__(  # noqa: super-init-not-called
         self,
-        pipeline: Pipeline,
+        pipeline: Pipeline_,
         parameter_grid: ParameterGrid,
         *,
-        scoring: Optional[Union[_SCORE_CALLABLE, Scorer]] = None,
+        scoring: Optional[Union[ScoreCallable[Pipeline_, Dataset_], Scorer]] = None,
         n_jobs: Optional[int] = None,
         return_optimized: Union[bool, str] = True,
         pre_dispatch: Union[int, str] = "n_jobs",
@@ -323,7 +321,7 @@ class GridSearch(BaseOptimize):
         self.error_score = error_score
         self.progress_bar = progress_bar
 
-    def optimize(self: GridSearch_, dataset: Dataset, **_: Any) -> GridSearch_:
+    def optimize(self, dataset: Dataset_, **_: Any) -> Self:
         """Run the grid search over the dataset and find the best parameter combination.
 
         Parameters
@@ -364,6 +362,7 @@ class GridSearch(BaseOptimize):
                 )
                 for paras in self.parameter_grid
             )
+        assert results is not None  # For the typechecker
         # We check here if all results are dicts. We only check the dtype of the first value, as the scorer should
         # have handled issues with non-uniform cases already.
         first_test_score = results[0]["scores"]
@@ -436,7 +435,7 @@ class GridSearch(BaseOptimize):
         return results
 
 
-class GridSearchCV(BaseOptimize):
+class GridSearchCV(BaseOptimize[OptimizablePipeline_, Dataset_]):
     """Exhaustive (hyper)parameter search using a cross validation based score to optimize pipeline parameters.
 
     This class follows as much as possible the interface of :func:`~sklearn.model_selection.GridSearchCV`.
@@ -586,9 +585,9 @@ class GridSearchCV(BaseOptimize):
 
     """
 
-    pipeline: OptimizablePipeline
+    pipeline: OptimizablePipeline_
     parameter_grid: ParameterGrid
-    scoring: Optional[Union[_SCORE_CALLABLE, Scorer]]
+    scoring: Optional[Union[ScoreCallable[OptimizablePipeline_, Dataset_], Scorer]]
     return_optimized: Union[bool, str]
     cv: Optional[Union[int, BaseCrossValidator, Iterator]]
     pure_parameters: Union[bool, List[str]]
@@ -609,10 +608,10 @@ class GridSearchCV(BaseOptimize):
 
     def __init__(  # noqa: super-init-not-called
         self,
-        pipeline: OptimizablePipeline,
+        pipeline: OptimizablePipeline_,
         parameter_grid: ParameterGrid,
         *,
-        scoring: Optional[Union[_SCORE_CALLABLE, Scorer]] = None,
+        scoring: Optional[Union[ScoreCallable[OptimizablePipeline_, Dataset_], Scorer]] = None,
         return_optimized: Union[bool, str] = True,
         cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
         pure_parameters: Union[bool, List[str]] = False,
@@ -638,13 +637,12 @@ class GridSearchCV(BaseOptimize):
         self.progress_bar = progress_bar
         self.safe_optimize = safe_optimize
 
-    def optimize(self: GridSearchCv_, dataset: Dataset, *, groups=None, **optimize_params) -> GridSearchCv_:  # noqa:
-        # arguments-differ
+    def optimize(self, dataset: Dataset_, *, groups=None, **optimize_params) -> Self:  # noqa: arguments-differ
         self.dataset = dataset
         scoring = _validate_scorer(self.scoring, self.pipeline)
 
-        cv = check_cv(self.cv, None, classifier=True)
-        n_splits = cv.get_n_splits(dataset, groups=groups)
+        cv_checked: BaseCrossValidator = check_cv(self.cv, None, classifier=True)
+        n_splits = cv_checked.get_n_splits(dataset, groups=groups)
 
         # We need to wrap our pipeline for a consistent interface.
         # In the future we might be able to allow objects with optimizer Interface as input directly.
@@ -668,7 +666,7 @@ class GridSearchCV(BaseOptimize):
         parameters = list(self.parameter_grid)
         split_parameters = _split_hyper_and_pure_parameters(parameters, pure_parameters)
         parameter_prefix = "pipeline__"
-        combinations = list(product(enumerate(split_parameters), enumerate(cv.split(dataset, groups=groups))))
+        combinations = list(product(enumerate(split_parameters), enumerate(cv_checked.split(dataset, groups=groups))))
 
         pbar: Optional[tqdm] = None
         if self.progress_bar:
@@ -707,6 +705,7 @@ class GridSearchCV(BaseOptimize):
                     )
                     for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in combinations
                 )
+        assert out is not None  # For the type checker
         results = self._format_results(parameters, n_splits, out)
         self.cv_results_ = results
 
