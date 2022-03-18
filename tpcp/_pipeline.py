@@ -1,6 +1,8 @@
 """Base Classes for custom pipelines."""
 from typing import Dict, Tuple, TypeVar, Union
 
+from typing_extensions import Self
+
 from tpcp._algorithm import Algorithm
 from tpcp._algorithm_utils import make_action_safe, make_optimize_safe
 from tpcp._dataset import Dataset
@@ -20,7 +22,7 @@ class Pipeline(Algorithm, _skip_validation=True):
     datapoint: Dataset
 
     @make_action_safe
-    def run(self: Pipeline_, datapoint: Dataset) -> Pipeline_:
+    def run(self, datapoint: Dataset) -> Self:
         """Run the pipeline.
 
         .. note::
@@ -42,7 +44,7 @@ class Pipeline(Algorithm, _skip_validation=True):
         raise NotImplementedError()  # pragma: no cover
 
     @make_action_safe
-    def safe_run(self: Pipeline_, datapoint: Dataset) -> Pipeline_:
+    def safe_run(self, datapoint: Dataset) -> Self:
         """Run the pipeline with some additional checks.
 
         It is preferred to use this method over `run`, as it can catch some simple implementation errors of custom
@@ -120,7 +122,7 @@ class OptimizablePipeline(Pipeline, _skip_validation=True):
     """
 
     @make_optimize_safe
-    def self_optimize(self: OptimizablePipeline_, dataset: Dataset, **kwargs) -> OptimizablePipeline_:
+    def self_optimize(self, dataset: Dataset, **kwargs) -> Self:
         """Optimize the input parameters of the pipeline or algorithm using any logic.
 
         This method can be used to adapt the input parameters (values provided in the init) based on any data driven
