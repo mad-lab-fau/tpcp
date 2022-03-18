@@ -251,7 +251,7 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
     def _get_unique_groups(self) -> Union[pd.MultiIndex, pd.Index]:
         return self.grouped_index.index.unique()
 
-    def __getitem__(self, subscript: Union[int, Sequence[int], np.ndarray]) -> Self:
+    def __getitem__(self, subscript: Union[int, Sequence[int], np.ndarray, slice]) -> Self:
         """Return a dataset object containing only the selected row indices of `self.groups`."""
         multi_index = self._get_unique_groups()[subscript]
         if not isinstance(multi_index, pd.Index):

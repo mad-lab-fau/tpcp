@@ -1,41 +1,63 @@
 """Helper to score pipelines."""
 from __future__ import annotations
 
-import numbers
 import warnings
 from traceback import format_exc
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple, Type, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    NewType,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 import numpy as np
-from typing_extensions import Protocol
+from typing_extensions import Protocol, TypeGuard
 
-from tpcp import Dataset
-from tpcp._utils._score import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SCORE_TYPE, _SINGLE_SCORE_TYPE, ScoreCallable
+from tpcp._dataset import Dataset, Dataset_
+from tpcp._pipeline import Pipeline_, Pipeline
+from tpcp._utils._score import _ERROR_SCORE_TYPE, _SCORE_TYPE
 from tpcp.exceptions import ScorerFailed
 
-if TYPE_CHECKING:
-    from tpcp import Pipeline
+SingleScoreType = float
+MultiScoreType = Dict[str, float]
+ScoreType_ = TypeVar("ScoreType_", SingleScoreType, MultiScoreType)
 
-Scorer_ = TypeVar("Scorer_", bound="Scorer")
+IndividualScoreType = Union[Dict[str, List[float]], List[float]]
+
+ScoreFuncSingle = Callable[[Pipeline_, Dataset_], SingleScoreType]
+ScoreFuncMultiple = Callable[[Pipeline_, Dataset_], MultiScoreType]
+ScoreFunc = Callable[[Pipeline_, Dataset_], ScoreType_]
+
+ScoringError = NewType("ScoringError", float)
 
 
-class SCORE_CALLBACK(Protocol):  # noqa: N801
+class ScoreCallback(Protocol[Pipeline_, Dataset_, ScoreType_]):
     """Callback signature for scorer callbacks."""
 
     def __call__(
         self,
         *,
         step: int,
-        scores: Tuple[_SCORE_TYPE, ...],
-        scorer: "Scorer",
-        pipeline: Pipeline,
-        dataset: Dataset,
+        scores: Tuple[Union[ScoreType_, ScoringError], ...],
+        scorer: "Scorer[Pipeline_, Dataset_, ScoreType_]",
+        pipeline: Pipeline_,
+        dataset: Dataset_,
         error_score: _ERROR_SCORE_TYPE,
     ) -> None:
         ...
 
 
-class Scorer:
+class Scorer(Generic[Pipeline_, Dataset_, ScoreType_]):
     """A scorer to score multiple data points of a dataset and average the results.
 
     Parameters
@@ -72,23 +94,26 @@ class Scorer:
     """
 
     kwargs: Dict[str, Any]
-    _score_func: ScoreCallable
-    _single_score_func: Optional[SCORE_CALLBACK]
+    _score_func: ScoreFunc[Pipeline_, Dataset_, ScoreType_]
+    _single_score_func: Optional[ScoreCallback[Pipeline_, Dataset_, ScoreType_]]
 
     def __init__(
-        self: Scorer_,
-        score_func: ScoreCallable,
+        self,
+        score_func: ScoreFunc[Pipeline_, Dataset_, ScoreType_],
         *,
-        single_score_callback: Optional[SCORE_CALLBACK] = None,
-        **kwargs,
+        single_score_callback: Optional[ScoreCallback[Pipeline_, Dataset_, ScoreType_]] = None,
+        **kwargs: Any,
     ):
         self.kwargs = kwargs
         self._score_func = score_func
         self._single_score_callback = single_score_callback
 
+    # The typing for IndividualScoreType here is not perfect, but not sure how to fix.
+    # For the aggregated scores, we can easily parameterize the value based on the generic, but not for the single
+    # scores
     def __call__(
-        self, pipeline: Pipeline, dataset: Dataset, error_score: _ERROR_SCORE_TYPE
-    ) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
+        self, pipeline: Pipeline_, dataset: Dataset_, error_score: _ERROR_SCORE_TYPE
+    ) -> Tuple[Union[ScoreType_, float], IndividualScoreType]:
         """Score the pipeline with the provided data.
 
         Returns
@@ -106,9 +131,9 @@ class Scorer:
         return float(np.mean(scores))
 
     def _score(
-        self, pipeline: Pipeline, dataset: Dataset, error_score: _ERROR_SCORE_TYPE
-    ) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
-        scores = []
+        self, pipeline: Pipeline_, dataset: Dataset_, error_score: _ERROR_SCORE_TYPE
+    ) -> Tuple[Union[ScoreType_, float], IndividualScoreType]:
+        scores: List[Union[ScoreType_, ScoringError]] = []
         for i, d in enumerate(dataset):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
@@ -116,7 +141,7 @@ class Scorer:
             except Exception:  # noqa: broad-except
                 if error_score == "raise":
                     raise
-                score = error_score
+                score = ScoringError(error_score)
                 warnings.warn(
                     f"Scoring failed for data point: {d.groups}. "
                     f"The score of this data point will be set to {error_score}. Details: \n"
@@ -135,16 +160,23 @@ class Scorer:
                     dataset=dataset,
                     error_score=error_score,
                 )
-        return aggregate_scores(scores, self.aggregate)
+        return aggregate_scores(scores, self.aggregate)  # type: ignore
 
 
-def _validate_score_return_val(value: _SCORE_TYPE):
+ScorerTypes = Union[ScoreFunc[Pipeline_, Dataset_, ScoreType_], Scorer[Pipeline_, Dataset_, ScoreType_], None]
+
+
+def _is_all_error(scores: List[Union[ScoreType_, ScoringError]], error_score: float) -> TypeGuard[List[float]]:
+    return all([s == error_score for s in scores])
+
+
+def _validate_score_return_val(value: Union[SingleScoreType, MultiScoreType, ScoringError]):
     """We expect a scorer to return either a numeric value or a dictionary of such values."""
-    if isinstance(value, numbers.Number):
+    if isinstance(value, (int, float)):
         return
     if isinstance(value, dict):
         for v in value.values():
-            if not isinstance(v, numbers.Number):
+            if not isinstance(v, (int, float)):
                 break
         else:
             return
@@ -153,22 +185,22 @@ def _validate_score_return_val(value: _SCORE_TYPE):
     )
 
 
-def _passthrough_scoring(pipeline: Pipeline, datapoint: Dataset):
+def _passthrough_scoring(pipeline: Pipeline[Dataset_], datapoint: Dataset_):
     """Call the score method of the pipeline to score the input."""
     return pipeline.score(datapoint)
 
 
 def _validate_scorer(
-    scoring: Optional[Union[Callable, Scorer]],
-    pipeline: Pipeline,
-    base_class: Type[Scorer] = Scorer,
-) -> Scorer:
+    scoring: ScorerTypes[Pipeline_, Dataset_, Any],
+    pipeline: Pipeline_,
+    base_class: Type[Scorer[Any, Any, Any]] = Scorer,
+) -> Scorer[Pipeline_, Dataset_, Any]:
     """Convert the provided scoring method into a valid scorer object."""
     if scoring is None:
         # If scoring is None, we will try to use the score method of the pipeline
         # However, we run score once with an empty dataset and check if it is actually implemented:
         try:
-            pipeline.score(Dataset())
+            pipeline.score(Dataset())  # type: ignore
         except NotImplementedError as e:
             raise e
         except Exception:  # noqa: broad-except
@@ -182,9 +214,24 @@ def _validate_scorer(
     raise ValueError("A valid scorer must either be a instance of `Scorer` (or subclass), None, or a callable.")
 
 
+@overload
 def aggregate_scores(
-    scores: Sequence[_SCORE_TYPE], agg_method: Callable[[Sequence[float]], float]
-) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
+    scores: List[Union[SingleScoreType, ScoringError]], agg_method: Callable[[Sequence[float]], float]
+) -> Tuple[float, List[float]]:
+    ...
+
+
+@overload
+def aggregate_scores(
+    scores: List[Union[MultiScoreType, ScoringError]], agg_method: Callable[[Sequence[float]], float]
+) -> Tuple[Dict[str, float], Dict[str, List[float]]]:
+    ...
+
+
+def aggregate_scores(
+    scores: Union[List[Union[SingleScoreType, ScoringError]], List[Union[MultiScoreType, ScoringError]]],
+    agg_method: Callable[[Sequence[float]], float],
+) -> Union[Tuple[float, List[float]], Tuple[Dict[str, float], Dict[str, List[float]]]]:
     """Invert result dict of and apply aggregation method to each score output.
 
     Parameters
@@ -221,14 +268,15 @@ def aggregate_scores(
             score_names = s.keys()
             break
     else:
-        return agg_method(scores), np.asarray(scores)
-    inv_scores = {}
-    agg_scores = {}
+        scores = cast(List[float], scores)
+        return agg_method(scores), scores
+    inv_scores: Dict[str, List[float]] = {}
+    agg_scores: Dict[str, float] = {}
     # Invert the dict and calculate the mean per score:
     for key in score_names:
         # If the scorer raised an error, there will only be a single value. This value will be used for all
         # scores then
-        score_array = np.asarray([score[key] if isinstance(score, dict) else score for score in scores])
+        score_array = [score[key] if isinstance(score, dict) else score for score in scores]
         inv_scores[key] = score_array
         agg_scores[key] = agg_method(score_array)
     return agg_scores, inv_scores
