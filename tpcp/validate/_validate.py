@@ -126,7 +126,7 @@ def cross_validate(
             instance.
 
     """
-    cv = check_cv(cv, None, classifier=True)
+    cv_checked: BaseCrossValidator = check_cv(cv, None, classifier=True)
 
     scoring = _validate_scorer(scoring, optimizable.pipeline)
 
@@ -138,7 +138,7 @@ def cross_validate(
             "Most likely you only want to use `propagate_groups`."
         )
 
-    splits = list(cv.split(dataset, groups=groups))
+    splits = list(cv_checked.split(dataset, groups=groups))
     # We clone the estimator to make sure that all the folds are
     # independent, and that it is pickle-able.
     pbar: Optional[tqdm] = None
