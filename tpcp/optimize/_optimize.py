@@ -812,15 +812,15 @@ class GridSearchCV(BaseOptimize):
 
         test_scores_dict = _normalize_score_results(out["test_scores"])
         test_single_scores_dict = _normalize_score_results(out["test_single_scores"])
-        if self.return_train_score:
-            train_scores_dict = _normalize_score_results(out["train_scores"])
-            train_single_scores_dict = _normalize_score_results(out["train_single_scores"])
 
         for scorer_name in test_scores_dict:
             # Computed the (weighted) mean and std for test scores alone
             _store(f"test_{scorer_name}", test_scores_dict[scorer_name], splits=True, rank=True, weights=None)
             _store_non_numeric(f"test_single_{scorer_name}", test_single_scores_dict[scorer_name])
             if self.return_train_score:
+                train_scores_dict = _normalize_score_results(out["train_scores"])
+                train_single_scores_dict = _normalize_score_results(out["train_single_scores"])
+
                 _store(f"train_{scorer_name}", train_scores_dict[scorer_name], splits=True)
                 _store_non_numeric(f"train_single_{scorer_name}", train_single_scores_dict[scorer_name])
 
