@@ -492,9 +492,14 @@ class CloneFactory(BaseFactory, Generic[T]):
         return clone(self.default_value)
 
 
-def cf(default_value: T) -> CloneFactory[T]:  # noqa: invalid-name
+# The typing here is obviously wrong and a hack to make object that are wrapped by clone factory seem to be just of
+# the same type.
+# Ideally clone factory would be some generic type of proxy, but it isn't.
+# Therefore, we fake the return type, so that external type checking in user code works without any errors.
+# As long as `cf` is used for its intended purpose that should not matter much.
+def cf(default_value: T) -> T:  # noqa: invalid-name
     """Wrap mutable default value with the `CloneFactory`.
 
     This is basically an alias for :class:`~tpcp.CloneFactory`
     """
-    return CloneFactory(default_value)
+    return CloneFactory(default_value)  # type: ignore
