@@ -38,7 +38,7 @@ class ScoreCallable(Protocol[Pipeline_contra, Dataset_contra]):
         ...
 
 
-class ScoreResults(TypedDict, total=False):
+class _ScoreResults(TypedDict, total=False):
     """Type representing results of _score."""
 
     scores: _AGG_SCORE_TYPE
@@ -48,7 +48,7 @@ class ScoreResults(TypedDict, total=False):
     parameters: Optional[Dict[str, Any]]
 
 
-class OptimizeScoreResults(TypedDict, total=False):
+class _OptimizeScoreResults(TypedDict, total=False):
     """Type representing results of _score_and_optimize."""
 
     test_scores: _AGG_SCORE_TYPE
@@ -72,7 +72,7 @@ def _score(
     return_data_labels=False,
     return_times=False,
     error_score: _ERROR_SCORE_TYPE = np.nan,
-) -> ScoreResults:
+) -> _ScoreResults:
     """Set parameters and return score.
 
     Parameters
@@ -130,7 +130,7 @@ def _score(
     agg_scores, single_scores = scorer(pipeline, dataset, error_score)
     score_time = time.time() - start_time
 
-    result: ScoreResults = {"scores": agg_scores, "single_scores": single_scores}
+    result: _ScoreResults = {"scores": agg_scores, "single_scores": single_scores}
     if return_times:
         result["score_time"] = score_time
     if return_data_labels:
@@ -157,7 +157,7 @@ def _optimize_and_score(  # noqa: too-many-branches
     return_times=False,
     error_score: _ERROR_SCORE_TYPE = np.nan,
     memory: Optional[Memory] = None,
-) -> OptimizeScoreResults:
+) -> _OptimizeScoreResults:
     """Optimize and score the optimized pipeline on the train and test data, respectively.
 
     This method is aware of the differences between hyperparameters and normal (pure) parameters.
@@ -196,7 +196,7 @@ def _optimize_and_score(  # noqa: too-many-branches
     agg_scores, single_scores = scorer(optimizer.optimized_pipeline_, test_set, error_score)
     score_time = time.time() - optimize_time - start_time
 
-    result: OptimizeScoreResults = {"test_scores": agg_scores, "test_single_scores": single_scores}
+    result: _OptimizeScoreResults = {"test_scores": agg_scores, "test_single_scores": single_scores}
     if return_train_score:
         train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set, error_score)
         result["train_scores"] = train_agg_scores

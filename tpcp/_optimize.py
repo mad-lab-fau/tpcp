@@ -2,15 +2,13 @@
 
 This is in a separate file to avoid circular imports.
 """
-from typing import Any, Dict, Generic, Tuple, TypeVar, Union
+from typing import Any, Dict, Generic, Tuple, Union
 
 from typing_extensions import Self
 
 from tpcp import Algorithm, Parameter
 from tpcp._dataset import Dataset_
 from tpcp._pipeline import Pipeline_
-
-BaseOptimize_ = TypeVar("BaseOptimize_", bound="BaseOptimize")
 
 
 class BaseOptimize(Algorithm, Generic[Pipeline_, Dataset_], _skip_validation=True):
