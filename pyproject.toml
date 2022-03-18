@@ -19,7 +19,7 @@ scikit-learn = "^1"
 numpy = "^1"
 pandas = "^1"
 tqdm = "^4.62.3"
-typing-extensions = ">=3.7"
+typing-extensions = ">=4.1.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.1"
@@ -28,7 +28,7 @@ prospector = "^1.7.7"
 black = "^22.1.0"
 isort = "^5.10.1"
 poethepoet = "^0.10.0"
-mypy = "^0.910"
+pyright = "^1.1.230"
 # Doc dependencies. They also need to be updated in ./docs/requirements.txt
 numpydoc = "^1.2.0"
 sphinx-gallery = "^0.10.1"
@@ -78,16 +78,8 @@ test = { cmd = "pytest --cov=tpcp --cov-report=term-missing --cov-report=xml", h
 docs = { "script" = "_tasks:task_docs()",  help = "Build the html docs using Sphinx." }
 bump_version = { "script" = "_tasks:task_update_version()" }
 
-[tool.mypy]
-[[tool.mypy.overrides]]
-module = [
-    "joblib.*",
-    "pandas.*",
-    "tqdm.*",
-    "sklearn.*",
-    "scipy.*",
-]
-ignore_missing_imports = true
+[tool.pyright]
+pythonVersion = "3.7"
 
 [build-system]
 requires = ["poetry_core>=1.0.0"]
