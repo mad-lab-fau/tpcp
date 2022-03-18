@@ -4,18 +4,35 @@ from __future__ import annotations
 import numbers
 import warnings
 from traceback import format_exc
-from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Type, TypeVar, Union, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 import numpy as np
+from typing_extensions import Protocol
 
-from tpcp._dataset import Dataset
+from tpcp import Dataset
 from tpcp._utils._score import _AGG_SCORE_TYPE, _ERROR_SCORE_TYPE, _SCORE_TYPE, _SINGLE_SCORE_TYPE, ScoreCallable
 from tpcp.exceptions import ScorerFailed
 
 if TYPE_CHECKING:
-    from tpcp._pipeline import Pipeline
+    from tpcp import Pipeline
 
 Scorer_ = TypeVar("Scorer_", bound="Scorer")
+
+
+class SCORE_CALLBACK(Protocol):  # noqa: N801
+    """Callback signature for scorer callbacks."""
+
+    def __call__(
+        self,
+        *,
+        step: int,
+        scores: Tuple[_SCORE_TYPE, ...],
+        scorer: "Scorer",
+        pipeline: Pipeline,
+        dataset: Dataset,
+        error_score: _ERROR_SCORE_TYPE,
+    ) -> None:
+        ...
 
 
 class Scorer:
@@ -27,19 +44,42 @@ class Scorer:
         The callable that is used to score each data point
     single_score_callback
         Callback function that is called after each datapoint that is scored.
-        It gets the scorer itself, the datapoint index, the dataset, and list of all results of the `score_func` so far
-        as inputs.
+        It should have the following call signature:
+
+        >>> def callback(
+        ...     *,
+        ...     step: int,
+        ...     scores: Tuple[_SCORE_TYPE, ...],
+        ...     scorer: "Scorer",
+        ...     pipeline: Pipeline,
+        ...     dataset: Dataset,
+        ...     error_score: _ERROR_SCORE_TYPE,
+        ...     **_
+        ... ) -> None:
+        ...     ...
+
+        All parameters will be passed as keyword arguments.
+        This means, if your callback only needs a subset of the defined parameters, you can ignore them by using
+        unused kwargs:
+
+        >>> def callback(*, step: int, pipeline: Pipeline, **_):
+        ...     ...
+
     kwargs
         Additional arguments that might be used by the scorer.
         These are ignored for the base scorer.
 
     """
 
+    kwargs: Dict[str, Any]
+    _score_func: ScoreCallable
+    _single_score_func: Optional[SCORE_CALLBACK]
+
     def __init__(
         self: Scorer_,
         score_func: ScoreCallable,
         *,
-        single_score_callback: Optional[Callable[[Scorer_, int, Dataset, List[_SCORE_TYPE]], None]] = None,
+        single_score_callback: Optional[SCORE_CALLBACK] = None,
         **kwargs,
     ):
         self.kwargs = kwargs
@@ -47,7 +87,7 @@ class Scorer:
         self._single_score_callback = single_score_callback
 
     def __call__(
-        self, pipeline: Pipeline, data: Dataset, error_score: _ERROR_SCORE_TYPE
+        self, pipeline: Pipeline, dataset: Dataset, error_score: _ERROR_SCORE_TYPE
     ) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
         """Score the pipeline with the provided data.
 
@@ -59,17 +99,17 @@ class Scorer:
             The scores for each individual data-point
 
         """
-        return self._score(pipeline=pipeline, data=data, error_score=error_score)
+        return self._score(pipeline=pipeline, dataset=dataset, error_score=error_score)
 
     def aggregate(self, scores: Sequence[float]) -> float:  # noqa: no-self-use
         """Aggregate the scores of each data point."""
         return float(np.mean(scores))
 
     def _score(
-        self, pipeline: Pipeline, data: Dataset, error_score: _ERROR_SCORE_TYPE
+        self, pipeline: Pipeline, dataset: Dataset, error_score: _ERROR_SCORE_TYPE
     ) -> Tuple[_AGG_SCORE_TYPE, _SINGLE_SCORE_TYPE]:
         scores = []
-        for i, d in enumerate(data):
+        for i, d in enumerate(dataset):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
                 score = self._score_func(pipeline.clone(), d)
@@ -87,7 +127,14 @@ class Scorer:
             _validate_score_return_val(score)
             scores.append(score)
             if self._single_score_callback:
-                self._single_score_callback(self, i, data, scores)
+                self._single_score_callback(
+                    step=i,
+                    scores=tuple(scores),
+                    scorer=self,
+                    pipeline=pipeline,
+                    dataset=dataset,
+                    error_score=error_score,
+                )
         return aggregate_scores(scores, self.aggregate)
 
 
