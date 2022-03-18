@@ -1,12 +1,11 @@
 """Base class for all datasets."""
-from typing import Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, overload
+from typing import Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, overload, cast, Dict
 
 import numpy as np
 import pandas as pd
+from typing_extensions import Self
 
 from tpcp._base import BaseTpcpObject
-
-Self = TypeVar("Self", bound="Dataset")
 
 
 class Dataset(BaseTpcpObject, _skip_validation=True):
@@ -250,7 +249,7 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
     def _get_unique_groups(self) -> Union[pd.MultiIndex, pd.Index]:
         return self.grouped_index.index.unique()
 
-    def __getitem__(self: Self, subscript: Union[int, Sequence[int], np.ndarray]) -> Self:
+    def __getitem__(self, subscript: Union[int, Sequence[int], np.ndarray]) -> Self:
         """Return a dataset object containing only the selected row indices of `self.groups`."""
         multi_index = self._get_unique_groups()[subscript]
         if not isinstance(multi_index, pd.Index):
@@ -275,7 +274,7 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
         return grouped_ds
 
     def get_subset(
-        self: Self,
+        self,
         *,
         groups: Optional[List[Union[str, Tuple[str, ...]]]] = None,
         index: Optional[pd.DataFrame] = None,
@@ -337,17 +336,17 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
             return self.clone().set_params(subset_index=self.index[bool_map].reset_index(drop=True))
 
         if len(kwargs) > 0:
-            kwargs = {k: _ensure_is_list(v) for k, v in kwargs.items()}
+            cleaned_kwargs = cast(Dict[str, List[str]], {k: _ensure_is_list(v) for k, v in kwargs.items()})
 
             # Check if all values are actually in their respective columns.
             # This is not strictly required, but avoids user error
-            _assert_all_in_df(self.index, kwargs)
+            _assert_all_in_df(self.index, cleaned_kwargs)
 
-            subset_index = self.index.loc[self.index[list(kwargs.keys())].isin(kwargs).all(axis=1)].reset_index(
+            subset_index = self.index.loc[self.index[list(cleaned_kwargs.keys())].isin(cleaned_kwargs).all(axis=1)].reset_index(
                 drop=True
             )
             if len(subset_index) == 0:
-                raise KeyError(f"No datapoint in the dataset matched the following filter: {kwargs}")
+                raise KeyError(f"No datapoint in the dataset matched the following filter: {cleaned_kwargs}")
 
             return self.clone().set_params(subset_index=subset_index)
 
@@ -377,11 +376,11 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
             .replace("<td>", '<td style="text-align: center; padding-left: 2em; padding-right: 2em;">')
         )
 
-    def __iter__(self: Self) -> Iterator[Self]:
+    def __iter__(self) -> Iterator[Self]:
         """Return generator object containing a subset for every combination up to and including the selected level."""
         return (self.__getitem__(i) for i in range(self.shape[0]))
 
-    def iter_level(self: Self, level: str) -> Iterator[Self]:
+    def iter_level(self, level: str) -> Iterator[Self]:
         """Return generator object containing a subset for every category from the selected level.
 
         Parameters
