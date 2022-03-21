@@ -24,7 +24,7 @@ import numpy as np
 from typing_extensions import Protocol, TypeGuard
 
 from tpcp._dataset import Dataset, Dataset_
-from tpcp._pipeline import Pipeline_, Pipeline
+from tpcp._pipeline import Pipeline, Pipeline_
 from tpcp._utils._score import _ERROR_SCORE_TYPE, _SCORE_TYPE
 from tpcp.exceptions import ScorerFailed
 

@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
-from typing import Any, ContextManager, Dict, Iterator, List, Optional, Union, Generic
+from typing import Any, ContextManager, Dict, Generic, Iterator, List, Optional, Union
 
 import numpy as np
 from joblib import Memory, delayed
@@ -32,7 +32,7 @@ from tpcp._utils._general import (
 from tpcp._utils._multiprocess import TqdmParallel
 from tpcp._utils._score import _ERROR_SCORE_TYPE, _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
-from tpcp.validate._scorer import ScorerTypes, _validate_scorer, ScoreType_
+from tpcp.validate._scorer import ScorerTypes, ScoreType_, _validate_scorer
 
 
 class DummyOptimize(BaseOptimize[Pipeline_, Dataset_], _skip_validation=True):
