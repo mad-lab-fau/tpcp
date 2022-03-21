@@ -9,14 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `Scorer` now supports an optional callback function, which will be called after each datapoint is scored.
+  (https://github.com/mad-lab-fau/tpcp/pull/29)
 - Pipelines, Optimize objects, and `Scorer` are now `Generic`. This improves typing (in particular with VsCode), but 
   means a little bit more typing (pun intended), when creating new Pipelines and Optimizers
+  (https://github.com/mad-lab-fau/tpcp/pull/29)
 
 ### Changed
 
 - The return type for the individual values in the `Scorer` class is not `List[float]` instead of `np.ndarray`.
   This also effects the output of `cross_validate`, `GridSearch.gs_results_` and `GridSearchCV.cv_results_`
+  (https://github.com/mad-lab-fau/tpcp/pull/29)
 - `cf` now has "faked" return type, so that type checkers in the user code, do not complain anymore.
+  (https://github.com/mad-lab-fau/tpcp/pull/29)
 
 
 ## [0.5.0] - 2022-03-15
