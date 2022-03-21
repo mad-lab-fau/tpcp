@@ -21,7 +21,7 @@ from typing import (
 )
 
 import numpy as np
-from typing_extensions import Protocol, TypeGuard
+from typing_extensions import Protocol
 
 from tpcp._dataset import Dataset, Dataset_
 from tpcp._pipeline import Pipeline, Pipeline_
@@ -48,7 +48,9 @@ class ScoreCallback(Protocol[Pipeline_, Dataset_, ScoreType_]):
         self,
         *,
         step: int,
-        scores: Tuple[Union[ScoreType_, ScoringError], ...],
+        # The `float` in this call signature is there, because the
+        # value will be float in case of a scoring error, independent of the remaining input types
+        scores: Tuple[Union[ScoreType_, float], ...],
         scorer: "Scorer[Pipeline_, Dataset_, ScoreType_]",
         pipeline: Pipeline_,
         dataset: Dataset_,
@@ -133,7 +135,8 @@ class Scorer(Generic[Pipeline_, Dataset_, ScoreType_]):
     def _score(
         self, pipeline: Pipeline_, dataset: Dataset_, error_score: _ERROR_SCORE_TYPE
     ) -> Tuple[Union[ScoreType_, float], IndividualScoreType]:
-        scores: List[Union[ScoreType_, ScoringError]] = []
+        # `float` because the return value in case of an exception will always be float
+        scores: List[Union[ScoreType_, float]] = []
         for i, d in enumerate(dataset):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
@@ -141,7 +144,8 @@ class Scorer(Generic[Pipeline_, Dataset_, ScoreType_]):
             except Exception:  # noqa: broad-except
                 if error_score == "raise":
                     raise
-                score = ScoringError(error_score)
+                # Error score should only be a float value
+                score = error_score
                 warnings.warn(
                     f"Scoring failed for data point: {d.groups}. "
                     f"The score of this data point will be set to {error_score}. Details: \n"
@@ -160,17 +164,16 @@ class Scorer(Generic[Pipeline_, Dataset_, ScoreType_]):
                     dataset=dataset,
                     error_score=error_score,
                 )
+        # We need to ignore the typing here, as there is no way to express the different types for `scores` correctly.
+        # Because all scores can be "ScoringError" there is an overlap between the call signatures.
+        # Therefore, it is not possible to provide better typing here.
         return aggregate_scores(scores, self.aggregate)  # type: ignore
 
 
 ScorerTypes = Union[ScoreFunc[Pipeline_, Dataset_, ScoreType_], Scorer[Pipeline_, Dataset_, ScoreType_], None]
 
 
-def _is_all_error(scores: List[Union[ScoreType_, ScoringError]], error_score: float) -> TypeGuard[List[float]]:
-    return all([s == error_score for s in scores])
-
-
-def _validate_score_return_val(value: Union[SingleScoreType, MultiScoreType, ScoringError]):
+def _validate_score_return_val(value: Union[SingleScoreType, MultiScoreType, float]):
     """We expect a scorer to return either a numeric value or a dictionary of such values."""
     if isinstance(value, (int, float)):
         return
@@ -214,22 +217,28 @@ def _validate_scorer(
     raise ValueError("A valid scorer must either be a instance of `Scorer` (or subclass), None, or a callable.")
 
 
+# Note, that there is an overlap between these call signatures which is a problem for typing.
+# In both cases it is valid that all values of `scores` are `float`.
+# This happens if an error is raised for all cases.
+# In this case it is not clear which call signature should be used (at least for the typechecker).
+# In reality this is equivalent to the "SingleScoreType" scenario.
+# Maybe there is a better way to type that in the future.
 @overload
 def aggregate_scores(
-    scores: List[Union[SingleScoreType, ScoringError]], agg_method: Callable[[Sequence[float]], float]
+    scores: List[Union[SingleScoreType, float]], agg_method: Callable[[Sequence[float]], float]
 ) -> Tuple[float, List[float]]:
     ...
 
 
 @overload
 def aggregate_scores(
-    scores: List[Union[MultiScoreType, ScoringError]], agg_method: Callable[[Sequence[float]], float]
+    scores: List[Union[MultiScoreType, float]], agg_method: Callable[[Sequence[float]], float]
 ) -> Tuple[Dict[str, float], Dict[str, List[float]]]:
     ...
 
 
 def aggregate_scores(
-    scores: Union[List[Union[SingleScoreType, ScoringError]], List[Union[MultiScoreType, ScoringError]]],
+    scores: Union[List[Union[SingleScoreType, float]], List[Union[MultiScoreType, float]]],
     agg_method: Callable[[Sequence[float]], float],
 ) -> Union[Tuple[float, List[float]], Tuple[Dict[str, float], Dict[str, List[float]]]]:
     """Invert result dict of and apply aggregation method to each score output.
