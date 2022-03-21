@@ -1,23 +1,32 @@
-from typing_extensions import Self
-
-from tpcp._dataset import Dataset_
-from tpcp._pipeline import Pipeline_
+import warnings
 
 try:
-    import optuna
-except ImportError:
-    raise ImportError("To use the tpcp Optuna interface, you first need to install optuna (`pip install optuna`)")
+    import optuna  # noqa: unused-import
+except ImportError as e:
+    raise ImportError(
+        "To use the tpcp Optuna interface, you first need to install optuna (`pip install optuna`)"
+    ) from e
 
-from typing import Any, Callable, Dict, Optional, Sequence, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, TypeVar, Union
 
 import numpy as np
 from optuna import Study, Trial
 from optuna.structs import FrozenTrial
 from optuna.study.study import ObjectiveFuncType
+from typing_extensions import Self
 
-from tpcp import Dataset, OptimizablePipeline, Parameter, Pipeline, clone
+from tpcp import OptimizablePipeline, clone
+from tpcp._dataset import Dataset_
 from tpcp._optimize import BaseOptimize
+from tpcp._pipeline import Pipeline_
 from tpcp.optimize import Optimize
+
+warnings.warn(
+    "The Optuna interface in tpcp is still experimental and we are testing if the workflow makes "
+    "sense even for larger projects. "
+    "This means, the interface for `CustomOptunaOptimize` will likely change in the future.",
+    UserWarning,
+)
 
 CustomOptunaOptimize_ = TypeVar("CustomOptunaOptimize_", bound="CustomOptunaOptimize")
 
@@ -38,6 +47,88 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
 
     Parameters
     ----------
+    pipeline
+        A tpcp pipeline with some hyper-parameters that should be optimized.
+        This can either be a normal pipeline or an optimizable-pipeline.
+        This fully depends on your implementation of the `create_objective` method.
+    n_trials
+        The number of trials.
+        If this argument is set to :obj:`None`, there is no limitation on the number of trials.
+        In this case you should use :obj:`timeout` instead.
+        Because optuna is called internally by this wrapper, you can not setup a study without limits and end it
+        using CTRL+C (as suggested by the Optuna docs).
+        In this case the entire execution flow would be stopped.
+    timeout
+        Stop study after the given number of second(s).
+        If this argument is set to :obj:`None`, the study is executed without time limitation.
+        In this case you should use :obj:`n_trials` to limit the execution.
+    return_optimized
+        If True, a pipeline object with the overall best parameters is created and re-optimized using all provided data
+        as input.
+        The optimized pipeline object is stored as `optimized_pipeline_`.
+        How the "re-optimization" works depends on the type of pipeline provided.
+        If it is a simple pipeline, no specific re-optimization will be perfomed and `optimized_pipeline_` will simply
+        be an instance of the pipeline with the best parameters indentified in the search.
+        When `pipeline` is a subclass of `OptimizablePipeline`, we attempt to call `pipeline.self_optimize` with the
+        entire dataset provided to the `optimize` method.
+        The result of this self-optimization will be set as `optimized_pipeline`.
+        If this behaviour is undesired, you can overwrite the `return_optimized_pipeline` method in subclass.s
+    callbacks
+        List of callback functions that are invoked at the end of each trial.
+        Each function must accept two parameters with the following types in this order:
+        :class:`~optuna.study.Study` and :class:`~optuna.FrozenTrial`.
+    gc_after_trial
+        Run the garbage collerctor after each trial.
+        Check the optuna documentation for more detail
+
+    Other Parameters
+    ----------------
+    dataset
+        The dataset instance passed to the optimize method
+
+    Attributes
+    ----------
+    search_results_
+        A dictionary containing all relevant results of the parameter search.
+        The format of this dictionary is designed to be directly passed into the `pd.DataFrame` constructor.
+        Each column then represents the result for one set of parameters.
+
+        The dictionary contains the following entries:
+
+        score
+            The value of the score for a specific trial.
+            If a trial was pruned this value is nan.
+        param_{parameter_name}
+            The value of a respective parameter.
+        params
+            A dictionary representing all parameters.
+        state
+            Whether the trial was completed, pruned, or any type of error occured
+        user_attrs
+        datetime_start
+            When the trial was started
+        datetime_complete
+            When the trial endend
+        duration
+            The duration of the trial
+        user_attrs_...
+            User attributes set within the objective function
+        system_attrs_...
+            System attributes set internally by optuna (usually empty)
+
+        If you need access to further parameter, inspect `self.study_` directly.
+    optimized_pipeline_
+        An instance of the input pipeline with the best parameter set.
+        This is only available if `return_optimized` is not False.
+    best_params_
+        The parameter combination identified in the study
+    best_score_
+        The score achieved in the best trial
+    best_trial_
+        The trial object that resulted in the best results
+    study_
+        The study object itself.
+        This should usually be identical to `self.study`.
 
 
     Example
@@ -59,10 +150,29 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
     >>> opti = MyOptunaOptimizer(pipeline=MyPipeline(), study=study, n_trials=10)
     >>> opti = opti.optimize(MyDataset())
 
+    Notes
+    -----
+    As this wrapper attempts to fully encapsule all Optuna calls to make it possible to be run seamlessly in a
+    cross-validation (or similar), you can not start multiple optuna optimizations at the same time which is the
+    preffered way of multi-processing for optuna.
+    In result, you are limited to single-process operations.
+    If you want to get "hacky" you can try the approach suggested
+    `here <https://github.com/optuna/optuna/issues/2862>`__ to create a study that uses joblib for internal
+    multiprocessing.
+
     """
 
-    pipeline: Parameter[Pipeline_]
-    study: Parameter[Study]
+    pipeline: Pipeline_
+    study: Study
+
+    return_optimized: bool
+
+    # Optuna Parameters that are directly forwarded to study.optimize
+    n_trials: Optional[int]
+    timeout: Optional[float]
+    callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]]
+    gc_after_trial: bool
+    show_progress_bar: bool
 
     optimized_pipeline_: Pipeline_
     study_: Study
@@ -74,12 +184,20 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
         *,
         n_trials: Optional[int] = None,
         timeout: Optional[float] = None,
+        callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None,
+        gc_after_trial: bool = False,
+        show_progress_bar: bool = False,
         return_optimized: bool = True,
     ) -> None:  # noqa: super-init-not-called
         self.pipeline = pipeline
-        self.timeout = timeout
-        self.n_trials = n_trials
         self.study = study
+
+        self.n_trials = n_trials
+        self.timeout = timeout
+        self.callbacks = callbacks
+        self.gc_after_trial = gc_after_trial
+        self.show_progress_bar = show_progress_bar
+
         self.return_optimized = return_optimized
 
     @property
@@ -148,16 +266,27 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
 
         objective = self._create_objective(self.pipeline, dataset=dataset)
 
-        self.study_ = self.study
-
-        # TODO: expose remaining parameters
-        # TODO: Write tests for new scorer functions
         # TODO: Add test for example
-        self.study_.optimize(objective, n_trials=self.n_trials, timeout=self.timeout)
+        self.study_ = self._call_optimize(self.study, objective)
 
         if self.return_optimized:
             self.optimized_pipeline_ = self.return_optimized_pipeline(clone(self.pipeline), dataset, self.study_)
         return self
+
+    def _call_optimize(self, study: Study, objective: ObjectiveFuncType) -> Study:
+        """Call the optuna study.
+
+        This is a separate method to make it easy to modify how the study is called.
+        """
+        study.optimize(
+            objective,
+            n_trials=self.n_trials,
+            timeout=self.timeout,
+            callbacks=self.callbacks,
+            gc_after_trial=self.gc_after_trial,
+            show_progress_bar=self.show_progress_bar,
+        )
+        return study
 
     def create_objective(self) -> Callable[[Trial, Pipeline_, Dataset_], Union[float, Sequence[float]]]:
         """Return the objective function that should be optimized.
@@ -178,7 +307,9 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
 
         return objective
 
-    def return_optimized_pipeline(self, pipeline: Pipeline_, dataset: Dataset_, study: Study) -> Pipeline_:
+    def return_optimized_pipeline(  # noqa: no-self-use
+        self, pipeline: Pipeline_, dataset: Dataset_, study: Study
+    ) -> Pipeline_:
         """Return the pipeline with the best parameters of a study.
 
         This either just returns the pipeline with the best parameters set, or if the pipeline is a subclass of
