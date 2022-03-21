@@ -6,7 +6,7 @@ The original code is licenced under BSD-3: https://github.com/scikit-learn/sciki
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
 import joblib
 import numpy as np

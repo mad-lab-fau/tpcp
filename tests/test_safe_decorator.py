@@ -1,9 +1,8 @@
 from unittest.mock import patch
 
-import joblib
 import pytest
 
-from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline
+from tests.test_pipelines.conftest import DummyDataset
 from tpcp import (
     Dataset,
     HyperParameter,
