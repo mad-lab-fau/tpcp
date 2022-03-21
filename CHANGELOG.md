@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A new class to wrap the optimization framework [Optuna](https://optuna.readthedocs.io/en/stable/).
+  `CustomOptunaOptimize` can be used to create custom wrapper classes for various Optuna optimizations, that play 
+  nicely with `tpcp` and can be nested within tpcp operations. (https://github.com/mad-lab-fau/tpcp/pull/27)
+- A new example for the `CustomOptunaOptimize` wrapper that explains how to create complex custom optimizers using
+  `Optuna` and the new Scorer callbacks (see below) (https://github.com/mad-lab-fau/tpcp/pull/27)
 - `Scorer` now supports an optional callback function, which will be called after each datapoint is scored.
   (https://github.com/mad-lab-fau/tpcp/pull/29)
 - Pipelines, Optimize objects, and `Scorer` are now `Generic`. This improves typing (in particular with VsCode), but 
