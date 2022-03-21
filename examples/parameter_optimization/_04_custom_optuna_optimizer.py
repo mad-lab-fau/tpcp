@@ -424,7 +424,7 @@ pd.DataFrame(opti_early_stop.search_results_)
 # Building a custom optimizer is a little more involved than just using `GridSearch`, however it allows great
 # flexibility with relatively small overhead compared to a pure implementation in Optuna.
 #
-# In this example we created a objective function that only makes sense for pipelines that don't have an internal
+# In this example we created an objective function that only makes sense for pipelines that don't have an internal
 # optimization.
 # However, instead of just a simple search, you could also create a CV based search by using
 # :func:`~tpcp.validate.cross_validate` within your objective to split the passed data into multiple train test sets
