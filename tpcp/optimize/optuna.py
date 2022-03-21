@@ -1,3 +1,4 @@
+"""Implementation of methods and classes to wrap the optimization Framework `Optuna`."""
 import warnings
 
 try:
