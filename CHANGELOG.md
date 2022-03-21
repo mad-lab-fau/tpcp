@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0]
+
+### Added
+
+- `Scorer` now supports an optional callback function, which will be called after each datapoint is scored.
+- Pipelines, Optimize objects, and `Scorer` are now `Generic`. This improves typing (in particular with VsCode), but 
+  means a little bit more typing (pun intended), when creating new Pipelines and Optimizers
+
+### Changed
+
+- The return type for the individual values in the `Scorer` class is not `List[float]` instead of `np.ndarray`.
+  This also effects the output of `cross_validate`, `GridSearch.gs_results_` and `GridSearchCV.cv_results_`
+- `cf` now has "faked" return type, so that type checkers in the user code, do not complain anymore.
+
+
 ## [0.5.0] - 2022-03-15
 
 ### Added
