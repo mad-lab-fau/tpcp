@@ -1,5 +1,6 @@
 # This is needed to avoid plots to open
 import matplotlib
+import pandas as pd
 from numpy.testing import assert_almost_equal, assert_array_equal
 
 matplotlib.use("Agg")
@@ -58,3 +59,21 @@ def test_cross_validate():
     from examples.validation._01_cross_validation import results
 
     assert_almost_equal(results["test_f1_score"], [0.9770585, 0.7108303, 0.9250665])
+
+
+def test_optuna():
+    from examples.parameter_optimization._04_custom_optuna_optimizer import opti, opti_early_stop
+
+    assert opti.best_params_ == {
+        "algorithm__min_r_peak_height_over_baseline": 0.4,
+        "algorithm__high_pass_filter_cutoff_hz": 0.4,
+    }
+    assert opti.best_score_ == 0.858757056619628
+
+    # Check number of pruned trials
+    assert pd.DataFrame(opti_early_stop.search_results_)["score"].isna().sum() == 6
+    assert opti_early_stop.best_params_ == {
+        "algorithm__min_r_peak_height_over_baseline": 0.4,
+        "algorithm__high_pass_filter_cutoff_hz": 0.4,
+    }
+    assert opti_early_stop.best_score_ == 0.858757056619628
