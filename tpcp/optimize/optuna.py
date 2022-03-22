@@ -54,6 +54,8 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
         A tpcp pipeline with some hyper-parameters that should be optimized.
         This can either be a normal pipeline or an optimizable-pipeline.
         This fully depends on your implementation of the `create_objective` method.
+    study
+        The optuna :class:`~optuna.Study` that should be used for optimization.
     n_trials
         The number of trials.
         If this argument is set to :obj:`None`, there is no limitation on the number of trials.
@@ -80,6 +82,8 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
         List of callback functions that are invoked at the end of each trial.
         Each function must accept two parameters with the following types in this order:
         :class:`~optuna.study.Study` and :class:`~optuna.FrozenTrial`.
+    show_progress_bar
+        Flag to show progress bars or not.
     gc_after_trial
         Run the garbage collerctor after each trial.
         Check the optuna documentation for more detail
@@ -265,6 +269,10 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
             The dataset used for optimization.
 
         """
+        if self.timeout is None and self.n_trials is None:
+            raise ValueError("You need to set either `timeout` or `n_trials` to a proper value."
+                             "Otherwise the optimization will not stop und run until infinity.")
+
         self.dataset = dataset
 
         objective = self._create_objective(self.pipeline, dataset=dataset)
