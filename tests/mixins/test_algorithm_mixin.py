@@ -11,6 +11,7 @@ from tpcp._base import BaseTpcpObjectObj_, get_param_names
 
 class TestAlgorithmMixin:
     algorithm_class = None
+    _ignored_names = tuple()
     __test__ = False
 
     @pytest.fixture()
@@ -36,6 +37,8 @@ class TestAlgorithmMixin:
 
         documented_names = set(p.name for p in docs["Parameters"])
         actual_names = set(get_param_names(self.algorithm_class))
+
+        actual_names -= set(self._ignored_names)
 
         assert documented_names == actual_names
 
