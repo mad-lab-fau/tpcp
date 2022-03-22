@@ -270,8 +270,10 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
 
         """
         if self.timeout is None and self.n_trials is None:
-            raise ValueError("You need to set either `timeout` or `n_trials` to a proper value."
-                             "Otherwise the optimization will not stop und run until infinity.")
+            raise ValueError(
+                "You need to set either `timeout` or `n_trials` to a proper value."
+                "Otherwise the optimization will not stop und run until infinity."
+            )
 
         self.dataset = dataset
 
