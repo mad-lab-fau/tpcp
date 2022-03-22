@@ -43,13 +43,13 @@ You are very much encouraged to read through the Optuna documentation and create
 # Checkout the other examples to learn more about them.
 # We will simply copy the code over create an instance of both objects to be used later.
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 
 from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
 from examples.datasets.datasets_final_ecg import ECGExampleData
-from tpcp import Dataset, Parameter, Pipeline, cf
+from tpcp import Parameter, Pipeline, cf
 
 try:
     HERE = Path(__file__).parent
