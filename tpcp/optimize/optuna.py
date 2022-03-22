@@ -268,8 +268,6 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
         self.dataset = dataset
 
         objective = self._create_objective(self.pipeline, dataset=dataset)
-
-        # TODO: Add test for example
         self.study_ = self._call_optimize(self.study, objective)
 
         if self.return_optimized:
