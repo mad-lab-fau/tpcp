@@ -23,6 +23,12 @@ Classes
 Optuna Interface
 ----------------
 
+.. automodule:: tpcp.optimize.optuna
+    :no-members:
+    :no-inherited-members:
+
+.. currentmodule:: tpcp.optimize
+
 .. autosummary::
    :toctree: generated/optimize
    :template: class_with_private.rst
