@@ -137,10 +137,8 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
         The study object itself.
         This should usually be identical to `self.study`.
 
-
-    Example
-    -------
-
+    Examples
+    --------
     >>> from tpcp.validate import Scorer
     >>> from optuna import create_study
     >>> from optuna import samplers
