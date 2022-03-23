@@ -467,7 +467,7 @@ class TestGridSearchCV:
 
     def test_pure_parameters_cache(self):
         """Test that pure parameter cache is deleted after run."""
-        # We just run our test twice. If the cache is not delted, the second run should fail.
+        # We just run our test twice. If the cache is not deleted, the second run should fail.
         self.test_pure_parameters(True, 4)
         self.test_pure_parameters(True, 4)
 
