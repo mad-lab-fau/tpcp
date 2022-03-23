@@ -241,7 +241,7 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
         # If this is required people should report them as user values in their objective function
         base_df.loc[base_df["state"] == "PRUNED", "score"] = np.nan
 
-        return base_df.to_dict()
+        return base_df.to_dict(orient="list")
 
     @property
     def best_params_(self) -> Dict[str, Any]:
@@ -302,10 +302,10 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
     def create_objective(self) -> Callable[[Trial, Pipeline_, Dataset_], Union[float, Sequence[float]]]:
         """Return the objective function that should be optimized.
 
-        This method should be implemented by a child class and return a objective function that is compatible with
+        This method should be implemented by a child class and return an objective function that is compatible with
         Optuna.
         However, compared to a normal Optuna objective function, the function should expect a pipeline and a dataset
-        object as additional inputs to do the optimization.
+        object as additional inputs to the optimization Trial object.
         """
         raise NotImplementedError()
 
