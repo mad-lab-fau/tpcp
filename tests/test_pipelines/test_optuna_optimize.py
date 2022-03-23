@@ -119,12 +119,12 @@ class TestCustomOptunaOptimize:
         ).optimize(dataset)
 
         assert mock_objective.call_count == n_trials
-        assert mock_objective.call_args.args[2] is dataset
+        assert mock_objective.call_args[0][2] is dataset
         # Should be a clone of the pipe, but not the pipe
-        assert mock_objective.call_args.args[1].get_params() == pipe.get_params()
-        assert mock_objective.call_args.args[1] is not pipe
+        assert mock_objective.call_args[0][1].get_params() == pipe.get_params()
+        assert mock_objective.call_args[0][1] is not pipe
 
-        assert isinstance(mock_objective.call_args.args[0], Trial)
+        assert isinstance(mock_objective.call_args[0][0], Trial)
 
     @pytest.mark.parametrize("return_optimize", (True, False))
     def test_return_optimized(self, return_optimize):
@@ -163,7 +163,7 @@ class TestCustomOptunaOptimize:
                 return_optimized=True,
             ).optimize(dataset)
 
-        assert mock.call_args.args[1] is dataset
+        assert mock.call_args[0][1] is dataset
 
     @pytest.mark.parametrize("pipe", (DummyOptimizablePipeline(), DummyPipeline()))
     def test_correct_paras_selected(self, pipe):
