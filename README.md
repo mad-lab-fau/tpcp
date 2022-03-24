@@ -71,11 +71,20 @@ We are using [poetry](https://python-poetry.org/) to manage dependencies and
 
 To set up the dev environment run the following commands:
 
-```
+```bash
 git clone https://github.com/mad-lab-fau/tpcp
 cd tpcp
 poetry install  -E torch # This might take a while
 ```
+
+To set up the dev environment *including* the required dependencies for using `tpcp` together with `optuna` 
+run the following commands: 
+```bash
+git clone https://github.com/mad-lab-fau/tpcp
+cd tpcp
+poetry install -E optuna  # This might take a while
+```
+
 
 Afterwards you can start to develop and change things.
 If you want to run tests, format your code, build the docs, ..., you can run one of the following `poethepoet` commands
@@ -92,7 +101,7 @@ CONFIGURED TASKS
 
 by calling
 
-```
+```bash
 poetry run poe <command name>
 ````
 
