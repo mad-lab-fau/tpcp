@@ -12,8 +12,9 @@ from tests.test_pipelines.conftest import (
     dummy_multi_score_func,
     dummy_single_score_func,
 )
+from tpcp.exceptions import ValidationError
 from tpcp.validate import Scorer
-from tpcp.validate._scorer import _passthrough_scoring, _validate_scorer
+from tpcp.validate._scorer import NoAgg, _passthrough_scoring, _validate_scorer
 
 
 class TestScorerCalls:
@@ -68,6 +69,27 @@ class TestScorer:
                 assert v == np.mean(data.groups) + 1
             else:
                 assert v == np.mean(data.groups)
+
+    def test_score_return_val_multi_score_no_agg(self):
+        def multi_score_func(pipeline, data_point):
+            return {"score_1": data_point.groups[0], "no_agg_score": NoAgg(str(data_point.groups))}
+
+        scorer = Scorer(multi_score_func)
+        pipe = DummyOptimizablePipeline()
+        data = DummyDataset()
+        agg, single = scorer(pipe, data, np.nan)
+        assert isinstance(single, dict)
+        for k, v in single.items():
+            assert len(v) == len(data)
+            # Our Dummy scorer, returns the groupname of the dataset as string in the no-agg case
+            if k == "no_agg_score":
+                assert all(np.array(v) == [str(d.groups) for d in data])
+            else:
+                assert all(np.array(v) == data.groups)
+        assert isinstance(agg, dict)
+        assert "score_1" in agg
+        assert "no_agg_score" not in agg
+        assert agg["score_1"] == np.mean(data.groups)
 
     @pytest.mark.parametrize("err_val", (np.nan, 1))
     def test_scoring_return_err_val(self, err_val):
@@ -128,15 +150,17 @@ class TestScorer:
         assert str(e.value) == "Dummy Error for 0"
 
     @pytest.mark.parametrize("error_score", ("raise", 0))
-    @pytest.mark.parametrize("bad_scorer", (lambda x, y: "test", lambda x, y: {"val": "test"}))
+    @pytest.mark.parametrize(
+        "bad_scorer", (lambda x, y: "test", lambda x, y: {"val": "test"}, lambda x, y: NoAgg(None))
+    )
     def test_bad_scorer(self, error_score, bad_scorer):
         """Check that we catch cases where the scoring func returns invalid values independent of the error_score val"""
         scorer = Scorer(bad_scorer)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
-        with pytest.raises(ValueError) as e:
+        with pytest.raises(ValidationError) as e:
             scorer(pipe, data, error_score)
-        assert "The scoring function must return" in str(e.value)
+        assert "The scoring function must have one" in str(e.value)
 
     def test_kwargs_passed(self):
         kwargs = {"a": 3, "b": "test"}
@@ -173,6 +197,9 @@ class TestScorer:
 
         pipe = DummyOptimizablePipeline()
         scorer(pipeline=pipe, dataset=DummyDataset(), error_score=np.nan)
+
+    def test_no_agg_scoring(self):
+        pass
 
 
 def _dummy_func(x):
