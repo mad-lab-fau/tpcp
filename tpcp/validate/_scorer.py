@@ -26,10 +26,13 @@ from typing_extensions import Protocol
 from tpcp._dataset import Dataset, Dataset_
 from tpcp._pipeline import Pipeline, Pipeline_
 from tpcp._utils._score import _ERROR_SCORE_TYPE
-from tpcp.exceptions import ScorerFailed
+from tpcp.exceptions import ScorerFailed, ValidationError
+
+T = TypeVar("T")
 
 SingleScoreType = float
-MultiScoreType = Dict[str, float]
+MultiScoreType = Dict[str, Union[float, "NoAgg"]]
+ScoreType = Union[SingleScoreType, MultiScoreType]
 ScoreType_ = TypeVar("ScoreType_", SingleScoreType, MultiScoreType)
 
 IndividualScoreType = Union[Dict[str, List[float]], List[float]]
@@ -57,6 +60,38 @@ class ScoreCallback(Protocol[Pipeline_, Dataset_, ScoreType_]):
         error_score: _ERROR_SCORE_TYPE,
     ) -> None:
         ...
+
+
+class NoAgg(Generic[T]):
+    """Wrapper to wrap one or multiple output values of a scorer to prevent aggregation of these values.
+
+    If one of the values in the return dictionary of a multi-value score function is wrapped with this class,
+    the scorer will not aggregate the value.
+    This allows to pass arbitary data from the score function through the scorer.
+    As example, this could be some general metadata, some non-numeric scores, or an array of values (e.g. when the
+    actual score is the mean of such values).
+
+    Examples
+    --------
+    >>> def score_func(pipe, dataset):
+    ...     ...
+    ...     return {"score_val_1": score, "some_metadata": NoAgg(metadata)}
+    >>> my_scorer = Scorer(score_func)
+
+    """
+
+    _value: T
+
+    def __init__(self, _value: T):
+        self._value = _value
+
+    def __repr__(self):
+        """Show the represnentation of the object."""
+        return f"{self.__class__.__name__}({repr(self._value)})"
+
+    def get_value(self) -> T:
+        """Return the value wrapped by NoAgg."""
+        return self._value
 
 
 class Scorer(Generic[Pipeline_, Dataset_, ScoreType_]):
@@ -173,18 +208,22 @@ class Scorer(Generic[Pipeline_, Dataset_, ScoreType_]):
 ScorerTypes = Union[ScoreFunc[Pipeline_, Dataset_, ScoreType_], Scorer[Pipeline_, Dataset_, ScoreType_], None]
 
 
-def _validate_score_return_val(value: Union[SingleScoreType, MultiScoreType, float]):
+def _validate_score_return_val(value: ScoreType):
     """We expect a scorer to return either a numeric value or a dictionary of such values."""
     if isinstance(value, (int, float)):
         return
     if isinstance(value, dict):
         for v in value.values():
-            if not isinstance(v, (int, float)):
+            if not isinstance(v, (int, float, NoAgg)):
                 break
         else:
             return
-    raise ValueError(
-        "The scoring function must return either a dictionary of numeric values or a single numeric value."
+
+    raise ValidationError(
+        "The scoring function must have one of the following return types:\n"
+        "1. dictionary of numeric values or values wrapped by `NoAgg`.\n"
+        "2. single numeric value.\n\n"
+        f"You return value was {value}"
     )
 
 
@@ -283,9 +322,23 @@ def aggregate_scores(
     agg_scores: Dict[str, float] = {}
     # Invert the dict and calculate the mean per score:
     for key in score_names:
-        # If the scorer raised an error, there will only be a single value. This value will be used for all
-        # scores then
-        score_array = [score[key] if isinstance(score, dict) else score for score in scores]
+        key_is_no_agg = False
+        score_array = []
+        for score in scores:
+            if isinstance(score, dict):
+                score_val = score[key]
+                if isinstance(score_val, NoAgg):
+                    # If one of the values are wrapped in NoAgg, we will not aggregate the values and only remove the
+                    # NoAgg warpper.
+                    key_is_no_agg = True
+                    score_array.append(score_val.get_value())
+                else:
+                    score_array.append(score_val)
+            else:
+                # If the scorer raised an error, there will only be a single value. This value will be used for all
+                # scores then
+                score_array.append(score)
         inv_scores[key] = score_array
-        agg_scores[key] = agg_method(score_array)
+        if not key_is_no_agg:
+            agg_scores[key] = agg_method(score_array)
     return agg_scores, inv_scores

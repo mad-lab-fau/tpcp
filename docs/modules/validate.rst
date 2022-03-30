@@ -14,7 +14,8 @@ Classes
    :toctree: generated/validate
    :template: class_with_private.rst
 
-   Scorer
+    Scorer
+    NoAgg
 
 Functions
 ---------
