@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pipelines, Optimize objects, and `Scorer` are now `Generic`. This improves typing (in particular with VsCode), but 
   means a little bit more typing (pun intended), when creating new Pipelines and Optimizers
   (https://github.com/mad-lab-fau/tpcp/pull/29)
+- Added option for scoring function to return arbitrary additional information using the `NoAgg` wrapper
+  (https://github.com/mad-lab-fau/tpcp/pull/31)
 
 ### Changed
 
