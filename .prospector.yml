@@ -37,7 +37,7 @@ pylint:
     argument-rgx: "[a-z_][a-z0-9_]{0,30}$"  # Allow for single letter argument names
     attr-rgx: "[a-z_][a-z0-9_]*$"  # Allow for single letter attribute names
     class-rgx: "[A-Z_][a-zA-Z0-9]*_?$" # Allow for single letter class names
-    type-rgx: "[A-Z_][a-zA-Z0-9]*_?$"
+    typevar-rgx: "[A-Z_][a-zA-Z0-9]*_?$" # TODO: Change that again, once we rename all the typevars to better names
   disable:
     - too-many-ancestors
     - too-few-public-methods
