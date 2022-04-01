@@ -74,7 +74,7 @@ To set up the dev environment run the following commands:
 ```
 git clone https://github.com/mad-lab-fau/tpcp
 cd tpcp
-poetry install  # This might take a while
+poetry install  -E torch # This might take a while
 ```
 
 Afterwards you can start to develop and change things.
