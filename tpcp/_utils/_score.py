@@ -8,13 +8,13 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
-import joblib
 import numpy as np
 from joblib import Memory
 from typing_extensions import Literal, TypedDict
 
 from tpcp._base import clone
 from tpcp._dataset import Dataset
+from tpcp._hash import custom_hash
 from tpcp._pipeline import Pipeline
 from tpcp._utils._general import _get_nested_paras
 
@@ -236,8 +236,8 @@ def _cached_optimize(
     # We check that by calculating the hash of all pure parameters before and after the optimization.
     opti_paras = optimizer.get_params()
     pure_para_subset = {k: opti_paras[k] for k in pure_parameters}
-    pure_para_hash = joblib.hash(pure_para_subset)
-    pipeline_pure_para_hash = joblib.hash(_get_nested_paras(pure_para_subset, "pipeline"))
+    pure_para_hash = custom_hash(pure_para_subset)
+    pipeline_pure_para_hash = custom_hash(_get_nested_paras(pure_para_subset, "pipeline"))
 
     # This is the actual call to train the optimizer:
     optimizer = optimize_func(type(optimizer), hyperparameters, data, optimize_paras)
@@ -248,9 +248,9 @@ def _cached_optimize(
     # to the pipeline have not changed in the `optimized_pipeline`.
     # Note, that the first case will never happen with tpcp native Optimizers, but could happen for custom
     # optimizers.
-    if pipeline_pure_para_hash != joblib.hash(
+    if pipeline_pure_para_hash != custom_hash(
         {k: optimized_pipeline_paras[k] for k in _get_nested_paras(pure_parameters, "pipeline")}
-    ) or pure_para_hash != joblib.hash({k: opti_paras[k] for k in pure_parameters}):
+    ) or pure_para_hash != custom_hash({k: opti_paras[k] for k in pure_parameters}):
         raise ValueError(
             "Optimizing the pipeline modified a parameter marked as `pure`. "
             "This must not happen. "
