@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (https://github.com/mad-lab-fau/tpcp/pull/29)
 - Added option for scoring function to return arbitrary additional information using the `NoAgg` wrapper
   (https://github.com/mad-lab-fau/tpcp/pull/31)
+- (experimental) Torch compatibility for hash based comparisons (e.g. in the `safe_run` wrapper). Before the wrapper 
+  would fail, with torch module subclasses, as their pickle based hashes where not consistent.
+  We implemented a custom hash function that should solve this.
+  For now, we will consider this feature experimental, as we are not sure if it breaks in certain usecases.
+  (https://github.com/mad-lab-fau/tpcp/pull/33)
 
 ### Changed
 
@@ -23,7 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (https://github.com/mad-lab-fau/tpcp/pull/29)
 - `cf` now has "faked" return type, so that type checkers in the user code, do not complain anymore.
   (https://github.com/mad-lab-fau/tpcp/pull/29)
-
 
 ## [0.5.0] - 2022-03-15
 
