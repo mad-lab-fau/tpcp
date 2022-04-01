@@ -9,10 +9,10 @@ from inspect import isclass
 from pickle import PicklingError
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
 
-import joblib
 from typing_extensions import Concatenate, ParamSpec
 
 from tpcp._base import _get_annotated_fields_of_type
+from tpcp._hash import custom_hash
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import PotentialUserErrorWarning
 
@@ -128,7 +128,7 @@ def is_action_applied(instance: Algorithm) -> bool:
 def _check_safe_run(algorithm: Algorithm_, old_method: Callable, *args: Any, **kwargs: Any) -> Algorithm_:
     """Run the pipeline and check that run behaved as expected."""
     before_paras = algorithm.get_params()
-    before_paras_hash = joblib.hash(before_paras)
+    before_paras_hash = custom_hash(before_paras)
     output: Algorithm_
     if hasattr(old_method, "__self__"):
         # In this case the method is already bound and we do not need to pass the algo as first argument
@@ -136,7 +136,7 @@ def _check_safe_run(algorithm: Algorithm_, old_method: Callable, *args: Any, **k
     else:
         output = old_method(algorithm, *args, **kwargs)
     after_paras = algorithm.get_params()
-    after_paras_hash = joblib.hash(after_paras)
+    after_paras_hash = custom_hash(after_paras)
     if not before_paras_hash == after_paras_hash:
         raise ValueError(
             f"Running `{old_method.__name__}` of {type(algorithm).__name__} did modify the parameters of the "
@@ -249,8 +249,8 @@ def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: A
             "Mark at least one; parameter with the `OptiPara`/`OptimizablePara` annotation to use "
             "`self_optimize`."
         )
-    before_hash_optimizable = joblib.hash(optimizable_paras)
-    before_hash_other = joblib.hash(other_paras)
+    before_hash_optimizable = custom_hash(optimizable_paras)
+    before_hash_other = custom_hash(other_paras)
     optimized_algorithm: Optimizable_
     if hasattr(old_method, "__self__"):
         # In this case the method is already bound and we do not need to pass the algo as first argument
@@ -267,8 +267,8 @@ def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: A
     # The first hash records any changes to the object.
     # The second hash only records changes to the parameters, because everything else is removed by clone.
     # Hence, if we see differences between the hashes, other things besides the parameters are changed.
-    after_hash = joblib.hash(optimized_algorithm)
-    after_hash_after_clone = joblib.hash(optimized_algorithm.clone())
+    after_hash = custom_hash(optimized_algorithm)
+    after_hash_after_clone = custom_hash(optimized_algorithm.clone())
     if after_hash_after_clone != after_hash:
         raise RuntimeError(
             "Optimizing seems to have changed class attributes that are not parameters (i.e. not provided in the "
@@ -283,15 +283,15 @@ def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: A
     # It takes care of including and excluding the correct parameters in the other list, even if nested paras are
     # marked as "Optimizable"
     after_optimizable_paras, after_other_paras = _get_nested_opti_paras(algorithm, opti_para_names)
-    after_hash_optimizable = joblib.hash(after_optimizable_paras)
-    after_hash_other = joblib.hash(after_other_paras)
+    after_hash_optimizable = custom_hash(after_optimizable_paras)
+    after_hash_other = custom_hash(after_other_paras)
     if before_hash_other != after_hash_other:
         # In this case we raise an error anyway, so lets go deep:
         removed_paras = set(other_paras) - set(after_other_paras)
         added_paras = set(after_other_paras) - set(other_paras)
         changed_paras = []
         for k in set(other_paras) - set(removed_paras):
-            if joblib.hash(other_paras[k]) != joblib.hash(after_other_paras[k]):
+            if custom_hash(other_paras[k]) != custom_hash(after_other_paras[k]):
                 changed_paras.append(k)
         changed_paras = sorted(changed_paras)
         changed_paras.extend([f"{p} (removed)" for p in sorted(removed_paras)])
