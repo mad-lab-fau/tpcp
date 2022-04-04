@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   For now, we will consider this feature experimental, as we are not sure if it breaks in certain use-cases.
   (https://github.com/mad-lab-fau/tpcp/pull/33)
 - `tpcp.types` now exposes a bunch of internal types that might be helpful to type custom Pipelines and Optimizers.
+  (https://github.com/mad-lab-fau/tpcp/pull/34)
 
 ### Changed
 
@@ -34,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (https://github.com/mad-lab-fau/tpcp/pull/29)
 - `cf` now has "faked" return type, so that type checkers in the user code, do not complain anymore.
   (https://github.com/mad-lab-fau/tpcp/pull/29)
-- All TypeVar Variables are now called `SomethingT` instead of `Something_`
+- All TypeVar Variables are now called `SomethingT` instead of `Something_` (https://github.com/mad-lab-fau/tpcp/pull/34)
 
 ## [0.5.0] - 2022-03-15
 
