@@ -4,12 +4,12 @@ r"""
 Custom Optuna Optimizer
 =======================
 
-.. warning:: This example shows more advanced features of tpcp when using
-             `Optuna <https://optuna.readthedocs.io/en/stable/index.html>`_ for hyper-parameter optimization.
+.. warning:: This example shows more advanced features of `tpcp` when using
+             `Optuna <https://optuna.readthedocs.io/en/stable/index.html>`_ for hyperparameter optimization.
              To make this example understandable, you should make yourself familiar with Optuna first and understand
              how it works, before trying to go through this example.
 
-The most popular method of (Hyper-)Parameter optimization is GridSearch (or GridSearchCV for optimizable pipelines).
+The most popular method of (hyper-)parameter optimization is GridSearch (or GridSearchCV for optimizable pipelines).
 These methods perform an exhaustive search of the parameter space by simply testing every option.
 Considering that training and testing an algorithm can be very costly, exhaustive gridsearch takes a long time and is
 sometimes not feasible at all due to the required computational load.
@@ -51,14 +51,14 @@ own project-specific optimizers.
 # We will simply copy the code over and create an instance of both objects to be used later.
 #
 # .. note:: We make pretty extensive use of Python's optional typing features (in particular generics) in this example.
-#           This can be a little overwhelming and you might not need that in your implementation.
-#           So whenever, you see `TpcpClass[SomClassName]` and you don't understand what it means, you can safely
+#           This can be a little overwhelming, and you might not need that in your implementation.
+#           So whenever, you see `TpcpClass[SomeClassName]` and you don't understand what it means, you can safely
 #           ignore it.
 #           But just for your understanding, if you see for example `Pipeline[ECGExampleData]` you should mentally
-#           read it as "A pipeline that requires a `ECGExampleData` - dataset internally.
-#           Whenever you encounter a variable ending with a `T` (e.g. `PipelineT`, these are TypeVar types) to type
+#           read it as "A pipeline that requires a :class:`~tpcp.Dataset` of type `ECGExampleData` internally.
+#           Whenever you encounter a variable ending with a `T` (e.g. `PipelineT`), these are TypeVar types to type
 #           generics.
-#           You should read that as "Some subclass of Pipeline, but we don't know which yet".
+#           You should read that as "Some subclass of :class:`~tpcp.Pipeline`, but we don't know which yet".
 #
 from pathlib import Path
 from typing import Any, Callable, Optional, Sequence, Tuple, Union
