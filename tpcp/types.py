@@ -4,8 +4,31 @@ Note, this module only imports them, but they are defined close to places where 
 """
 
 
-from tpcp._algorithm import Algorithm_
-from tpcp._dataset import Dataset_
-from tpcp._pipeline import OptimizablePipeline_, Pipeline_
+from tpcp._algorithm import AlgorithmT
+from tpcp._base import BaseTpcpObjectObjT
+from tpcp._dataset import DatasetT
+from tpcp._pipeline import OptimizablePipelineT, PipelineT
+from tpcp.validate._scorer import (
+    MultiScoreType,
+    ScoreFunc,
+    ScoreFuncMultiple,
+    ScoreFuncSingle,
+    ScoreType,
+    ScoreTypeT,
+    SingleScoreType,
+)
 
-__all__ = ["Pipeline_", "OptimizablePipeline_", "Dataset_", "Algorithm_"]
+__all__ = [
+    "BaseTpcpObjectObjT",
+    "PipelineT",
+    "OptimizablePipelineT",
+    "DatasetT",
+    "AlgorithmT",
+    "ScoreTypeT",
+    "SingleScoreType",
+    "MultiScoreType",
+    "ScoreType",
+    "ScoreFuncSingle",
+    "ScoreFuncMultiple",
+    "ScoreFunc",
+]

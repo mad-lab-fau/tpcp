@@ -7,7 +7,7 @@ from typing_extensions import Self
 
 from tpcp._base import BaseTpcpObject
 
-Dataset_ = TypeVar("Dataset_", bound="Dataset")
+DatasetT = TypeVar("DatasetT", bound="Dataset")
 
 
 class Dataset(BaseTpcpObject, _skip_validation=True):

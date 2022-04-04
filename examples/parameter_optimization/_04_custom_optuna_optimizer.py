@@ -183,20 +183,20 @@ from optuna import Study, Trial
 #
 # With that, our implementation looks as follows:
 from tpcp.optimize.optuna import CustomOptunaOptimize
-from tpcp.types import Dataset_, Pipeline_
+from tpcp.types import DatasetT, PipelineT
 from tpcp.validate import Scorer
 
 
-class OptunaSearch(CustomOptunaOptimize[Pipeline_, Dataset_]):
+class OptunaSearch(CustomOptunaOptimize[PipelineT, DatasetT]):
     create_search_space: Parameter[Callable[[Trial], None]]
-    score_function: Parameter[Callable[[Pipeline_, Dataset_], float]]
+    score_function: Parameter[Callable[[PipelineT, DatasetT], float]]
 
     def __init__(
         self,
-        pipeline: Pipeline_,
+        pipeline: PipelineT,
         study: Study,
         create_search_space: Callable[[Trial], None],
-        score_function: Callable[[Pipeline_, Dataset_], float],
+        score_function: Callable[[PipelineT, DatasetT], float],
         *,
         n_trials: Optional[int] = None,
         timeout: Optional[float] = None,
@@ -206,10 +206,10 @@ class OptunaSearch(CustomOptunaOptimize[Pipeline_, Dataset_]):
         self.score_function = score_function
         super().__init__(pipeline, study, n_trials=n_trials, timeout=timeout, return_optimized=return_optimized)
 
-    def create_objective(self) -> Callable[[Trial, Pipeline_, Dataset_], Union[float, Sequence[float]]]:
+    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
         # Here we define our objective function
 
-        def objective(trial: Trial, pipeline: Pipeline_, dataset: Dataset_) -> float:
+        def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
             # First we need to select parameters for the current trial
             self.create_search_space(trial)
             # Then we apply these parameters to the pipeline
@@ -356,16 +356,16 @@ class MinDatapointPerformancePruner(BasePruner):
 from optuna import TrialPruned
 
 
-class OptunaSearchEarlyStopping(CustomOptunaOptimize[Pipeline_, Dataset_]):
+class OptunaSearchEarlyStopping(CustomOptunaOptimize[PipelineT, DatasetT]):
     create_search_space: Parameter[Callable[[Trial], None]]
-    score_function: Parameter[Callable[[Pipeline_, Dataset_], float]]
+    score_function: Parameter[Callable[[PipelineT, DatasetT], float]]
 
     def __init__(
         self,
-        pipeline: Pipeline_,
+        pipeline: PipelineT,
         study: Study,
         create_search_space: Callable[[Trial], None],
-        score_function: Callable[[Pipeline_, Dataset_], float],
+        score_function: Callable[[PipelineT, DatasetT], float],
         *,
         n_trials: Optional[int] = None,
         timeout: Optional[float] = None,
@@ -375,14 +375,14 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize[Pipeline_, Dataset_]):
         self.score_function = score_function
         super().__init__(pipeline, study, n_trials=n_trials, timeout=timeout, return_optimized=return_optimized)
 
-    def create_objective(self) -> Callable[[Trial, Pipeline_, Dataset_], Union[float, Sequence[float]]]:
-        def objective(trial: Trial, pipeline: Pipeline_, dataset: Dataset_) -> float:
+    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
+        def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
             # First, we need to select parameters for the current trial
             self.create_search_space(trial)
             # Then, we apply these parameters to the pipeline
             pipeline = pipeline.set_params(**trial.params)
 
-            def single_score_callback(*, step: int, dataset: Dataset_, scores: Tuple[float, ...], **_: Any):
+            def single_score_callback(*, step: int, dataset: DatasetT, scores: Tuple[float, ...], **_: Any):
                 # We need to report the new score value.
                 # This will call the pruner internally and then tell us if we should stop
                 trial.report(float(scores[step]), step)

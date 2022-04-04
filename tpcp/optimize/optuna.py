@@ -8,7 +8,7 @@ except ImportError as e:
         "To use the tpcp Optuna interface, you first need to install optuna (`pip install optuna`)"
     ) from e
 
-from typing import Any, Callable, Dict, List, Optional, Sequence, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 from optuna import Study, Trial
@@ -17,9 +17,9 @@ from optuna.study.study import ObjectiveFuncType
 from typing_extensions import Self
 
 from tpcp import OptimizablePipeline, clone
-from tpcp._dataset import Dataset_
+from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
-from tpcp._pipeline import Pipeline_
+from tpcp._pipeline import PipelineT
 from tpcp.optimize import Optimize
 
 __all__ = ["CustomOptunaOptimize"]
@@ -31,10 +31,8 @@ warnings.warn(
     UserWarning,
 )
 
-CustomOptunaOptimize_ = TypeVar("CustomOptunaOptimize_", bound="CustomOptunaOptimize")
 
-
-class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
+class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     """Base class for custom Optuna optimizer.
 
     This provides a relatively simple tpcp compatible interface to Optuna.
@@ -167,7 +165,7 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
 
     """
 
-    pipeline: Pipeline_
+    pipeline: PipelineT
     study: Study
 
     return_optimized: bool
@@ -179,12 +177,12 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
     gc_after_trial: bool
     show_progress_bar: bool
 
-    optimized_pipeline_: Pipeline_
+    optimized_pipeline_: PipelineT
     study_: Study
 
     def __init__(
         self,
-        pipeline: Pipeline_,
+        pipeline: PipelineT,
         study: Study,
         *,
         n_trials: Optional[int] = None,
@@ -256,7 +254,7 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
         """Best trial in the :class:`~optuna.study.Study`."""
         return self.study_.best_trial
 
-    def optimize(self, dataset: Dataset_, **_: Any) -> Self:
+    def optimize(self, dataset: DatasetT, **_: Any) -> Self:
         """Optimize the objective over the dataset and find the best parameter combination.
 
         This method calls `self.create_objective` to obtain the objective function that should be optimized.
@@ -297,7 +295,7 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
         )
         return study
 
-    def create_objective(self) -> Callable[[Trial, Pipeline_, Dataset_], Union[float, Sequence[float]]]:
+    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
         """Return the objective function that should be optimized.
 
         This method should be implemented by a child class and return an objective function that is compatible with
@@ -307,7 +305,7 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
         """
         raise NotImplementedError()
 
-    def _create_objective(self, pipeline: Pipeline_, dataset: Dataset_) -> ObjectiveFuncType:
+    def _create_objective(self, pipeline: PipelineT, dataset: DatasetT) -> ObjectiveFuncType:
         inner_objective = self.create_objective()
 
         def objective(trial: Trial):
@@ -317,8 +315,8 @@ class CustomOptunaOptimize(BaseOptimize[Pipeline_, Dataset_]):
         return objective
 
     def return_optimized_pipeline(  # noqa: no-self-use
-        self, pipeline: Pipeline_, dataset: Dataset_, study: Study
-    ) -> Pipeline_:
+        self, pipeline: PipelineT, dataset: DatasetT, study: Study
+    ) -> PipelineT:
         """Return the pipeline with the best parameters of a study.
 
         This either just returns the pipeline with the best parameters set, or if the pipeline is a subclass of

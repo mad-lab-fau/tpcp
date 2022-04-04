@@ -23,7 +23,7 @@ from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, PotentialUserErrorWarning, ValidationError
 
 T = TypeVar("T")
-BaseTpcpObjectObj_ = TypeVar("BaseTpcpObjectObj_", bound="BaseTpcpObject")
+BaseTpcpObjectObjT = TypeVar("BaseTpcpObjectObjT", bound="BaseTpcpObject")
 
 
 class _Nothing:
@@ -271,7 +271,7 @@ def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
     return out
 
 
-def _set_params(instance: BaseTpcpObjectObj_, **params: Any) -> BaseTpcpObjectObj_:
+def _set_params(instance: BaseTpcpObjectObjT, **params: Any) -> BaseTpcpObjectObjT:
     """Set the parameters of an instance.
 
     To set parameters of nested objects use `nested_object_name__para_name=`.

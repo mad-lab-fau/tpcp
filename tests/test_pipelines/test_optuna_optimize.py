@@ -9,16 +9,16 @@ from optuna.structs import FrozenTrial
 from tests.mixins.test_algorithm_mixin import TestAlgorithmMixin
 from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline, DummyPipeline, dummy_single_score_func
 from tpcp import make_optimize_safe
-from tpcp._dataset import Dataset_
-from tpcp._pipeline import OptimizablePipeline, Pipeline_
+from tpcp._dataset import DatasetT
+from tpcp._pipeline import OptimizablePipeline, PipelineT
 from tpcp.optimize.optuna import CustomOptunaOptimize
 from tpcp.validate import Scorer
 
 
-class DummyOptunaOptimizer(CustomOptunaOptimize[Pipeline_, Dataset_]):
+class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
     def __init__(
         self,
-        pipeline: Pipeline_,
+        pipeline: PipelineT,
         study: Study,
         scoring: Callable,
         create_search_space: Callable,
@@ -45,8 +45,8 @@ class DummyOptunaOptimizer(CustomOptunaOptimize[Pipeline_, Dataset_]):
             return_optimized=return_optimized,
         )
 
-    def create_objective(self) -> Callable[[Trial, Pipeline_, Dataset_], Union[float, Sequence[float]]]:
-        def objective(trial: Trial, pipeline: Pipeline_, dataset: Dataset_) -> float:
+    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
+        def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
             self.create_search_space(trial)
             pipeline = pipeline.set_params(**trial.params)
 
