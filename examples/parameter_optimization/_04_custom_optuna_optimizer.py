@@ -4,6 +4,11 @@ r"""
 Custom Optuna Optimizer
 =======================
 
+.. warning:: This example shows more advanced features of tpcp when using
+             `Optuna <https://optuna.readthedocs.io/en/stable/index.html>`_ for hyper-parameter optimization.
+             To make this example understandable, you should make yourself familiar with Optuna first and understand
+             how it works, before trying to go through this example.
+
 The most popular method of (Hyper-)Parameter optimization is GridSearch (or GridSearchCV for optimizable pipelines).
 These methods perform an exhaustive search of the parameter space by simply testing every option.
 Considering that training and testing an algorithm can be very costly, exhaustive gridsearch takes a long time and is
@@ -44,6 +49,17 @@ own project-specific optimizers.
 # For this example we are using the `QRSDetector` pipeline (the non-trainable version) and the `ECGExampleData` dataset.
 # Check out the other examples to learn more about them.
 # We will simply copy the code over and create an instance of both objects to be used later.
+#
+# .. note:: We make pretty extensive use of Python's optional typing features (in particular generics) in this example.
+#           This can be a little overwhelming and you might not need that in your implementation.
+#           So whenever, you see `TpcpClass[SomClassName]` and you don't understand what it means, you can safely
+#           ignore it.
+#           But just for your understanding, if you see for example `Pipeline[ECGExampleData]` you should mentally
+#           read it as "A pipeline that requires a `ECGExampleData` - dataset internally.
+#           Whenever you encounter a variable ending with a `T` (e.g. `PipelineT`, these are TypeVar types) to type
+#           generics.
+#           You should read that as "Some subclass of Pipeline, but we don't know which yet".
+#
 from pathlib import Path
 from typing import Any, Callable, Optional, Sequence, Tuple, Union
 
@@ -422,6 +438,26 @@ opti_early_stop.optimize(example_data)
 # For each of these values we saved some time.
 # For the other trials, we get the same results as earlier.
 pd.DataFrame(opti_early_stop.search_results_)
+
+# %%
+# Summary
+# -------
+# The tpcp <-> Optuna interface is a little bit more low-level than many other tpcp features.
+# Therefore, here is a short summary of the steps you need:
+#
+# 1. Create a custom optimizer than inherits from `CustomOptunaOptimize`
+# 2. Overwrite the `create_objective` method so that it returns a Callable.
+# 3. The returned callable should expect a :class:`~optuna.Trial`, a :class:`~tpcp.Pipeline`,
+#    and a :class:`~tpcp.Dataset` object as input.
+#    Otherwise, it is identical to the objective function you would write in "plain" Optuna, and hence, should only
+#    return a single cost value for the optimization.
+# 4. If your objective function requires parameter, add them as class attributes via the init.
+# 5. (optional) If you want to report additional values from your optimization, you can do that via the
+#    `set_user_attr` parameter of the :class:`~optuna.Trial` object.
+# 6. (optional) Early stopping and other Pruners can be implemented identical to Optuna.
+#    Using the callback option of :class:`~tpcp.validate.Scorer` you can even hook into the datapoint iteration to
+#    trigger early stopping.
+
 
 # %%
 # Next steps
