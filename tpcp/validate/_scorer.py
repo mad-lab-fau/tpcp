@@ -3,28 +3,13 @@ from __future__ import annotations
 
 import warnings
 from traceback import format_exc
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Generic,
-    List,
-    NewType,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-    overload,
-)
+from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast, overload
 
 import numpy as np
 from typing_extensions import Protocol
 
-from tpcp._dataset import Dataset, Dataset_
-from tpcp._pipeline import Pipeline, Pipeline_
+from tpcp._dataset import Dataset, DatasetT
+from tpcp._pipeline import Pipeline, PipelineT
 from tpcp._utils._score import _ERROR_SCORE_TYPE
 from tpcp.exceptions import ScorerFailed, ValidationError
 
@@ -33,18 +18,16 @@ T = TypeVar("T")
 SingleScoreType = float
 MultiScoreType = Dict[str, Union[float, "NoAgg"]]
 ScoreType = Union[SingleScoreType, MultiScoreType]
-ScoreType_ = TypeVar("ScoreType_", SingleScoreType, MultiScoreType)
+ScoreTypeT = TypeVar("ScoreTypeT", SingleScoreType, MultiScoreType)
 
 IndividualScoreType = Union[Dict[str, List[float]], List[float]]
 
-ScoreFuncSingle = Callable[[Pipeline_, Dataset_], SingleScoreType]
-ScoreFuncMultiple = Callable[[Pipeline_, Dataset_], MultiScoreType]
-ScoreFunc = Callable[[Pipeline_, Dataset_], ScoreType_]
-
-ScoringError = NewType("ScoringError", float)
+ScoreFuncSingle = Callable[[PipelineT, DatasetT], SingleScoreType]
+ScoreFuncMultiple = Callable[[PipelineT, DatasetT], MultiScoreType]
+ScoreFunc = Callable[[PipelineT, DatasetT], ScoreTypeT]
 
 
-class ScoreCallback(Protocol[Pipeline_, Dataset_, ScoreType_]):
+class ScoreCallback(Protocol[PipelineT, DatasetT, ScoreTypeT]):
     """Callback signature for scorer callbacks."""
 
     def __call__(
@@ -53,10 +36,10 @@ class ScoreCallback(Protocol[Pipeline_, Dataset_, ScoreType_]):
         step: int,
         # The `float` in this call signature is there, because the
         # value will be float in case of a scoring error, independent of the remaining input types
-        scores: Tuple[Union[ScoreType_, float], ...],
-        scorer: "Scorer[Pipeline_, Dataset_, ScoreType_]",
-        pipeline: Pipeline_,
-        dataset: Dataset_,
+        scores: Tuple[Union[ScoreTypeT, float], ...],
+        scorer: "Scorer[PipelineT, DatasetT, ScoreTypeT]",
+        pipeline: PipelineT,
+        dataset: DatasetT,
         error_score: _ERROR_SCORE_TYPE,
     ) -> None:
         ...
@@ -94,7 +77,7 @@ class NoAgg(Generic[T]):
         return self._value
 
 
-class Scorer(Generic[Pipeline_, Dataset_, ScoreType_]):
+class Scorer(Generic[PipelineT, DatasetT, ScoreTypeT]):
     """A scorer to score multiple data points of a dataset and average the results.
 
     Parameters
@@ -131,14 +114,14 @@ class Scorer(Generic[Pipeline_, Dataset_, ScoreType_]):
     """
 
     kwargs: Dict[str, Any]
-    _score_func: ScoreFunc[Pipeline_, Dataset_, ScoreType_]
-    _single_score_func: Optional[ScoreCallback[Pipeline_, Dataset_, ScoreType_]]
+    _score_func: ScoreFunc[PipelineT, DatasetT, ScoreTypeT]
+    _single_score_func: Optional[ScoreCallback[PipelineT, DatasetT, ScoreTypeT]]
 
     def __init__(
         self,
-        score_func: ScoreFunc[Pipeline_, Dataset_, ScoreType_],
+        score_func: ScoreFunc[PipelineT, DatasetT, ScoreTypeT],
         *,
-        single_score_callback: Optional[ScoreCallback[Pipeline_, Dataset_, ScoreType_]] = None,
+        single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT, ScoreTypeT]] = None,
         **kwargs: Any,
     ):
         self.kwargs = kwargs
@@ -149,8 +132,8 @@ class Scorer(Generic[Pipeline_, Dataset_, ScoreType_]):
     # For the aggregated scores, we can easily parameterize the value based on the generic, but not for the single
     # scores
     def __call__(
-        self, pipeline: Pipeline_, dataset: Dataset_, error_score: _ERROR_SCORE_TYPE
-    ) -> Tuple[Union[ScoreType_, float], IndividualScoreType]:
+        self, pipeline: PipelineT, dataset: DatasetT, error_score: _ERROR_SCORE_TYPE
+    ) -> Tuple[Union[ScoreTypeT, float], IndividualScoreType]:
         """Score the pipeline with the provided data.
 
         Returns
@@ -168,10 +151,10 @@ class Scorer(Generic[Pipeline_, Dataset_, ScoreType_]):
         return float(np.mean(scores))
 
     def _score(
-        self, pipeline: Pipeline_, dataset: Dataset_, error_score: _ERROR_SCORE_TYPE
-    ) -> Tuple[Union[ScoreType_, float], IndividualScoreType]:
+        self, pipeline: PipelineT, dataset: DatasetT, error_score: _ERROR_SCORE_TYPE
+    ) -> Tuple[Union[ScoreTypeT, float], IndividualScoreType]:
         # `float` because the return value in case of an exception will always be float
-        scores: List[Union[ScoreType_, float]] = []
+        scores: List[Union[ScoreTypeT, float]] = []
         for i, d in enumerate(dataset):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
@@ -205,7 +188,7 @@ class Scorer(Generic[Pipeline_, Dataset_, ScoreType_]):
         return aggregate_scores(scores, self.aggregate)  # type: ignore
 
 
-ScorerTypes = Union[ScoreFunc[Pipeline_, Dataset_, ScoreType_], Scorer[Pipeline_, Dataset_, ScoreType_], None]
+ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT, ScoreTypeT], Scorer[PipelineT, DatasetT, ScoreTypeT], None]
 
 
 def _validate_score_return_val(value: ScoreType):
@@ -227,16 +210,16 @@ def _validate_score_return_val(value: ScoreType):
     )
 
 
-def _passthrough_scoring(pipeline: Pipeline[Dataset_], datapoint: Dataset_):
+def _passthrough_scoring(pipeline: Pipeline[DatasetT], datapoint: DatasetT):
     """Call the score method of the pipeline to score the input."""
     return pipeline.score(datapoint)
 
 
 def _validate_scorer(
-    scoring: ScorerTypes[Pipeline_, Dataset_, Any],
-    pipeline: Pipeline_,
+    scoring: ScorerTypes[PipelineT, DatasetT, Any],
+    pipeline: PipelineT,
     base_class: Type[Scorer[Any, Any, Any]] = Scorer,
-) -> Scorer[Pipeline_, Dataset_, Any]:
+) -> Scorer[PipelineT, DatasetT, Any]:
     """Convert the provided scoring method into a valid scorer object."""
     if scoring is None:
         # If scoring is None, we will try to use the score method of the pipeline

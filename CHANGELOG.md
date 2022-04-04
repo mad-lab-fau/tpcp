@@ -23,8 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - (experimental) Torch compatibility for hash based comparisons (e.g. in the `safe_run` wrapper). Before the wrapper 
   would fail, with torch module subclasses, as their pickle based hashes where not consistent.
   We implemented a custom hash function that should solve this.
-  For now, we will consider this feature experimental, as we are not sure if it breaks in certain usecases.
+  For now, we will consider this feature experimental, as we are not sure if it breaks in certain use-cases.
   (https://github.com/mad-lab-fau/tpcp/pull/33)
+- `tpcp.types` now exposes a bunch of internal types that might be helpful to type custom Pipelines and Optimizers.
 
 ### Changed
 
@@ -33,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (https://github.com/mad-lab-fau/tpcp/pull/29)
 - `cf` now has "faked" return type, so that type checkers in the user code, do not complain anymore.
   (https://github.com/mad-lab-fau/tpcp/pull/29)
+- All TypeVar Variables are now called `SomethingT` instead of `Something_`
 
 ## [0.5.0] - 2022-03-15
 

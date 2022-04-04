@@ -9,7 +9,7 @@ from typing_extensions import Self
 from tpcp._algorithm_utils import make_optimize_safe
 from tpcp._base import BaseTpcpObject
 
-Algorithm_ = TypeVar("Algorithm_", bound="Algorithm")
+AlgorithmT = TypeVar("AlgorithmT", bound="Algorithm")
 
 
 class Algorithm(BaseTpcpObject, _skip_validation=True):

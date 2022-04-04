@@ -19,10 +19,10 @@ from typing_extensions import Self
 from tpcp import OptimizablePipeline
 from tpcp._algorithm_utils import OPTIMIZE_METHOD_INDICATOR, _check_safe_optimize
 from tpcp._base import _get_annotated_fields_of_type
-from tpcp._dataset import Dataset_
+from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
 from tpcp._parameters import Parameter, _ParaTypes
-from tpcp._pipeline import OptimizablePipeline_, Pipeline_
+from tpcp._pipeline import OptimizablePipelineT, PipelineT
 from tpcp._utils._general import (
     _aggregate_final_results,
     _normalize_score_results,
@@ -32,10 +32,10 @@ from tpcp._utils._general import (
 from tpcp._utils._multiprocess import TqdmParallel
 from tpcp._utils._score import _ERROR_SCORE_TYPE, _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
-from tpcp.validate._scorer import ScorerTypes, ScoreType_, _validate_scorer
+from tpcp.validate._scorer import ScorerTypes, ScoreTypeT, _validate_scorer
 
 
-class DummyOptimize(BaseOptimize[Pipeline_, Dataset_], _skip_validation=True):
+class DummyOptimize(BaseOptimize[PipelineT, DatasetT], _skip_validation=True):
     """Provide API compatibility for SimplePipelines in optimize wrappers.
 
     This is a simple dummy Optimizer that will **not** optimize anything, but just provide the correct API so that
@@ -63,14 +63,14 @@ class DummyOptimize(BaseOptimize[Pipeline_, Dataset_], _skip_validation=True):
 
     """
 
-    pipeline: Parameter[Pipeline_]
+    pipeline: Parameter[PipelineT]
 
-    optimized_pipeline_: Pipeline_
+    optimized_pipeline_: PipelineT
 
-    def __init__(self, pipeline: Pipeline_) -> None:  # noqa: super-init-not-called
+    def __init__(self, pipeline: PipelineT) -> None:  # noqa: super-init-not-called
         self.pipeline = pipeline
 
-    def optimize(self, dataset: Dataset_, **optimize_params: Any) -> Self:
+    def optimize(self, dataset: DatasetT, **optimize_params: Any) -> Self:
         """Run the "dummy" optimization.
 
         Parameters
@@ -99,7 +99,7 @@ class DummyOptimize(BaseOptimize[Pipeline_, Dataset_], _skip_validation=True):
         return self
 
 
-class Optimize(BaseOptimize[OptimizablePipeline_, Dataset_]):
+class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
     """Run a generic self-optimization on the pipeline.
 
     This is a simple wrapper for pipelines that already implement a `self_optimize` method.
@@ -134,18 +134,18 @@ class Optimize(BaseOptimize[OptimizablePipeline_, Dataset_]):
 
     """
 
-    pipeline: Parameter[OptimizablePipeline_]
+    pipeline: Parameter[OptimizablePipelineT]
     safe_optimize: bool
 
-    optimized_pipeline_: OptimizablePipeline_
+    optimized_pipeline_: OptimizablePipelineT
 
     def __init__(  # noqa: super-init-not-called
-        self, pipeline: OptimizablePipeline_, *, safe_optimize: bool = True
+        self, pipeline: OptimizablePipelineT, *, safe_optimize: bool = True
     ) -> None:
         self.pipeline = pipeline
         self.safe_optimize = safe_optimize
 
-    def optimize(self, dataset: Dataset_, **optimize_params: Any) -> Self:
+    def optimize(self, dataset: DatasetT, **optimize_params: Any) -> Self:
         """Run the self-optimization defined by the pipeline.
 
         The optimized version of the pipeline is stored as `self.optimized_pipeline_`.
@@ -186,7 +186,7 @@ class Optimize(BaseOptimize[OptimizablePipeline_, Dataset_]):
         return self
 
 
-class GridSearch(BaseOptimize[Pipeline_, Dataset_], Generic[Pipeline_, Dataset_, ScoreType_]):
+class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT, ScoreTypeT]):
     """Perform a grid search over various parameters.
 
     This scores the pipeline for every combination of data points in the provided dataset and parameter combinations
@@ -286,7 +286,7 @@ class GridSearch(BaseOptimize[Pipeline_, Dataset_], Generic[Pipeline_, Dataset_,
     """
 
     parameter_grid: ParameterGrid
-    scoring: ScorerTypes[Pipeline_, Dataset_, ScoreType_]
+    scoring: ScorerTypes[PipelineT, DatasetT, ScoreTypeT]
     n_jobs: Optional[int]
     return_optimized: Union[bool, str]
     pre_dispatch: Union[int, str]
@@ -301,10 +301,10 @@ class GridSearch(BaseOptimize[Pipeline_, Dataset_], Generic[Pipeline_, Dataset_,
 
     def __init__(  # noqa: super-init-not-called
         self,
-        pipeline: Pipeline_,
+        pipeline: PipelineT,
         parameter_grid: ParameterGrid,
         *,
-        scoring: ScorerTypes[Pipeline_, Dataset_, ScoreType_] = None,
+        scoring: ScorerTypes[PipelineT, DatasetT, ScoreTypeT] = None,
         n_jobs: Optional[int] = None,
         return_optimized: Union[bool, str] = True,
         pre_dispatch: Union[int, str] = "n_jobs",
@@ -320,7 +320,7 @@ class GridSearch(BaseOptimize[Pipeline_, Dataset_], Generic[Pipeline_, Dataset_,
         self.error_score = error_score
         self.progress_bar = progress_bar
 
-    def optimize(self, dataset: Dataset_, **_: Any) -> Self:
+    def optimize(self, dataset: DatasetT, **_: Any) -> Self:
         """Run the grid search over the dataset and find the best parameter combination.
 
         Parameters
@@ -434,7 +434,7 @@ class GridSearch(BaseOptimize[Pipeline_, Dataset_], Generic[Pipeline_, Dataset_,
         return results
 
 
-class GridSearchCV(BaseOptimize[OptimizablePipeline_, Dataset_], Generic[OptimizablePipeline_, Dataset_, ScoreType_]):
+class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[OptimizablePipelineT, DatasetT, ScoreTypeT]):
     """Exhaustive (hyper)parameter search using a cross validation based score to optimize pipeline parameters.
 
     This class follows as much as possible the interface of :func:`~sklearn.model_selection.GridSearchCV`.
@@ -584,9 +584,9 @@ class GridSearchCV(BaseOptimize[OptimizablePipeline_, Dataset_], Generic[Optimiz
 
     """
 
-    pipeline: OptimizablePipeline_
+    pipeline: OptimizablePipelineT
     parameter_grid: ParameterGrid
-    scoring: ScorerTypes[OptimizablePipeline_, Dataset_, ScoreType_]
+    scoring: ScorerTypes[OptimizablePipelineT, DatasetT, ScoreTypeT]
     return_optimized: Union[bool, str]
     cv: Optional[Union[int, BaseCrossValidator, Iterator]]
     pure_parameters: Union[bool, List[str]]
@@ -607,10 +607,10 @@ class GridSearchCV(BaseOptimize[OptimizablePipeline_, Dataset_], Generic[Optimiz
 
     def __init__(  # noqa: super-init-not-called
         self,
-        pipeline: OptimizablePipeline_,
+        pipeline: OptimizablePipelineT,
         parameter_grid: ParameterGrid,
         *,
-        scoring: ScorerTypes[OptimizablePipeline_, Dataset_, ScoreType_] = None,
+        scoring: ScorerTypes[OptimizablePipelineT, DatasetT, ScoreTypeT] = None,
         return_optimized: Union[bool, str] = True,
         cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
         pure_parameters: Union[bool, List[str]] = False,
@@ -636,7 +636,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipeline_, Dataset_], Generic[Optimiz
         self.progress_bar = progress_bar
         self.safe_optimize = safe_optimize
 
-    def optimize(self, dataset: Dataset_, *, groups=None, **optimize_params) -> Self:  # noqa: arguments-differ
+    def optimize(self, dataset: DatasetT, *, groups=None, **optimize_params) -> Self:  # noqa: arguments-differ
         self.dataset = dataset
         scoring = _validate_scorer(self.scoring, self.pipeline)
 

@@ -18,9 +18,9 @@ from tpcp.exceptions import PotentialUserErrorWarning
 
 if TYPE_CHECKING:
     from tpcp import Algorithm, OptimizableAlgorithm, OptimizablePipeline
-    from tpcp._algorithm import Algorithm_
+    from tpcp._algorithm import AlgorithmT
 
-    Optimizable_ = TypeVar("Optimizable_", OptimizablePipeline, OptimizableAlgorithm)
+    OptimizableT = TypeVar("OptimizableT", OptimizablePipeline, OptimizableAlgorithm)
 
 ACTION_METHOD_INDICATOR = "__tpcp_action_method"
 OPTIMIZE_METHOD_INDICATOR = "__tpcp_optimize_method"
@@ -125,11 +125,11 @@ def is_action_applied(instance: Algorithm) -> bool:
     return True
 
 
-def _check_safe_run(algorithm: Algorithm_, old_method: Callable, *args: Any, **kwargs: Any) -> Algorithm_:
+def _check_safe_run(algorithm: AlgorithmT, old_method: Callable, *args: Any, **kwargs: Any) -> AlgorithmT:
     """Run the pipeline and check that run behaved as expected."""
     before_paras = algorithm.get_params()
     before_paras_hash = custom_hash(before_paras)
-    output: Algorithm_
+    output: AlgorithmT
     if hasattr(old_method, "__self__"):
         # In this case the method is already bound and we do not need to pass the algo as first argument
         output = old_method(*args, **kwargs)
@@ -165,8 +165,8 @@ def _check_safe_run(algorithm: Algorithm_, old_method: Callable, *args: Any, **k
 
 
 def make_action_safe(
-    action_method: Callable[Concatenate[Algorithm_, P], Algorithm_]
-) -> Callable[Concatenate[Algorithm_, P], Algorithm_]:
+    action_method: Callable[Concatenate[AlgorithmT, P], AlgorithmT]
+) -> Callable[Concatenate[AlgorithmT, P], AlgorithmT]:
     """Mark a method as an "action" and apply a set of runtime checks to prevent implementation errors.
 
     This decorator marks a method as action.
@@ -201,7 +201,7 @@ def make_action_safe(
         return action_method
 
     @wraps(action_method)
-    def safe_wrapped(self: Algorithm_, *args: P.args, **kwargs: P.kwargs) -> Algorithm_:
+    def safe_wrapped(self: AlgorithmT, *args: P.args, **kwargs: P.kwargs) -> AlgorithmT:
         if action_method.__name__ not in get_action_methods_names(self):
             warnings.warn(
                 "The `make_action_safe` decorator should only be applied to an action method "
@@ -239,7 +239,7 @@ def _get_nested_opti_paras(algorithm: Algorithm, opti_para_names: List[str]) -> 
     return optimizable_paras, other_paras
 
 
-def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: Any, **kwargs: Any) -> Optimizable_:
+def _check_safe_optimize(algorithm: OptimizableT, old_method: Callable, *args: Any, **kwargs: Any) -> OptimizableT:
     # record the hash of the pipeline to make an educated guess if the optimization works
     opti_para_names = _get_annotated_fields_of_type(algorithm, _ParaTypes.OPTI)
     optimizable_paras, other_paras = _get_nested_opti_paras(algorithm, opti_para_names)
@@ -251,7 +251,7 @@ def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: A
         )
     before_hash_optimizable = custom_hash(optimizable_paras)
     before_hash_other = custom_hash(other_paras)
-    optimized_algorithm: Optimizable_
+    optimized_algorithm: OptimizableT
     if hasattr(old_method, "__self__"):
         # In this case the method is already bound and we do not need to pass the algo as first argument
         optimized_algorithm = old_method(*args, **kwargs)
@@ -316,8 +316,8 @@ def _check_safe_optimize(algorithm: Optimizable_, old_method: Callable, *args: A
 
 
 def make_optimize_safe(
-    self_optimize_method: Callable[Concatenate[Optimizable_, P], Optimizable_]
-) -> Callable[Concatenate[Optimizable_, P], Optimizable_]:
+    self_optimize_method: Callable[Concatenate[OptimizableT, P], OptimizableT]
+) -> Callable[Concatenate[OptimizableT, P], OptimizableT]:
     """Apply a set of runtime checks to a custom `self_optimize` method to prevent implementation errors.
 
     The following things are checked:
@@ -356,7 +356,7 @@ def make_optimize_safe(
         return self_optimize_method
 
     @wraps(self_optimize_method)
-    def safe_wrapped(self: Optimizable_, *args: P.args, **kwargs: P.kwargs) -> Optimizable_:
+    def safe_wrapped(self: OptimizableT, *args: P.args, **kwargs: P.kwargs) -> OptimizableT:
         if self_optimize_method.__name__ != "self_optimize":
             warnings.warn(
                 "The `make_optimize_safe` decorator is only meant for the `self_optimize` method, but you applied it "
