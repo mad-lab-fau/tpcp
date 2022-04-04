@@ -69,20 +69,12 @@ To make `tpcp` easy to use, we try to focus on a couple of key ideas:
 We are using [poetry](https://python-poetry.org/) to manage dependencies and 
 [poethepoet](https://github.com/nat-n/poethepoet) to run and manage dev tasks.
 
-To set up the dev environment run the following commands:
-
-```bash
-git clone https://github.com/mad-lab-fau/tpcp
-cd tpcp
-poetry install  -E torch # This might take a while
-```
-
 To set up the dev environment *including* the required dependencies for using `tpcp` together with `optuna` 
 run the following commands: 
 ```bash
 git clone https://github.com/mad-lab-fau/tpcp
 cd tpcp
-poetry install -E optuna  # This might take a while
+poetry install -E optuna -E torch # This might take a while
 ```
 
 
