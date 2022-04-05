@@ -1,3 +1,4 @@
+from typing import Dict
 from unittest.mock import patch
 
 import pytest
@@ -224,12 +225,24 @@ class TestSafeOptimize:
             self.para += 1
             return self
 
-    def test_non_opti_para_changed(self):
+    class PipelineModifyOtherParasMutable(OptimizablePipeline):
+        para: Parameter[Dict]
+        opti_para: OptimizableParameter[int]
+
+        def __init__(self, para=cf({}), opti_para: int = 0):
+            self.para = para
+            self.opti_para = opti_para
+
+        def self_optimize(self, dataset: Dataset, **kwargs):
+            self.opti_para += 1
+            self.para["a"] = 3
+            return self
+
+    @pytest.mark.parametrize("klass", (PipelineModifyOtherParas, PipelineModifyOtherParasMutable))
+    def test_non_opti_para_changed(self, klass):
 
         with pytest.raises(RuntimeError) as e:
-            make_optimize_safe(self.PipelineModifyOtherParas.self_optimize)(
-                self.PipelineModifyOtherParas(), DummyDataset()
-            )
+            make_optimize_safe(klass.self_optimize)(klass(), DummyDataset())
 
         assert "optimizable: ['para']" in str(e.value)
 
@@ -257,7 +270,7 @@ class TestSafeOptimize:
                 self.PipelineModifyNestedParas(), DummyDataset()
             )
 
-        assert "optimizable: ['nested__para_1']" in str(e.value)
+        assert "optimizable: ['nested', 'nested__para_1']" in str(e.value)
 
     class PipelineModifyNestedParasSpecific(OptimizablePipeline):
         para: Parameter[int]

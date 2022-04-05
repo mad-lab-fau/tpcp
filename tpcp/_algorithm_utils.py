@@ -251,6 +251,10 @@ def _check_safe_optimize(algorithm: OptimizableT, old_method: Callable, *args: A
         )
     before_hash_optimizable = custom_hash(optimizable_paras)
     before_hash_other = custom_hash(other_paras)
+    # We also precalculate the hash of the indidividual inputs here.
+    # Otherwise, we can not capture the "before" state correctly, in case some parameters are mutables (container,
+    # or custom object instances)
+    before_hash_other_individual = {k: custom_hash(v) for k, v in other_paras.items()}
     optimized_algorithm: OptimizableT
     if hasattr(old_method, "__self__"):
         # In this case the method is already bound and we do not need to pass the algo as first argument
@@ -291,11 +295,18 @@ def _check_safe_optimize(algorithm: OptimizableT, old_method: Callable, *args: A
         added_paras = set(after_other_paras) - set(other_paras)
         changed_paras = []
         for k in set(other_paras) - set(removed_paras):
-            if custom_hash(other_paras[k]) != custom_hash(after_other_paras[k]):
+            if before_hash_other_individual[k] != custom_hash(after_other_paras[k]):
                 changed_paras.append(k)
         changed_paras = sorted(changed_paras)
         changed_paras.extend([f"{p} (removed)" for p in sorted(removed_paras)])
         changed_paras.extend([f"{p} (added)" for p in sorted(added_paras)])
+        if not removed_paras and not added_paras and not changed_paras:
+            raise ValueError(
+                "Optimizing the pipeline has modified parameters that are not marked as optimizable. "
+                "However, we could not determine, which parameter actual changed. "
+                "This could hint at a bug with the way `tpcp` hashes objects. "
+                "Consider submitting a bug report for tpcp on github with a minimal example to reproduce this issue"
+            )
         raise RuntimeError(
             "Optimizing the pipeline has modified the following parameters, that were not marked as optimizable: "
             f"{changed_paras}. "
