@@ -5,7 +5,36 @@ import sys
 from joblib.hashing import Hasher, NumpyHasher
 
 
-class TorchHasher(NumpyHasher):
+class NoMemoizeHasher(Hasher):
+    """A joblib hasher with all memoize features disabled."""
+
+    def memoize(self, obj):
+        # We skip memoization here, as it can cause some issues with nested objects.
+        # https://github.com/joblib/joblib/issues/1283
+        # In particular with the way cloning is implemented in tpcp, such bugs might occur more often than in other
+        # applications.
+        # My understanding is that memoization is used to reduce the size of the output.
+        # Not using memoization is actually faster, but will fail with self referential objects.
+        # (https://docs.python.org/3/library/pickle.html#pickle.Pickler.fast).
+        # In these cases hashing will throw an `RecursionError`.
+        # So it seems like it is a tradeoff between the two issues.
+        # For now, we accept the recursion issue, as I think this might happen less often by accident.
+        return
+
+    def hash(self, obj, return_digest=True):
+        try:
+            return super().hash(obj, return_digest)
+        except RecursionError as e:
+            raise ValueError(
+                "The custom hasher used in tpcp does not support hashing of self-referential objects."
+            ) from e
+
+
+class NoMemoizeNumpyHasher(NumpyHasher, NoMemoizeHasher):
+    """A joblib numpy hasher with all memoize features disabled."""
+
+
+class TorchHasher(NoMemoizeNumpyHasher):
     """A hasher that can handle torch models.
 
     Under the hood this uses the new implementation of `torch.save` to serialize the model.
@@ -53,7 +82,7 @@ def custom_hash(obj, hash_name="md5", coerce_mmap=False):
     if "torch" in sys.modules:
         hasher = TorchHasher(hash_name=hash_name, coerce_mmap=coerce_mmap)
     elif "numpy" in sys.modules:
-        hasher = NumpyHasher(hash_name=hash_name, coerce_mmap=coerce_mmap)
+        hasher = NoMemoizeNumpyHasher(hash_name=hash_name, coerce_mmap=coerce_mmap)
     else:
-        hasher = Hasher(hash_name=hash_name)
+        hasher = NoMemoizeHasher(hash_name=hash_name)
     return hasher.hash(obj)
