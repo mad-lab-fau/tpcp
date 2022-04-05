@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Fixed bug with tensor hashing (https://github.com/mad-lab-fau/tpcp/pull/37)
-- Fixed a issue with memoization during hashing (https://github.com/mad-lab-fau/tpcp/pull/37)
+- Fixed an issue with memoization during hashing (https://github.com/mad-lab-fau/tpcp/pull/37)
+- Fixed an issue that the `safe_optimize_wrapper` could not correctly detect changes to mutable objects.
+  This is now fixed by pre-calculating all the hashes. (https://github.com/mad-lab-fau/tpcp/pull/38)
 
 ## [0.6.0] - 2022-04-04
 
