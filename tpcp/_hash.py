@@ -21,7 +21,7 @@ class TorchHasher(NumpyHasher):
         self.torch = torch
 
     def save(self, obj):
-        if isinstance(obj, self.torch.nn.Module):
+        if isinstance(obj, (self.torch.nn.Module, self.torch.Tensor)):
             b = bytes()
             buffer = io.BytesIO(b)
             self.torch.save(obj, buffer)

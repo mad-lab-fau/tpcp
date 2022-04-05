@@ -1,7 +1,9 @@
 import joblib
+import pytest
 import torch
 from torch import nn
 
+from tpcp import Algorithm, clone
 from tpcp._hash import custom_hash
 
 
@@ -12,6 +14,11 @@ class TorchModel(nn.Module):
 
     def forward(self, x):
         return self.readout(x)
+
+
+@pytest.fixture(params=(TorchModel(), torch.tensor([0, 1, 2])))
+def torch_objects(request):
+    return request.param
 
 
 def test_hash_model():
@@ -28,10 +35,25 @@ def test_hash_model():
 
 
 def test_hash_tensor():
-    # This should work even without our custom implementation, but let's be safe and test it.
     data = [0, 1, 2]
+    tensor = torch.tensor(data)
 
-    first = custom_hash(torch.tensor(data))
+    first = custom_hash(tensor)
+    cloned = custom_hash(clone(tensor))
     second = custom_hash(torch.tensor(data))
 
     assert first == second
+    assert first == cloned
+
+
+@pytest.mark.parametrize("c", (list, tuple))
+def test_container_tensor(torch_objects, c):
+
+    tmp = c([torch_objects])
+    assert custom_hash(tmp) == custom_hash(clone(tmp))
+
+
+def test_dict_tensor(torch_objects):
+
+    tmp = {"a": torch_objects}
+    assert custom_hash(tmp) == custom_hash(clone(tmp))
