@@ -1414,7 +1414,7 @@ torch = ["torch"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.7.1,<3.11"
-content-hash = "88a7ac4f7f14ece76242f2d891b1cc20303480e458564b31ba53799e358ed2d7"
+content-hash = "0dbb546a7aeb459ca1d60cb26fd39f6d4a05ff83c2febb4c191d68849345a8b1"
 
 [metadata.files]
 alabaster = [
