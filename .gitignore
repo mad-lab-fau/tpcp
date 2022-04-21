@@ -295,9 +295,6 @@ $RECYCLE.BIN/
 # local poetry config
 poetry.toml
 
-# poetry.lock file for package development
-poetry.lock
-
 # Virtual env
 .venv
 
