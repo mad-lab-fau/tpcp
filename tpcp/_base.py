@@ -430,6 +430,9 @@ def clone(algorithm: T, *, safe: bool = False) -> T:
     """
     if algorithm is NOTHING:
         return algorithm
+    # Handle named tuple
+    if isinstance(algorithm, tuple) and hasattr(algorithm, "_asdict") and hasattr(algorithm, "_fields"):
+        return type(algorithm)(*(clone(a, safe=safe) for a in algorithm))  # noqa: to-many-function-args
     # XXX: not handling dictionaries
     if isinstance(algorithm, (list, tuple, set, frozenset)):
         return type(algorithm)([clone(a, safe=safe) for a in algorithm])  # noqa: to-many-function-args

@@ -1,4 +1,5 @@
 """This tests the BaseAlgorithm and fundamental functionality."""
+from collections import namedtuple
 from inspect import Parameter, signature
 from typing import Any, Dict, Tuple
 
@@ -235,6 +236,34 @@ def test_clone_mutable():
     assert test_instance.mutable is mutable
     assert cloned_instance.mutable is not mutable
     assert joblib.hash(cloned_instance.mutable) == joblib.hash(test_instance.mutable) == joblib.hash(mutable)
+
+
+@pytest.mark.parametrize("mutable", [True, False])
+def test_clone_namedtuple(mutable):
+    """Test that objects with namedtuples are cloned correctly.
+
+    We expect a deepcopy of the named tuple and all its elements
+    """
+    # create a new namedtuple
+    namedtuple_class = namedtuple("namedtuple_class", ["a", "b"])
+    # Create named tuple with either mutable or imutable elements
+    if mutable:
+        namedtuple_instance = namedtuple_class(a={"a": "a"}, b={"b": "b"})
+    else:
+        # Note: we use tuples here, as they are immutable, but we can still use `is` to check the mem address
+        namedtuple_instance = namedtuple_class(a=("a",), b=("b",))
+
+    test_class = create_test_class("test", params={"namedtuple": namedtuple_instance})
+
+    # Test clone with instance
+    # We expect that the cloned namedtuple has the same content as the original, but the memory address is different
+    cloned_class = clone(test_class)
+    cloned_named_tuble = cloned_class.namedtuple
+    assert namedtuple_instance is not cloned_named_tuble
+    assert namedtuple_instance.a is not cloned_named_tuble.a
+    assert namedtuple_instance.b is not cloned_named_tuble.b
+    assert namedtuple_instance.a == cloned_named_tuble.a
+    assert namedtuple_instance.b == cloned_named_tuble.b
 
 
 def test_mutable_default_nested_objects_error():
