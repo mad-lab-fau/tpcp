@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+
+- We removed the `OptimizableAlgorithm` base class, as it is not really useful.
+  We recommend implementing your own base class or mixin if you are implementing a set of algorithms that need a normal
+  and an optimizable version. 
+
 ## [0.6.3] - 2022-05-31
 
 - It is now possible to use namedtuples as parameters and they are correctly cloned
