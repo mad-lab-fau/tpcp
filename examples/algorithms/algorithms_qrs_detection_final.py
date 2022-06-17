@@ -16,15 +16,7 @@ from scipy import signal
 from scipy.spatial import cKDTree, minkowski_distance
 from sklearn.metrics import roc_curve
 
-from tpcp import (
-    Algorithm,
-    HyperParameter,
-    OptimizableAlgorithm,
-    OptimizableParameter,
-    Parameter,
-    make_action_safe,
-    make_optimize_safe,
-)
+from tpcp import Algorithm, HyperParameter, OptimizableParameter, Parameter, make_action_safe, make_optimize_safe
 
 
 def match_events_with_reference(
@@ -183,7 +175,7 @@ class QRSDetector(Algorithm):
         return signal.sosfiltfilt(sos, ecg_signal)
 
 
-class OptimizableQrsDetector(QRSDetector, OptimizableAlgorithm):
+class OptimizableQrsDetector(QRSDetector):
     min_r_peak_height_over_baseline: OptimizableParameter[float]
     r_peak_match_tolerance_s: HyperParameter[float]
 

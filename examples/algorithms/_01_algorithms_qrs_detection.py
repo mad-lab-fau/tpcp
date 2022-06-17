@@ -164,23 +164,25 @@ plt.show()
 # Therefore, we will create a second implementation of our algorithm that is *trainable*.
 # Meaning, we will implement a method (`self_optimize`) that is able to estimate a suitable value for our cutoff
 # based on some training data.
+# Note, that we do not provide a generic base class for optimizable algorithms.
+# If you need one, create your own class with a call signature for `self_optimize` that makes sense for the group of
+# algorithms you are trying to implement.
 #
 # From an implementation perspective, this means that we need to do the following things:
 #
-# 1. Our Algorithms now needs to inherit from :class:`~tpcp.OptimizableAlgorithm`
-# 2. We need to mark the parameters that we want to optimize as `OptimizableParameter` using the type annotations on
-#    the class level.
-# 3. Implement a `self_optimize` method that takes the data of multiple recordings including the reference labels to
+# 1. Implement a `self_optimize` method that takes the data of multiple recordings including the reference labels to
 #    calculate a suitable threshold. This method should modify only parameters marked as `OptimizableParameter` and then
 #    return `self`.
-# 4. We introduce a new parameter called `r_peak_match_tolerance_s` that is used by our `self_optimize` method.
+# 2. We need to mark the parameters that we want to optimize as `OptimizableParameter` using the type annotations on
+#    the class level.
+# 3. We introduce a new parameter called `r_peak_match_tolerance_s` that is used by our `self_optimize` method.
 #    Changing it, changes the output of our optimization.
 #    Therefore, it is a Hyper-Parameter of our method.
 #    We mark it as such using the type-hints on class level.
 # 5. (Optional) Wrap the `self_optimize` method with the :func:`~tpcp.make_optimize_safe` decorator. It will perform
 #    some runtime checks and inform us, if we did not implement `self_optimize` as expected.
 #
-# .. note:: The process required to implement an `OptimizableAlgorithm` will always be very similar to what we did
+# .. note:: The process required to implement an optimizable algorith will always be very similar to what we did
 #           here.
 #           It doesn't matter, if the optimization only optimizes a threshold or trains a neuronal network.
 #           The structure will be very similar.
@@ -196,10 +198,10 @@ plt.show()
 from sklearn.metrics import roc_curve
 
 from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference
-from tpcp import HyperParameter, OptimizableAlgorithm, OptimizableParameter, make_optimize_safe
+from tpcp import HyperParameter, OptimizableParameter, make_optimize_safe
 
 
-class OptimizableQrsDetector(QRSDetector, OptimizableAlgorithm):
+class OptimizableQrsDetector(QRSDetector):
     min_r_peak_height_over_baseline: OptimizableParameter[float]
     r_peak_match_tolerance_s: HyperParameter[float]
 

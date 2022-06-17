@@ -1,5 +1,5 @@
 """tpcp - Tiny Pipelines for Complicated Problems."""
-from tpcp._algorithm import Algorithm, OptimizableAlgorithm
+from tpcp._algorithm import Algorithm
 from tpcp._algorithm_utils import (
     get_action_method,
     get_action_methods_names,
@@ -42,7 +42,6 @@ __all__ = [
     "Parameter",
     "Para",
     "Algorithm",
-    "OptimizableAlgorithm",
     "BaseTpcpObject",
     "Dataset",
     "Pipeline",

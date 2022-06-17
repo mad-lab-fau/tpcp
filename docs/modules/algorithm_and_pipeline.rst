@@ -11,7 +11,6 @@ Classes
    :template: class_with_private.rst
 
     Algorithm
-    OptimizableAlgorithm
     Pipeline
     OptimizablePipeline
 

@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Tuple, TypeVar, Union
+from typing import Tuple, TypeVar, Union
 
-from typing_extensions import Self
-
-from tpcp._algorithm_utils import make_optimize_safe
 from tpcp._base import BaseTpcpObject
 
 AlgorithmT = TypeVar("AlgorithmT", bound="Algorithm")
@@ -20,6 +17,12 @@ class Algorithm(BaseTpcpObject, _skip_validation=True):
     1. overwrite `_action_method` with the name of the actual action method of this class type
     2. implement a stub for the action method
 
+    If you want to create an optimizable algorithm, add a `self_optimize` method to your class.
+    We do not provide a separate base class for that, as we can make no assumptions about the call signature of your
+    custom `self_optimize` method.
+    If you need an "optimizable" version for a group of algorithms you are working with, create a custom
+    `OptimizableAlgorithm` class or `OptimizableAlgorithmMixing` that is specific to your algorithm.
+
     Attributes
     ----------
     _action_methods
@@ -28,26 +31,3 @@ class Algorithm(BaseTpcpObject, _skip_validation=True):
     """
 
     _action_methods: Union[Tuple[str, ...], str]
-
-
-class OptimizableAlgorithm(Algorithm, _skip_validation=True):
-    """Base class for algorithms with distinct parameter optimization."""
-
-    @make_optimize_safe
-    def self_optimize(self, *args: Any, **kwargs: Any) -> Self:
-        """Optimize the input parameter of the algorithm using any logic.
-
-        This method can be used to adapt the input parameters (values provided in the init) based on any data-driven
-        heuristic.
-
-        .. note::
-            The optimizations must **only** modify the input parameters that are marked as
-            `optiparas`/`optimizable_parameters`.
-
-        Returns
-        -------
-        self
-            The class instance with optimized input parameters.
-
-        """
-        raise NotImplementedError()
