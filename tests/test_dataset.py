@@ -201,7 +201,13 @@ class TestDataset:
         )
 
     @pytest.mark.parametrize(
-        "index,what_to_expect", [(pd.DataFrame(), "Provided index is not formatted correctly",),],
+        "index,what_to_expect",
+        [
+            (
+                pd.DataFrame(),
+                "Provided index is not formatted correctly",
+            ),
+        ],
     )
     def test_get_subset_index_error_input(self, index, what_to_expect):
         with pytest.raises(ValueError, match=what_to_expect):
@@ -223,7 +229,12 @@ class TestDataset:
 
     @pytest.mark.parametrize(
         "bool_map,what_to_expect",
-        [(_create_random_bool_map(12, 68752868)[:-1], "Parameter bool_map must have length",),],
+        [
+            (
+                _create_random_bool_map(12, 68752868)[:-1],
+                "Parameter bool_map must have length",
+            ),
+        ],
     )
     def test_get_subset_bool_map_error_input(self, bool_map, what_to_expect):
         with pytest.raises(ValueError, match=what_to_expect):
@@ -235,7 +246,10 @@ class TestDataset:
             (
                 {"patients": ["patient_1", "patient_3"], "tests": ["test_2", "test_3"], "extra with space": ["0"]},
                 _create_valid_index(
-                    {"patient_1": {"a": ["test_2"], "b": ["0"]}, "patient_3": {"a": ["test_2", "test_3"], "b": ["0"]},},
+                    {
+                        "patient_1": {"a": ["test_2"], "b": ["0"]},
+                        "patient_3": {"a": ["test_2", "test_3"], "b": ["0"]},
+                    },
                     columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
@@ -266,7 +280,9 @@ class TestDataset:
                 0,
                 ["patients", "tests", "extra with space"],
                 _create_valid_index(
-                    {"patient_1": {"a": ["test_1"], "b": ["0"]},},
+                    {
+                        "patient_1": {"a": ["test_1"], "b": ["0"]},
+                    },
                     columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
@@ -285,7 +301,10 @@ class TestDataset:
                 [0, 4],
                 ["patients", "tests"],
                 _create_valid_index(
-                    {"patient_1": {"a": ["test_1"], "b": ["0", "1"]}, "patient_3": {"a": ["test_2"], "b": ["0", "1"]},},
+                    {
+                        "patient_1": {"a": ["test_1"], "b": ["0", "1"]},
+                        "patient_3": {"a": ["test_2"], "b": ["0", "1"]},
+                    },
                     columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
@@ -299,7 +318,18 @@ class TestDataset:
 
     @pytest.mark.parametrize(
         "subscript,select_lvl,what_to_expect",
-        [(4, "patients", "out of bounds",), ([0, 1, 4], "patients", "out of bounds",),],
+        [
+            (
+                4,
+                "patients",
+                "out of bounds",
+            ),
+            (
+                [0, 1, 4],
+                "patients",
+                "out of bounds",
+            ),
+        ],
     )
     def test_getitem_error_input(self, subscript, select_lvl, what_to_expect):
         with pytest.raises(IndexError, match=what_to_expect):
@@ -323,21 +353,27 @@ class TestDataset:
             ),
             (
                 _create_valid_index(
-                    {"patient_3": {"a": ["test_1", "test_2", "test_3"], "b": ["0", "1"]},},
+                    {
+                        "patient_3": {"a": ["test_1", "test_2", "test_3"], "b": ["0", "1"]},
+                    },
                     columns_names=["patients", "tests", "extra with space"],
                 ),
                 [["patients"]],
             ),
             (
                 _create_valid_index(
-                    {"patient_3": {"a": ["test_1"], "b": ["0", "1"]},},
+                    {
+                        "patient_3": {"a": ["test_1"], "b": ["0", "1"]},
+                    },
                     columns_names=["patients", "tests", "extra with space"],
                 ),
                 [["patients"], ["patients", "tests"]],
             ),
             (
                 _create_valid_index(
-                    {"patient_3": {"a": ["test_1"], "b": ["1"]},},
+                    {
+                        "patient_3": {"a": ["test_1"], "b": ["1"]},
+                    },
                     columns_names=["patients", "tests", "extra with space"],
                 ),
                 [["patients"], ["patients", "tests"], ["patients", "tests", "extra with space"], None],
@@ -397,7 +433,9 @@ class TestDataset:
                         columns_names=["patients", "tests", "extra with space"],
                     ),
                     _create_valid_index(
-                        {"patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]},},
+                        {
+                            "patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]},
+                        },
                         columns_names=["patients", "tests", "extra with space"],
                     ),
                 ),
@@ -411,7 +449,10 @@ class TestDataset:
         pd.testing.assert_frame_equal(left=what_to_expect[1], right=df[test].index)
 
     @pytest.mark.parametrize(
-        "n_splits,select_lvl,what_to_expect", [(13, "extra with space", "Cannot have number of splits"),],
+        "n_splits,select_lvl,what_to_expect",
+        [
+            (13, "extra with space", "Cannot have number of splits"),
+        ],
     )
     def test_dataset_with_kfold_error_input(self, n_splits, select_lvl, what_to_expect):
         with pytest.raises(ValueError, match=what_to_expect):
@@ -423,21 +464,27 @@ class TestDataset:
             (
                 "patients",
                 _create_valid_index(
-                    {"patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]},},
+                    {
+                        "patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]},
+                    },
                     columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
             (
                 ["patients", "tests"],
                 _create_valid_index(
-                    {"patient_1": {"a": ["test_1"], "b": ["0", "1"]},},
+                    {
+                        "patient_1": {"a": ["test_1"], "b": ["0", "1"]},
+                    },
                     columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
             (
                 ["patients", "tests", "extra with space"],
                 _create_valid_index(
-                    {"patient_1": {"a": ["test_1"], "b": ["0"]},},
+                    {
+                        "patient_1": {"a": ["test_1"], "b": ["0"]},
+                    },
                     columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
@@ -477,7 +524,9 @@ class TestDataset:
             (
                 "patients",
                 _create_valid_index(
-                    {"patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]},},
+                    {
+                        "patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]},
+                    },
                     columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
@@ -489,7 +538,13 @@ class TestDataset:
         pd.testing.assert_frame_equal(left=what_to_expect, right=values[0].index)
 
     @pytest.mark.parametrize(
-        "level,what_to_expect", [("wrong", "`level` must be one of",),],
+        "level,what_to_expect",
+        [
+            (
+                "wrong",
+                "`level` must be one of",
+            ),
+        ],
     )
     def test_iter_level_error_input(self, level, what_to_expect):
         with pytest.raises(ValueError, match=what_to_expect):

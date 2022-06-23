@@ -251,7 +251,7 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
         This is equal to the number of rows in the index, if `self.groupby_cols=None`.
         Otherwise, it is equal to the number of unique groups.
         """
-        return len(self),
+        return (len(self),)
 
     @property
     def grouped_index(self) -> pd.DataFrame:
@@ -269,8 +269,7 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
         """Get the groupby columns."""
         if self.groupby_cols is None:
             return self.index.columns.to_list()
-        else:
-            return _ensure_is_list(self.groupby_cols)
+        return _ensure_is_list(self.groupby_cols)
 
     def _get_unique_groups(self) -> Union[pd.MultiIndex, pd.Index]:
         return self.grouped_index.index.unique()
@@ -463,22 +462,31 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
             if groupby_cols is None:
                 groupby_cols = self.index.columns.to_list()
             raise ValueError(
-                f"The attribute `{property_name}` of dataset {self.__class__.__name__} can only be accessed if there is "
-                f"only a single combination of the columns {groupby_cols} left in a data subset,"
+                f"The attribute `{property_name}` of dataset {self.__class__.__name__} can only be accessed if there "
+                f"is only a single combination of the columns {groupby_cols} left in a data subset,"
             )
 
     def assert_is_single_group(self, property_name) -> None:
         """Raise error if index does contain more than one group/row.
 
         Note that this is different from `assert_is_single` as it is aware of the current grouping.
-        Instead of checking that a certain combination of columns is left in the dataset, it checks that only a 
+        Instead of checking that a certain combination of columns is left in the dataset, it checks that only a
         single group exists with the already selected grouping as defined by `self.groupby_cols`.
+
+        Parameters
+        ----------
+        property_name
+            Name of the property this check is used in.
+            Used to format the error message.
+
         """
         if not self.is_single_group():
             if self.groupby_cols is None:
-                group_error_str = "Currently the dataset is not grouped. " \
-                                  "This means a single group is identical to having only a single row in the "\
-                                  "dataset index."
+                group_error_str = (
+                    "Currently the dataset is not grouped. "
+                    "This means a single group is identical to having only a single row in the "
+                    "dataset index."
+                )
             else:
                 group_error_str = f"Currently the dataset is grouped by {self.groupby_cols}."
 
@@ -486,7 +494,7 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
                 f"The attribute `{property_name}` of dataset {self.__class__.__name__} can only be accessed if there is"
                 f" only a single group left in a data subset. " + group_error_str
             )
-    
+
     def create_group_labels(self, label_cols: Union[str, List[str]]):
         """Generate a list of labels for each group/row in the dataset.
 

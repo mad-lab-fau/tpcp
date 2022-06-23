@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The `Dataset` class now has a new parameter `group`, which will return the group/row information, if there is only a 
+  single group/row left in the dataset.
+  This parameter returns either a string or a namedtuple to make it easy to access the group/row information.
+- The `Dataset.groups` parameter now returns a list of namedtuples when it previously returned a list of normal tuples.
+- New `is_single_group` and `assert_is_single_group` methods for the `Dataset` class are added.
+  They are shortcuts for calling `self.is_single(groupby_cols=self.groupby_cols)` and 
+  `self.assert_is_single(groupby_cols=self.groupby_cols)`.
+
 ### Removed
 
 - We removed the `OptimizableAlgorithm` base class, as it is not really useful.
