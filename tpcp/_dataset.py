@@ -24,11 +24,8 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
         A column name or a list of column names that should be used to group the index before iterating over it.
         For examples see below.
     subset_index
-        For all classes that inherit from this class, subset_index **must** be None.
-        The subset_index **must** be created in the method `__create_index`.
-        If the base class is used, then the index the dataset should represent **must** be a :class:`~pd.Dataframe`
-        containig the index.
-        For examples see below.
+        For all classes that inherit from this class, subset_index **must** be None by default.
+        But the subclasses require a `create_index` method that returns a DataFrame representing the index.
 
     Attributes
     ----------
@@ -62,6 +59,8 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
     ...     columns=["patient", "test", "extra"],
     ... )
     >>> # We create a little dummy dataset by passing an index directly to `test_index`
+    >>> # Usually we would create a subclass with a `create_index` method that returns a DataFrame representing the
+    >>> # index.
     >>> dataset = Dataset(subset_index=test_index)
     >>> dataset
     Dataset [12 groups/rows]
@@ -212,8 +211,29 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
 
     @property
     def groups(self) -> List[Union[str, Tuple[str, ...]]]:
-        """Get all groups based on the set groupby level."""
-        return self._get_unique_groups().to_list()
+        """Get all groups based on the set groupby level.
+
+        This will either return a list of strings/integers, if there is only a single group level or index column.
+        If there are multiple groupy levels/index columns, it will return a list of named tuples.
+
+        Note, that if one of the groupby levels/index columns is not a valid Python attribute name (e.g. in contains
+        spaces or starts with a number), the named tuple will not contain the correct column name!
+        For more information see the documentation of the `rename` parameter of :func:`collections.namedtuple`.
+        """
+        if len(self._get_groupby_columns()) == 1:
+            return self._get_unique_groups().to_list()
+        return list(self._get_unique_groups().to_frame().itertuples(index=False, name=type(self).__name__))
+
+    @property
+    def group(self) -> Union[str, Tuple[str, ...]]:
+        """Get the current group.
+
+        Note, this attribute can only be used, if there is just a single group.
+        If there is only a single groupby column or column in the index, this will return a string.
+        Otherwise, this will return a named tuple.
+        """
+        self.assert_is_single_group("group")
+        return self.groups[0]
 
     def __len__(self) -> int:
         """Get the length of the dataset.
@@ -231,15 +251,12 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
         This is equal to the number of rows in the index, if `self.groupby_cols=None`.
         Otherwise, it is equal to the number of unique groups.
         """
-        return (len(self),)
+        return len(self),
 
     @property
     def grouped_index(self) -> pd.DataFrame:
         """Return the index with the `groupby` columns set as multiindex."""
-        if self.groupby_cols is None:
-            groupby_cols = self.index.columns.to_list()
-        else:
-            groupby_cols = self.groupby_cols
+        groupby_cols = self._get_groupby_columns()
         try:
             return self.index.set_index(groupby_cols, drop=False)
         except KeyError as e:
@@ -247,6 +264,13 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
                 f"You can only groupby columns that are part of the index columns ({list(self.index.columns)}) and not"
                 f" {self.groupby_cols}"
             ) from e
+
+    def _get_groupby_columns(self) -> List[str]:
+        """Get the groupby columns."""
+        if self.groupby_cols is None:
+            return self.index.columns.to_list()
+        else:
+            return _ensure_is_list(self.groupby_cols)
 
     def _get_unique_groups(self) -> Union[pd.MultiIndex, pd.Index]:
         return self.grouped_index.index.unique()
@@ -406,6 +430,7 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
         """Return True if index contains only one row/group with the given groupby settings.
 
         If `groupby_cols=None` this checks if there is only a single row left.
+        If you want to check if there is only a single group within the current grouping, use `is_single_group` instead.
 
         Parameters
         ----------
@@ -413,7 +438,11 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
             None (no grouping) or a valid subset of the columns available in the dataset index.
 
         """
-        return self.groupby(groupby_cols).shape[0] == 1
+        return len(self.groupby(groupby_cols)) == 1
+
+    def is_single_group(self) -> bool:
+        """Return True if index contains only one group."""
+        return len(self) == 1
 
     def assert_is_single(self, groupby_cols: Optional[Union[str, List[str]]], property_name) -> None:
         """Raise error if index does contain more than one group/row with the given groupby settings.
@@ -434,10 +463,30 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
             if groupby_cols is None:
                 groupby_cols = self.index.columns.to_list()
             raise ValueError(
-                f"The data value {property_name} of dataset {self.__class__.__name__} can only be accessed if there is"
-                f" only a single combination of the columns {groupby_cols} left in a data subset"
+                f"The attribute `{property_name}` of dataset {self.__class__.__name__} can only be accessed if there is "
+                f"only a single combination of the columns {groupby_cols} left in a data subset,"
             )
 
+    def assert_is_single_group(self, property_name) -> None:
+        """Raise error if index does contain more than one group/row.
+
+        Note that this is different from `assert_is_single` as it is aware of the current grouping.
+        Instead of checking that a certain combination of columns is left in the dataset, it checks that only a 
+        single group exists with the already selected grouping as defined by `self.groupby_cols`.
+        """
+        if not self.is_single_group():
+            if self.groupby_cols is None:
+                group_error_str = "Currently the dataset is not grouped. " \
+                                  "This means a single group is identical to having only a single row in the "\
+                                  "dataset index."
+            else:
+                group_error_str = f"Currently the dataset is grouped by {self.groupby_cols}."
+
+            raise ValueError(
+                f"The attribute `{property_name}` of dataset {self.__class__.__name__} can only be accessed if there is"
+                f" only a single group left in a data subset. " + group_error_str
+            )
+    
     def create_group_labels(self, label_cols: Union[str, List[str]]):
         """Generate a list of labels for each group/row in the dataset.
 

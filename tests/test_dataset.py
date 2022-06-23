@@ -1,3 +1,4 @@
+from collections import namedtuple
 from itertools import product
 from operator import itemgetter
 
@@ -41,7 +42,7 @@ def _create_valid_index(input_dict=None, columns_names=None):
                     "test_3",
                     "test_3",
                 ],
-                "extra": ["0", "1", "0", "1", "0", "1", "0", "1", "0", "1", "0", "1"],
+                "extra with space": ["0", "1", "0", "1", "0", "1", "0", "1", "0", "1", "0", "1"],
             }
         )
 
@@ -69,9 +70,9 @@ class TestDataset:
             ("patients", 3),
             (["patients"], 3),
             (["patients", "tests"], 6),
-            (["patients", "tests", "extra"], 12),
-            (["extra", "patients", "tests"], 12),
-            ("extra", 2),
+            (["patients", "tests", "extra with space"], 12),
+            (["extra with space", "patients", "tests"], 12),
+            ("extra with space", 2),
             (None, 12),
         ],
     )
@@ -133,11 +134,11 @@ class TestDataset:
             (
                 _create_valid_index(
                     {"patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]}},
-                    columns_names=["patients", "tests", "extra"],
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
                 _create_valid_index(
                     {"patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]}},
-                    columns_names=["patients", "tests", "extra"],
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
         ],
@@ -154,14 +155,14 @@ class TestDataset:
                 [("patient_1", "test_2", "0")],
                 _create_valid_index(
                     {"patient_1": {"a": ["test_2"], "b": ["0"]}},
-                    columns_names=["patients", "tests", "extra"],
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
             (
                 [("patient_1", "test_2", "0"), ("patient_1", "test_2", "1")],
                 _create_valid_index(
                     {"patient_1": {"a": ["test_2"], "b": ["0", "1"]}},
-                    columns_names=["patients", "tests", "extra"],
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
         ],
@@ -178,14 +179,14 @@ class TestDataset:
                 [("patient_1", "test_2")],
                 _create_valid_index(
                     {"patient_1": {"a": ["test_2"], "b": ["0", "1"]}},
-                    columns_names=["patients", "tests", "extra"],
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
             (
                 [("patient_1", "test_1"), ("patient_1", "test_2")],
                 _create_valid_index(
                     {"patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]}},
-                    columns_names=["patients", "tests", "extra"],
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
         ],
@@ -200,13 +201,7 @@ class TestDataset:
         )
 
     @pytest.mark.parametrize(
-        "index,what_to_expect",
-        [
-            (
-                pd.DataFrame(),
-                "Provided index is not formatted correctly",
-            ),
-        ],
+        "index,what_to_expect", [(pd.DataFrame(), "Provided index is not formatted correctly",),],
     )
     def test_get_subset_index_error_input(self, index, what_to_expect):
         with pytest.raises(ValueError, match=what_to_expect):
@@ -228,12 +223,7 @@ class TestDataset:
 
     @pytest.mark.parametrize(
         "bool_map,what_to_expect",
-        [
-            (
-                _create_random_bool_map(12, 68752868)[:-1],
-                "Parameter bool_map must have length",
-            ),
-        ],
+        [(_create_random_bool_map(12, 68752868)[:-1], "Parameter bool_map must have length",),],
     )
     def test_get_subset_bool_map_error_input(self, bool_map, what_to_expect):
         with pytest.raises(ValueError, match=what_to_expect):
@@ -243,13 +233,10 @@ class TestDataset:
         "kwargs,what_to_expect",
         [
             (
-                {"patients": ["patient_1", "patient_3"], "tests": ["test_2", "test_3"], "extra": ["0"]},
+                {"patients": ["patient_1", "patient_3"], "tests": ["test_2", "test_3"], "extra with space": ["0"]},
                 _create_valid_index(
-                    {
-                        "patient_1": {"a": ["test_2"], "b": ["0"]},
-                        "patient_3": {"a": ["test_2", "test_3"], "b": ["0"]},
-                    },
-                    columns_names=["patients", "tests", "extra"],
+                    {"patient_1": {"a": ["test_2"], "b": ["0"]}, "patient_3": {"a": ["test_2", "test_3"], "b": ["0"]},},
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
         ],
@@ -263,7 +250,7 @@ class TestDataset:
         "kwargs,what_to_expect",
         [
             (
-                {"wrong": ["patient_1", "patient_3"], "tests": ["test_2", "test_3"], "extra": ["0"]},
+                {"wrong": ["patient_1", "patient_3"], "tests": ["test_2", "test_3"], "extra with space": ["0"]},
                 "Can not filter by key `wrong`!",
             ),
         ],
@@ -277,12 +264,10 @@ class TestDataset:
         [
             (
                 0,
-                ["patients", "tests", "extra"],
+                ["patients", "tests", "extra with space"],
                 _create_valid_index(
-                    {
-                        "patient_1": {"a": ["test_1"], "b": ["0"]},
-                    },
-                    columns_names=["patients", "tests", "extra"],
+                    {"patient_1": {"a": ["test_1"], "b": ["0"]},},
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
             (
@@ -293,18 +278,15 @@ class TestDataset:
                         "patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]},
                         "patient_2": {"a": ["test_1"], "b": ["0", "1"]},
                     },
-                    columns_names=["patients", "tests", "extra"],
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
             (
                 [0, 4],
                 ["patients", "tests"],
                 _create_valid_index(
-                    {
-                        "patient_1": {"a": ["test_1"], "b": ["0", "1"]},
-                        "patient_3": {"a": ["test_2"], "b": ["0", "1"]},
-                    },
-                    columns_names=["patients", "tests", "extra"],
+                    {"patient_1": {"a": ["test_1"], "b": ["0", "1"]}, "patient_3": {"a": ["test_2"], "b": ["0", "1"]},},
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
         ],
@@ -317,24 +299,15 @@ class TestDataset:
 
     @pytest.mark.parametrize(
         "subscript,select_lvl,what_to_expect",
-        [
-            (
-                4,
-                "patients",
-                "out of bounds",
-            ),
-            (
-                [0, 1, 4],
-                "patients",
-                "out of bounds",
-            ),
-        ],
+        [(4, "patients", "out of bounds",), ([0, 1, 4], "patients", "out of bounds",),],
     )
     def test_getitem_error_input(self, subscript, select_lvl, what_to_expect):
         with pytest.raises(IndexError, match=what_to_expect):
             _ = Dataset(subset_index=_create_valid_index(), groupby_cols=select_lvl)[subscript]
 
-    @pytest.mark.parametrize("groupby_level", (["patients"], ["patients", "tests"], ["patients", "tests", "extra"]))
+    @pytest.mark.parametrize(
+        "groupby_level", (["patients"], ["patients", "tests"], ["patients", "tests", "extra with space"])
+    )
     @pytest.mark.parametrize(
         "index,is_single_level",
         (
@@ -344,42 +317,36 @@ class TestDataset:
                         "patient_2": {"a": ["test_1"], "b": ["0", "1"]},
                         "patient_3": {"a": ["test_1", "test_2", "test_3"], "b": ["0", "1"]},
                     },
-                    columns_names=["patients", "tests", "extra"],
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
                 [],
             ),
             (
                 _create_valid_index(
-                    {
-                        "patient_3": {"a": ["test_1", "test_2", "test_3"], "b": ["0", "1"]},
-                    },
-                    columns_names=["patients", "tests", "extra"],
+                    {"patient_3": {"a": ["test_1", "test_2", "test_3"], "b": ["0", "1"]},},
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
                 [["patients"]],
             ),
             (
                 _create_valid_index(
-                    {
-                        "patient_3": {"a": ["test_1"], "b": ["0", "1"]},
-                    },
-                    columns_names=["patients", "tests", "extra"],
+                    {"patient_3": {"a": ["test_1"], "b": ["0", "1"]},},
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
                 [["patients"], ["patients", "tests"]],
             ),
             (
                 _create_valid_index(
-                    {
-                        "patient_3": {"a": ["test_1"], "b": ["1"]},
-                    },
-                    columns_names=["patients", "tests", "extra"],
+                    {"patient_3": {"a": ["test_1"], "b": ["1"]},},
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
-                [["patients"], ["patients", "tests"], ["patients", "tests", "extra"], None],
+                [["patients"], ["patients", "tests"], ["patients", "tests", "extra with space"], None],
             ),
         ),
     )
     def test_is_single(self, index, is_single_level, groupby_level):
         ds = Dataset(subset_index=index, groupby_cols=groupby_level)
-        for gr in ["patients"], ["patients", "tests"], ["patients", "tests", "extra"], None:
+        for gr in ["patients"], ["patients", "tests"], ["patients", "tests", "extra with space"], None:
             if gr in is_single_level:
                 assert ds.is_single(gr) is True
                 # Check that no error is raised
@@ -389,6 +356,13 @@ class TestDataset:
                 assert ds.is_single(gr) is False
                 with pytest.raises(ValueError):
                     ds.assert_is_single(gr, "test")
+            if len(ds) == 1:
+                assert ds.is_single_group() is True
+                ds.assert_is_single_group("test")
+            else:
+                assert ds.is_single_group() is False
+                with pytest.raises(ValueError):
+                    ds.assert_is_single_group("test")
 
     def test_assert_is_single_error(self):
         index = _create_valid_index(
@@ -396,7 +370,7 @@ class TestDataset:
                 "patient_2": {"a": ["test_1"], "b": ["0", "1"]},
                 "patient_3": {"a": ["test_1", "test_2", "test_3"], "b": ["0", "1"]},
             },
-            columns_names=["patients", "tests", "extra"],
+            columns_names=["patients", "tests", "extra with space"],
         )
         ds = Dataset(subset_index=index)
         with pytest.raises(ValueError) as e:
@@ -420,13 +394,11 @@ class TestDataset:
                             "patient_2": {"a": ["test_1"], "b": ["0", "1"]},
                             "patient_3": {"a": ["test_1", "test_2", "test_3"], "b": ["0", "1"]},
                         },
-                        columns_names=["patients", "tests", "extra"],
+                        columns_names=["patients", "tests", "extra with space"],
                     ),
                     _create_valid_index(
-                        {
-                            "patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]},
-                        },
-                        columns_names=["patients", "tests", "extra"],
+                        {"patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]},},
+                        columns_names=["patients", "tests", "extra with space"],
                     ),
                 ),
             ),
@@ -439,10 +411,7 @@ class TestDataset:
         pd.testing.assert_frame_equal(left=what_to_expect[1], right=df[test].index)
 
     @pytest.mark.parametrize(
-        "n_splits,select_lvl,what_to_expect",
-        [
-            (13, "extra", "Cannot have number of splits"),
-        ],
+        "n_splits,select_lvl,what_to_expect", [(13, "extra with space", "Cannot have number of splits"),],
     )
     def test_dataset_with_kfold_error_input(self, n_splits, select_lvl, what_to_expect):
         with pytest.raises(ValueError, match=what_to_expect):
@@ -454,28 +423,22 @@ class TestDataset:
             (
                 "patients",
                 _create_valid_index(
-                    {
-                        "patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]},
-                    },
-                    columns_names=["patients", "tests", "extra"],
+                    {"patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]},},
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
             (
                 ["patients", "tests"],
                 _create_valid_index(
-                    {
-                        "patient_1": {"a": ["test_1"], "b": ["0", "1"]},
-                    },
-                    columns_names=["patients", "tests", "extra"],
+                    {"patient_1": {"a": ["test_1"], "b": ["0", "1"]},},
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
             (
-                ["patients", "tests", "extra"],
+                ["patients", "tests", "extra with space"],
                 _create_valid_index(
-                    {
-                        "patient_1": {"a": ["test_1"], "b": ["0"]},
-                    },
-                    columns_names=["patients", "tests", "extra"],
+                    {"patient_1": {"a": ["test_1"], "b": ["0"]},},
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
         ],
@@ -490,14 +453,14 @@ class TestDataset:
         "level,what_to_expect",
         [
             (
-                "extra",
+                "extra with space",
                 _create_valid_index(
                     {
                         "patient_1": {"a": ["test_1", "test_2"], "b": ["0"]},
                         "patient_2": {"a": ["test_1"], "b": ["0"]},
                         "patient_3": {"a": ["test_1", "test_2", "test_3"], "b": ["0"]},
                     },
-                    columns_names=["patients", "tests", "extra"],
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
             (
@@ -508,16 +471,14 @@ class TestDataset:
                         "patient_2": {"a": ["test_1"], "b": ["0", "1"]},
                         "patient_3": {"a": ["test_1"], "b": ["0", "1"]},
                     },
-                    columns_names=["patients", "tests", "extra"],
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
             (
                 "patients",
                 _create_valid_index(
-                    {
-                        "patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]},
-                    },
-                    columns_names=["patients", "tests", "extra"],
+                    {"patient_1": {"a": ["test_1", "test_2"], "b": ["0", "1"]},},
+                    columns_names=["patients", "tests", "extra with space"],
                 ),
             ),
         ],
@@ -528,13 +489,7 @@ class TestDataset:
         pd.testing.assert_frame_equal(left=what_to_expect, right=values[0].index)
 
     @pytest.mark.parametrize(
-        "level,what_to_expect",
-        [
-            (
-                "wrong",
-                "`level` must be one of",
-            ),
-        ],
+        "level,what_to_expect", [("wrong", "`level` must be one of",),],
     )
     def test_iter_level_error_input(self, level, what_to_expect):
         with pytest.raises(ValueError, match=what_to_expect):
@@ -545,7 +500,7 @@ class TestDataset:
         (
             (None, "patients", 3),
             (None, ["patients"], 3),
-            (None, ["patients", "extra"], 6),
+            (None, ["patients", "extra with space"], 6),
             (["patients", "tests"], ["patients"], 3),
         ),
     )
@@ -565,3 +520,31 @@ class TestDataset:
         ds = Dataset(subset_index=_create_valid_index())
         with pytest.raises(KeyError, match="The selected label columns"):
             ds.create_group_labels("something_wrong")
+
+    @pytest.mark.parametrize("groupby", ["patients", "tests", ["patients", "tests"], None])
+    def test_group(self, groupby):
+        ds = Dataset(subset_index=_create_valid_index(), groupby_cols=groupby)
+        group = ds[0].group
+
+        assert group == ds[0].groups[0]
+        if isinstance(groupby, str):
+            assert group == ds.index.iloc[0][groupby]
+        elif groupby is None:
+            assert group == tuple(ds.index.iloc[0])
+        else:
+            assert group._fields == tuple(groupby)
+            assert group == tuple(ds.index.iloc[0][groupby])
+
+    def test_group_with_invalid_col_name(self):
+        ds = Dataset(subset_index=_create_valid_index())
+        group = ds[0].group
+
+        # the named tuple will rename columns that are invalid, therefore instead of `extra with spaces`,
+        # it should be `_2`
+        assert group._fields == ("patients", "tests", "_2")
+
+    def test_group_only_for_single_group(self):
+        ds = Dataset(subset_index=_create_valid_index())
+
+        with pytest.raises(ValueError, match="only a single group left"):
+            _ = ds.group
