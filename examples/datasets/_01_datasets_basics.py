@@ -266,10 +266,10 @@ class CustomDataset(Dataset):
         # Note that we need to make our checks from the least restrictive to the most restrictive (if there is only a
         # single trail, there is only just a single recording).
         if self.is_single(["participant", "recording"]):
-            return "This is the data for participant {} and rec {}".format(*self.groups[0])
+            return "This is the data for participant {} and rec {}".format(*self.group)
         # None -> single row
         if self.is_single(None):
-            return "This is the data for participant {}, rec {} and trial {}".format(*self.groups[0])
+            return "This is the data for participant {}, rec {} and trial {}".format(*self.group)
         raise ValueError(
             "Data can only be accessed when their is only a single recording of a single participant in the subset"
         )
@@ -283,7 +283,7 @@ class CustomDataset(Dataset):
         # We use assert here, as we don't have multiple options.
         # (We could also used `None` for the `groupby_cols` here)
         self.assert_is_single(["participant", "recording", "trial"], "segmented_stride_list_")
-        return "This is the segmented stride list for participant {}, rec {} and trial {}".format(*self.groups[0])
+        return "This is the segmented stride list for participant {}, rec {} and trial {}".format(*self.group)
 
     def create_index(self):
         return index
