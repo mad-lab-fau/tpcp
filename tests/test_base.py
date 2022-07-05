@@ -303,6 +303,7 @@ def test_invalid_parameter_names():
     assert "double-underscore" in str(e)
 
 
+# TODO: We likely need some more tests for the dataclass support
 def test_basic_dataclass_support():
     class Test(Algorithm, dataclass=True):
         a: OptiPara[int]
