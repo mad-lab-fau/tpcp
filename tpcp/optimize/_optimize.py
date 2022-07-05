@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
-from typing import Any, ContextManager, Dict, Generic, Iterator, List, Optional, Union, Tuple
+from typing import Any, ContextManager, Dict, Generic, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
 from joblib import Memory, delayed
@@ -368,7 +368,10 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         self.multimetric_ = isinstance(first_test_score, dict)
         _validate_return_optimized(self.return_optimized, self.multimetric_, first_test_score)
 
-        results = self._format_results(list(self.parameter_grid), results,)
+        results = self._format_results(
+            list(self.parameter_grid),
+            results,
+        )
 
         if self.return_optimized:
             return_optimized = "score"
@@ -407,7 +410,16 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         # Use one MaskedArray and mask all the places where the param is not
         # applicable for that candidate. Use defaultdict as each candidate may
         # not contain all the params
-        param_results = defaultdict(partial(MaskedArray, np.empty(n_candidates,), mask=True, dtype=object,))
+        param_results = defaultdict(
+            partial(
+                MaskedArray,
+                np.empty(
+                    n_candidates,
+                ),
+                mask=True,
+                dtype=object,
+            )
+        )
         for cand_idx, params in enumerate(candidate_params):
             for name, value in params.items():
                 # An all masked empty array gets created for the key
@@ -803,7 +815,16 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         # Use one MaskedArray and mask all the places where the param is not
         # applicable for that candidate. Use defaultdict as each candidate may
         # not contain all the params
-        param_results: Dict = defaultdict(partial(MaskedArray, np.empty(n_candidates,), mask=True, dtype=object,))
+        param_results: Dict = defaultdict(
+            partial(
+                MaskedArray,
+                np.empty(
+                    n_candidates,
+                ),
+                mask=True,
+                dtype=object,
+            )
+        )
         for cand_idx, params in enumerate(candidate_params):
             for name, value in params.items():
                 # An all masked empty array gets created for the key
