@@ -1,5 +1,7 @@
 """This tests the BaseAlgorithm and fundamental functionality."""
+import dataclasses
 from collections import namedtuple
+from dataclasses import dataclass
 from inspect import Parameter, signature
 from typing import Any, Dict, Tuple
 
@@ -7,7 +9,7 @@ import joblib
 import pytest
 
 from tests.conftest import _get_params_without_nested_class
-from tpcp import Algorithm, cf, clone
+from tpcp import Algorithm, OptiPara, cf, clone
 from tpcp._algorithm_utils import (
     get_action_method,
     get_action_methods_names,
@@ -299,3 +301,15 @@ def test_invalid_parameter_names():
                 self.invalid__name = invalid__name
 
     assert "double-underscore" in str(e)
+
+
+def test_basic_dataclass_support():
+    class Test(Algorithm, dataclass=True):
+        a: OptiPara[int]
+        b: int
+
+    assert not dataclasses.is_dataclass(Test)
+    DTest = dataclasses.dataclass(Test)
+    assert dataclasses.is_dataclass(DTest)
+    dtest = DTest(a=1, b=2)
+    assert dtest.get_params() == {"a": 1, "b": 2}
