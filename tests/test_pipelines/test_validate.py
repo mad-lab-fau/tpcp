@@ -3,7 +3,7 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import pytest
-from sklearn.model_selection import GroupKFold, KFold
+from sklearn.model_selection import GroupKFold, KFold, StratifiedKFold
 
 from tests.test_pipelines.conftest import (
     DummyDataset,
@@ -137,3 +137,31 @@ class TestCrossValidate:
                 assert set(np.unique(call[1]["groups"])) == set(train_labels)
             else:
                 assert "groups" not in call[1]
+
+    @pytest.mark.parametrize("propagate", (True, False))
+    def test_propagate_mock_labels(self, propagate):
+        pipeline = DummyOptimizablePipeline()
+        dataset = DummyGroupedDataset()
+        groups = dataset.create_group_labels("v1")
+        # With 5 folds, we expect exactly on "a", one "b", and one "c" in each fold
+        cv = StratifiedKFold(n_splits=5)
+
+        dummy_results = Optimize(pipeline).optimize(dataset)
+        with patch.object(Optimize, "optimize", return_value=dummy_results) as mock:
+            cross_validate(
+                Optimize(pipeline),
+                dataset,
+                cv=cv,
+                scoring=lambda x, y: 1,
+                mock_labels=groups,
+                propagate_mock_labels=propagate,
+                propagate_groups=False,
+            )
+
+        assert mock.call_count == 5
+        for call in mock.call_args_list:
+            if propagate:
+                assert len(np.unique(call[1]["mock_labels"])) == 3
+                assert set(np.unique(call[1]["mock_labels"])) == set("abc")
+            else:
+                assert "mock_labels" not in call[1]

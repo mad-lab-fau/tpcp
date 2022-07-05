@@ -20,12 +20,14 @@ def cross_validate(
     dataset: Dataset,
     *,
     groups: Optional[List[Union[str, Tuple[str, ...]]]] = None,
+    mock_labels: Optional[List[Union[str, Tuple[str, ...]]]] = None,
     scoring: Optional[Callable] = None,
     cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
     n_jobs: Optional[int] = None,
     verbose: int = 0,
     optimize_params: Optional[Dict[str, Any]] = None,
     propagate_groups: bool = True,
+    propagate_mock_labels: bool = True,
     pre_dispatch: Union[str, int] = "2*n_jobs",
     return_train_score: bool = False,
     return_optimizer: bool = False,
@@ -49,6 +51,19 @@ def cross_validate(
         :class:`~sklearn.model_selection.GroupKFold`).
         Check the documentation of the :class:`~tpcp.dataset.Dataset` class and the respective example for
         information on how to generate group labels for tpcp datasets.
+
+        The groups will be passed to the optimizers `optimize` method under the same name, if `propagate_groups` is
+        True.
+    mock_labels
+        The value of `mock_labels` is passed as the `y` parameter to the cross-validation helper's `split` method.
+        This can be helpful, if you want to use stratified cross validation.
+        Usually, the stratified CV classes use `y` (i.e. the label) to stratify the data.
+        However, in tpcp, we don't have a dedicated `y` as data and labels are both stored in a single datastructure.
+        If you want to stratify the data (e.g. based on patient cohorts), you can create your own list of labels/groups
+        that should be used for stratification and pass it to `mock_labels` instead.
+
+        The labels will be passed to the optimizers `optimize` method under the same name, if
+        `propagate_mock_labels` is True (similar to how groups are handled).
     scoring
         A callable that can score a single data point given a pipeline.
         This function should return either a single score or a dictionary of scores.
@@ -73,6 +88,9 @@ def cross_validate(
         using a grouped cross validation, you probably want to use the same grouped CV for the outer and the inner
         cross validation. If `propagate_groups` is True, the group labels belonging to the training of each fold are
         passed to the `optimize` method of the optimizable. This only has an effect if `groups` are specified.
+    propagate_mock_labels
+        For the same reason as `propagate_groups`, you might also want to forward the value provided for
+        `mock_labels` to the optimization workflow.
     pre_dispatch
         The number of jobs that should be pre dispatched.
         For an explanation see the documentation of :class:`~joblib.Parallel`.
@@ -137,8 +155,7 @@ def cross_validate(
             "The latter would overwrite the prior. "
             "Most likely you only want to use `propagate_groups`."
         )
-
-    splits = list(cv_checked.split(dataset, groups=groups))
+    splits = list(cv_checked.split(dataset, mock_labels, groups=groups))
     # We clone the estimator to make sure that all the folds are
     # independent, and that it is pickle-able.
     pbar: Optional[tqdm] = None
@@ -152,7 +169,11 @@ def cross_validate(
             scoring,
             train,
             test,
-            optimize_params={**_propagate_groups(propagate_groups, groups, train), **optimize_params},
+            optimize_params={
+                **_propagate_values("groups", propagate_groups, groups, train),
+                **_propagate_values("mock_labels", propagate_mock_labels, mock_labels, train),
+                **optimize_params,
+            },
             hyperparameters=None,
             pure_parameters=None,
             return_train_score=return_train_score,
@@ -181,9 +202,9 @@ def cross_validate(
     return results
 
 
-def _propagate_groups(
-    propagate_groups: bool, groups: Optional[List[Union[str, Tuple[str, ...]]]], train_idx: List[int]
+def _propagate_values(
+    name: str, propagate_values: bool, values: Optional[List[Union[str, Tuple[str, ...]]]], train_idx: List[int]
 ):
-    if propagate_groups is False or groups is None:
+    if propagate_values is False or values is None:
         return {}
-    return {"groups": np.array(groups)[train_idx]}
+    return {name: np.array(values)[train_idx]}
