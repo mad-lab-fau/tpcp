@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
-from typing import Any, ContextManager, Dict, Generic, Iterator, List, Optional, Union
+from typing import Any, ContextManager, Dict, Generic, Iterator, List, Optional, Union, Tuple
 
 import numpy as np
 from joblib import Memory, delayed
@@ -368,10 +368,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         self.multimetric_ = isinstance(first_test_score, dict)
         _validate_return_optimized(self.return_optimized, self.multimetric_, first_test_score)
 
-        results = self._format_results(
-            list(self.parameter_grid),
-            results,
-        )
+        results = self._format_results(list(self.parameter_grid), results,)
 
         if self.return_optimized:
             return_optimized = "score"
@@ -410,16 +407,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         # Use one MaskedArray and mask all the places where the param is not
         # applicable for that candidate. Use defaultdict as each candidate may
         # not contain all the params
-        param_results = defaultdict(
-            partial(
-                MaskedArray,
-                np.empty(
-                    n_candidates,
-                ),
-                mask=True,
-                dtype=object,
-            )
-        )
+        param_results = defaultdict(partial(MaskedArray, np.empty(n_candidates,), mask=True, dtype=object,))
         for cand_idx, params in enumerate(candidate_params):
             for name, value in params.items():
                 # An all masked empty array gets created for the key
@@ -518,6 +506,10 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
     ----------------
     dataset
         The dataset instance passed to the optimize method
+    groups
+        The groups passed to the optimize method
+    mock_labels
+        The mock labels passed to the optimize method
 
     Attributes
     ----------
@@ -598,6 +590,9 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
     progress_bar: bool
     safe_optimize: bool
 
+    groups: Optional[List[Union[str, Tuple[str, ...]]]]
+    mock_labels: Optional[List[Union[str, Tuple[str, ...]]]]
+
     cv_results_: Dict[str, Any]
     best_params_: Dict[str, Any]
     best_index_: int
@@ -636,12 +631,31 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         self.progress_bar = progress_bar
         self.safe_optimize = safe_optimize
 
-    def optimize(self, dataset: DatasetT, *, groups=None, **optimize_params) -> Self:  # noqa: arguments-differ
+    def optimize(
+        self, dataset: DatasetT, *, groups=None, mock_labels=None, **optimize_params
+    ) -> Self:  # noqa: arguments-differ
+        """Run the GridSearchCV on the given dataset.
+
+        Parameters
+        ----------
+        dataset
+            The dataset to optimize on.
+        groups
+            An optional set of group labels that are passed to the cross-validation helper.
+        mock_labels
+            An optional set of mocked labels that are passed to the cross-validation helper as the `y` parameter.
+            This can be helpful in combination with the `Stratified*Fold` cross-validation helpers, that use the `y`
+            parameter to stratify the folds.
+
+        """
         self.dataset = dataset
+        self.groups = groups
+        self.mock_labels = mock_labels
+
         scoring = _validate_scorer(self.scoring, self.pipeline)
 
         cv_checked: BaseCrossValidator = check_cv(self.cv, None, classifier=True)
-        n_splits = cv_checked.get_n_splits(dataset, groups=groups)
+        n_splits = cv_checked.get_n_splits(dataset, mock_labels, groups=groups)
 
         # We need to wrap our pipeline for a consistent interface.
         # In the future we might be able to allow objects with optimizer Interface as input directly.
@@ -665,7 +679,9 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         parameters = list(self.parameter_grid)
         split_parameters = _split_hyper_and_pure_parameters(parameters, pure_parameters)
         parameter_prefix = "pipeline__"
-        combinations = list(product(enumerate(split_parameters), enumerate(cv_checked.split(dataset, groups=groups))))
+        combinations = list(
+            product(enumerate(split_parameters), enumerate(cv_checked.split(dataset, mock_labels, groups=groups)))
+        )
 
         pbar: Optional[tqdm] = None
         if self.progress_bar:
@@ -787,16 +803,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         # Use one MaskedArray and mask all the places where the param is not
         # applicable for that candidate. Use defaultdict as each candidate may
         # not contain all the params
-        param_results: Dict = defaultdict(
-            partial(
-                MaskedArray,
-                np.empty(
-                    n_candidates,
-                ),
-                mask=True,
-                dtype=object,
-            )
-        )
+        param_results: Dict = defaultdict(partial(MaskedArray, np.empty(n_candidates,), mask=True, dtype=object,))
         for cand_idx, params in enumerate(candidate_params):
             for name, value in params.items():
                 # An all masked empty array gets created for the key
