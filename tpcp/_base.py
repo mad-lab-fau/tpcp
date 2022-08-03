@@ -187,62 +187,77 @@ def _run_field_checks(cls, fields: Dict[str, Any]) -> None:
     _annotations_are_valid(fields, cls)
 
 
+def _process_tpcp_class(cls: Type[_BaseTpcpObject]):
+    # We extract the fields of the init
+    fields = _get_init_defaults(cls)
+    # Then we extract our metadata annotations
+    cls.__field_annotations__ = _extract_annotations(cls, init_fields=fields)
+
+    # Validation
+    if cls.__skip_validation__ is not True:
+        _run_field_checks(cls, fields)
+
+    if dataclasses.is_dataclass(cls) and any(isinstance(field.default, BaseFactory) for field in fields.values()):
+        # If the class is already a data class when this check runs (aka when it is triggered by the custom
+        # decorator), then we don't need to do anything.
+        # The BaseTpcpObject already implements the post_init method to handly all factory stuff.
+        # However, when you are already using dataclasses, you should probably use their factory methods.
+        warnings.warn(
+            "You are using the tpcp default factory (`cf`/`CloneFactory`) in combination with "
+            "`dataclasses`. "
+            "Consider using the `factory` option of `dataclasses.field` instead."
+        )
+
+    cls.__tpcp_cls_processed__ = True
+
+
+def _requires_processed_class(instance: _BaseTpcpObject, method_name: str) -> None:
+    if not instance.__tpcp_cls_processed__:
+        raise RuntimeError(
+            f"You are calling {method_name} on a class that has not been processed by tpcp. "
+            "This should not happen!\n\n"
+            "The only case we know of, is when you defined a class with class annotations, but without an init or a"
+            "dataclass decorator. "
+            "This is likely a user error.\n\n"
+            "If this is not what happened, please open an issue on GitHub with an example explaining how you "
+            "reached this error."
+        )
+
+
 class _BaseTpcpObject:
     __field_annotations__: Dict[str, _ParaTypes]
+    __skip_validation__: bool
+    __tpcp_cls_processed__: bool
 
-    def __init_subclass__(cls, *, _skip_validation: bool = False, dataclass: bool = False, **kwargs: Any):
+    def __init_subclass__(cls, *, _skip_validation: bool = False, **kwargs: Any):
         super().__init_subclass__(**kwargs)
-        klass = cls
-        if dataclass:
-            # If dataclass is True, we do all of our validation on a copy of the class that is transformed with the
-            # data class decorator.
-            # This copy does not validate the fields (`_skip_validation` is True) and has `dataclass` set to False to
-            # avoid recursion.
-            # This way we get the init, the dataclass would generate for our validation.
-            # However, we do not modify the class itself.
-            # We still expect the user to use the dataclass decorator explicitly.
-            # This makes things easier to read and has better IDE support.
-            klass = dataclasses.dataclass(
-                type(
-                    cls.__name__,
-                    cls.__bases__,
-                    dict(cls.__dict__),
-                    _skip_validation=True,
-                    dataclass=False,
-                )
-            )
-        fields = _get_init_defaults(klass)
+        cls.__skip_validation__ = _skip_validation
+        # We set that here to make sure the value is not inherited from the parent class.
+        cls.__tpcp_cls_processed__ = False
 
-        # We set the field annotations on the original class.
-        cls.__field_annotations__ = _extract_annotations(klass, init_fields=fields)
+        if cls.__init__ is object.__init__ or dataclasses.is_dataclass(cls):
+            # If the class has no init or is a dataclass (aka a subclass of a dataclass), we don't need to do anything.
+            # It could be that it is a dataclass, but then the dataclass wrapper will already call the post_init
+            # correctly.
+            #
+            # WARNING: This misses one case! Namely, when someone creates a class without an init,
+            # but with annotations that should be processed.
+            # This is not a valid class, but we can not check this, as we will not process the class, because the
+            # `post_init` will never be called.
+            #
+            # For this (and potential other cases), we have simple checks on the basic methods, that raise errors if
+            # the class has not been processed yet...
 
-        # Validation
-        if _skip_validation is not True:
-            _run_field_checks(klass, fields)
+            return
 
-        if any(isinstance(field.default, BaseFactory) for field in fields.values()):
-            # In case we have fields that use a tpcp factory, we need to wrap the init/run a post_init method to
-            # replace the values.
-            if cls.__init__ is object.__init__:
-                # Aka the class has no custom init.
-                # So, there is nothing to do, unless we assume to be wrapped by a dataclass decorator.
-                # However, we have that case already handled, because `BaseTpcpObject` defines the logic we need in a
-                # `__post_init__` method, which would be executed by the autogenerated `__init__` method of the
-                # dataclass.
-                if dataclass:
-                    warnings.warn(
-                        "You are using the tpcp default factory (`cf`/`CloneFactory`) in combination with "
-                        "`dataclasses`. "
-                        "Consider using the `factory` option of `dataclasses.field` instead."
-                    )
-            else:
-                setattr(cls, "__init__", _replace_defaults_wrapper(cls.__init__))
+        # If we have a custom init, we need to wrap it to call the post_init method.
+        setattr(cls, "__init__", _replace_defaults_wrapper(cls.__init__))
 
 
 class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
     """Baseclass for all tpcp objects."""
 
-    def get_params(self, deep: bool = True) -> Dict[str, Any]:
+    def get_params(self: Self, deep: bool = True) -> Dict[str, Any]:
         """Get parameters for this algorithm.
 
         Parameters
@@ -294,6 +309,14 @@ class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
         This will either be called by `dataclasses.dataclass` or by in the modified `__init__` tpcp creates for
         normal classes.
         """
+        # When using dataclasses, this method will be called, even if our custom processing did not run.
+        # However, this is an issue, and we need to force users to apply the custom decorator.
+        if not self.__tpcp_cls_processed__:
+            # The first time we run an init of this class we run our processing.
+            # Running that in the init for the first time, makes sure that it runs after any processing run on the class
+            # itself (i.e. when a dataclass decorator is used).
+            _process_tpcp_class(type(self))
+
         # Check if any of the initial values has a "default parameter flag".
         # If yes we replace it with a clone (in case of a tpcp object) or a deepcopy in case of other objects.
         for k, v in self.get_params(deep=False).items():
@@ -303,6 +326,7 @@ class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
 
 # TODO: Make public api
 def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
+    _requires_processed_class(instance, "get_params")
     valid_fields = get_param_names(type(instance))
 
     out: Dict[str, Any] = {}

@@ -294,23 +294,29 @@ def test_nested_mutable_algorithm_copy():
 
 
 def test_invalid_parameter_names():
-    with pytest.raises(ValidationError) as e:
+    class Test(Algorithm):
+        def __init__(self, invalid__name):
+            self.invalid__name = invalid__name
 
-        class Test(Algorithm):
-            def __init__(self, invalid__name):
-                self.invalid__name = invalid__name
+    with pytest.raises(ValidationError) as e:
+        Test(invalid__name="test")
 
     assert "double-underscore" in str(e)
 
 
 # TODO: We likely need some more tests for the dataclass support
 def test_basic_dataclass_support():
-    class Test(Algorithm, dataclass=True):
+    @dataclasses.dataclass
+    class Test(Algorithm):
         a: OptiPara[int]
         b: int
 
-    assert not dataclasses.is_dataclass(Test)
-    DTest = dataclasses.dataclass(Test)
+    Test(a=1, b=2)
+
+    class Test2(Test):
+        c: OptiPara[int]
+
+    DTest = dataclasses.dataclass(Test2)
     assert dataclasses.is_dataclass(DTest)
-    dtest = DTest(a=1, b=2)
-    assert dtest.get_params() == {"a": 1, "b": 2}
+    dtest = DTest(a=1, b=2, c=3)
+    assert dtest.get_params() == {"a": 1, "b": 2, "c": 3}
