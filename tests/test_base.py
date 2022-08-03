@@ -4,6 +4,7 @@ from collections import namedtuple
 from dataclasses import dataclass
 from inspect import Parameter, signature
 from typing import Any, Dict, Tuple
+from unittest.mock import patch
 
 import joblib
 import pytest
@@ -17,6 +18,7 @@ from tpcp._algorithm_utils import (
     get_results,
     is_action_applied,
 )
+from tpcp._base import _process_tpcp_class
 from tpcp.exceptions import MutableDefaultsError, ValidationError
 
 
@@ -304,7 +306,55 @@ def test_invalid_parameter_names():
     assert "double-underscore" in str(e)
 
 
-# TODO: We likely need some more tests for the dataclass support
+@patch("tpcp._base._process_tpcp_class", wraps=_process_tpcp_class)
+def test_processing_is_only_run_on_first_init(mock_process):
+    class Test(Algorithm):
+        def __init__(self, name):
+            self.name = name
+
+    Test("test")
+    Test("test2")
+
+    assert Test.__tpcp_cls_processed__ is True
+    assert mock_process.call_count == 1
+
+
+@patch("tpcp._base._process_tpcp_class", wraps=_process_tpcp_class)
+def test_processing_is_correctly_called_on_all_subclasses(mock_process):
+    class Test(Algorithm):
+        def __init__(self, name):
+            self.name = name
+
+    class Test2(Test):
+        pass
+
+    Test("test")
+    assert Test2.__tpcp_cls_processed__ is False
+    Test2("test")
+    assert Test2.__tpcp_cls_processed__ is True
+
+    assert mock_process.call_count == 2
+
+
+@patch("tpcp._base._process_tpcp_class", wraps=_process_tpcp_class)
+def test_processing_is_correctly_called_on_all_subclasses_2(mock_process):
+    class Test(Algorithm):
+        def __init__(self, name):
+            self.name = name
+
+    # We force processing, before the second class is created
+    Test("test")
+
+    class Test2(Test):
+        pass
+
+    assert Test2.__tpcp_cls_processed__ is False
+    Test2("test")
+    assert Test2.__tpcp_cls_processed__ is True
+
+    assert mock_process.call_count == 2
+
+
 def test_basic_dataclass_support():
     @dataclasses.dataclass
     class Test(Algorithm):
@@ -320,3 +370,16 @@ def test_basic_dataclass_support():
     assert dataclasses.is_dataclass(DTest)
     dtest = DTest(a=1, b=2, c=3)
     assert dtest.get_params() == {"a": 1, "b": 2, "c": 3}
+
+
+def test_dataclass_warns_when_cf_is_used():
+    @dataclasses.dataclass
+    class Test(Algorithm):
+        b: int
+        a: OptiPara[int] = cf("test")
+
+    with pytest.warns(UserWarning) as w:
+        Test(b=2)
+
+    assert len(w) == 1
+    assert "factory" in str(w[0].message)

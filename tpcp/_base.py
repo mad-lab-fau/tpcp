@@ -319,6 +319,7 @@ class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
 
         # Check if any of the initial values has a "default parameter flag".
         # If yes we replace it with a clone (in case of a tpcp object) or a deepcopy in case of other objects.
+        # This is handled by the factory `get_value` method.
         for k, v in self.get_params(deep=False).items():
             if isinstance(v, BaseFactory):
                 setattr(self, k, v.get_value())
