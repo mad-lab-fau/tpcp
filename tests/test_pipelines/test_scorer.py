@@ -29,7 +29,7 @@ class TestScorerCalls:
         mock_score_func = Mock(return_value=1)
         scorer = Scorer(mock_score_func)
         pipe = DummyOptimizablePipeline()
-        scorer(pipeline=pipe, dataset=DummyDataset(), error_score=np.nan)
+        scorer(pipeline=pipe, dataset=DummyDataset())
 
         assert mock_score_func.call_count == len(DummyDataset())
         for call, d in zip(mock_score_func.call_args_list, DummyDataset()):
@@ -44,7 +44,7 @@ class TestScorer:
         scorer = Scorer(dummy_single_score_func)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
-        agg, single = scorer(pipe, data, np.nan)
+        agg, single = scorer(pipe, data)
         assert len(single) == len(data)
         # Our Dummy scorer, returns the groupname of the dataset
         assert all(np.array(single) == data.groups)
@@ -54,7 +54,7 @@ class TestScorer:
         scorer = Scorer(dummy_multi_score_func)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
-        agg, single = scorer(pipe, data, np.nan)
+        agg, single = scorer(pipe, data)
         assert isinstance(single, dict)
         for k, v in single.items():
             assert len(v) == len(data)
@@ -77,7 +77,7 @@ class TestScorer:
         scorer = Scorer(multi_score_func)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
-        agg, single = scorer(pipe, data, np.nan)
+        agg, single = scorer(pipe, data)
         assert isinstance(single, dict)
         for k, v in single.items():
             assert len(v) == len(data)
@@ -91,75 +91,16 @@ class TestScorer:
         assert "no_agg_score" not in agg
         assert agg["score_1"] == np.mean(data.groups)
 
-    @pytest.mark.parametrize("err_val", (np.nan, 1))
-    def test_scoring_return_err_val(self, err_val):
-        scorer = Scorer(dummy_error_score_func)
-        pipe = DummyOptimizablePipeline()
-        data = DummyDataset()
-        with pytest.warns(UserWarning) as ws:
-            agg, single = scorer(pipe, data, err_val)
-
-        assert len(ws) == 3
-        for w, n in zip(ws, [0, 2, 4]):
-            assert str(n) in str(w)
-            assert str(err_val) in str(w)
-
-        expected = np.array([err_val, 1, err_val, 3, err_val])
-
-        assert len(single) == len(data)
-        nan_vals = np.isnan(single)
-        assert all(np.array(nan_vals) == np.isnan(expected))
-        assert all(np.array(single)[~nan_vals] == expected[~nan_vals])
-
-        # agg should become nan if a single value is nan
-        if sum(nan_vals) > 0:
-            assert np.isnan(agg)
-        else:
-            assert agg == np.mean(expected)
-
-    @pytest.mark.parametrize("err_val", (np.nan, 1))
-    @pytest.mark.filterwarnings("ignore::tpcp.exceptions.ScorerFailed")
-    def test_scoring_return_err_val_multi(self, err_val):
-        scorer = Scorer(dummy_error_score_func_multi)
-        pipe = DummyOptimizablePipeline()
-        data = DummyDataset()
-        agg, single = scorer(pipe, data, err_val)
-
-        expected = np.array([err_val, 1, err_val, 3, err_val])
-
-        for v in single.values():
-            assert len(v) == len(data)
-            nan_vals = np.isnan(v)
-            assert all(np.array(nan_vals) == np.isnan(expected))
-            assert all(np.array(v)[~nan_vals] == expected[~nan_vals])
-
-        for v in agg.values():
-            # agg should become nan if a single value is nan
-            if sum(nan_vals) > 0:
-                assert np.isnan(v)
-            else:
-                assert v == np.mean(expected)
-
-    def test_err_val_raises(self):
-        scorer = Scorer(dummy_error_score_func)
-        pipe = DummyOptimizablePipeline()
-        data = DummyDataset()
-        with pytest.raises(ValueError) as e:
-            scorer(pipe, data, "raise")
-
-        assert str(e.value) == "Dummy Error for 0"
-
-    @pytest.mark.parametrize("error_score", ("raise", 0))
     @pytest.mark.parametrize(
         "bad_scorer", (lambda x, y: "test", lambda x, y: {"val": "test"}, lambda x, y: NoAgg(None))
     )
-    def test_bad_scorer(self, error_score, bad_scorer):
+    def test_bad_scorer(self, bad_scorer):
         """Check that we catch cases where the scoring func returns invalid values independent of the error_score val"""
         scorer = Scorer(bad_scorer)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         with pytest.raises(ValidationError) as e:
-            scorer(pipe, data, error_score)
+            scorer(pipe, data)
         assert "The scoring function must have one" in str(e.value)
 
     def test_kwargs_passed(self):
@@ -173,7 +114,7 @@ class TestScorer:
         scorer = Scorer(mock_score_func, single_score_callback=mock_callback)
 
         pipe = DummyOptimizablePipeline()
-        scorer(pipeline=pipe, dataset=DummyDataset(), error_score=np.nan)
+        scorer(pipeline=pipe, dataset=DummyDataset())
 
         assert mock_callback.call_count == len(DummyDataset())
         for call, i in zip(mock_callback.call_args_list, range(len(DummyDataset()))):
@@ -184,7 +125,6 @@ class TestScorer:
             assert kwargs.pop("pipeline") == pipe
             assert kwargs.pop("dataset").groups == DummyDataset().groups
             assert kwargs.pop("step") == i
-            assert np.isnan(kwargs.pop("error_score"))
             assert kwargs == {}
 
     def test_documented_callback_signature_valid(self):
@@ -196,7 +136,7 @@ class TestScorer:
         scorer = Scorer(mock_score_func, single_score_callback=callback)
 
         pipe = DummyOptimizablePipeline()
-        scorer(pipeline=pipe, dataset=DummyDataset(), error_score=np.nan)
+        scorer(pipeline=pipe, dataset=DummyDataset())
 
     def test_no_agg_scoring(self):
         pass

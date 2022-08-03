@@ -221,7 +221,7 @@ class OptunaSearch(CustomOptunaOptimize[PipelineT, DatasetT]):
             # In the end, we calculate the results per datapoint.
             # Note that we could expose the `error_score` parameter on an optimizer level.
             # But let's keep it simple for now.
-            average_score, single_scores = scorer(pipeline, dataset, error_score="raise")
+            average_score, single_scores = scorer(pipeline, dataset)
 
             # As a bonus, we use the custom params option of optuna to store the individual scores per datapoint and the
             # respective data labels
@@ -404,7 +404,7 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize[PipelineT, DatasetT]):
             # Calculate the results per datapoint.
             # Note that we could expose the `error_score` parameter on an optimizer level.
             # But let's keep it simple for now.
-            average_score, single_scores = scorer(pipeline, dataset, error_score="raise")
+            average_score, single_scores = scorer(pipeline, dataset)
 
             # As a bonus, we use the custom params option of Optuna to store the individual scores per datapoint and the
             # respective data labels.

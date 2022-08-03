@@ -25,11 +25,6 @@ class TestScoreMock:
         result = _score(*self.dummy_paras, parameters=None, **{enable_output: True})
         assert out_para in result
 
-    @pytest.mark.parametrize("wrong_value", ("wrong", None))
-    def test_wrong_error_score(self, wrong_value):
-        with pytest.raises(ValueError):
-            _score(*self.dummy_paras, parameters=None, error_score=wrong_value)
-
     def test_parameter_set(self):
         """Test that the parameters are set before score is called."""
         paras = {"para_1": "para_1_val", "para_2": "para_2_val"}
