@@ -22,7 +22,6 @@ if TYPE_CHECKING:
     from tpcp._optimize import BaseOptimize
     from tpcp.validate import Scorer
 
-_ERROR_SCORE_TYPE = Union[Literal["raise"], float]  # noqa: invalid-name
 _SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
 _AGG_SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
 _SINGLE_SCORE_TYPE = Union[Dict[str, List[float]], List[float]]  # noqa: invalid-name
@@ -61,7 +60,6 @@ def _score(
     return_parameters=False,
     return_data_labels=False,
     return_times=False,
-    error_score: _ERROR_SCORE_TYPE = np.nan,
 ) -> _ScoreResults:
     """Set parameters and return score.
 
@@ -81,13 +79,6 @@ def _score(
         If the names of the data points should be added to the result dict
     return_times
         If the time required to score the dataset should be added to the result dict
-    error_score
-        The value that should be used if scoring fails for a specific data point.
-        This can be any numeric value (including nan and inf) or "raises".
-        If it is "raises", the scoring error is raised instead of ignored.
-        In all other cases a warning is displayed.
-        Note, that if the value is set to np.nan, the aggregated value over multiple data points will also be nan,
-        if scoring fails for a single data point.
 
     Returns
     -------
@@ -104,11 +95,6 @@ def _score(
             The parameters that have been evaluated.
 
     """
-    if not isinstance(error_score, float) and error_score != "raise":
-        raise ValueError(
-            "error_score must be the string 'raise' or a numeric value. "
-            "(Hint: if using 'raise', please make sure that it has been spelled correctly.)"
-        )
 
     if parameters is not None:
         # clone after setting parameters in case any parameters are estimators (like pipeline steps).
@@ -117,7 +103,7 @@ def _score(
         pipeline = pipeline.set_params(**parameters)
 
     start_time = time.time()
-    agg_scores, single_scores = scorer(pipeline, dataset, error_score)
+    agg_scores, single_scores = scorer(pipeline, dataset)
     score_time = time.time() - start_time
 
     result: _ScoreResults = {"scores": agg_scores, "single_scores": single_scores}
@@ -145,7 +131,6 @@ def _optimize_and_score(  # noqa: too-many-branches
     return_parameters=False,
     return_data_labels=False,
     return_times=False,
-    error_score: _ERROR_SCORE_TYPE = np.nan,
     memory: Optional[Memory] = None,
 ) -> _OptimizeScoreResults:
     """Optimize and score the optimized pipeline on the train and test data, respectively.
@@ -183,12 +168,12 @@ def _optimize_and_score(  # noqa: too-many-branches
     # beginning.
     optimizer = optimizer.set_params(**pure_parameters)
 
-    agg_scores, single_scores = scorer(optimizer.optimized_pipeline_, test_set, error_score)
+    agg_scores, single_scores = scorer(optimizer.optimized_pipeline_, test_set)
     score_time = time.time() - optimize_time - start_time
 
     result: _OptimizeScoreResults = {"test_scores": agg_scores, "test_single_scores": single_scores}
     if return_train_score:
-        train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set, error_score)
+        train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set)
         result["train_scores"] = train_agg_scores
         result["train_single_scores"] = train_single_scores
     if return_times:

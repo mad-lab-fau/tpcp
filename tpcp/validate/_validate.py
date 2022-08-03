@@ -11,7 +11,7 @@ from tpcp import Dataset
 from tpcp._optimize import BaseOptimize
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results
 from tpcp._utils._multiprocess import TqdmParallel
-from tpcp._utils._score import _ERROR_SCORE_TYPE, _optimize_and_score
+from tpcp._utils._score import _optimize_and_score
 from tpcp.validate._scorer import _validate_scorer
 
 
@@ -31,7 +31,6 @@ def cross_validate(
     pre_dispatch: Union[str, int] = "2*n_jobs",
     return_train_score: bool = False,
     return_optimizer: bool = False,
-    error_score: _ERROR_SCORE_TYPE = np.nan,
     progress_bar: bool = True,
 ):
     """Evaluate a pipeline on a dataset using cross validation.
@@ -101,10 +100,6 @@ def cross_validate(
     return_optimizer
         If the optimized instance of the input optimizable should be returned.
         If `True`, the field `optimizer` is available in the results.
-    error_score
-        Value to assign to the score if an error occurs during scoring.
-        If set to ‘raise’, the error is raised.
-        If a numeric value is given, a Warning is raised.
     progress_bar
         True/False to enable/disable a `tqdm` progress bar.
 
@@ -180,7 +175,6 @@ def cross_validate(
             return_times=True,
             return_data_labels=True,
             return_optimizer=return_optimizer,
-            error_score=error_score,
         )
         for train, test in splits
     )

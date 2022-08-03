@@ -30,7 +30,7 @@ from tpcp._utils._general import (
     _split_hyper_and_pure_parameters,
 )
 from tpcp._utils._multiprocess import TqdmParallel
-from tpcp._utils._score import _ERROR_SCORE_TYPE, _optimize_and_score, _score
+from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.validate._scorer import ScorerTypes, ScoreTypeT, _validate_scorer
 
@@ -230,10 +230,6 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         If False, the respective result attributes will not be populated.
         If multiple parameter combinations have the same score, the one tested first will be used.
         Otherwise, higher values are always considered better.
-    error_score
-        Value to assign to the score if an error occurs during scoring.
-        If set to ‘raise’, the error is raised.
-        If a numeric value is given, a Warning is raised.
     progress_bar
         True/False to enable/disable a tqdm progress bar.
 
@@ -290,7 +286,6 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
     n_jobs: Optional[int]
     return_optimized: Union[bool, str]
     pre_dispatch: Union[int, str]
-    error_score: _ERROR_SCORE_TYPE
     progress_bar: bool
 
     gs_results_: Dict[str, Any]
@@ -308,7 +303,6 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         n_jobs: Optional[int] = None,
         return_optimized: Union[bool, str] = True,
         pre_dispatch: Union[int, str] = "n_jobs",
-        error_score: _ERROR_SCORE_TYPE = np.nan,
         progress_bar: bool = True,
     ) -> None:
         self.pipeline = pipeline
@@ -317,7 +311,6 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         self.n_jobs = n_jobs
         self.pre_dispatch = pre_dispatch
         self.return_optimized = return_optimized
-        self.error_score = error_score
         self.progress_bar = progress_bar
 
     def optimize(self, dataset: DatasetT, **_: Any) -> Self:
@@ -357,7 +350,6 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
                     return_parameters=True,
                     return_data_labels=True,
                     return_times=True,
-                    error_score=self.error_score,
                 )
                 for paras in self.parameter_grid
             )
@@ -503,10 +495,6 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
     pre_dispatch
         The number of jobs that should be pre dispatched.
         For an explanation see the documentation of :class:`~sklearn.model_selection.GridSearchCV`
-    error_score
-        Value to assign to the score if an error occurs during scoring.
-        If set to ‘raise’, the error is raised.
-        If a numeric value is given, a Warning is raised.
     progress_bar
         True/False to enable/disable a tqdm progressbar.
     safe_optimize
@@ -598,7 +586,6 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
     verbose: int
     n_jobs: Optional[int]
     pre_dispatch: Union[int, str]
-    error_score: _ERROR_SCORE_TYPE
     progress_bar: bool
     safe_optimize: bool
 
@@ -625,7 +612,6 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         verbose: int = 0,
         n_jobs: Optional[int] = None,
         pre_dispatch: Union[int, str] = "n_jobs",
-        error_score: _ERROR_SCORE_TYPE = np.nan,
         progress_bar: bool = True,
         safe_optimize: bool = True,
     ) -> None:
@@ -639,7 +625,6 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         self.verbose = verbose
         self.n_jobs = n_jobs
         self.pre_dispatch = pre_dispatch
-        self.error_score = error_score
         self.progress_bar = progress_bar
         self.safe_optimize = safe_optimize
 
@@ -727,7 +712,6 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
                         return_parameters=False,
                         return_data_labels=True,
                         return_times=True,
-                        error_score=self.error_score,
                         memory=tmp_cache,
                     )
                     for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in combinations

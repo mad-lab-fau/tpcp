@@ -52,7 +52,7 @@ class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
 
             scorer = Scorer(self.scoring)
 
-            average_score, single_scores = scorer(pipeline, dataset, error_score="raise")
+            average_score, single_scores = scorer(pipeline, dataset)
             trial.set_user_attr("single_scores", single_scores)
             return average_score
 

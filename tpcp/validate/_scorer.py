@@ -1,16 +1,16 @@
 """Helper to score pipelines."""
 from __future__ import annotations
 
+import traceback
 import warnings
 from traceback import format_exc
-from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast, overload
+from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 import numpy as np
 from typing_extensions import Protocol
 
 from tpcp._dataset import Dataset, DatasetT
 from tpcp._pipeline import Pipeline, PipelineT
-from tpcp._utils._score import _ERROR_SCORE_TYPE
 from tpcp.exceptions import ScorerFailed, ValidationError
 
 T = TypeVar("T")
@@ -40,7 +40,6 @@ class ScoreCallback(Protocol[PipelineT, DatasetT, ScoreTypeT]):
         scorer: "Scorer[PipelineT, DatasetT, ScoreTypeT]",
         pipeline: PipelineT,
         dataset: DatasetT,
-        error_score: _ERROR_SCORE_TYPE,
     ) -> None:
         ...
 
@@ -95,7 +94,6 @@ class Scorer(Generic[PipelineT, DatasetT, ScoreTypeT]):
         ...     scorer: "Scorer",
         ...     pipeline: Pipeline,
         ...     dataset: Dataset,
-        ...     error_score: _ERROR_SCORE_TYPE,
         ...     **_
         ... ) -> None:
         ...     ...
@@ -131,9 +129,7 @@ class Scorer(Generic[PipelineT, DatasetT, ScoreTypeT]):
     # The typing for IndividualScoreType here is not perfect, but not sure how to fix.
     # For the aggregated scores, we can easily parameterize the value based on the generic, but not for the single
     # scores
-    def __call__(
-        self, pipeline: PipelineT, dataset: DatasetT, error_score: _ERROR_SCORE_TYPE
-    ) -> Tuple[Union[ScoreTypeT, float], IndividualScoreType]:
+    def __call__(self, pipeline: PipelineT, dataset: DatasetT) -> Tuple[Union[ScoreTypeT, float], IndividualScoreType]:
         """Score the pipeline with the provided data.
 
         Returns
@@ -144,7 +140,7 @@ class Scorer(Generic[PipelineT, DatasetT, ScoreTypeT]):
             The scores for each individual data-point
 
         """
-        return self._score(pipeline=pipeline, dataset=dataset, error_score=error_score)
+        return self._score(pipeline=pipeline, dataset=dataset)
 
     def aggregate_single(  # noqa: no-self-use
         self, scores: Sequence[Union[float, NoAgg[T]]], name: Optional[str] = None
@@ -195,37 +191,29 @@ class Scorer(Generic[PipelineT, DatasetT, ScoreTypeT]):
                 agg_scores[name] = agg_score
         return agg_scores, raw_scores
 
-    def _score(
-        self, pipeline: PipelineT, dataset: DatasetT, error_score: _ERROR_SCORE_TYPE
-    ) -> Tuple[Union[ScoreTypeT, float], IndividualScoreType]:
+    def _score(self, pipeline: PipelineT, dataset: DatasetT) -> Tuple[Union[ScoreTypeT, float], IndividualScoreType]:
         # `float` because the return value in case of an exception will always be float
         scores: List[Union[ScoreTypeT, float]] = []
         for i, d in enumerate(dataset):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
                 score = self._score_func(pipeline.clone(), d)
-            except Exception:  # noqa: broad-except
-                if error_score == "raise":
-                    raise
-                # Error score should only be a float value
-                score = error_score
-                warnings.warn(
-                    f"Scoring failed for data point: {d.groups}. "
-                    f"The score of this data point will be set to {error_score}. Details: \n"
-                    f"{format_exc()}",
-                    ScorerFailed,
-                )
+            except Exception as e:  # noqa: broad-except
+                raise ScorerFailed(
+                    f"Scorer raised an exception while scoring data point {i}. "
+                    "Tpcp does not support that (compared to sklearn) and you need to handle error cases yourself "
+                    "within the scoring function."
+                    "\n\n"
+                    "The original exception was:\n\n"
+                    f"{traceback.format_exc()}"
+                ) from e
+
             # We check that the scorer returns only numeric values.
             _validate_score_return_val(score)
             scores.append(score)
             if self._single_score_callback:
                 self._single_score_callback(
-                    step=i,
-                    scores=tuple(scores),
-                    scorer=self,
-                    pipeline=pipeline,
-                    dataset=dataset,
-                    error_score=error_score,
+                    step=i, scores=tuple(scores), scorer=self, pipeline=pipeline, dataset=dataset,
                 )
 
         return self.aggregate(_invert_score_dict(scores))
