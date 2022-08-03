@@ -174,6 +174,7 @@ sphinx_gallery_conf = {
             "../examples/algorithms",
             "../examples/parameter_optimization",
             "../examples/validation",
+            "../examples/other_features",
         ]
     ),
     "within_subsection_order": FileNameSortKey,
