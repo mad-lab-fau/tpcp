@@ -77,3 +77,9 @@ def test_optuna():
         "algorithm__high_pass_filter_cutoff_hz": 0.4,
     }
     assert opti_early_stop.best_score_ == 0.858757056619628
+
+
+def test_dataclasses():
+    from examples.other_features._01_dataclasses import nested_object_is_different
+
+    assert nested_object_is_different is True
