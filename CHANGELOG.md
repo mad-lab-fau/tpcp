@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [unreleased] - 
+
+### Added
+- An example on how to use the `dataclass` decorator with tpcp classes. (https://github.com/mad-lab-fau/tpcp/pull/41)
+
+### Changed
+- Most of the class proccesing and sanity checks now happens in the init (or rather a post init hook) instead of during 
+  class initialisation.
+  This increases the chance for some edge cases, but allows to post-process classes, before tpcp checks are run.
+  Most importantly, it allows the use of the `dataclass` decorator in combination with tpcp classes.
+  For the "enduser", this change will have minimal impact.
+  Only, if you relied on accessing special tpcp class parameters before the class (e.g. `__field_annotations__`) was 
+  initialised, you will get an error now.
+  Other than that, you will only notice a very slight overhead on class initialisation, as we know need to run some 
+  basic checks when you call the init or `get_params`.
+  (https://github.com/mad-lab-fau/tpcp/pull/41)
+
+
 ## [0.7.0] - 2022-06-23
 
 ### Added
