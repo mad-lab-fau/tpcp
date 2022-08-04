@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 from joblib import Memory
-from typing_extensions import Literal, TypedDict
+from typing_extensions import TypedDict
 
 from tpcp._base import clone
 from tpcp._dataset import Dataset
@@ -95,7 +95,6 @@ def _score(
             The parameters that have been evaluated.
 
     """
-
     if parameters is not None:
         # clone after setting parameters in case any parameters are estimators (like pipeline steps).
         parameters = _clone_parameter_dict(parameters)

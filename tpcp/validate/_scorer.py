@@ -2,49 +2,79 @@
 from __future__ import annotations
 
 import traceback
-import warnings
-from traceback import format_exc
-from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Set, Tuple, Type, TypeVar, Union, cast
 
 import numpy as np
 from typing_extensions import Protocol
 
+from tpcp import NOTHING
+from tpcp._base import _Nothing
 from tpcp._dataset import Dataset, DatasetT
 from tpcp._pipeline import Pipeline, PipelineT
 from tpcp.exceptions import ScorerFailed, ValidationError
 
 T = TypeVar("T")
+AggReturnType = Union[float, Dict[str, float], _Nothing]
 
-SingleScoreType = float
-MultiScoreType = Dict[str, Union[float, "NoAgg"]]
-ScoreType = Union[SingleScoreType, MultiScoreType]
-ScoreTypeT = TypeVar("ScoreTypeT", SingleScoreType, MultiScoreType)
+SingleScoreTypeT = Union[T, "Aggregator[Any]"]
+MultiScoreTypeT = Dict[str, SingleScoreTypeT[T]]
+ScoreTypeT = Union[SingleScoreTypeT[T], MultiScoreTypeT[T]]
 
-IndividualScoreType = Union[Dict[str, List[float]], List[float]]
-
-ScoreFuncSingle = Callable[[PipelineT, DatasetT], SingleScoreType]
-ScoreFuncMultiple = Callable[[PipelineT, DatasetT], MultiScoreType]
-ScoreFunc = Callable[[PipelineT, DatasetT], ScoreTypeT]
+ScoreFuncSingle = Callable[[PipelineT, DatasetT], SingleScoreTypeT[T]]
+ScoreFuncMultiple = Callable[[PipelineT, DatasetT], MultiScoreTypeT[T]]
+ScoreFunc = Callable[[PipelineT, DatasetT], ScoreTypeT[T]]
 
 
-class ScoreCallback(Protocol[PipelineT, DatasetT, ScoreTypeT]):
+class ScoreCallback(Protocol[PipelineT, DatasetT, T]):
     """Callback signature for scorer callbacks."""
 
     def __call__(
         self,
         *,
         step: int,
-        # The `float` in this call signature is there, because the
-        # value will be float in case of a scoring error, independent of the remaining input types
-        scores: Tuple[Union[ScoreTypeT, float], ...],
-        scorer: "Scorer[PipelineT, DatasetT, ScoreTypeT]",
+        scores: Tuple[ScoreTypeT[T], ...],
+        scorer: "Scorer[PipelineT, DatasetT, T]",
         pipeline: PipelineT,
         dataset: DatasetT,
     ) -> None:
         ...
 
 
-class NoAgg(Generic[T]):
+class Aggregator(Generic[T]):
+    _value: T
+
+    def __init__(self, _value: T):
+        self._value = _value
+
+    def __repr__(self):
+        """Show the representation of the object."""
+        return f"{self.__class__.__name__}({repr(self._value)})"
+
+    def get_value(self) -> T:
+        """Return the value wrapped by aggregator."""
+        return self._value
+
+    @classmethod
+    def aggregate(cls, values: Sequence[T]) -> AggReturnType:
+        """Aggregate the values."""
+        raise NotImplementedError()
+
+
+class MeanAggregator(Aggregator[float]):
+    """Aggregator that calculates the mean of the values."""
+
+    @classmethod
+    def aggregate(cls, values: Sequence[float]) -> float:
+        try:
+            return float(np.mean(values))
+        except TypeError as e:
+            raise ValidationError(
+                "MeanAggregator can only be used with float values. "
+                f"Got the following values instead:\n\n{values}"
+            ) from e
+
+
+class NoAgg(Aggregator[Any]):
     """Wrapper to wrap one or multiple output values of a scorer to prevent aggregation of these values.
 
     If one of the values in the return dictionary of a multi-value score function is wrapped with this class,
@@ -62,21 +92,12 @@ class NoAgg(Generic[T]):
 
     """
 
-    _value: T
-
-    def __init__(self, _value: T):
-        self._value = _value
-
-    def __repr__(self):
-        """Show the represnentation of the object."""
-        return f"{self.__class__.__name__}({repr(self._value)})"
-
-    def get_value(self) -> T:
-        """Return the value wrapped by NoAgg."""
-        return self._value
+    @classmethod
+    def aggregate(cls, values: Sequence[Any]) -> _Nothing:
+        return NOTHING
 
 
-class Scorer(Generic[PipelineT, DatasetT, ScoreTypeT]):
+class Scorer(Generic[PipelineT, DatasetT, T]):
     """A scorer to score multiple data points of a dataset and average the results.
 
     Parameters
@@ -112,24 +133,28 @@ class Scorer(Generic[PipelineT, DatasetT, ScoreTypeT]):
     """
 
     kwargs: Dict[str, Any]
-    _score_func: ScoreFunc[PipelineT, DatasetT, ScoreTypeT]
-    _single_score_func: Optional[ScoreCallback[PipelineT, DatasetT, ScoreTypeT]]
+    _score_func: ScoreFunc[PipelineT, DatasetT, T]
+    _single_score_func: Optional[ScoreCallback[PipelineT, DatasetT, T]]
 
     def __init__(
         self,
-        score_func: ScoreFunc[PipelineT, DatasetT, ScoreTypeT],
+        score_func: ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]],
         *,
-        single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT, ScoreTypeT]] = None,
+        default_aggregator: Type[Aggregator[T]] = MeanAggregator,
+        single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT, T]] = None,
         **kwargs: Any,
     ):
         self.kwargs = kwargs
         self._score_func = score_func
+        self._default_aggregator = default_aggregator
         self._single_score_callback = single_score_callback
 
     # The typing for IndividualScoreType here is not perfect, but not sure how to fix.
     # For the aggregated scores, we can easily parameterize the value based on the generic, but not for the single
     # scores
-    def __call__(self, pipeline: PipelineT, dataset: DatasetT) -> Tuple[Union[ScoreTypeT, float], IndividualScoreType]:
+    def __call__(
+        self, pipeline: PipelineT, dataset: DatasetT
+    ) -> Tuple[Union[float, Dict[str, float]], Union[List[Any], Dict[str, List[Any]]]]:
         """Score the pipeline with the provided data.
 
         Returns
@@ -142,58 +167,51 @@ class Scorer(Generic[PipelineT, DatasetT, ScoreTypeT]):
         """
         return self._score(pipeline=pipeline, dataset=dataset)
 
-    def aggregate_single(  # noqa: no-self-use
-        self, scores: Sequence[Union[float, NoAgg[T]]], name: Optional[str] = None
-    ) -> Tuple[List[float, T], Optional[float]]:
-        """Aggregate the scores of each data point.
-
-        Parameters
-        ----------
-        scores
-            The scores of each data point
-        name
-            The optional name of the score the values belong to.
-            This will be None, if the scorer only handles a single value.
-
-        """
-        is_no_agg = False
-        return_scores = []
-        for score in scores:
-            if isinstance(score, NoAgg):
-                is_no_agg = True
-                return_scores.append(score.get_value())
-            else:
-                return_scores.append(score)
-        if is_no_agg:
-            return return_scores, None
-        return return_scores, float(np.mean(scores))
-
     def aggregate(
-        self, scores: Union[Sequence[Union[float, NoAgg[T]]], Dict[str, Union[float, NoAgg[T]]]]
-    ) -> Tuple[Union[ScoreTypeT, float], IndividualScoreType]:
+        self, scores: Union[Tuple[Type[Aggregator[T]], List[T]], Dict[str, Tuple[Type[Aggregator[T]], List[T]]]]
+    ) -> Tuple[Union[float, Dict[str, float]], Union[List[T], Dict[str, List[T]]]]:
         if not isinstance(scores, dict):
-            raw_scores, agg_scores = self.aggregate_single(scores, None)
-            if agg_scores is None:
-                raise ValueError(
-                    "Scorer returned a NoAgg object."
-                    "This is not allowed when returning only a single score value."
+            aggregator_single, raw_scores_single = scores
+            if aggregator_single is NoAgg:
+                raise ValidationError(
+                    "Scorer returned a NoAgg object. "
+                    "This is not allowed when returning only a single score value. "
                     "If you want to use a NoAgg scorer, return a dictionary of values, where one or "
                     "multiple values are wrapped with NoAgg."
                 )
-            return agg_scores, raw_scores
+            agg_val = aggregator_single.aggregate(raw_scores_single)
+            if not isinstance(agg_val, float):
+                raise ValidationError("The final aggregated score must be a float. " f"Instead it is:\n{agg_val}")
+            return agg_val, list(raw_scores_single)
 
-        raw_scores: Dict[str, List[float, T]] = {}
+        raw_scores: Dict[str, List[T]] = {}
         agg_scores: Dict[str, float] = {}
-        for name, score in scores.items():
-            raw_score, agg_score = self.aggregate_single(score, name)
-            raw_scores[name] = raw_score
-            if agg_score is not None:
+        for name, (aggregator, raw_score) in scores.items():
+            raw_scores[name] = list(raw_score)
+            agg_score = aggregator.aggregate(raw_score)
+            if agg_score is NOTHING or isinstance(agg_score, _Nothing):
+                # This is the case with the NoAgg Scorer
+                continue
+            if isinstance(agg_score, dict):
+                # If the aggregator returned mutliple values, we merge them prefixing the original name
+                for key, value in agg_score.items():
+                    agg_scores[f"{name}__{key}"] = value
+            else:
                 agg_scores[name] = agg_score
+        # Finally we check that all aggregates values are floats
+        if not all(isinstance(score, float) for score in agg_scores.values()):
+            raise ValidationError(
+                "Final aggregated scores are not all floats. "
+                "Double-check your (custom) aggregators."
+                f"The current values are:\n{agg_scores}"
+            )
         return agg_scores, raw_scores
 
-    def _score(self, pipeline: PipelineT, dataset: DatasetT) -> Tuple[Union[ScoreTypeT, float], IndividualScoreType]:
+    def _score(
+        self, pipeline: PipelineT, dataset: DatasetT
+    ) -> Tuple[Union[float, Dict[str, float]], Union[List[Any], Dict[str, List[Any]]]]:
         # `float` because the return value in case of an exception will always be float
-        scores: List[Union[ScoreTypeT, float]] = []
+        scores: List[ScoreTypeT[T]] = []
         for i, d in enumerate(dataset):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
@@ -208,37 +226,16 @@ class Scorer(Generic[PipelineT, DatasetT, ScoreTypeT]):
                     f"{traceback.format_exc()}"
                 ) from e
 
-            # We check that the scorer returns only numeric values.
-            _validate_score_return_val(score)
             scores.append(score)
             if self._single_score_callback:
                 self._single_score_callback(
                     step=i, scores=tuple(scores), scorer=self, pipeline=pipeline, dataset=dataset,
                 )
 
-        return self.aggregate(_invert_score_dict(scores))
+        return self.aggregate(_check_and_invert_score_dict(scores, self._default_aggregator))
 
 
-ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT, ScoreTypeT], Scorer[PipelineT, DatasetT, ScoreTypeT], None]
-
-
-def _validate_score_return_val(value: ScoreType):
-    """We expect a scorer to return either a numeric value or a dictionary of such values."""
-    if isinstance(value, (int, float)):
-        return
-    if isinstance(value, dict):
-        for v in value.values():
-            if not isinstance(v, (int, float, NoAgg)):
-                break
-        else:
-            return
-
-    raise ValidationError(
-        "The scoring function must have one of the following return types:\n"
-        "1. dictionary of numeric values or values wrapped by `NoAgg`.\n"
-        "2. single numeric value.\n\n"
-        f"You return value was {value}"
-    )
+ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]], Scorer[PipelineT, DatasetT, ScoreTypeT[T]], None]
 
 
 def _passthrough_scoring(pipeline: Pipeline[DatasetT], datapoint: DatasetT):
@@ -270,111 +267,64 @@ def _validate_scorer(
     raise ValueError("A valid scorer must either be a instance of `Scorer` (or subclass), None, or a callable.")
 
 
-def _invert_score_dict(scores: List[ScoreType]) -> IndividualScoreType:
+_non_homogeneous_scoring_error = ValidationError(
+    "The returned score values are not homogeneous. "
+    "For some datapoint a single values was returned, but for others a dictionary was returned. "
+    "This is not allowed."
+)
+
+
+def _check_and_invert_score_dict(
+    scores: List[ScoreTypeT[T]], default_agg: Type[Aggregator]
+) -> Union[Tuple[Type[Aggregator[T]], List[T]], Dict[str, Tuple[Type[Aggregator[T]], List[T]]]]:
     """Invert the scores dictionary to a list of scores."""
+    first_score = scores[0]
+    if not isinstance(first_score, dict):
+        # We expect a single score value from each datapoint
+        # We check that no other value is a dictionary.
+        # Other than that we can check nothing else here.
+        # What datatypes are really allowed is controlled by the aggregator and will be checked there.
+        if any(isinstance(s, dict) for s in scores):
+            raise _non_homogeneous_scoring_error
+        # We check that the score types are consistent for all datatypes.
+        types = cast(
+            Set[Type[Aggregator]], set((type(s) if isinstance(s, Aggregator) else default_agg) for s in scores)
+        )
+        if len(types) > 1:
+            raise ValidationError(
+                f"The score values are not consistent. The following aggregation types were found: {types}"
+            )
+        consistent_type = types.pop()
+        return (
+            consistent_type,
+            [(s.get_value() if isinstance(s, consistent_type) else consistent_type(s).get_value()) for s in scores],
+        )
+
+    score_types = {k: (type(s) if isinstance(s, Aggregator) else default_agg) for k, s in first_score.items()}
+    return_dict = {k: (v, []) for k, v in score_types.items()}
     for s in scores:
-        if isinstance(s, dict):
-            score_names = s.keys()
-            break
-    else:
-        return scores
-    return_dict = {}
-    for key in score_names:
-        score_array = []
-        for score in scores:
-            if isinstance(score, dict):
-                score_array.append(score[key])
-            else:
-                # If the scorer raised an error, there will only be a single value. This value will be used for all
-                # scores then
-                score_array.append(score)
-        return_dict[key] = score_array
+        if not isinstance(s, dict):
+            raise _non_homogeneous_scoring_error
+        # We check that the score types are consistent for all datatypes.
+        for k, v in score_types.items():
+            try:
+                score = s[k]
+            except KeyError as e:
+                raise ValidationError(
+                    "The return values of the scoring function is expected to have the same keys "
+                    "for each datapoint."
+                    f"However, for at least one datapoint the return values is missing the key '{k}'. "
+                    "Expected keys are: {score_types.keys()}"
+                ) from e
+            # If the score is not wrapped in an aggregator, we wrap it in the default aggregator.
+            if not isinstance(score, Aggregator):
+                # NOTE: Not really elegant to wrap the values and then get the value two lines below... But it works.
+                score = default_agg(score)
+            if not isinstance(score, v):
+                raise ValidationError(
+                    f"The score value for {k} is not consistently of type {v}."
+                    f"For at least one datapoint, the score value was {s[k]}."
+                )
+            return_dict[k][1].append(score.get_value())
+
     return return_dict
-
-
-# # Note, that there is an overlap between these call signatures which is a problem for typing.
-# # In both cases it is valid that all values of `scores` are `float`.
-# # This happens if an error is raised for all cases.
-# # In this case it is not clear which call signature should be used (at least for the typechecker).
-# # In reality this is equivalent to the "SingleScoreType" scenario.
-# # Maybe there is a better way to type that in the future.
-# @overload
-# def aggregate_scores(
-#     scores: List[Union[SingleScoreType, float]], agg_method: Callable[[Sequence[float]], float]
-# ) -> Tuple[float, List[float]]:
-#     ...
-#
-#
-# @overload
-# def aggregate_scores(
-#     scores: List[Union[MultiScoreType, float]], agg_method: Callable[[Sequence[float]], float]
-# ) -> Tuple[Dict[str, float], Dict[str, List[float]]]:
-#     ...
-#
-#
-# def aggregate_scores(
-#     scores: Union[List[Union[SingleScoreType, float]], List[Union[MultiScoreType, float]]],
-#     agg_method: Callable[[Sequence[float]], float],
-# ) -> Union[Tuple[float, List[float]], Tuple[Dict[str, float], Dict[str, List[float]]]]:
-#     """Invert result dict of and apply aggregation method to each score output.
-#
-#     Parameters
-#     ----------
-#     scores
-#         A list of either numeric values or dicts with numeric values. We expect all dicts to have the same structure
-#         in the latter case.
-#         If dicts and numeric values are mixed, we assume that the single numeric values should indicate a scoring
-#         error for this data point.
-#         In this case, the single value will be replaced by a dict having the same shape as all other dicts provided,
-#         but with all values being the value provided.
-#     agg_method
-#         A callable that can take a list of numeric values and returns a single value.
-#         It will be called on the list of scores provided.
-#         In case `scores` is a list of dicts, it will be called on the list of values
-#
-#     Returns
-#     -------
-#     aggregated_scores
-#         If `scores` was a list of numeric values this will simply be the result of `agg_method(scores)`.
-#         If `scores` was a list of dicts, this will also be a dict, where `agg_method` was applied across all values
-#         with the respective dict key.
-#     single_scores
-#         If `scores` was a list of numeric values, this is simply `scores`.
-#         If `scores` was a list of dicts, this is the inverted dict (aka a dict of lists) with the original scores
-#         values.
-#
-#     """
-#     # We need to go through all scores and check if one is a dictionary.
-#     # Otherwise, it might be possible that the values were caused by an error and hence did not return a dict as
-#     # expected.
-#     for s in scores:
-#         if isinstance(s, dict):
-#             score_names = s.keys()
-#             break
-#     else:
-#         scores = cast(List[float], scores)
-#         return agg_method(scores), scores
-#     inv_scores: Dict[str, List[float]] = {}
-#     agg_scores: Dict[str, float] = {}
-#     # Invert the dict and calculate the mean per score:
-#     for key in score_names:
-#         key_is_no_agg = False
-#         score_array = []
-#         for score in scores:
-#             if isinstance(score, dict):
-#                 score_val = score[key]
-#                 if isinstance(score_val, NoAgg):
-#                     # If one of the values are wrapped in NoAgg, we will not aggregate the values and only remove the
-#                     # NoAgg warpper.
-#                     key_is_no_agg = True
-#                     score_array.append(score_val.get_value())
-#                 else:
-#                     score_array.append(score_val)
-#             else:
-#                 # If the scorer raised an error, there will only be a single value. This value will be used for all
-#                 # scores then
-#                 score_array.append(score)
-#         inv_scores[key] = score_array
-#         if not key_is_no_agg:
-#             agg_scores[key] = agg_method(score_array)
-#     return agg_scores, inv_scores

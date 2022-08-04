@@ -91,9 +91,7 @@ class TestScorer:
         assert "no_agg_score" not in agg
         assert agg["score_1"] == np.mean(data.groups)
 
-    @pytest.mark.parametrize(
-        "bad_scorer", (lambda x, y: "test", lambda x, y: {"val": "test"}, lambda x, y: NoAgg(None))
-    )
+    @pytest.mark.parametrize("bad_scorer", (lambda x, y: "test", lambda x, y: {"val": "test"}))
     def test_bad_scorer(self, bad_scorer):
         """Check that we catch cases where the scoring func returns invalid values independent of the error_score val"""
         scorer = Scorer(bad_scorer)
@@ -101,7 +99,15 @@ class TestScorer:
         data = DummyDataset()
         with pytest.raises(ValidationError) as e:
             scorer(pipe, data)
-        assert "The scoring function must have one" in str(e.value)
+        assert "MeanAggregator can only be used with float values" in str(e.value)
+
+    def test_no_agg_as_single_scorer(self):
+        scorer = Scorer(lambda x, y: NoAgg(None))
+        pipe = DummyOptimizablePipeline()
+        data = DummyDataset()
+        with pytest.raises(ValidationError) as e:
+            scorer(pipe, data)
+        assert "Scorer returned a NoAgg object" in str(e.value)
 
     def test_kwargs_passed(self):
         kwargs = {"a": 3, "b": "test"}
