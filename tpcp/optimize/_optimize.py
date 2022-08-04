@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
-from typing import Any, ContextManager, Dict, Generic, Iterator, List, Optional, Tuple, Union
+from typing import Any, ContextManager, Dict, Generic, Iterator, List, Optional, Tuple, Union, TypeVar
 
 import numpy as np
 from joblib import Memory, delayed
@@ -32,7 +32,10 @@ from tpcp._utils._general import (
 from tpcp._utils._multiprocess import TqdmParallel
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
-from tpcp.validate._scorer import ScorerTypes, ScoreTypeT, _validate_scorer
+from tpcp.validate._scorer import ScorerTypes, _validate_scorer
+
+
+T = TypeVar("T")
 
 
 class DummyOptimize(BaseOptimize[PipelineT, DatasetT], _skip_validation=True):
@@ -186,7 +189,7 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
         return self
 
 
-class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT, ScoreTypeT]):
+class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT, T]):
     """Perform a grid search over various parameters.
 
     This scores the pipeline for every combination of data points in the provided dataset and parameter combinations
@@ -282,7 +285,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
     """
 
     parameter_grid: ParameterGrid
-    scoring: ScorerTypes[PipelineT, DatasetT, ScoreTypeT]
+    scoring: ScorerTypes[PipelineT, DatasetT, T]
     n_jobs: Optional[int]
     return_optimized: Union[bool, str]
     pre_dispatch: Union[int, str]
@@ -299,7 +302,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         pipeline: PipelineT,
         parameter_grid: ParameterGrid,
         *,
-        scoring: ScorerTypes[PipelineT, DatasetT, ScoreTypeT] = None,
+        scoring: ScorerTypes[PipelineT, DatasetT, T] = None,
         n_jobs: Optional[int] = None,
         return_optimized: Union[bool, str] = True,
         pre_dispatch: Union[int, str] = "n_jobs",
@@ -426,7 +429,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         return results
 
 
-class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[OptimizablePipelineT, DatasetT, ScoreTypeT]):
+class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[OptimizablePipelineT, DatasetT, T]):
     """Exhaustive (hyper)parameter search using a cross validation based score to optimize pipeline parameters.
 
     This class follows as much as possible the interface of :func:`~sklearn.model_selection.GridSearchCV`.
@@ -578,7 +581,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
 
     pipeline: OptimizablePipelineT
     parameter_grid: ParameterGrid
-    scoring: ScorerTypes[OptimizablePipelineT, DatasetT, ScoreTypeT]
+    scoring: ScorerTypes[OptimizablePipelineT, DatasetT, T]
     return_optimized: Union[bool, str]
     cv: Optional[Union[int, BaseCrossValidator, Iterator]]
     pure_parameters: Union[bool, List[str]]
@@ -604,7 +607,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         pipeline: OptimizablePipelineT,
         parameter_grid: ParameterGrid,
         *,
-        scoring: ScorerTypes[OptimizablePipelineT, DatasetT, ScoreTypeT] = None,
+        scoring: ScorerTypes[OptimizablePipelineT, DatasetT, T] = None,
         return_optimized: Union[bool, str] = True,
         cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
         pure_parameters: Union[bool, List[str]] = False,
