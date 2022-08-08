@@ -14,7 +14,7 @@ from tests.test_pipelines.conftest import (
     dummy_multi_score_func,
     dummy_single_score_func,
 )
-from tpcp.exceptions import ValidationError
+from tpcp.exceptions import ValidationError, ScorerFailed
 from tpcp.validate import Scorer
 from tpcp.validate._scorer import Aggregator, NoAgg, _passthrough_scoring, _validate_scorer
 
@@ -145,6 +145,18 @@ class TestScorer:
         assert "same keys for each datapoint." in str(e)
         assert "missing the key 'val2'" in str(e)
         assert "are: ('val1', 'val2')" in str(e)
+
+    def test_score_func_raises_exception(self):
+        def score_func(x, y):
+            raise Exception("test")
+
+        scorer = Scorer(score_func)
+        pipe = DummyOptimizablePipeline()
+        data = DummyDataset()
+        with pytest.raises(ScorerFailed) as e:
+            scorer(pipe, data)
+
+        assert 'Exception("test")' in str(e)
 
 
 def _dummy_func(x):
@@ -304,8 +316,27 @@ class TestCustomAggregator:
         assert "no_agg_score" not in agg
         assert agg["score_1"] == np.mean(data.groups)
 
+    class InvalidMultiAgg(Aggregator):
+        @classmethod
+        def aggregate(cls, values: Sequence[float]):
+            return {"val": "invalid"}
 
-# Test scorer raises exception
-# Test final values are not all float
+    class InvalidSingleAgg(Aggregator):
+        @classmethod
+        def aggregate(cls, values: Sequence[float]):
+            return "invalid"
+
+    @pytest.mark.parametrize("score_func", (lambda x, y: 1, lambda x, y: {"val": 1}))
+    @pytest.mark.parametrize("aggregator", [InvalidMultiAgg, InvalidSingleAgg])
+    def test_invalid_aggregator_return_type(self, aggregator, score_func):
+        scorer = Scorer(score_func, default_aggregator=aggregator)
+        pipe = DummyOptimizablePipeline()
+        data = DummyDataset()
+        with pytest.raises(ValidationError) as e:
+            _ = scorer(pipe, data)
+
+        assert "number" in str(e)
+
+
 # Test passthrough scoring
 # Test multi aggregator all get right values
