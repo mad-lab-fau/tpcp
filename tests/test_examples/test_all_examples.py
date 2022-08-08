@@ -83,3 +83,26 @@ def test_dataclasses():
     from examples.other_features._01_dataclasses import nested_object_is_different
 
     assert nested_object_is_different is True
+
+
+def test_custom_scorer():
+    from examples.validation._02_custom_scorer import (
+        baseline_results_agg,
+        complicated_agg,
+        median_results_agg,
+        multi_agg_agg,
+        no_agg_agg,
+        partial_median_results_agg,
+    )
+
+    assert_almost_equal(baseline_results_agg["f1_score"], 0.7089728)
+    assert_almost_equal(median_results_agg["f1_score"], 0.9173713)
+    assert_almost_equal(partial_median_results_agg["f1_score"], median_results_agg["f1_score"])
+    assert_almost_equal(partial_median_results_agg["precision"], baseline_results_agg["precision"])
+    assert_almost_equal(multi_agg_agg["f1_score__mean"], baseline_results_agg["f1_score"])
+    assert_almost_equal(multi_agg_agg["f1_score__std"], 0.39387732846763174)
+
+    assert_almost_equal(complicated_agg["f1_score"], baseline_results_agg["f1_score"])
+    assert_almost_equal(complicated_agg["per_sample__f1_score"], 0.8172557027823545)
+
+    assert "f1_score" not in no_agg_agg
