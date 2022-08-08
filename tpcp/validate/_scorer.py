@@ -194,7 +194,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             if isinstance(agg_val, dict):
                 if not all(isinstance(score, float) for score in agg_val.values()):
                     raise ValidationError(
-                        "Final aggregated scores are not all floats. "
+                        "Final aggregated scores are not all numbers. "
                         "Double-check your (custom) aggregators."
                         f"The current values are: \n{agg_val}"
                     )
@@ -219,7 +219,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         # Finally we check that all aggregates values are floats
         if not all(isinstance(score, (int, float)) for score in agg_scores.values()):
             raise ValidationError(
-                "Final aggregated scores are not all floats. "
+                "Final aggregated scores are not all numbers. "
                 "Double-check your (custom) aggregators."
                 f"The current values are:\n{agg_scores}"
             )
