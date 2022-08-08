@@ -29,6 +29,8 @@ As example, we are going to Gridsearch some parameters of the `QRSDetector` we i
 # For our GridSearch, we need an instance of this dataset.
 from pathlib import Path
 
+import numpy as np
+
 from examples.datasets.datasets_final_ecg import ECGExampleData
 
 try:
@@ -110,7 +112,7 @@ pipe = MyPipeline()
 # In this case we compare the identified R-peaks with the reference and identify which R-peaks were correctly
 # found within a certain margin around the reference points
 # Based on these matches, we calculate the precision, the recall, and the f1-score using some helper functions.
-from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference
+from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference, precision_recall_f1_score
 
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
@@ -119,15 +121,12 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     # will clone it again.
     pipeline = pipeline.safe_run(datapoint)
     tolerance_s = 0.02  # We just use 20 ms for this example
-    matches_events, _ = match_events_with_reference(
+    matches = match_events_with_reference(
         pipeline.r_peak_positions_.to_numpy(),
         datapoint.r_peak_positions_.to_numpy(),
         tolerance=tolerance_s * datapoint.sampling_rate_hz,
     )
-    n_tp = len(matches_events)
-    precision = n_tp / len(pipeline.r_peak_positions_)
-    recall = n_tp / len(datapoint.r_peak_positions_)
-    f1_score = (2 * n_tp) / (len(pipeline.r_peak_positions_) + len(datapoint.r_peak_positions_))
+    precision, recall, f1_score = precision_recall_f1_score(matches)
     return {"precision": precision, "recall": recall, "f1_score": f1_score}
 
 

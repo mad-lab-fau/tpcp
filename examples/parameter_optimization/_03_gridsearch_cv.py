@@ -16,6 +16,7 @@ tuning hyperparameters <https://scikit-learn.org/stable/modules/grid_search.html
 """
 import random
 
+import numpy as np
 import pandas as pd
 from typing_extensions import Self
 
@@ -50,7 +51,7 @@ from typing import Any
 # For more information about the pipeline below check :ref:`optimize_pipelines`.
 #    Todo: Full dedicated example for `PureParameter`
 from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDetector
-from tpcp import Dataset, OptimizableParameter, OptimizablePipeline, Parameter, cf
+from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf
 
 
 class MyPipeline(OptimizablePipeline[ECGExampleData]):
@@ -86,9 +87,9 @@ pipe = MyPipeline()
 # ----------
 # The scorer is identical to the scoring function used in the other examples.
 # The F1-score is still the most important parameter for our comparison.
-from typing import Any, Dict
+from typing import Dict
 
-from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference
+from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference, precision_recall_f1_score
 
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData) -> Dict[str, float]:
@@ -97,15 +98,12 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData) -> Dict[str, float]:
     # will clone it again.
     pipeline = pipeline.safe_run(datapoint)
     tolerance_s = 0.02  # We just use 20 ms for this example
-    matches_events, _ = match_events_with_reference(
+    matches = match_events_with_reference(
         pipeline.r_peak_positions_.to_numpy(),
         datapoint.r_peak_positions_.to_numpy(),
         tolerance=tolerance_s * datapoint.sampling_rate_hz,
     )
-    n_tp = len(matches_events)
-    precision = n_tp / len(pipeline.r_peak_positions_)
-    recall = n_tp / len(datapoint.r_peak_positions_)
-    f1_score = (2 * n_tp) / (len(pipeline.r_peak_positions_) + len(datapoint.r_peak_positions_))
+    precision, recall, f1_score = precision_recall_f1_score(matches)
     return {"precision": precision, "recall": recall, "f1_score": f1_score}
 
 
