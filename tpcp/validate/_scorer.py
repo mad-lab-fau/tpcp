@@ -69,8 +69,7 @@ class MeanAggregator(Aggregator[float]):
             return float(np.mean(values))
         except TypeError as e:
             raise ValidationError(
-                "MeanAggregator can only be used with float values. "
-                f"Got the following values instead:\n\n{values}"
+                "MeanAggregator can only be used with float values. " f"Got the following values instead:\n\n{values}"
             ) from e
 
 
@@ -229,7 +228,11 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             scores.append(score)
             if self._single_score_callback:
                 self._single_score_callback(
-                    step=i, scores=tuple(scores), scorer=self, pipeline=pipeline, dataset=dataset,
+                    step=i,
+                    scores=tuple(scores),
+                    scorer=self,
+                    pipeline=pipeline,
+                    dataset=dataset,
                 )
 
         return self.aggregate(_check_and_invert_score_dict(scores, self._default_aggregator))

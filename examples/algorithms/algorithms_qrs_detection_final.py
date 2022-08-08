@@ -13,15 +13,13 @@ from typing import List, Tuple, Union
 import numpy as np
 import pandas as pd
 from scipy import signal
-from scipy.spatial import cKDTree, minkowski_distance, KDTree
+from scipy.spatial import KDTree, cKDTree, minkowski_distance
 from sklearn.metrics import roc_curve
 
 from tpcp import Algorithm, HyperParameter, OptimizableParameter, Parameter, make_action_safe, make_optimize_safe
 
 
-def match_events_with_reference(
-    events: np.ndarray, reference: np.ndarray, tolerance: Union[int, float]
-) -> np.ndarray:
+def match_events_with_reference(events: np.ndarray, reference: np.ndarray, tolerance: Union[int, float]) -> np.ndarray:
     """Find matches in two lists based on the distance between their vectors.
 
     Parameters
