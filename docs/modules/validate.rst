@@ -15,6 +15,8 @@ Classes
    :template: class_with_private.rst
 
     Scorer
+    Aggregator
+    MeanAggregator
     NoAgg
 
 Functions
@@ -26,4 +28,3 @@ Functions
    :template: function.rst
 
     cross_validate
-    aggregate_scores
