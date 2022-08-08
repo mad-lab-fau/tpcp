@@ -13,15 +13,15 @@ from typing import List, Tuple, Union
 import numpy as np
 import pandas as pd
 from scipy import signal
-from scipy.spatial import cKDTree, minkowski_distance
+from scipy.spatial import cKDTree, minkowski_distance, KDTree
 from sklearn.metrics import roc_curve
 
 from tpcp import Algorithm, HyperParameter, OptimizableParameter, Parameter, make_action_safe, make_optimize_safe
 
 
 def match_events_with_reference(
-    events: np.ndarray, reference: np.ndarray, tolerance: Union[int, float], one_to_one: bool = True
-) -> Tuple[np.ndarray, np.ndarray]:
+    events: np.ndarray, reference: np.ndarray, tolerance: Union[int, float]
+) -> np.ndarray:
     """Find matches in two lists based on the distance between their vectors.
 
     Parameters
@@ -32,42 +32,25 @@ def match_events_with_reference(
         An m long array of d-dimensional vectors
     tolerance
         Max allowed Chebyshev distance between matches
-    one_to_one
-        If True only valid one-to-one matches are returned (see more below)
 
     Returns
     -------
-    event_indices
-        Indices from the events array that have a match in the right list.
-        If `one_to_one` is False, indices might repeat.
-    reference_indices
-        Indices from the reference array that have a match in the left list.
-        If `one_to_one` is False, indices might repeat.
-        A valid match pare is then `(event_indices[i], reference_indices[i]) for all i.
+    A array that marks all matches.
+    If one value is NaN, it means that no match was found for this index.
 
     Notes
     -----
-    This function supports 2 modes:
-
-    `one_to_one` = False:
-        In this mode every match is returned as long the distance in all dimensions between the matches is at most
-        tolerance.
-        This is equivalent to the Chebyshev distance between the matches
-        (aka `np.max(np.abs(left_match - right_match)) < tolerance`).
-        This means multiple matches for each vector will be returned.
-        This means the respective indices will occur multiple times in the output vectors.
-    `one_to_one` = True:
-        In this mode only a single match per index is allowed in both directions.
-        This means that every index will only occur once in the output arrays.
-        If multiple matches are possible based on the tolerance of the Chebyshev distance, the closest match will be
-        selected based on the Manhatten distance (aka `np.sum(np.abs(left_match - right_match`).
-        Only this match will be returned.
-        Note, that in the implementation, we first get the closest match based on the Manhatten distance and check in a
-        second step if this closed match is also valid based on the Chebyshev distance.
+    Only a single match per index is allowed in both directions.
+    This means that every index will only occur once in the output arrays.
+    If multiple matches are possible based on the tolerance of the Chebyshev distance, the closest match will be
+    selected based on the Manhatten distance (aka `np.sum(np.abs(left_match - right_match`).
+    Only this match will be returned.
+    Note, that in the implementation, we first get the closest match based on the Manhatten distance and check in a
+    second step if this closed match is also valid based on the Chebyshev distance.
 
     """
     if len(events) == 0 or len(reference) == 0:
-        return np.array([]), np.array([])
+        return np.array([])
 
     events = np.atleast_1d(events.squeeze())
     reference = np.atleast_1d(reference.squeeze())
@@ -76,20 +59,12 @@ def match_events_with_reference(
     events = np.atleast_2d(events).T
     reference = np.atleast_2d(reference).T
 
-    right_tree = cKDTree(reference)
-    left_tree = cKDTree(events)
+    right_tree = KDTree(reference)
+    left_tree = KDTree(events)
 
-    if one_to_one is False:
-        # p = np.inf is used to select the Chebyshev distance
-        keys = list(zip(*right_tree.sparse_distance_matrix(left_tree, tolerance, p=np.inf).keys()))
-        # All values are returned that have a valid match
-        return (np.array([]), np.array([])) if len(keys) == 0 else (np.array(keys[1]), np.array(keys[0]))
-
-    # one_to_one is True
     # We calculate the closest neighbor based on the Manhatten distance in both directions and then find only the cases
     # were the right side closest neighbor resulted in the same pairing as the left side closest neighbor ensuring
     # that we have true one-to-one-matches
-
     # p = 1 is used to select the Manhatten distance
     l_nearest_distance, l_nearest_neighbor = right_tree.query(events, p=1, workers=-1)
     _, r_nearest_neighbor = left_tree.query(reference, p=1, workers=-1)
@@ -113,9 +88,27 @@ def match_events_with_reference(
 
         valid_matches = np.delete(valid_matches, index_large_matches[output], axis=0)
 
-    valid_matches = valid_matches.T
+    valid_matches = valid_matches
+    # Add invalid pairs to the output array
+    missing_l_indexes = np.setdiff1d(np.arange(len(events)), valid_matches[:, 0])
+    missing_l_matches = np.vstack([missing_l_indexes, np.full(len(missing_l_indexes), np.nan)]).T
+    missing_r_indexes = np.setdiff1d(np.arange(len(reference)), valid_matches[:, 1])
+    missing_r_matches = np.vstack([np.full(len(missing_r_indexes), np.nan), missing_r_indexes]).T
+    valid_matches = np.vstack([valid_matches, missing_l_matches, missing_r_matches])
 
-    return valid_matches[0], valid_matches[1]
+    return valid_matches
+
+
+def precision_recall_f1_score(matches: np.ndarray):
+    if len(matches) == 0:
+        return 0, 0, 0
+    n_tp = np.sum((~np.isnan(matches)).all(axis=-1))
+    len_events = np.sum(~np.isnan(matches[:, 0]))
+    len_reference = np.sum(~np.isnan(matches[:, 1]))
+    precision = n_tp / len_events if len_events > 0 else 0
+    recall = n_tp / len_reference if len_reference > 0 else 0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
+    return precision, recall, f1
 
 
 class QRSDetector(Algorithm):
@@ -203,13 +196,13 @@ class OptimizableQrsDetector(QRSDetector):
             potential_peaks = self._search_strategy(filtered, sampling_rate_hz, use_height=False)
             # Determine the label for each peak, by matching them with our ground truth
             labels = np.zeros(potential_peaks.shape)
-            matches, _ = match_events_with_reference(
+            matches = match_events_with_reference(
                 events=np.atleast_2d(potential_peaks).T,
                 reference=np.atleast_2d(p.to_numpy().astype(int)).T,
                 tolerance=self.r_peak_match_tolerance_s * sampling_rate_hz,
-                one_to_one=True,
             )
-            labels[matches] = 1
+            tp_matches = matches[(~np.isnan(matches)).all(axis=1), 0].astype(int)
+            labels[tp_matches] = 1
             labels = labels.astype(bool)
             all_labels.append(labels)
             all_peak_heights.append(filtered[potential_peaks])

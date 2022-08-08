@@ -119,7 +119,7 @@ pipe = MyPipeline()
 # We could still calculate and return multiple other scores, but this would complicate the implementation of our
 # Optimizer and hence, is kept as exercise for the reader ;) .
 
-from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference
+from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference, precision_recall_f1_score
 
 
 def f1_score(pipeline: MyPipeline, datapoint: ECGExampleData) -> float:
@@ -128,14 +128,13 @@ def f1_score(pipeline: MyPipeline, datapoint: ECGExampleData) -> float:
     # will clone it again.
     pipeline = pipeline.safe_run(datapoint)
     tolerance_s = 0.02  # We just use 20 ms for this example
-    matches_events, _ = match_events_with_reference(
+    matches = match_events_with_reference(
         pipeline.r_peak_positions_.to_numpy(),
         datapoint.r_peak_positions_.to_numpy(),
         tolerance=tolerance_s * datapoint.sampling_rate_hz,
     )
-    n_tp = len(matches_events)
-    f1_score = (2 * n_tp) / (len(pipeline.r_peak_positions_) + len(datapoint.r_peak_positions_))
-    return f1_score
+    *_, f1_score_ = precision_recall_f1_score(matches)
+    return f1_score_
 
 
 from optuna import Study, Trial

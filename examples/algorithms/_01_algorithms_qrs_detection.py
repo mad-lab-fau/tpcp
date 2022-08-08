@@ -229,13 +229,13 @@ class OptimizableQrsDetector(QRSDetector):
             potential_peaks = self._search_strategy(filtered, sampling_rate_hz, use_height=False)
             # Determine the label for each peak, by matching them with our ground truth
             labels = np.zeros(potential_peaks.shape)
-            matches, _ = match_events_with_reference(
+            matches = match_events_with_reference(
                 events=potential_peaks,
                 reference=p.to_numpy().astype(int),
                 tolerance=self.r_peak_match_tolerance_s * sampling_rate_hz,
-                one_to_one=True,
             )
-            labels[matches] = 1
+            tp_matches = matches[(~np.isnan(matches)).all(axis=1), 0].astype(int)
+            labels[tp_matches] = 1
             labels = labels.astype(bool)
             all_labels.append(labels)
             all_peak_heights.append(filtered[potential_peaks])
