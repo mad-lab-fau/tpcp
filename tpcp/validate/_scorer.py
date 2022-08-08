@@ -41,6 +41,16 @@ class ScoreCallback(Protocol[PipelineT, DatasetT, T]):
 
 
 class Aggregator(Generic[T]):
+    """Base class for aggregators.
+
+    You can subclass this class to create your own aggregators.
+    The only thing you should change, is to overwrite the `aggregate` method.
+    Everything else should not be modified.
+
+    Custom aggregators can then be used to wrap return values of score functions or they can be passed as
+    `default_aggregator` to the :class:`~tpcp.validate.Scorer` class.
+    """
+
     _value: T
 
     def __init__(self, _value: T):
@@ -65,6 +75,7 @@ class MeanAggregator(Aggregator[float]):
 
     @classmethod
     def aggregate(cls, values: Sequence[float]) -> float:
+        """Aggregate a sequence of floats by taking the mean."""
         try:
             return float(np.mean(values))
         except TypeError as e:
@@ -92,7 +103,8 @@ class NoAgg(Aggregator[Any]):
     """
 
     @classmethod
-    def aggregate(cls, values: Sequence[Any]) -> _Nothing:
+    def aggregate(cls, _: Sequence[Any]) -> _Nothing:
+        """Return nothing, indicating no aggregation."""
         return NOTHING
 
 
@@ -166,7 +178,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         """
         return self._score(pipeline=pipeline, dataset=dataset)
 
-    def aggregate(
+    def aggregate(  # noqa: no-self-use
         self, scores: Union[Tuple[Type[Aggregator[T]], List[T]], Dict[str, Tuple[Type[Aggregator[T]], List[T]]]]
     ) -> Tuple[Union[float, Dict[str, float]], Union[List[T], Dict[str, List[T]]]]:
         if not isinstance(scores, dict):
@@ -228,11 +240,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             scores.append(score)
             if self._single_score_callback:
                 self._single_score_callback(
-                    step=i,
-                    scores=tuple(scores),
-                    scorer=self,
-                    pipeline=pipeline,
-                    dataset=dataset,
+                    step=i, scores=tuple(scores), scorer=self, pipeline=pipeline, dataset=dataset,
                 )
 
         return self.aggregate(_check_and_invert_score_dict(scores, self._default_aggregator))
@@ -277,7 +285,7 @@ _non_homogeneous_scoring_error = ValidationError(
 )
 
 
-def _check_and_invert_score_dict(
+def _check_and_invert_score_dict(  # noqa: MC0001  I don't care that this is to complex, some things need to be complex
     scores: List[ScoreTypeT[T]], default_agg: Type[Aggregator]
 ) -> Union[Tuple[Type[Aggregator[T]], List[T]], Dict[str, Tuple[Type[Aggregator[T]], List[T]]]]:
     """Invert the scores dictionary to a list of scores."""
