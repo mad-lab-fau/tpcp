@@ -191,8 +191,15 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
                     "multiple values are wrapped with NoAgg."
                 )
             agg_val = aggregator_single.aggregate(raw_scores_single)
-            if not isinstance(agg_val, float):
-                raise ValidationError("The final aggregated score must be a float. " f"Instead it is:\n{agg_val}")
+            if isinstance(agg_val, dict):
+                if not all(isinstance(score, float) for score in agg_val.values()):
+                    raise ValidationError(
+                        "Final aggregated scores are not all floats. "
+                        "Double-check your (custom) aggregators."
+                        f"The current values are: \n{agg_val}"
+                    )
+            elif not isinstance(agg_val, (int, float)):
+                raise ValidationError(f"The final aggregated score must be a numbers. Instead it is:\n{agg_val}")
             return agg_val, list(raw_scores_single)
 
         raw_scores: Dict[str, List[T]] = {}
@@ -204,13 +211,13 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
                 # This is the case with the NoAgg Scorer
                 continue
             if isinstance(agg_score, dict):
-                # If the aggregator returned mutliple values, we merge them prefixing the original name
+                # If the aggregator returned multiple values, we merge them prefixing the original name
                 for key, value in agg_score.items():
                     agg_scores[f"{name}__{key}"] = value
             else:
                 agg_scores[name] = agg_score
         # Finally we check that all aggregates values are floats
-        if not all(isinstance(score, float) for score in agg_scores.values()):
+        if not all(isinstance(score, (int, float)) for score in agg_scores.values()):
             raise ValidationError(
                 "Final aggregated scores are not all floats. "
                 "Double-check your (custom) aggregators."
@@ -240,7 +247,11 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             scores.append(score)
             if self._single_score_callback:
                 self._single_score_callback(
-                    step=i, scores=tuple(scores), scorer=self, pipeline=pipeline, dataset=dataset,
+                    step=i,
+                    scores=tuple(scores),
+                    scorer=self,
+                    pipeline=pipeline,
+                    dataset=dataset,
                 )
 
         return self.aggregate(_check_and_invert_score_dict(scores, self._default_aggregator))
@@ -322,10 +333,9 @@ def _check_and_invert_score_dict(  # noqa: MC0001  I don't care that this is to 
                 score = s[k]
             except KeyError as e:
                 raise ValidationError(
-                    "The return values of the scoring function is expected to have the same keys "
-                    "for each datapoint."
+                    "The return values of the scoring function is expected to have the same keys for each datapoint. "
                     f"However, for at least one datapoint the return values is missing the key '{k}'. "
-                    "Expected keys are: {score_types.keys()}"
+                    f"Expected keys are: {tuple(score_types.keys())}"
                 ) from e
             # If the score is not wrapped in an aggregator, we wrap it in the default aggregator.
             if not isinstance(score, Aggregator):

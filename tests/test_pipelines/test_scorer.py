@@ -1,4 +1,6 @@
-from typing import Sequence
+from itertools import cycle
+from typing import Dict, Sequence
+from unittest import mock
 from unittest.mock import Mock
 
 import numpy as np
@@ -14,7 +16,7 @@ from tests.test_pipelines.conftest import (
 )
 from tpcp.exceptions import ValidationError
 from tpcp.validate import Scorer
-from tpcp.validate._scorer import NoAgg, _passthrough_scoring, _validate_scorer
+from tpcp.validate._scorer import Aggregator, NoAgg, _passthrough_scoring, _validate_scorer
 
 
 class TestScorerCalls:
@@ -70,27 +72,6 @@ class TestScorer:
             else:
                 assert v == np.mean(data.groups)
 
-    def test_score_return_val_multi_score_no_agg(self):
-        def multi_score_func(pipeline, data_point):
-            return {"score_1": data_point.groups[0], "no_agg_score": NoAgg(str(data_point.groups))}
-
-        scorer = Scorer(multi_score_func)
-        pipe = DummyOptimizablePipeline()
-        data = DummyDataset()
-        agg, single = scorer(pipe, data)
-        assert isinstance(single, dict)
-        for k, v in single.items():
-            assert len(v) == len(data)
-            # Our Dummy scorer, returns the groupname of the dataset as string in the no-agg case
-            if k == "no_agg_score":
-                assert all(np.array(v) == [str(d.groups) for d in data])
-            else:
-                assert all(np.array(v) == data.groups)
-        assert isinstance(agg, dict)
-        assert "score_1" in agg
-        assert "no_agg_score" not in agg
-        assert agg["score_1"] == np.mean(data.groups)
-
     @pytest.mark.parametrize("bad_scorer", (lambda x, y: "test", lambda x, y: {"val": "test"}))
     def test_bad_scorer(self, bad_scorer):
         """Check that we catch cases where the scoring func returns invalid values independent of the error_score val"""
@@ -100,14 +81,6 @@ class TestScorer:
         with pytest.raises(ValidationError) as e:
             scorer(pipe, data)
         assert "MeanAggregator can only be used with float values" in str(e.value)
-
-    def test_no_agg_as_single_scorer(self):
-        scorer = Scorer(lambda x, y: NoAgg(None))
-        pipe = DummyOptimizablePipeline()
-        data = DummyDataset()
-        with pytest.raises(ValidationError) as e:
-            scorer(pipe, data)
-        assert "Scorer returned a NoAgg object" in str(e.value)
 
     def test_kwargs_passed(self):
         kwargs = {"a": 3, "b": "test"}
@@ -144,8 +117,34 @@ class TestScorer:
         pipe = DummyOptimizablePipeline()
         scorer(pipeline=pipe, dataset=DummyDataset())
 
-    def test_no_agg_scoring(self):
-        pass
+    @pytest.mark.parametrize("reversed", (True, False))
+    def test_non_homogeneus_return(self, reversed):
+        non_homogeneous_return = [3, {"val": 3}]
+        if reversed:
+            non_homogeneous_return.reverse()
+
+        return_vals = cycle(non_homogeneous_return)
+
+        with pytest.raises(ValidationError) as e:
+            scorer = Scorer(lambda x, y: next(return_vals))
+            pipe = DummyOptimizablePipeline()
+            data = DummyDataset()
+            _ = scorer(pipe, data)
+
+        assert "The returned score values are not homogeneous." in str(e)
+
+    def test_inconsistent_keys(self):
+        return_vals = cycle([{"val1": 3, "val2": 3}, {"val1": 3, "val3": 3}])
+
+        with pytest.raises(ValidationError) as e:
+            scorer = Scorer(lambda x, y: next(return_vals))
+            pipe = DummyOptimizablePipeline()
+            data = DummyDataset()
+            _ = scorer(pipe, data)
+
+        assert "same keys for each datapoint." in str(e)
+        assert "missing the key 'val2'" in str(e)
+        assert "are: ('val1', 'val2')" in str(e)
 
 
 def _dummy_func(x):
@@ -183,3 +182,130 @@ class TestScorerUtils:
             _validate_scorer("something invalid", pipe)
 
         assert "A valid scorer must either be a instance of" in str(e)
+
+
+class TestCustomAggregator:
+    class MultiAgg(Aggregator):
+        @classmethod
+        def aggregate(cls, values: Sequence[float]) -> Dict[str, float]:
+            return {"mean": float(np.mean(values)), "std": float(np.std(values))}
+
+    @pytest.mark.parametrize(
+        "score_type, scorefunc", [("single", lambda x, y: 3), ("multi", lambda x, y: {"value": 3})]
+    )
+    def test_multi_agg(self, score_type, scorefunc):
+        scorer = Scorer(scorefunc, default_aggregator=self.MultiAgg)
+        pipe = DummyOptimizablePipeline()
+        data = DummyDataset()
+        agg, single = scorer(pipe, data)
+        assert isinstance(agg, dict)
+        if score_type == "multi":
+            assert "value__mean" in agg
+            assert "value__std" in agg
+        else:
+            assert "mean" in agg
+            assert "std" in agg
+
+    class DummyAgg(Aggregator):
+        @classmethod
+        def aggregate(cls, values: Sequence[float]) -> float:
+            return 0
+
+    @pytest.mark.parametrize(
+        "scorer_return", (1, {"val": 1}, {"val": 1, "val2": 2}, {"val": 1, "val2": 2, "val3": NoAgg(None)})
+    )
+    @mock.patch("tests.test_pipelines.test_scorer.TestCustomAggregator.DummyAgg.aggregate", return_value=1)
+    def test_default_agg_method(self, mock_aggregate, scorer_return):
+        scorer = Scorer(lambda x, y: scorer_return, default_aggregator=self.DummyAgg)
+        pipe = DummyOptimizablePipeline()
+        data = DummyDataset()
+        _ = scorer(pipe, data)
+
+        expected_called = (
+            len([s for s in scorer_return.values() if not isinstance(s, NoAgg)])
+            if isinstance(scorer_return, dict)
+            else 1
+        )
+
+        assert mock_aggregate.call_count == expected_called
+
+    @pytest.mark.parametrize(
+        "scorer_return,expected_val",
+        (
+            (1, 0),
+            ({"val": 1}, 0),
+            ({"val": 1, "val2": 2}, 0),
+            ({"val": 1, "val2": 2, "val3": NoAgg(None)}, 0),
+            (DummyAgg(1), 1),
+            ({"val": DummyAgg(1)}, 1),
+            ({"val": DummyAgg(1), "val2": DummyAgg(2)}, 2),
+            ({"val": DummyAgg(1), "val2": 2, "val3": NoAgg(3)}, 1),
+        ),
+    )
+    @mock.patch("tests.test_pipelines.test_scorer.TestCustomAggregator.DummyAgg.aggregate", return_value=1)
+    def test_selective_agg(self, mock_aggregate, scorer_return, expected_val):
+        scorer = Scorer(lambda x, y: scorer_return)
+        pipe = DummyOptimizablePipeline()
+        data = DummyDataset()
+        _ = scorer(pipe, data)
+        assert mock_aggregate.call_count == expected_val
+
+    def test_inconsistent_return_single(self):
+        return_vals = cycle([self.DummyAgg(1), 3])
+
+        with pytest.raises(ValidationError) as e:
+            scorer = Scorer(lambda x, y: next(return_vals))
+            pipe = DummyOptimizablePipeline()
+            data = DummyDataset()
+            _ = scorer(pipe, data)
+
+        assert "The score values are not consistent." in str(e)
+
+    def test_inconsistent_return_multi(self):
+        return_vals = cycle(
+            [{"val1": self.DummyAgg(1), "val2": 3}, {"val1": self.DummyAgg(1), "val2": self.DummyAgg(5)}]
+        )
+
+        with pytest.raises(ValidationError) as e:
+            scorer = Scorer(lambda x, y: next(return_vals))
+            pipe = DummyOptimizablePipeline()
+            data = DummyDataset()
+            _ = scorer(pipe, data)
+
+        assert "val2" in str(e)
+
+    def test_no_agg_single_raises(self):
+        with pytest.raises(ValidationError) as e:
+            scorer = Scorer(lambda x, y: NoAgg(None))
+            pipe = DummyOptimizablePipeline()
+            data = DummyDataset()
+            _ = scorer(pipe, data)
+
+        assert "Scorer returned a NoAgg object. " in str(e)
+
+    def test_score_return_val_multi_score_no_agg(self):
+        def multi_score_func(pipeline, data_point):
+            return {"score_1": data_point.groups[0], "no_agg_score": NoAgg(str(data_point.groups))}
+
+        scorer = Scorer(multi_score_func)
+        pipe = DummyOptimizablePipeline()
+        data = DummyDataset()
+        agg, single = scorer(pipe, data)
+        assert isinstance(single, dict)
+        for k, v in single.items():
+            assert len(v) == len(data)
+            # Our Dummy scorer, returns the groupname of the dataset as string in the no-agg case
+            if k == "no_agg_score":
+                assert all(np.array(v) == [str(d.groups) for d in data])
+            else:
+                assert all(np.array(v) == data.groups)
+        assert isinstance(agg, dict)
+        assert "score_1" in agg
+        assert "no_agg_score" not in agg
+        assert agg["score_1"] == np.mean(data.groups)
+
+
+# Test scorer raises exception
+# Test final values are not all float
+# Test passthrough scoring
+# Test multi aggregator all get right values
