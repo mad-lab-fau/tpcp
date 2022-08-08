@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
-from typing import Any, ContextManager, Dict, Generic, Iterator, List, Optional, Tuple, Union, TypeVar
+from typing import Any, ContextManager, Dict, Generic, Iterator, List, Optional, Tuple, TypeVar, Union
 
 import numpy as np
 from joblib import Memory, delayed
@@ -33,7 +33,6 @@ from tpcp._utils._multiprocess import TqdmParallel
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
-
 
 T = TypeVar("T")
 

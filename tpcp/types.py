@@ -9,13 +9,13 @@ from tpcp._base import BaseTpcpObjectObjT
 from tpcp._dataset import DatasetT
 from tpcp._pipeline import OptimizablePipelineT, PipelineT
 from tpcp.validate._scorer import (
+    AggReturnType,
     MultiScoreTypeT,
     ScoreFunc,
     ScoreFuncMultiple,
     ScoreFuncSingle,
     ScoreTypeT,
     SingleScoreTypeT,
-    AggReturnType,
 )
 
 __all__ = [
