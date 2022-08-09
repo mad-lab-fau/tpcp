@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - An example on how to use the `dataclass` decorator with tpcp classes. (https://github.com/mad-lab-fau/tpcp/pull/41)
+- In case you need complex aggregations of scores across data points, you can now wrap the return values of score 
+  functions in custom `Aggregators`.
+  The best plac eto learn about this feature is the new "Custom Scorer" example.
+  (https://github.com/mad-lab-fau/tpcp/pull/42)
 
 ### Changed
 - Most of the class proccesing and sanity checks now happens in the init (or rather a post init hook) instead of during 
@@ -20,7 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Other than that, you will only notice a very slight overhead on class initialisation, as we know need to run some 
   basic checks when you call the init or `get_params`.
   (https://github.com/mad-lab-fau/tpcp/pull/41)
-
+- The API of the Scorer class was modified.
+  In case you used custom Scorer before, they will likely not work anymore.
+  Further, we removed the `error_score` parameter from the Scorer and all related methods, that forwarded this parameter
+  (e.g. `GridSearch`).
+  Error that occur in the score function will now always be raised!
+  If you need special handling of error cases, handle them in your error function yourself (i.e. using try-except).
+  This gives more granular control and makes the implementation of the expected score function returns much easier on 
+  the `tpcp` side.
+  (https://github.com/mad-lab-fau/tpcp/pull/42)
 
 ## [0.7.0] - 2022-06-23
 
