@@ -68,7 +68,28 @@ class level parameters to annotate the respective parameters:
 This helps not only with documentation, but can actually be used to perform sanity checks when running the optimization.
 For example, if after running `self_optimize` of a pipeline is called, none of the optimizable parameters is changed,
 likely something has gone wrong.
-This is done using the :class:`~tpcp.optimize.Optimize` class or the :class:`~tpcp.make_optimize_safe` decorators.
+Such checks can be performed by :class:`~tpcp.optimize.Optimize` class or the :class:`~tpcp.make_optimize_safe`
+decorators based on the provided parameter annotations.
 Have a look at the documentation there to understand which checks are performed.
 
 To see these parameter annotations in action, check out this `example <optimize_pipelines>`_.
+
+
+External Optimization vs `self_optimize`
+----------------------------------------
+When implementing a new algorithm or pipeline that should have optimizable parameter, you need to decide whether to
+implement an explicit `self_optimize` method or use (or create) an external parameter optimizer like the
+:class:`~tpcp.optimize.GridSearch`.
+
+The simple advise here is, that you should never "re-implement" any form of "dumb" search within a `self_optimize`
+method.
+The `self_optimize` should only be used, if there are algorithm specific details or methods that can be used to optimize
+parameters far more efficient than random search (or similar).
+For example, the backpropagation logic for a neuronal network would be a candidate for `self_optimize`.
+It is domain specific (i.e. not generic) and hence, is less suited for a general "parameter" optimizer class.
+
+However, at the end the line between to two domains is a bit fuzzy.
+You might very well decide to implement something in the `self_optimize` method, and later decide to move this logic
+into a more generic optimizer class.
+Or you might start with a generic GridSearch and move to a `self_optimize` method, once you realise, you need very
+specific modifications for your algorithm or group of algorithms.
