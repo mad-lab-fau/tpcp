@@ -103,7 +103,7 @@ class NoAgg(Aggregator[Any]):
     """
 
     @classmethod
-    def aggregate(cls, /, **_: Any) -> _Nothing:
+    def aggregate(cls, /, values: Sequence[Any], datapoints: Sequence[Dataset]) -> _Nothing:  # noqa: unused-argument
         """Return nothing, indicating no aggregation."""
         return NOTHING
 
