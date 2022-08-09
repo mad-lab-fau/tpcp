@@ -65,7 +65,7 @@ class Aggregator(Generic[T]):
         return self._value
 
     @classmethod
-    def aggregate(cls, values: Sequence[T]) -> AggReturnType:
+    def aggregate(cls, /, values: Sequence[T], datapoints: Sequence[Dataset]) -> AggReturnType:
         """Aggregate the values."""
         raise NotImplementedError()
 
@@ -74,7 +74,7 @@ class MeanAggregator(Aggregator[float]):
     """Aggregator that calculates the mean of the values."""
 
     @classmethod
-    def aggregate(cls, values: Sequence[float]) -> float:
+    def aggregate(cls, /, values: Sequence[float], **_: Any) -> float:
         """Aggregate a sequence of floats by taking the mean."""
         try:
             return float(np.mean(values))
@@ -103,7 +103,7 @@ class NoAgg(Aggregator[Any]):
     """
 
     @classmethod
-    def aggregate(cls, _: Sequence[Any]) -> _Nothing:
+    def aggregate(cls, /, **_: Any) -> _Nothing:
         """Return nothing, indicating no aggregation."""
         return NOTHING
 
@@ -179,7 +179,9 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         return self._score(pipeline=pipeline, dataset=dataset)
 
     def _aggregate(  # noqa: no-self-use
-        self, scores: Union[Tuple[Type[Aggregator[T]], List[T]], Dict[str, Tuple[Type[Aggregator[T]], List[T]]]]
+        self,
+        scores: Union[Tuple[Type[Aggregator[T]], List[T]], Dict[str, Tuple[Type[Aggregator[T]], List[T]]]],
+        datapoints: List[DatasetT],
     ) -> Tuple[Union[float, Dict[str, float]], Union[List[T], Dict[str, List[T]]]]:
         if not isinstance(scores, dict):
             aggregator_single, raw_scores_single = scores
@@ -193,7 +195,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             # We create an instance of the aggregator here, even though we only need to call the class method.
             # This way, `aggregate` will work, even if people forgot to implement the aggregate method as class
             # method on their custom aggregator.
-            agg_val = aggregator_single(None).aggregate(raw_scores_single)
+            agg_val = aggregator_single(None).aggregate(values=raw_scores_single, datapoints=datapoints)
             if isinstance(agg_val, dict):
                 if not all(isinstance(score, float) for score in agg_val.values()):
                     raise ValidationError(
@@ -209,7 +211,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         agg_scores: Dict[str, float] = {}
         for name, (aggregator, raw_score) in scores.items():
             raw_scores[name] = list(raw_score)
-            agg_score = aggregator.aggregate(raw_score)
+            agg_score = aggregator(None).aggregate(values=raw_score, datapoints=datapoints)
             if agg_score is NOTHING or isinstance(agg_score, _Nothing):
                 # This is the case with the NoAgg Scorer
                 continue
@@ -233,6 +235,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
     ) -> Tuple[Union[float, Dict[str, float]], Union[List[Any], Dict[str, List[Any]]]]:
         # `float` because the return value in case of an exception will always be float
         scores: List[ScoreTypeT[T]] = []
+        datapoints: List[DatasetT] = []
         for i, d in enumerate(dataset):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
@@ -250,14 +253,11 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             scores.append(score)
             if self._single_score_callback:
                 self._single_score_callback(
-                    step=i,
-                    scores=tuple(scores),
-                    scorer=self,
-                    pipeline=pipeline,
-                    dataset=dataset,
+                    step=i, scores=tuple(scores), scorer=self, pipeline=pipeline, dataset=dataset,
                 )
+            datapoints.append(d)
 
-        return self._aggregate(_check_and_invert_score_dict(scores, self._default_aggregator))
+        return self._aggregate(_check_and_invert_score_dict(scores, self._default_aggregator), datapoints)
 
 
 ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]], Scorer[PipelineT, DatasetT, ScoreTypeT[T]], None]

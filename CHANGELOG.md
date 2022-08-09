@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [unreleased]
+
+This release drops Python 3.7 support!
+
+### Changed
+- The `aggregate` methods of custom aggregators now get a list of datapoints in additions to the scores.
+  Both parameters are now passed as keyword only arguments.
+
 ## [0.8.0] - 2022-08-09
 
 ### Added

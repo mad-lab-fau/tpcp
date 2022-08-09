@@ -13,7 +13,8 @@ datapoints.
 
 In the following, we will demonstrate solutions for two typical usecases:
 
-1. Instead of averaging the scores you want to use another metric (e.g. median)
+1. Instead of averaging the scores you want to use another metric (e.g. median) or you want to weight the scores
+   based on the datatype.
 2. You want to calculate a score, that can not be first aggregated on a datapoint level.
    This can happen, if each datapoint has multiple events.
    If you score (e.g. F1 score) on each datapoint first, you will get a different result, compared to calculating the F1
@@ -21,7 +22,7 @@ In the following, we will demonstrate solutions for two typical usecases:
    (Note, which of the two cases you want will depend on your usecase and the data distributions per datapoint)
 
 """
-
+from itertools import groupby
 from pathlib import Path
 
 # %%
@@ -114,6 +115,9 @@ from tpcp.exceptions import ValidationError
 # %%
 # We can change this behaviour by implementing a custom Aggregator.
 # This is a simple class inheriting from :class:`tpcp.validate.Aggregator`, implementing a `aggregate` class - method.
+# This method gets the score values and the datapoints that generated them as keyword only arguments.
+# (Note, if you need just the values and not the datapoints, you can use the `**_` syntax to catch all unused parameters.)
+#
 # Below we have implemented a custom aggregator that calculates the median of the per-datapoint scores.
 # In addition, it prints a log message when it is called, so we can better understand how it works.
 from tpcp.validate import Aggregator
@@ -121,7 +125,7 @@ from tpcp.validate import Aggregator
 
 class MedianAggregator(Aggregator):
     @classmethod
-    def aggregate(cls, values: Sequence[float]) -> float:
+    def aggregate(cls, /, values: Sequence[float], **_) -> float:
         print("Median Aggregator called")
         try:
             return float(np.median(values))
@@ -203,7 +207,7 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
 
 class MeanAndStdAggregator(Aggregator[float]):
     @classmethod
-    def aggregate(cls, values: Sequence[float]) -> Dict[str, float]:
+    def aggregate(cls, /, values: Sequence[float], **_) -> Dict[str, float]:
         print("MeanAndStdAggregator Aggreagtor called")
         try:
             return {"mean": float(np.mean(values)), "std": float(np.std(values))}
@@ -236,7 +240,7 @@ multi_agg_agg
 
 class SingleValuePrecisionRecallF1(Aggregator[np.ndarray]):
     @classmethod
-    def aggregate(cls, values: Sequence[np.ndarray]) -> Dict[str, float]:
+    def aggregate(cls, /, values: Sequence[np.ndarray], **_) -> Dict[str, float]:
         print("SingleValuePrecisionRecallF1 Aggregator called")
         precision, recall, f1_score = precision_recall_f1_score(np.vstack(values))
         return {"precision": precision, "recall": recall, "f1_score": f1_score}
@@ -272,6 +276,57 @@ complicated_agg
 # %%
 # The raw matches array is still available in the `single` results.
 complicated_single["per_sample"]
+
+
+# %%
+# Weighted Aggregation
+# --------------------
+# So far all aggregators only used the values for aggregation.
+# However, sometimes we want to treat values differently depending on where they came from.
+# For these "complicated" weighting cases, we can use the `datapoint` parameter that is passed to the `aggregate`
+# method.
+#
+# In the following example, we want to calculate the Macro Average over all participant groups (see dataset below).
+# This means, we want to average the parameters first in each group and then average the results.
+example_data
+
+# %%
+# For this our aggregator will use the `datapoint` parameter to find out which group the datapoint belongs and then
+# average the values using pandas groupby function.
+# We also return the values of the individual groups.
+# Note that we must return everything as a dict of float values.
+#
+class GroupWeightedAggregator(Aggregator[float]):
+    @classmethod
+    def aggregate(cls, /, values: Sequence[float], datapoints: Sequence[ECGExampleData], **_) -> Dict[str, float]:
+        print("GroupWeightedAggregator Aggregator called")
+        patient_groups = [d.group.patient_group for d in datapoints]
+        data = pd.DataFrame({"value": values, "patient_groups": patient_groups})
+        per_group = data.groupby("patient_groups").mean()["value"]
+        return {**per_group.to_dict(), "group_mean": per_group.mean()}
+
+
+# %%
+# In our score function, we wrap the f1-score with the new aggregator (we could of cause also wrap the others,
+# or use the `default_aggregator` parameter).
+def score(pipeline: MyPipeline, datapoint: ECGExampleData):
+    # We use the `safe_run` wrapper instead of just run. This is always a good idea.
+    # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
+    # will clone it again.
+    pipeline = pipeline.safe_run(datapoint)
+    tolerance_s = 0.02  # We just use 20 ms for this example
+    matches = match_events_with_reference(
+        pipeline.r_peak_positions_.to_numpy(),
+        datapoint.r_peak_positions_.to_numpy(),
+        tolerance=tolerance_s * datapoint.sampling_rate_hz,
+    )
+    precision, recall, f1_score = precision_recall_f1_score(matches)
+    return {"precision": precision, "recall": recall, "f1_score": GroupWeightedAggregator(f1_score)}
+
+
+group_weighted_agg, group_weighted_single = Scorer(score)(pipe, example_data)
+group_weighted_agg
+
 
 # %%
 # No-Aggregation Aggregator

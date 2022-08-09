@@ -198,7 +198,7 @@ class TestScorerUtils:
 class TestCustomAggregator:
     class MultiAgg(Aggregator):
         @classmethod
-        def aggregate(cls, values: Sequence[float]) -> Dict[str, float]:
+        def aggregate(cls, /, values: Sequence[float], **_) -> Dict[str, float]:
             return {"mean": float(np.mean(values)), "std": float(np.std(values))}
 
     @pytest.mark.parametrize(
@@ -219,7 +219,7 @@ class TestCustomAggregator:
 
     class DummyAgg(Aggregator):
         @classmethod
-        def aggregate(cls, values: Sequence[float]) -> float:
+        def aggregate(cls, /, values: Sequence[float], **_) -> float:
             return 0
 
     @pytest.mark.parametrize(
@@ -317,12 +317,12 @@ class TestCustomAggregator:
 
     class InvalidMultiAgg(Aggregator):
         @classmethod
-        def aggregate(cls, values: Sequence[float]):
+        def aggregate(cls, **_):
             return {"val": "invalid"}
 
     class InvalidSingleAgg(Aggregator):
         @classmethod
-        def aggregate(cls, values: Sequence[float]):
+        def aggregate(cls, **_):
             return "invalid"
 
     @pytest.mark.parametrize("score_func", (lambda x, y: 1, lambda x, y: {"val": 1}))
@@ -333,17 +333,16 @@ class TestCustomAggregator:
         data = DummyDataset()
         with pytest.raises(ValidationError) as e:
             _ = scorer(pipe, data)
-
         assert "number" in str(e)
 
     class TestAgg1(Aggregator):
         @classmethod
-        def aggregate(cls, values):
+        def aggregate(cls, **_):
             return 1
 
     class TestAgg2(Aggregator):
         @classmethod
-        def aggregate(cls, values):
+        def aggregate(cls, **_):
             return 2
 
     def test_all_aggregators_called_correctly(self):
@@ -359,3 +358,21 @@ class TestCustomAggregator:
         assert agg_score["agg2"] == 2
         assert agg_score["default_agg"] == 3
         assert "no_agg" not in agg_score
+
+    class DatapointAgg(Aggregator):
+        @classmethod
+        def aggregate(cls, /, values, datapoints):
+            return 1
+
+    @pytest.mark.parametrize("score_func_type", ("single", "multi"))
+    @mock.patch("tests.test_pipelines.test_scorer.TestCustomAggregator.DatapointAgg.aggregate", return_value=1)
+    def test_datapoints_forwarded_to_agg(self, mock_method, score_func_type):
+        if score_func_type == "single":
+            score_func = lambda x, y: self.DatapointAgg(y)
+        else:
+            score_func = lambda x, y: {"val": self.DatapointAgg(y)}
+        scorer = Scorer(score_func)
+        pipe = DummyOptimizablePipeline()
+        data = DummyDataset()
+        _ = scorer(pipe, data)
+        assert mock_method.called_with(values=[d for d in data], datapoints=[d for d in data])
