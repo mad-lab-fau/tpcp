@@ -20,3 +20,13 @@ Optimization and Validation
     Opti... what? - An introduction to algorithm optimization and validation <algorithm_evaluation>
     Parameter optimization and training of Pipelines <optimization>
     Validation of algorithms and pipelines
+
+
+Other Information
+=================
+
+.. toctree::
+    :maxdepth: 1
+
+    sklearn_differences
+
