@@ -89,11 +89,11 @@ def test_custom_scorer():
     from examples.validation._02_custom_scorer import (
         baseline_results_agg,
         complicated_agg,
+        group_weighted_agg,
         median_results_agg,
         multi_agg_agg,
         no_agg_agg,
         partial_median_results_agg,
-        group_weighted_agg
     )
 
     assert_almost_equal(baseline_results_agg["f1_score"], 0.7089728)
