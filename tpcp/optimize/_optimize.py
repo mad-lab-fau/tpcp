@@ -672,7 +672,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
             pure_parameters = self.pure_parameters
         else:
             raise ValueError(
-                "`self.pure_parameters` must either be a List of field names (nested are allowed) or " "True/False."
+                "`self.pure_parameters` must either be a List of field names (nested are allowed) or True/False."
             )
 
         parameters = list(self.parameter_grid)

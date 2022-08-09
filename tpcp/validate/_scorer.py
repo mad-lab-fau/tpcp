@@ -74,7 +74,7 @@ class MeanAggregator(Aggregator[float]):
     """Aggregator that calculates the mean of the values."""
 
     @classmethod
-    def aggregate(cls, /, values: Sequence[float], **_: Any) -> float:
+    def aggregate(cls, /, values: Sequence[float], datapoints: Sequence[Dataset]) -> float:
         """Aggregate a sequence of floats by taking the mean."""
         try:
             return float(np.mean(values))
@@ -253,7 +253,11 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             scores.append(score)
             if self._single_score_callback:
                 self._single_score_callback(
-                    step=i, scores=tuple(scores), scorer=self, pipeline=pipeline, dataset=dataset,
+                    step=i,
+                    scores=tuple(scores),
+                    scorer=self,
+                    pipeline=pipeline,
+                    dataset=dataset,
                 )
             datapoints.append(d)
 
