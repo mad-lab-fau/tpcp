@@ -93,6 +93,7 @@ def test_custom_scorer():
         multi_agg_agg,
         no_agg_agg,
         partial_median_results_agg,
+        group_weighted_agg
     )
 
     assert_almost_equal(baseline_results_agg["f1_score"], 0.7089728)
@@ -106,3 +107,7 @@ def test_custom_scorer():
     assert_almost_equal(complicated_agg["per_sample__f1_score"], 0.8172557027823545)
 
     assert "f1_score" not in no_agg_agg
+
+    assert group_weighted_agg["f1_score__group_mean"] == 0.7089727629059107
+    for i in range(1, 4):
+        assert f"f1_score__group_{i}" in group_weighted_agg
