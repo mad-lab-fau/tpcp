@@ -70,7 +70,7 @@ pipe = MyPipeline()
 
 # %%
 # Custom Median Scorer
-# ---------------------
+# --------------------
 # To create a custom score aggregation, we first need a score function.
 # We will use a similar score function as we used in the QRS detection example.
 # It returns the precision, recall and f1 score of the QRS detection for each datapoint.
@@ -181,7 +181,7 @@ assert partial_median_results_agg["precision"] == np.mean(partial_median_results
 
 # %%
 # Multi-Return Aggregator
-# ----------------------
+# -----------------------
 # Sometimes an aggregator needs to return multiple values.
 # We can easily do that, by returning a dict from the `aggregate` method.
 #
