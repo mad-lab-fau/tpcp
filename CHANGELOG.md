@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   functions in custom `Aggregators`.
   The best plac eto learn about this feature is the new "Custom Scorer" example.
   (https://github.com/mad-lab-fau/tpcp/pull/42)
+- All cross_validation based methods now have a new parameter called `mock_labels`.
+  This can be used to provide a "y" value to the split method of a sklearn-cv splitter.
+  This is required e.g. for Stratified KFold splitters.
+  (https://github.com/mad-lab-fau/tpcp/pull/43)
 
 ### Changed
 - Most of the class proccesing and sanity checks now happens in the init (or rather a post init hook) instead of during 
