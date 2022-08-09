@@ -57,12 +57,39 @@ To make `tpcp` easy to use, we try to focus on a couple of key ideas:
   `tpcp` implements complicated constructs like cross validation and grid search and, whenever possible, tries to catch obvious errors in your approach.
   However, for the actual algorithm and dataset you are free to do whatever is required to solve your current research question.
 
-## Projects that use tpcp
+## Should you use tpcp?
 
-#### Datasets
+### Datasets
 
+**Yes** - the object-oriented Datasets have proven themselves to be a really nice and flexible way to encapsulate Datasets with data from multiple modalities.
+There is a clear path of integrating lazy-loading, load-cashing, data filtering, or pre-processing on loading.
+From our experience, even if you ignore all the other tpcp features, Datasets can greatly simplify how you interact with your data sources and can serve as a self-documenting API for your data.
+
+[Learn more](https://tpcp.readthedocs.io/en/latest/guides/algorithms_pipelines_datasets.html#datasets) 
+([Examples](https://tpcp.readthedocs.io/en/latest/auto_examples/index.html#datasets))
+
+Other projects using Datasets:
 - [sensor_position_dataset_helper](https://github.com/mad-lab-fau/sensor_position_dataset_helper/blob/master/sensor_position_dataset_helper/tpcp_dataset.py)
 - [cold-face-test-analysis](https://github.com/mad-lab-fau/cft-analysis/tree/main/cft_analysis/datasets)
+- [mad-datasets](https://github.com/mad-lab-fau/mad-datasets)
+
+### Parameter Optimization and Cross Validation
+
+**Maybe** - All parameter optimization features in tpcp exist to provide a unified API, in case other specific frameworks are to specialised.
+In cases where all your algorithms can be abstracted by `sklearn`, `pytorch` (with the `skorch` wrapper), `tensorflow`/`Keras` (with the `scikeras` wrapper), 
+or any other framework that provides a nice scikit-learn API, you will get all the features tpcp can provide with much less boilerplate by just using `sklearn` and `optuna` directly.
+Even, if you need to implement completely custom algorithms, we would encourage you to see if you can emulate a sklearn-like API to make use of its fast ecosystem.
+
+This will usually work well for all algorithms that can be abstracted by the fit-predict paradigm.
+However, for more "traditional" algorithms with no "fit" step or complicated optimizations, the `run` (with optional `self_optimize`) API of tpcp might be a better fit.
+So if you are using or developing algorithms across library domains, that don't all work well with a sklearn API, then **Yes**, tpcp is a good choice.
+
+Learn more:
+[General Concepts](https://tpcp.readthedocs.io/en/latest/guides/index.html#user-guides),
+[Custom Algorithms](https://tpcp.readthedocs.io/en/latest/auto_examples/index.html#algorithms), 
+[Parameter Optimization](https://tpcp.readthedocs.io/en/latest/auto_examples/index.html#parameter-optimization), 
+[Cross Validation](https://tpcp.readthedocs.io/en/latest/auto_examples/index.html#validation)
+
 
 ## Dev Setup
 
