@@ -8,7 +8,7 @@ of thresholds in classical algorithms.
 Therefore, we attempt to have a unified interface for all these cases.
 
 This is achieved by defining "optimization" as any form of data-driven optimization of the "parameters"
-(see `parameters`_) specified in the `__init__` of an algorithm.
+(see :ref:`parameters`) specified in the `__init__` of an algorithm.
 This optimization can be performed via *internal* optimization implemented in a `self_optimize` method on the pipeline
 or via *external* optimization like the :class:`~tpcp.optimize.GridSearch` wrapper.
 

@@ -35,14 +35,14 @@ black = "^22.3.0"
 isort = "^5.10.1"
 poethepoet = "^0.10.0"
 pyright = "^1.1.230"
-numpydoc = "^1.2.0"
-sphinx-gallery = "^0.10.1"
+numpydoc = "^1.4.0"
+sphinx-gallery = "^0.11.0"
 pydata-sphinx-theme = "^0.9.0"
 recommonmark = "^0.7.1"
 memory-profiler = "^0.58.0"
 matplotlib = "^3.4.3"
 toml = "^0.10.2"
-Sphinx = "^4.2.0"
+Sphinx = "^5.1.1"
 
 [tool.black]
 line-length = 120
