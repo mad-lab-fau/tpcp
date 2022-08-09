@@ -178,7 +178,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         """
         return self._score(pipeline=pipeline, dataset=dataset)
 
-    def aggregate(  # noqa: no-self-use
+    def _aggregate(  # noqa: no-self-use
         self, scores: Union[Tuple[Type[Aggregator[T]], List[T]], Dict[str, Tuple[Type[Aggregator[T]], List[T]]]]
     ) -> Tuple[Union[float, Dict[str, float]], Union[List[T], Dict[str, List[T]]]]:
         if not isinstance(scores, dict):
@@ -190,7 +190,10 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
                     "If you want to use a NoAgg scorer, return a dictionary of values, where one or "
                     "multiple values are wrapped with NoAgg."
                 )
-            agg_val = aggregator_single.aggregate(raw_scores_single)
+            # We create an instance of the aggregator here, even though we only need to call the class method.
+            # This way, `aggregate` will work, even if people forgot to implement the aggregate method as class
+            # method on their custom aggregator.
+            agg_val = aggregator_single(None).aggregate(raw_scores_single)
             if isinstance(agg_val, dict):
                 if not all(isinstance(score, float) for score in agg_val.values()):
                     raise ValidationError(
@@ -254,7 +257,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
                     dataset=dataset,
                 )
 
-        return self.aggregate(_check_and_invert_score_dict(scores, self._default_aggregator))
+        return self._aggregate(_check_and_invert_score_dict(scores, self._default_aggregator))
 
 
 ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]], Scorer[PipelineT, DatasetT, ScoreTypeT[T]], None]
