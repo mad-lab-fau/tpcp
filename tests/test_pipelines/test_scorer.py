@@ -9,12 +9,11 @@ import pytest
 from tests.test_pipelines.conftest import (
     DummyDataset,
     DummyOptimizablePipeline,
-    dummy_error_score_func,
-    dummy_error_score_func_multi,
+    DummyPipeline,
     dummy_multi_score_func,
     dummy_single_score_func,
 )
-from tpcp.exceptions import ValidationError, ScorerFailed
+from tpcp.exceptions import ScorerFailed, ValidationError
 from tpcp.validate import Scorer
 from tpcp.validate._scorer import Aggregator, NoAgg, _passthrough_scoring, _validate_scorer
 
@@ -337,6 +336,26 @@ class TestCustomAggregator:
 
         assert "number" in str(e)
 
+    class TestAgg1(Aggregator):
+        @classmethod
+        def aggregate(cls, values):
+            return 1
 
-# Test passthrough scoring
-# Test multi aggregator all get right values
+    class TestAgg2(Aggregator):
+        @classmethod
+        def aggregate(cls, values):
+            return 2
+
+    def test_all_aggregators_called_correctly(self):
+        def score_func(p, d):
+            return {"agg1": self.TestAgg1(None), "agg2": self.TestAgg2(None), "default_agg": 3, "no_agg": NoAgg(4)}
+
+        scorer = Scorer(score_func)
+        pipe = DummyOptimizablePipeline()
+        data = DummyDataset()
+        agg_score, _ = scorer(pipe, data)
+
+        assert agg_score["agg1"] == 1
+        assert agg_score["agg2"] == 2
+        assert agg_score["default_agg"] == 3
+        assert "no_agg" not in agg_score
