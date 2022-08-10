@@ -70,7 +70,8 @@ All of this requires a profound understanding of machine learning to implement t
 cross-validation, as well as extensive experience in the programming language of choice to design and implement an 
 algorithm interface.
 
-The second example is a comparison of stride detection algorithms based on IMU data recently published in [@Roth2021a].
+The second example is a comparison of stride detection algorithms based on IMU data recently published by Roth et al.
+[@Roth2021a].
 The authors compared a custom Hidden Markov Model implemented using 
 [`pomegranate`](https://pomegranate.readthedocs.io/en/latest/) [@Schreiber2017] with an implementation of a template 
 matching algorithm based on [@Barth2013].
@@ -146,18 +147,14 @@ Therefore, we need Pipelines to connect the reusable Dataset and Algorithm inter
 (\autoref{fig:algo_simple}, \autoref{fig:algo_complex}).
 Pipelines also provide a fixed and unified interface that utility methods in `tpcp` can use.
 
+![Simple case with a single Pipeline:
+The Pipeline can interface between all available Datasets and all Algorithms because they share a common interface.
+\label{fig:algo_simple}](img/algos_simple.pdf)
 
-\begin{figure}[!h]
-\includegraphics[width=0.9\textwidth]{img/algos_simple.pdf}
-\caption{Simple case with a single Pipeline: The Pipeline can interface between all available Datasets and all Algorithms because they share a common interface.}
-\label{fig:algo_simple}
-\end{figure}
-
-\begin{figure}[!h]
-\includegraphics[width=0.9\textwidth]{img/algos_complex.pdf}
-\caption{A more complex case: Pipelines act as gluing code for one Dataset interface with one or multiple Algorithm interfaces to perform one specific analysis.}
-\label{fig:algo_complex}
-\end{figure}
+![A more complex case:
+Pipelines act as gluing code for one Dataset interface with one or multiple Algorithm interfaces to perform one 
+specific analysis.
+\label{fig:algo_complex}](img/algos_complex.pdf)
 
 ## Parameter Optimization and Evaluation Tools
 
