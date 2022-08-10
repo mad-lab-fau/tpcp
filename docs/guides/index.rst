@@ -19,7 +19,7 @@ Optimization and Validation
 
     Opti... what? - An introduction to algorithm optimization and validation <algorithm_evaluation>
     Parameter optimization and training of Pipelines <optimization>
-    Validation of algorithms and pipelines
+    Validation of algorithms and pipelines <algorithm_validation_tpcp>
 
 
 Other Information

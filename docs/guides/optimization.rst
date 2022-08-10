@@ -2,6 +2,15 @@ Optimization and Training
 =========================
 .. _optimization:
 
+Pre-Requisites
+--------------
+To use the algorithm validation tools in tpcp, you need to first represent your data as a :class:`~tpcp.Dataset` and
+implement the algorithms you want to validate as :class:`~tpcp.Pipeline`.
+All parameters that should be optimized (either internally or using an external wrapper) as part of a parameter search
+should be exposed as parameters in the init.
+
+General Concepts
+----------------
 In `tpcp`, we use the term *Optimization* as a wrapper term for any form of data-driven parameter optimization.
 This can be traditional ML training of model weights, black-box optimizations of hyperparameters or a simple grid search
 of thresholds in classical algorithms.
@@ -35,9 +44,9 @@ wrapper instead of calling `self_optimize` directly.
     >>> my_optimized_pipeline.val1
     "optimized_val1"
 
+
 Parameter Annotations
 ---------------------
-
 When talking about optimization it becomes clear, that we need to differentiate the different types of parameters an
 algorithm or pipeline might have.
 They can fall into three categories:
