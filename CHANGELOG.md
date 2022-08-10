@@ -8,8 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This release drops Python 3.7 support!
 
+### Added
+- Bunch new high-level documentation
+
 ### Changed
-- The `aggregate` methods of custom aggregators now get a list of datapoints in additions to the scores.
+- The `aggregate` methods of custom aggregators now gets the list of datapoints in additions to the scores.
   Both parameters are now passed as keyword only arguments.
 
 ## [0.8.0] - 2022-08-09
