@@ -113,14 +113,6 @@ The package `tpcp` provides three things:
 Beyond that, the documentation of `tpcp` attempts to provide fundamental information and recipes on how to approach 
 algorithm development and algorithm evaluation.
 
-## Algorithms
-
-In `tpcp`, we do not provide any specific algorithm implementations, but only simple base classes to build algorithms 
-with a `scikit-learn` inspired interface.
-Using this object-oriented interface to implement algorithms ensures comparable interfaces for similar algorithms.
-Using this part of `tpcp` is completely optional (i.e., all other features are completely independent of the algorithm 
-implementation), but following our recommendations can simplify the integration with other parts of `tpcp`.
-
 ## Datasets
 
 In cases where data points cannot be expressed by a simple feature vector, data loading and handling require 
@@ -134,6 +126,14 @@ Inspired by `pytorch` datasets, they provide a common interface and their struct
 split.
 These datasets are compatible with other tooling provided in `tpcp` and allow to pass complex data structures through
 a cross-validations or gridsearch.
+
+## Algorithms
+
+In `tpcp`, we do not provide any specific algorithm implementations, but only simple base classes to build algorithms 
+with a `scikit-learn` inspired interface.
+Using this object-oriented interface to implement algorithms ensures comparable interfaces for similar algorithms.
+Using this part of `tpcp` is completely optional (i.e., all other features are completely independent of the algorithm 
+implementation), but following our recommendations can simplify the integration with other parts of `tpcp`.
 
 ## Pipelines
 
