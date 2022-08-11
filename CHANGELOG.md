@@ -4,12 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [unreleased]
+## [0.9.0] - 2022-08-11
 
 This release drops Python 3.7 support!
 
 ### Added
 - Bunch new high-level documentation
+- Added submission version of JOSS paper
 
 ### Changed
 - The `aggregate` methods of custom aggregators now gets the list of datapoints in additions to the scores.
