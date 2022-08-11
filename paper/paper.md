@@ -33,19 +33,19 @@ With such libraries, complex analysis tasks can often be reduced to a couple of 
 This not only reduces the amount of implementation required but also prevents errors.
 
 The best developer experience is usually achieved when the entire analysis can be represented with the tools provided by
-a specific library.
+a single library.
 For example, when an entire machine learning pipeline is represented by a `scikit-learn` pipeline [@Pedregosa2011a], it
 is extremely easy to switch out and train algorithms.
 Furthermore, train/test leaks and other methodological errors at various stages in the analysis are automatically 
-prevented – even if the user might not be aware of the issue.
+prevented – even if the user might not be aware of these issue.
 
 However, if the performed analysis gets too complex, too specific to an application domain, or requires the use of 
 tooling and algorithms from multiple frameworks, developers lose a lot of the benefits provided by individual 
-frameworks.
-In turn, the required skill level and the chance of methodological error rise.
+libraries.
+In turn, the required skill level and the chance of methodological errors rise.
 
-With `tpcp` we attempt to provide tooling and structure for algorithm development and evaluation that is independent of 
-the frameworks required for the algorithm implementation.
+With `tpcp` we attempt to overcome the issue by providing higher-level tooling and structure for algorithm development 
+and evaluation that is independent of the frameworks required for the algorithm implementation.
 
 # Statement of Need
 
@@ -184,7 +184,10 @@ Therefore, we would like to thank all students and MaD Lab members that engaged 
 brainstorming sessions about evaluation approaches for obscure algorithms and design for the algorithm interface.
 
 Bjoern M. Eskofier gratefully acknowledges the support of the German Research Foundation (DFG) within the framework of 
-the Heisenberg professorship programme (grant number ES 434/8-1). Further, this work was partly funded by the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) – SFB 1483 – Project-ID 442419336, EmpkinS and by the Mobilise-D project that has received funding from the Innovative Medicines Initiative 2 Joint Undertaking (JU) under grant agreement No. 820820.
+the Heisenberg professorship programme (grant number ES 434/8-1).
+Further, this work was partly funded by the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) 
+– SFB 1483 – Project-ID 442419336, EmpkinS and by the Mobilise-D project that has received funding from the Innovative 
+Medicines Initiative 2 Joint Undertaking (JU) under grant agreement No. 820820.
 This JU receives support from the European Union’s Horizon 2020 research and innovation program and the European 
 Federation of Pharmaceutical Industries and Associations (EFPIA).
 Content in this publication reflects the authors’ view and neither IMI nor the European Union, EFPIA, or any Associated 
