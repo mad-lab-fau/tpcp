@@ -179,10 +179,10 @@ plt.show()
 #    Changing it, changes the output of our optimization.
 #    Therefore, it is a Hyper-Parameter of our method.
 #    We mark it as such using the type-hints on class level.
-# 5. (Optional) Wrap the `self_optimize` method with the :func:`~tpcp.make_optimize_safe` decorator. It will perform
+# 4. (Optional) Wrap the `self_optimize` method with the :func:`~tpcp.make_optimize_safe` decorator. It will perform
 #    some runtime checks and inform us, if we did not implement `self_optimize` as expected.
 #
-# .. note:: The process required to implement an optimizable algorith will always be very similar to what we did
+# .. note:: The process required to implement an optimizable algorithm will always be very similar to what we did
 #           here.
 #           It doesn't matter, if the optimization only optimizes a threshold or trains a neuronal network.
 #           The structure will be very similar.

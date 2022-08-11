@@ -170,6 +170,7 @@ from optuna import Study, Trial
 #    the selected parameters. You will see how this works later on.
 #
 # With these two pieces of configuration in place our objective needs to simply do four things:
+#
 # 1. First, we need to call the search space function to get the parameters.
 # 2. Then, apply these parameters to our pipeline.
 # 3. Afterwards, we need to calculate how good the pipeline with the new parameters works for each of the datapoints
@@ -401,8 +402,6 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize[PipelineT, DatasetT]):
             scorer = Scorer(self.score_function, single_score_callback=single_score_callback)
 
             # Calculate the results per datapoint.
-            # Note that we could expose the `error_score` parameter on an optimizer level.
-            # But let's keep it simple for now.
             average_score, single_scores = scorer(pipeline, dataset)
 
             # As a bonus, we use the custom params option of Optuna to store the individual scores per datapoint and the
