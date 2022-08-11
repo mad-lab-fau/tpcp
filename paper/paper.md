@@ -11,8 +11,8 @@ authors:
   - name: Robert Richer  
     orcid: 0000-0003-0272-5403  
     affiliation: 1
-  - name: Raul C. Sîmpetru
-    orcid: 0000-0003-0455-0168
+  - name: Raul C. Sîmpetru  
+    orcid: 0000-0003-0455-0168  
     affiliation: 2
   - name: Bjoern M. Eskofier  
     orcid: 0000-0002-0417-0336  
@@ -20,9 +20,9 @@ authors:
 affiliations:
   - name: Machine Learning and Data Analytics Lab (MaD Lab), Department Artificial Intelligence in Biomedical Engineering (AIBE), Friedrich-Alexander-Universität Erlangen-Nürnberg (FAU)  
     index: 1
-  - name:  Neuromuscular Physiology and Neural Interfacing (N-squared) Laboratory, Department Artificial Intelligence in Biomedical Engineering (AIBE), Friedrich-Alexander-Universität Erlangen-Nürnberg (FAU)
-    index: 2
-date: 10 August 2022
+  - name:  Neuromuscular Physiology and Neural Interfacing (N-squared) Laboratory, Department Artificial Intelligence in Biomedical Engineering (AIBE), Friedrich-Alexander-Universität Erlangen-Nürnberg (FAU)  
+    index: 2  
+date: 10 August 2022  
 bibliography: tpcp.bib
 ---
 
