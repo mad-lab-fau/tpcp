@@ -16,7 +16,6 @@ tuning hyperparameters <https://scikit-learn.org/stable/modules/grid_search.html
 """
 import random
 
-import numpy as np
 import pandas as pd
 from typing_extensions import Self
 
@@ -48,8 +47,8 @@ from typing import Any
 # Here we are going to create an optimizable pipeline that wraps the optimizable version of the QRS detector we
 # developed in :ref:`custom_algorithms_qrs_detection`.
 #
-# For more information about the pipeline below check :ref:`optimize_pipelines`.
-#    Todo: Full dedicated example for `PureParameter`
+# For more information about the pipeline below check our examples on :ref:`optimize_pipelines`.
+# Todo: Full dedicated example for `PureParameter`
 from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDetector
 from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf
 
@@ -149,7 +148,7 @@ gs = gs.optimize(example_data)
 # %%
 # Results
 # -------
-# The output is also comparable to the output of the GridSearch.
+# The output is also comparable to the output of the :class:`~tpcp.optimize.GridSearch`.
 # The main results are stored in the `cv_results_` parameter.
 # But instead of just a single performance value per parameter, we get one value per fold and the mean and std over
 # all folds.
@@ -160,7 +159,7 @@ results_df
 
 # %%
 # The mean score is the primary parameter used to select the best parameter combi (if `return_optimized` is True).
-# All other values performance values are just there to provide further inside.
+# All other values performance values are just there to provide further insight.
 
 results_df[["mean_test_precision", "mean_test_recall", "mean_test_f1_score"]]
 
@@ -177,8 +176,8 @@ print("Best Para Combi:", gs.best_params_)
 print("Paras of optimized Pipeline:", gs.optimized_pipeline_.get_params())
 
 # %%
-# To run the optimized pipeline, we can directly use the `run`/`safe_run` method on the GridSearch object.
-# This makes it possible to use the `GridSearch` as a replacement for your pipeline object with minimal code changes.
+# To run the optimized pipeline, we can directly use the `run`/`safe_run` method on the `GridSearchCV` object.
+# This makes it possible to use the `GridSearchCV` as a replacement for your pipeline object with minimal code changes.
 #
 # If you tried to call `run`/`safe_run` (or `score` for that matter), before the optimization, an error is
 # raised.

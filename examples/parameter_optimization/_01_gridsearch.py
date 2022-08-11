@@ -53,9 +53,9 @@ example_data = ECGExampleData(data_path)
 #    The `run` method should expect only a single data point (in our case a single recording of one sensor) as input.
 # 3. A `init` that defines all parameters that should be adjustable. Note, that the names in the function signature of
 #    the `init` method, **must** match the corresponding attribute names (e.g. `max_cost` -> `self.max_cost`).
-#    If you want to adjust multiple parameters that all belong to the same algorithm, it might also be convenient to
-#    just pass the algorithm as a parameter. However, keep potential issues with mutable defaults in mind (:ref:`more
-#    info <mutable_defaults>`).
+#    If you want to adjust multiple parameters that all belong to the same algorithm (and your algorithm is
+#    implemented as a subclass of :class:`~tpcp.Algorithm`, it can be convenient to just pass the algorithm as a
+#    parameter.
 #
 # Here we simply extract the data and sampling rate from the datapoint and then run the algorithm.
 # We store the final results we are interested in on the pipeline object.
@@ -99,7 +99,7 @@ pipe = MyPipeline()
 # If you want to calculate multiple performance measures, you can also return a dictionary of such values.
 # In any case, the performance for a specific parameter combination in the GridSearch will be calculated as the mean
 # over all datapoints.
-# (Note, if you want to change this, you can create custom subclasses of :class:`~tpcp.validate.Scorer`).
+# (Note, if you want to change this, you can create :ref:`a custom Aggregator<custom_scorer>`).
 #
 # A typical score function will first call `safe_run` (which calls `run` internally) on the pipeline and then
 # compare the output with some reference.
@@ -148,8 +148,8 @@ parameters = ParameterGrid({"algorithm__high_pass_filter_cutoff_hz": [0.25, 0.5,
 # Now we have all the pieces to run the GridSearch.
 # After initializing, we can use `optimize` to run the GridSearch.
 #
-# .. note:: If the score function returns a dictionary of scores, `rank_scorer` must be set to the name of the score,
-#           that should be used to decide on the best parameter set.
+# .. note:: If the score function returns a dictionary of scores, `return_optimized` must be set to the name of the
+#           score, that should be used to decide on the best parameter set.
 from tpcp.optimize import GridSearch
 
 gs = GridSearch(pipe, parameters, scoring=score, return_optimized="f1_score")
@@ -172,7 +172,7 @@ print("Best Para Combi:", gs.best_params_)
 print("Paras of optimized Pipeline:", gs.optimized_pipeline_.get_params())
 
 # %%
-# To run the optimized pipeline, we can directly use the `run`/`safe_run` method on the GridSearch object.
+# To run the optimized pipeline, we can directly use the `run`/`safe_run` method on the `GridSearch` object.
 # This makes it possible to use the `GridSearch` as a replacement for your pipeline object with minimal code changes.
 #
 # If you tried to call `run`/`safe_run` (or `score` for that matter), before the optimization, an error is raised.

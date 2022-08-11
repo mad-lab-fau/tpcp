@@ -4,7 +4,7 @@ r"""
 Optimizable Pipelines
 =====================
 
-Some gait analysis algorithms can actively be "trained" to improve their performance or adapt it to a certain dataset.
+Some algorithms can actively be "trained" to improve their performance or adapt it to a certain dataset.
 In `tpcp` we use the term "optimize" instead of "train", as not all algorithms are based on "machine learning" in the
 traditional sense.
 We consider all algorithms/pipelines "optimizable" if they have parameters and models that can be adapted and optimized
@@ -41,17 +41,20 @@ This example shows how such a pipeline should be implemented and how it can be o
 #    using the class-level typehints (more below)
 # 4. A `init` that defines all parameters that should be adjustable. Note, that the names in the function signature of
 #    the `init` method, **must** match the corresponding attribute names (e.g. `max_cost` -> `self.max_cost`).
-#    If you want to adjust multiple parameters that all belong to the same algorithm, it might also be convenient to
-#    just pass the algorithm as a parameter. However, keep potential issues with mutable defaults in mind (:ref:`more
-#    info <mutable_defaults>`). As `OptimizableQrsDetector` is a tpcp-algorithm class, we can do that in our case.
+#    If you want to adjust multiple parameters that all belong to the same algorithm (and your algorithm is
+#    implemented as a subclass of :class:`~tpcp.Algorithm`, it can be convenient to just pass the algorithm as a
+#    parameter.
+#    However, keep potential issues with mutable defaults in mind (:ref:`more info <mutable_defaults>`).
 # 5. At least one of the input parameters must be marked as `OptimizableParameter` in the class-level typehints.
 #    If parameters are nested tpcp objects you can use the `__` syntax to mark nested values as optimizable.
 #    Note, that you always need to mark the parameters you want to optimize in the current pipeline.
-#    Annotations in nested objects are not considered.
+#    Annotations in nested objects are ignored.
 #    The more precise you are with these annotations, the more help the runtime checks in tpcp can provide.
-# 6. (Optionally) Mark parameters as `PureParameter` using the type annotations. This can be used by GridSearchCv to
-#    apply some performance optimizations. However, be careful with that! In our case, there are not `PureParameters`,
-#    As all (nested) input parameters change the output of the `self_optimize` method.
+# 6. (Optionally) Mark parameters as `PureParameter` using the type annotations. This can be used by
+#    :class:`~tpcp.optimize.GridSearchCV` to apply some performance optimizations.
+#    However, be careful with that!
+#    In our case, there are no `PureParameters`, as all (nested) input parameters change the output of the
+#    `self_optimize` method.
 #
 
 import pandas as pd
@@ -149,7 +152,7 @@ print("Number of R-Peaks:", len(optimized_results.r_peak_positions_))
 
 # %%
 # We can see that training has drastically modified the threshold and increased the number of R-peaks we detected.
-# To figure our, if all the new R-peaks are actually correct, we would need to make a more extensive evaluation.
+# To figure out, if all the new R-peaks are actually correct, we would need to make a more extensive evaluation.
 #
 #
 # Final Notes
