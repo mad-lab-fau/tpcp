@@ -34,7 +34,7 @@ This not only reduces the amount of implementation required but also prevents er
 
 The best developer experience is usually achieved when the entire analysis can be represented with the tools provided by
 a single library.
-For example, when an entire machine learning pipeline is represented by a `scikit-learn` pipeline [@Pedregosa2011a], it
+For example, when an entire machine learning pipeline is represented by a `scikit-learn` pipeline [@Pedregosa2018], it
 is extremely easy to switch out and train algorithms.
 Furthermore, train/test leaks and other methodological errors at various stages in the analysis are automatically 
 prevented – even if the user might not be aware of these issue.
@@ -57,7 +57,7 @@ deep learning (DL) approaches [@Palotti2019].
 When one attempts to compare multiple algorithms, it is not possible to use just a single high-level framework to 
 implement and run all of them.
 Heuristic algorithms will most likely be implemented without specific frameworks, ML approaches are most likely based 
-on [`scikit-learn`](https://scikit-learn.org/stable/) [@Pedregosa2011a], and Deep Learning approaches based on 
+on [`scikit-learn`](https://scikit-learn.org/stable/) [@Pedregosa2018], and Deep Learning approaches based on 
 [`tensorflow`](https://www.tensorflow.org/) [@tensorflow2015-whitepaper]
 or [`PyTorch`](https://pytorch.org/) [@Paske2019].
 Further, the required data are usually multimodal time series (e.g., motion and cardiac data) [@Zhai2020a].
@@ -73,8 +73,7 @@ All of this requires a profound understanding of machine learning to implement t
 cross-validation, as well as extensive experience in the programming language of choice to design and implement an 
 algorithm interface.
 
-The second example is a comparison of stride detection algorithms based on IMU data recently published by Roth et al.
-[@Roth2021a].
+The second example is a comparison of stride detection algorithms based on IMU data recently published by @Roth2021a.
 The authors compared a custom Hidden Markov Model implemented using 
 [`pomegranate`](https://pomegranate.readthedocs.io/en/latest/) [@Schreiber2017] with an implementation of a template 
 matching algorithm based on [@Barth2013].
@@ -192,3 +191,5 @@ This JU receives support from the European Union’s Horizon 2020 research and i
 Federation of Pharmaceutical Industries and Associations (EFPIA).
 Content in this publication reflects the authors’ view and neither IMI nor the European Union, EFPIA, or any Associated 
 Partners are responsible for any use that may be made of the information contained herein.
+
+# References
