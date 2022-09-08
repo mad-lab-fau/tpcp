@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2022-09-08
+
+### Fixed
+- Classes without init can now pass the tpcp checks
+
+### Added
+- You can nest parameter annotations into `ClassVar` and they will still be processed. 
+  This is helpful when using dataclasses and annotating nested parameter values.
+
 ## [0.9.0] - 2022-08-11
 
 This release drops Python 3.7 support!
