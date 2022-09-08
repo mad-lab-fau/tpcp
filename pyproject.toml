@@ -84,7 +84,7 @@ docs = { "script" = "_tasks:task_docs()",  help = "Build the html docs using Sph
 bump_version = { "script" = "_tasks:task_update_version()" }
 
 [tool.pyright]
-pythonVersion = "3.7"
+pythonVersion = "3.8"
 
 [build-system]
 requires = ["poetry_core>=1.0.0"]
