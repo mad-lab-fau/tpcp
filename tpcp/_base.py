@@ -13,7 +13,21 @@ import warnings
 from collections import defaultdict
 from functools import wraps
 from types import MethodWrapperType
-from typing import Any, Callable, DefaultDict, Dict, Generic, Iterable, List, Optional, Tuple, Type, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    DefaultDict,
+    Dict,
+    Generic,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    ClassVar,
+)
 
 import numpy as np
 import pandas as pd
@@ -165,20 +179,30 @@ def _custom_get_type_hints(cls: Type[_BaseTpcpObject]) -> Dict[str, Any]:
     return hints
 
 
-def _extract_annotations(
-    cls: Type[_BaseTpcpObject], init_fields: Dict[str, inspect.Parameter]
-) -> Dict[str, _ParaTypes]:
+def _extract_partial_annotations(cls: Type[_BaseTpcpObject]) -> Dict[str, _ParaTypes]:
     cls_annotations = _custom_get_type_hints(cls)
     para_annotations = {}
     for k, v in cls_annotations.items():
-        if get_origin(v) is Annotated:
+        origin = get_origin(v)
+        if origin is ClassVar:
+            # If the parameter is a ClassVar, we go one level deeper and check, if its argument was annotated.
+            v = get_args(v)[0]
+            origin = get_origin(v)
+        if origin is Annotated:
             for annot in get_args(v)[1:]:
                 if isinstance(annot, _ParaTypes):
                     para_annotations[k] = annot
                     break
-        elif k in init_fields:
-            para_annotations[k] = _ParaTypes.SIMPLE
+
     return para_annotations
+
+
+def _add_missing_init_fields_to_annotations(
+    para_annotations: Dict[str, _ParaTypes], init_fields: Dict[str, inspect.Parameter]
+):
+    for k in init_fields:
+        if k not in para_annotations:
+            para_annotations[k] = _ParaTypes.SIMPLE
 
 
 def _run_field_checks(cls, fields: Dict[str, Any]) -> None:
@@ -190,8 +214,9 @@ def _run_field_checks(cls, fields: Dict[str, Any]) -> None:
 def _process_tpcp_class(cls: Type[_BaseTpcpObject]):
     # We extract the fields of the init
     fields = _get_init_defaults(cls)
-    # Then we extract our metadata annotations
-    cls.__field_annotations__ = _extract_annotations(cls, init_fields=fields)
+
+    # Now that we know the init fields for sure, we can complete our parameter extraction
+    _add_missing_init_fields_to_annotations(cls.__field_annotations__, fields)
 
     # Validation
     if cls.__skip_validation__ is not True:
@@ -213,6 +238,11 @@ def _process_tpcp_class(cls: Type[_BaseTpcpObject]):
 
 def _requires_processed_class(instance: _BaseTpcpObject, method_name: str) -> None:
     if not instance.__tpcp_cls_processed__:
+        if not instance.__field_annotations__ and type(instance).__init__ == object.__init__:
+            # If there are no annotations and no init, it was just a simple class without parameters or init.
+            # This is fine and we mark it as processed to speed up future checks.
+            type(instance).__tpcp_cls_processed__ = True
+            return
         raise RuntimeError(
             f"You are calling {method_name} on a class that has not been processed by tpcp. "
             "This should not happen!\n\n"
@@ -234,20 +264,19 @@ class _BaseTpcpObject:
         cls.__skip_validation__ = _skip_validation
         # We set that here to make sure the value is not inherited from the parent class.
         cls.__tpcp_cls_processed__ = False
+        cls.__tpcp_might_have_empty_init__ = False
 
+        # Then we extract all custom annotations that have been made.
+        # We can do that safely, even before a dataclass decorator might process the class
+        cls.__field_annotations__ = _extract_partial_annotations(cls)
+
+        # If the class has no init or is a dataclass (aka a subclass of a dataclass), we don't need to do anything.
+        # It could be that it is a dataclass, but then the dataclass wrapper will already call the post_init
+        # correctly.
+        #
+        # If our class simply does not have an __init__ and will not get one via the dataclass wrapper, there is
+        # nothing to do anyway.
         if cls.__init__ is object.__init__ or dataclasses.is_dataclass(cls):
-            # If the class has no init or is a dataclass (aka a subclass of a dataclass), we don't need to do anything.
-            # It could be that it is a dataclass, but then the dataclass wrapper will already call the post_init
-            # correctly.
-            #
-            # WARNING: This misses one case! Namely, when someone creates a class without an init,
-            # but with annotations that should be processed.
-            # This is not a valid class, but we can not check this, as we will not process the class, because the
-            # `post_init` will never be called.
-            #
-            # For this (and potential other cases), we have simple checks on the basic methods, that raise errors if
-            # the class has not been processed yet...
-
             return
 
         # If we have a custom init, we need to wrap it to call the post_init method.
@@ -459,10 +488,11 @@ def _has_invalid_name(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpO
             f"The parameters {invalid_names} of {cls.__name__} have a double-underscore in their name. "
             "This is not allowed, as it interferes with the nested naming conventions in tpcp.\n\n"
             "If you are seeing this while using `dataclasses`, and trying to annotate nested parameters, make sure to "
-            "exclude from the init using the explicit field syntax:\n\n"
+            "exclude from the init using the explicit field syntax or by wrapping it with `ClassVar`:\n\n"
             ">>> @dataclasses.dataclass\n"
             "... class MyClass(BaseTpcpObject, dataclass=True):  # Yes, this valid Python!\n"
-            "...    nested__parameter: OptiPara[int] = dataclasses.field(init=False)\n\n"
+            "...    nested__parameter: OptiPara[int] = dataclasses.field(init=False)\n"
+            "...    other_nested__parameter: ClassVar[OptiPara[int]]\n\n"
         )
 
 

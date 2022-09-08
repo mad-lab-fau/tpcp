@@ -3,14 +3,14 @@ import dataclasses
 from collections import namedtuple
 from dataclasses import dataclass
 from inspect import Parameter, signature
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, ClassVar
 from unittest.mock import patch
 
 import joblib
 import pytest
 
 from tests.conftest import _get_params_without_nested_class
-from tpcp import Algorithm, OptiPara, cf, clone
+from tpcp import Algorithm, OptiPara, cf, clone, Para
 from tpcp._algorithm_utils import (
     get_action_method,
     get_action_methods_names,
@@ -19,6 +19,7 @@ from tpcp._algorithm_utils import (
     is_action_applied,
 )
 from tpcp._base import _process_tpcp_class
+from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, ValidationError
 
 
@@ -355,6 +356,13 @@ def test_processing_is_correctly_called_on_all_subclasses_2(mock_process):
     assert mock_process.call_count == 2
 
 
+def test_processing_works_with_class_without_init():
+    class Test(Algorithm):
+        pass
+
+    Test().get_params()
+
+
 def test_basic_dataclass_support():
     @dataclasses.dataclass
     class Test(Algorithm):
@@ -370,6 +378,35 @@ def test_basic_dataclass_support():
     assert dataclasses.is_dataclass(DTest)
     dtest = DTest(a=1, b=2, c=3)
     assert dtest.get_params() == {"a": 1, "b": 2, "c": 3}
+
+
+def test_dataclass_work_with_custom_annot():
+    @dataclasses.dataclass
+    class Test(Algorithm):
+        a: OptiPara[int]
+        b: int
+
+    Test(a=1, b=2)
+
+    @dataclasses.dataclass
+    class Test2(Algorithm):
+        c: Para[Test]
+        c__a: ClassVar[OptiPara[int]]
+
+    assert dataclasses.is_dataclass(Test2)
+    dtest = Test2(c=Test(a=1, b=2))
+    assert Test2.__field_annotations__ == {"c": _ParaTypes.SIMPLE, "c__a": _ParaTypes.OPTI}
+    paras = dtest.get_params()
+    paras.pop("c")
+    assert paras == {"c__a": 1, "c__b": 2}
+
+
+def test_dataclass_with_nested_para_is_invalid():
+    class Test(Algorithm):
+        c__a: int = 3
+
+    with pytest.raises(ValidationError):
+        dataclasses.dataclass(Test)()
 
 
 def test_dataclass_warns_when_cf_is_used():
