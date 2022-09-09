@@ -16,6 +16,7 @@ from types import MethodWrapperType
 from typing import (
     Any,
     Callable,
+    ClassVar,
     DefaultDict,
     Dict,
     Generic,
@@ -26,7 +27,6 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    ClassVar,
 )
 
 import numpy as np
@@ -120,8 +120,6 @@ def _retry_eval_with_missing_locals(
             missing = str(e).split("'")[1]
             localns[missing] = None
         except AttributeError as e:
-            if "'NoneType' object has no attribute 'GridSearch'" not in str(e):
-                raise e
             raise RuntimeError(
                 "You ran into an edge case of the builtin type resolver. "
                 "This happens if you use a nested type annotation that is only valid during runtime. "

@@ -3,14 +3,14 @@ import dataclasses
 from collections import namedtuple
 from dataclasses import dataclass
 from inspect import Parameter, signature
-from typing import Any, Dict, Tuple, ClassVar
+from typing import Any, ClassVar, Dict, Tuple
 from unittest.mock import patch
 
 import joblib
 import pytest
 
 from tests.conftest import _get_params_without_nested_class
-from tpcp import Algorithm, OptiPara, cf, clone, Para
+from tpcp import Algorithm, OptiPara, Para, cf, clone
 from tpcp._algorithm_utils import (
     get_action_method,
     get_action_methods_names,
