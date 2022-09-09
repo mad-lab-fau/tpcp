@@ -71,6 +71,7 @@ def test_import_forward_error():
         from tpcp import optimize
 
     with pytest.raises(RuntimeError) as e:
+
         class Test(BaseTpcpObject):
             hyper: HyperPara[int]
             normal: Para[optimize.GridSearch]
