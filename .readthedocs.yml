@@ -20,4 +20,5 @@ build:
       - asdf global poetry latest
       - poetry config virtualenvs.create false
     post_install:
+      - poetry env use python
       - poetry install -E torch -E optuna
