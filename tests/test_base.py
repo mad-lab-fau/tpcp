@@ -1,7 +1,6 @@
 """This tests the BaseAlgorithm and fundamental functionality."""
 import dataclasses
 from collections import namedtuple
-from dataclasses import dataclass
 from inspect import Parameter, signature
 from typing import Any, ClassVar, Dict, Tuple
 from unittest.mock import patch

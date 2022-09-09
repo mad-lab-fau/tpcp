@@ -1,4 +1,3 @@
-from collections import namedtuple
 from itertools import product
 from operator import itemgetter
 

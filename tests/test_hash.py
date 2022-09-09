@@ -1,10 +1,9 @@
 import joblib
-import numpy as np
 import pytest
 import torch
 from torch import nn
 
-from tpcp import Algorithm, clone
+from tpcp import clone
 from tpcp._hash import custom_hash
 
 

@@ -9,7 +9,6 @@ import pytest
 from typing_extensions import Annotated
 
 from tpcp import BaseTpcpObject, HyperPara, Para
-from tpcp._base import _validate_parameter
 from tpcp._parameters import _ParaTypes
 
 

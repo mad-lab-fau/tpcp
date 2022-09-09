@@ -9,7 +9,6 @@ import pytest
 from tests.test_pipelines.conftest import (
     DummyDataset,
     DummyOptimizablePipeline,
-    DummyPipeline,
     dummy_multi_score_func,
     dummy_single_score_func,
 )
