@@ -18,7 +18,7 @@ from tpcp._algorithm_utils import (
     get_results,
     is_action_applied,
 )
-from tpcp._base import _process_tpcp_class
+from tpcp._base import _validate_parameter
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, ValidationError
 
@@ -44,7 +44,7 @@ def create_test_class(
 
     # We create the class once, then create a proper signature and then create the class again to trigger the
     # signature related checks of the metaclass
-    test_class = type("TestClass", (Algorithm,), class_dict)
+    test_class = type("TestClass", (object,), class_dict)
 
     # Set the signature to conform to the expected conventions
     sig = signature(test_class.__init__)
@@ -307,7 +307,7 @@ def test_invalid_parameter_names():
     assert "double-underscore" in str(e)
 
 
-@patch("tpcp._base._process_tpcp_class", wraps=_process_tpcp_class)
+@patch("tpcp._base._validate_parameter", wraps=_validate_parameter)
 def test_processing_is_only_run_on_first_init(mock_process):
     class Test(Algorithm):
         def __init__(self, name):
@@ -320,7 +320,7 @@ def test_processing_is_only_run_on_first_init(mock_process):
     assert mock_process.call_count == 1
 
 
-@patch("tpcp._base._process_tpcp_class", wraps=_process_tpcp_class)
+@patch("tpcp._base._validate_parameter", wraps=_validate_parameter)
 def test_processing_is_correctly_called_on_all_subclasses(mock_process):
     class Test(Algorithm):
         def __init__(self, name):
@@ -337,7 +337,7 @@ def test_processing_is_correctly_called_on_all_subclasses(mock_process):
     assert mock_process.call_count == 2
 
 
-@patch("tpcp._base._process_tpcp_class", wraps=_process_tpcp_class)
+@patch("tpcp._base._validate_parameter", wraps=_validate_parameter)
 def test_processing_is_correctly_called_on_all_subclasses_2(mock_process):
     class Test(Algorithm):
         def __init__(self, name):
@@ -395,7 +395,7 @@ def test_dataclass_work_with_custom_annot():
 
     assert dataclasses.is_dataclass(Test2)
     dtest = Test2(c=Test(a=1, b=2))
-    assert Test2.__field_annotations__ == {"c": _ParaTypes.SIMPLE, "c__a": _ParaTypes.OPTI}
+    assert dtest.__field_annotations__ == {"c": _ParaTypes.SIMPLE, "c__a": _ParaTypes.OPTI}
     paras = dtest.get_params()
     paras.pop("c")
     assert paras == {"c__a": 1, "c__b": 2}

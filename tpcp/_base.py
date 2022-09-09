@@ -161,12 +161,17 @@ def _retry_eval_with_missing_locals(
 
 
 def _custom_get_type_hints(cls: Type[_BaseTpcpObject]) -> Dict[str, Any]:
-    """Extract type hints while avoiding issues with forward references."""
+    """Extract type hints while avoiding issues with forward references.
+
+    We automatically skip all douple_underscore methods.
+    """
     hints = {}
     for base in reversed(cls.__mro__):
         base_globals = sys.modules[base.__module__].__dict__
         ann = base.__dict__.get("__annotations__", {})
         for name, value in ann.items():
+            if name.startswith("__"):
+                continue
             if value is None:
                 value = type(None)
             elif isinstance(value, str):
@@ -177,7 +182,9 @@ def _custom_get_type_hints(cls: Type[_BaseTpcpObject]) -> Dict[str, Any]:
     return hints
 
 
-def _extract_partial_annotations(cls: Type[_BaseTpcpObject]) -> Dict[str, _ParaTypes]:
+def _extract_annotations(
+    cls: Type[_BaseTpcpObject], init_fields: Dict[str, inspect.Parameter]
+) -> Dict[str, _ParaTypes]:
     cls_annotations = _custom_get_type_hints(cls)
     para_annotations = {}
     for k, v in cls_annotations.items():
@@ -191,36 +198,21 @@ def _extract_partial_annotations(cls: Type[_BaseTpcpObject]) -> Dict[str, _ParaT
                 if isinstance(annot, _ParaTypes):
                     para_annotations[k] = annot
                     break
-
+        elif k in init_fields:
+            para_annotations[k] = _ParaTypes.SIMPLE
     return para_annotations
 
 
-def _add_missing_init_fields_to_annotations(
-    para_annotations: Dict[str, _ParaTypes], init_fields: Dict[str, inspect.Parameter]
-):
-    for k in init_fields:
-        if k not in para_annotations:
-            para_annotations[k] = _ParaTypes.SIMPLE
-
-
-def _run_field_checks(cls, fields: Dict[str, Any]) -> None:
-    _has_dangerous_mutable_default(fields, cls)
-    _has_invalid_name(fields, cls)
-    _annotations_are_valid(fields, cls)
-
-
-def _process_tpcp_class(cls: Type[_BaseTpcpObject]):
+def _validate_parameter(instance: _BaseTpcpObject):
     # We extract the fields of the init
-    fields = _get_init_defaults(cls)
-
-    # Now that we know the init fields for sure, we can complete our parameter extraction
-    _add_missing_init_fields_to_annotations(cls.__field_annotations__, fields)
+    fields = _get_init_defaults(type(instance))
 
     # Validation
-    if cls.__skip_validation__ is not True:
-        _run_field_checks(cls, fields)
+    if instance.__skip_validation__ is not True:
+        _has_dangerous_mutable_default(fields, instance)
+        _has_invalid_name(fields, instance)
 
-    if dataclasses.is_dataclass(cls) and any(isinstance(field.default, BaseFactory) for field in fields.values()):
+    if dataclasses.is_dataclass(instance) and any(isinstance(field.default, BaseFactory) for field in fields.values()):
         # If the class is already a data class when this check runs (aka when it is triggered by the custom
         # decorator), then we don't need to do anything.
         # The BaseTpcpObject already implements the post_init method to handly all factory stuff.
@@ -231,42 +223,36 @@ def _process_tpcp_class(cls: Type[_BaseTpcpObject]):
             "Consider using the `factory` option of `dataclasses.field` instead."
         )
 
-    cls.__tpcp_cls_processed__ = True
-
-
-def _requires_processed_class(instance: _BaseTpcpObject, method_name: str) -> None:
-    if not instance.__tpcp_cls_processed__:
-        if not instance.__field_annotations__ and type(instance).__init__ == object.__init__:
-            # If there are no annotations and no init, it was just a simple class without parameters or init.
-            # This is fine and we mark it as processed to speed up future checks.
-            type(instance).__tpcp_cls_processed__ = True
-            return
-        raise RuntimeError(
-            f"You are calling {method_name} on a class that has not been processed by tpcp. "
-            "This should not happen!\n\n"
-            "The only case we know of, is when you defined a class with class annotations, but without an init or a"
-            "dataclass decorator. "
-            "This is likely a user error.\n\n"
-            "If this is not what happened, please open an issue on GitHub with an example explaining how you "
-            "reached this error."
-        )
-
 
 class _BaseTpcpObject:
-    __field_annotations__: Dict[str, _ParaTypes]
+    __field_annotations_cache__: Union[_Nothing, Dict[str, _ParaTypes]]
     __skip_validation__: bool
     __tpcp_cls_processed__: bool
+
+    @property
+    def __field_annotations__(self) -> Dict[str, _ParaTypes]:
+        """Get the field annotations that provide higher level information about the role of a parameter.
+
+        We implement that as property to move the extraction of the annotations as far down in the initialization as
+        possible, when we are sure the cls definition is properly finalized (i.e. dataclass decorators are run)
+        """
+        if getattr(self, "__field_annotations_cache__", NOTHING) is NOTHING:
+            fields = _get_init_defaults(type(self))
+            cls = type(self)
+            field_annotations = _extract_annotations(cls, fields)
+            # We only validate the annotations here. If the user is not using the annotations, no need to bother them
+            # with useless error messages
+            _annotations_are_valid(field_annotations, fields, cls_name=cls.__name__)
+            # We set the cache on the cls, so that only one instance is required to process it.
+            cls.__field_annotations_cache__ = field_annotations
+        return self.__field_annotations_cache__
 
     def __init_subclass__(cls, *, _skip_validation: bool = False, **kwargs: Any):
         super().__init_subclass__(**kwargs)
         cls.__skip_validation__ = _skip_validation
         # We set that here to make sure the value is not inherited from the parent class.
         cls.__tpcp_cls_processed__ = False
-        cls.__tpcp_might_have_empty_init__ = False
-
-        # Then we extract all custom annotations that have been made.
-        # We can do that safely, even before a dataclass decorator might process the class
-        cls.__field_annotations__ = _extract_partial_annotations(cls)
+        cls.__field_annotations_cache__ = NOTHING
 
         # If the class has no init or is a dataclass (aka a subclass of a dataclass), we don't need to do anything.
         # It could be that it is a dataclass, but then the dataclass wrapper will already call the post_init
@@ -339,10 +325,11 @@ class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
         # When using dataclasses, this method will be called, even if our custom processing did not run.
         # However, this is an issue, and we need to force users to apply the custom decorator.
         if not self.__tpcp_cls_processed__:
-            # The first time we run an init of this class we run our processing.
+            # The first time we run an init of this class we run our parameter validation.
             # Running that in the init for the first time, makes sure that it runs after any processing run on the class
             # itself (i.e. when a dataclass decorator is used).
-            _process_tpcp_class(type(self))
+            _validate_parameter(self)
+            type(self).__tpcp_cls_processed__ = True
 
         # Check if any of the initial values has a "default parameter flag".
         # If yes we replace it with a clone (in case of a tpcp object) or a deepcopy in case of other objects.
@@ -354,7 +341,6 @@ class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
 
 # TODO: Make public api
 def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
-    _requires_processed_class(instance, "get_params")
     valid_fields = get_param_names(type(instance))
 
     out: Dict[str, Any] = {}
@@ -395,7 +381,7 @@ def _set_params(instance: BaseTpcpObjectObjT, **params: Any) -> BaseTpcpObjectOb
     return instance
 
 
-def get_param_names(cls: Type[_BaseTpcpObject]) -> List[str]:
+def get_param_names(obj: Union[Type[_BaseTpcpObject], _BaseTpcpObject]) -> List[str]:
     """Get parameter names for the object.
 
     The parameters of an algorithm/pipeline are defined based on its `__init__` method.
@@ -411,6 +397,7 @@ def get_param_names(cls: Type[_BaseTpcpObject]) -> List[str]:
         List of parameter names of the algorithm
 
     """
+    cls = obj if isinstance(obj, type) else type(obj)
     parameters = list(_get_init_defaults(cls).values())
     for p in parameters:
         if p.kind == p.VAR_POSITIONAL:
@@ -423,14 +410,14 @@ def get_param_names(cls: Type[_BaseTpcpObject]) -> List[str]:
 
 
 def _get_annotated_fields_of_type(
-    instance_or_cls: Union[Type[BaseTpcpObject], BaseTpcpObject], field_type: Union[_ParaTypes, Iterable[_ParaTypes]]
+    instance_or_cls: Union[BaseTpcpObject], field_type: Union[_ParaTypes, Iterable[_ParaTypes]]
 ) -> List[str]:
     if isinstance(field_type, _ParaTypes):
         field_type = [field_type]
     return [k for k, v in instance_or_cls.__field_annotations__.items() if v in field_type]
 
 
-def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]) -> None:
+def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], instance: _BaseTpcpObject) -> None:
     mutable_defaults = []
 
     for name, field in fields.items():
@@ -441,7 +428,7 @@ def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Ty
 
     if len(mutable_defaults) > 0:
         raise MutableDefaultsError(
-            f"The class {cls.__name__} contains mutable objects as default values ({mutable_defaults}). "
+            f"The class {type(instance).__name__} contains mutable objects as default values ({mutable_defaults}). "
             "This can lead to unexpected and unpleasant issues! "
             "To solve this the default value should be generated by a factory that produces a new value for each "
             "instance. "
@@ -455,8 +442,10 @@ def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Ty
         )
 
 
-def _annotations_are_valid(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]) -> None:
-    for k, v in cls.__field_annotations__.items():
+def _annotations_are_valid(
+    field_annotations: Dict[str, _ParaTypes], fields: Dict[str, inspect.Parameter], cls_name: str
+) -> None:
+    for k, v in field_annotations.items():
         if "__" in k:
             if v is _ParaTypes.SIMPLE:
                 warnings.warn(
@@ -466,30 +455,26 @@ def _annotations_are_valid(fields: Dict[str, inspect.Parameter], cls: Type[_Base
                 )
         elif k not in fields:
             raise ValueError(
-                f"The field '{k}' of {cls.__name__} was annotated as a `tpcp` (Hyper/Pure/Normal/Optimizable)-"
-                f"Parameter, but is not a parameter listed in the init! "
+                f"The field '{k}' of {cls_name} was annotated as a `tpcp` "
+                "(Hyper/Pure/Normal/Optimizable)-Parameter, but is not a parameter listed in the init! "
                 "Add the parameter to the init if it is an actual parameter of your algorithm, or remove the "
-                "annotation.\n\n"
-                "If you are seeing this issue when you are using `dataclasses`, this could also be a false positive."
-                "Make sure you set `dataclass=True` during class definition:\n\n"
-                ">>> @dataclasses.dataclass\n"
-                "... class MyClass(BaseTpcpObject, dataclass=True):  # Yes, this valid Python!\n"
-                "...    ...\n\n"
-                ""
+                "annotation."
             )
 
 
-def _has_invalid_name(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]) -> None:
+def _has_invalid_name(fields: Dict[str, inspect.Parameter], instance: _BaseTpcpObject) -> None:
     invalid_names = [f for f in fields if "__" in f]
     if len(invalid_names) > 0:
         raise ValidationError(
-            f"The parameters {invalid_names} of {cls.__name__} have a double-underscore in their name. "
+            f"The parameters {invalid_names} of {type(instance).__name__} have a double-underscore in their name. "
             "This is not allowed, as it interferes with the nested naming conventions in tpcp.\n\n"
             "If you are seeing this while using `dataclasses`, and trying to annotate nested parameters, make sure to "
-            "exclude from the init using the explicit field syntax or by wrapping it with `ClassVar`:\n\n"
+            "exclude from the init using the explicit `field` syntax or by wrapping it with `ClassVar`:\n\n"
             ">>> @dataclasses.dataclass\n"
-            "... class MyClass(BaseTpcpObject, dataclass=True):  # Yes, this valid Python!\n"
+            "... class MyClass(BaseTpcpObject):\n"
+            "...    # first option\n"
             "...    nested__parameter: OptiPara[int] = dataclasses.field(init=False)\n"
+            "...    # second option\n"
             "...    other_nested__parameter: ClassVar[OptiPara[int]]\n\n"
         )
 

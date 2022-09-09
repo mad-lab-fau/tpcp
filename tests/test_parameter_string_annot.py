@@ -9,7 +9,7 @@ import pytest
 from typing_extensions import Annotated
 
 from tpcp import BaseTpcpObject, HyperPara, Para
-from tpcp._base import _process_tpcp_class
+from tpcp._base import _validate_parameter
 from tpcp._parameters import _ParaTypes
 
 
@@ -26,10 +26,8 @@ def test_basic_annotation_collection():
             self.custom_annotated = custom_annotated
             self.normal_no_annot = normal_no_annot
 
-    # We manually trigger the second part of the processing of the annotations
-    _process_tpcp_class(Test)
-
-    assert Test.__field_annotations__ == {
+    test = Test(1, "a", 2, 3)
+    assert test.__field_annotations__ == {
         "hyper": _ParaTypes.HYPER,
         "normal": _ParaTypes.SIMPLE,
         "custom_annotated": _ParaTypes.HYPER,
@@ -55,10 +53,8 @@ def test_import_forward():
             self.custom_annotated = custom_annotated
             self.normal_no_annot = normal_no_annot
 
-    # We manually trigger the second part of the processing of the annotations
-    _process_tpcp_class(Test)
-
-    assert Test.__field_annotations__ == {
+    test = Test(1, "a", 2, 3)
+    assert test.__field_annotations__ == {
         "hyper": _ParaTypes.HYPER,
         "normal": _ParaTypes.SIMPLE,
         "custom_annotated": _ParaTypes.HYPER,
@@ -70,20 +66,20 @@ def test_import_forward_error():
     if TYPE_CHECKING:
         from tpcp import optimize
 
+    class Test(BaseTpcpObject):
+        hyper: HyperPara[int]
+        normal: Para[optimize.GridSearch]
+        custom_annotated: Annotated[HyperPara[int], "custom_metadata"]
+        normal_no_annot: int
+
+        def __init__(self, hyper: int, normal: optimize.GridSearch, custom_annotated: int, normal_no_annot: int):
+            self.hyper = hyper
+            self.normal = normal
+            self.custom_annotated = custom_annotated
+            self.normal_no_annot = normal_no_annot
+
     with pytest.raises(RuntimeError) as e:
-
-        class Test(BaseTpcpObject):
-            hyper: HyperPara[int]
-            normal: Para[optimize.GridSearch]
-            custom_annotated: Annotated[HyperPara[int], "custom_metadata"]
-            normal_no_annot: int
-
-            def __init__(self, hyper: int, normal: optimize.GridSearch, custom_annotated: int, normal_no_annot: int):
-                self.hyper = hyper
-                self.normal = normal
-                self.custom_annotated = custom_annotated
-                self.normal_no_annot = normal_no_annot
-
+        _ = Test(1, "a", 2, 3).__field_annotations__
     assert "You ran into an edge case" in str(e)
 
 
@@ -100,10 +96,8 @@ def test_test_str_based_forward():
             self.custom_annotated = custom_annotated
             self.normal_no_annot = normal_no_annot
 
-    # We manually trigger the processing of the annotations
-    _process_tpcp_class(Test)
-
-    assert Test.__field_annotations__ == {
+    test = Test(1, "a", 2, 3)
+    assert test.__field_annotations__ == {
         "hyper": _ParaTypes.HYPER,
         "normal": _ParaTypes.SIMPLE,
         "custom_annotated": _ParaTypes.HYPER,
