@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2022-09-09
+
+### Changed
+
+- Reworked once again when and how annotations for tpcp classes are processed.
+  Processing is now delayed until you are actually using the annotations (i.e. as part of the "safe wrappers").
+  The only user facing change is that the chance of running into edge cases is lower and that `__field_annotations__` is
+  now only available on class instances and not the class itself anymore.
+
+
 ## [0.9.1] - 2022-09-08
 
 ### Fixed
