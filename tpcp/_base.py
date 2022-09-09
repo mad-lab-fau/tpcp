@@ -99,6 +99,8 @@ def _replace_defaults_wrapper(old_init: Callable) -> Callable:
         old_init(self, *args, **kwargs)
         self.__post_init__()
 
+    new_init.__tpcp_wrapped__ = True
+
     return new_init
 
 
@@ -261,6 +263,14 @@ class _BaseTpcpObject:
         # If our class simply does not have an __init__ and will not get one via the dataclass wrapper, there is
         # nothing to do anyway.
         if cls.__init__ is object.__init__ or dataclasses.is_dataclass(cls):
+            return
+
+        # We also don't want to wrap the init again, if it is the init of the parent.
+        # If users call "super" within the init, we can of cause not detect that and will wrap an init,
+        # that will call a wrapped init internally again.
+        # However, we use the `__tpcp_cls_processed__` parameter to reduce the runtime cost of this case and will not
+        # check the parameters multiple time, we still need to call a set of wrappers of course.
+        if getattr(cls.__init__, "__tpcp_wrapped__", False) is True:
             return
 
         # If we have a custom init, we need to wrap it to call the post_init method.
