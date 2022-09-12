@@ -18,7 +18,7 @@ from typing_extensions import Self
 
 from tpcp import OptimizablePipeline
 from tpcp._algorithm_utils import OPTIMIZE_METHOD_INDICATOR, _check_safe_optimize
-from tpcp._base import _get_annotated_fields_of_type
+from tpcp._base import _get_annotated_fields_of_type, Info, clone
 from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
 from tpcp._parameters import Parameter, _ParaTypes
@@ -140,6 +140,7 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
     safe_optimize: bool
 
     optimized_pipeline_: OptimizablePipelineT
+    optimize_info_: Info
 
     def __init__(  # noqa: super-init-not-called
         self, pipeline: OptimizablePipelineT, *, safe_optimize: bool = True
@@ -184,6 +185,7 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
         else:
             optimized_pipeline = pipeline.self_optimize(dataset, **optimize_params)
         # We clone again, just to be sure
+        self.optimize_info_ = clone(optimized_pipeline.info.to_dict())
         self.optimized_pipeline_ = optimized_pipeline.clone()
         return self
 

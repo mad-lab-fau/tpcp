@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Ty
 
 from typing_extensions import Concatenate, ParamSpec
 
-from tpcp._base import _get_annotated_fields_of_type
+from tpcp._base import _get_annotated_fields_of_type, BaseTpcpObject, _clone
 from tpcp._hash import custom_hash
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import PotentialUserErrorWarning
@@ -251,7 +251,7 @@ def _check_safe_optimize(algorithm: OptimizableT, old_method: Callable, *args: A
         )
     before_hash_optimizable = custom_hash(optimizable_paras)
     before_hash_other = custom_hash(other_paras)
-    # We also precalculate the hash of the indidividual inputs here.
+    # We also precalculate the hash of the individual inputs here.
     # Otherwise, we can not capture the "before" state correctly, in case some parameters are mutables (container,
     # or custom object instances)
     before_hash_other_individual = {k: custom_hash(v) for k, v in other_paras.items()}
@@ -271,13 +271,14 @@ def _check_safe_optimize(algorithm: OptimizableT, old_method: Callable, *args: A
     # The first hash records any changes to the object.
     # The second hash only records changes to the parameters, because everything else is removed by clone.
     # Hence, if we see differences between the hashes, other things besides the parameters are changed.
+    # del optimized_algorithm.info
     after_hash = custom_hash(optimized_algorithm)
-    after_hash_after_clone = custom_hash(optimized_algorithm.clone())
+    after_hash_after_clone = custom_hash(_clone(optimized_algorithm, _copy_info=True))
     if after_hash_after_clone != after_hash:
         raise RuntimeError(
             "Optimizing seems to have changed class attributes that are not parameters (i.e. not provided in the "
             "`__init__`). "
-            "This can lead to unexpected issues!"
+            "These will be removed, when the object is cloned and can lead to unexpected issues!"
         )
     # Now we need to check, which parameters have been modified.
     # We only expect/allow parameters that are marked as "Optimizable".

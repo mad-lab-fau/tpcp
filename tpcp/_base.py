@@ -11,7 +11,7 @@ import inspect
 import sys
 import warnings
 from collections import defaultdict
-from functools import wraps
+from functools import wraps, cached_property
 from types import MethodWrapperType
 from typing import (
     Any,
@@ -26,7 +26,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
-    Union,
+    Union, Mapping,
 )
 
 import numpy as np
@@ -277,6 +277,36 @@ class _BaseTpcpObject:
         setattr(cls, "__init__", _replace_defaults_wrapper(cls.__init__))
 
 
+class Info(dict):
+    def add(self, name: str, value: Any) -> Self:
+        """Add a value to the info dict.
+
+        This is equivalent to `info[name] = value`, but returns `Self` so that it can be chained.
+        """
+        self[name] = value
+        return self
+
+    def update(self, E: Mapping=None, **F: Mapping) -> Self:
+        """Update the info dict with multiple values.
+
+        This works identical to the normal `dict.update` method, but returns `Self`, so it can be chained.
+        """
+        super().update(E=None, **F)
+        return self
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return the info object as a normal dictionary."""
+        return dict(self)
+
+    def inherit(self, name: str, nested_object: BaseTpcpObject) -> Self:
+        """Copy the info dictionary of the nested object and store it under the `name` key in the current info."""
+        # We take the value directly from the instance dict.
+        # Otherwise, the cached property will initialize the value and effectively change the nested_object,
+        # when it was not defined before.
+        self[name] = copy.deepcopy(nested_object.__dict__.get("info", {}))
+        return self
+
+
 class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
     """Baseclass for all tpcp objects."""
 
@@ -311,6 +341,10 @@ class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
         This will create a new instance of the class itself and all nested objects
         """
         return clone(self, safe=True)
+
+    @cached_property
+    def info(self):
+        return Info()
 
     def __repr__(self):
         """Provide generic representation for the object based on all parameters."""
@@ -532,6 +566,10 @@ def clone(algorithm: T, *, safe: bool = False) -> T:
         If safe is False, clone will fall back to a deep copy on objects that are not algorithms.
 
     """
+    return _clone(algorithm, safe=safe)
+
+
+def _clone(algorithm: T, *, safe: bool = False, _copy_info: bool = False) -> T:
     if algorithm is NOTHING:
         return algorithm
     # Handle named tuple
@@ -559,6 +597,10 @@ def clone(algorithm: T, *, safe: bool = False) -> T:
     for name, param in new_object_params.items():
         new_object_params[name] = clone(param, safe=False)
     new_object = klass(**new_object_params)
+    # The dict check, checks if the info object was ever accessed. As the info object is a cached_property,
+    # it will only appear in the instance dict, if it was accessed once.
+    if _copy_info is True and "info" in algorithm.__dict__:
+        new_object.__dict__["info"] = copy.deepcopy(algorithm.info)
     params_set = new_object.get_params(deep=False)
 
     # quick sanity check of the parameters of the clone
