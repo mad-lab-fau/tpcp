@@ -23,7 +23,7 @@ from tpcp._parameters import (
 )
 from tpcp._pipeline import OptimizablePipeline, Pipeline
 
-__version__ = "0.10.0"
+__version__ = "0.11.0a0"
 
 
 __all__ = [
