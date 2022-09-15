@@ -188,7 +188,7 @@ class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     def __init__(
         self,
         pipeline: PipelineT,
-        create_study:Callable[[], Study],
+        create_study: Callable[[], Study],
         *,
         n_trials: Optional[int] = None,
         timeout: Optional[float] = None,
@@ -259,7 +259,7 @@ class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         """Best trial in the :class:`~optuna.study.Study`."""
         return self.study_.best_trial
 
-    def optimize(self, dataset: DatasetT, **kwargs: Any) -> Self:
+    def optimize(self, dataset: DatasetT, **_: Any) -> Self:
         """Optimize the objective over the dataset and find the best parameter combination.
 
         This method calls `self.create_objective` to obtain the objective function that should be optimized.
@@ -268,8 +268,6 @@ class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         ----------
         dataset
             The dataset used for optimization.
-        kwargs
-            Kwargs are forwarded to the `self.create_study`
 
         """
         if self.timeout is None and self.n_trials is None:

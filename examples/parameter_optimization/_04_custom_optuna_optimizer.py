@@ -240,6 +240,7 @@ class OptunaSearch(CustomOptunaOptimize[PipelineT, DatasetT]):
 # search space:
 from optuna import create_study, samplers
 
+
 # We use a simple in-memory study with the direction "maximize", as we want to optimize for the highest f1-score
 # However, we wrap it by a callable to ensure that we get a new and independent study everytime our Optuna optimizer
 # is called.
@@ -269,7 +270,13 @@ def create_search_space(trial: Trial):
 # Finally, we are ready to run the pipeline.
 # We create a new instance and set the stopping criteria (in this case 10 random trials).
 # Then we can use the familiar :class:`~tpcp.optimize.Optimize` interface to run everything.
-opti = OptunaSearch(pipe, get_study, create_search_space=create_search_space, score_function=f1_score, n_trials=10,)
+opti = OptunaSearch(
+    pipe,
+    get_study,
+    create_search_space=create_search_space,
+    score_function=f1_score,
+    n_trials=10,
+)
 
 opti = opti.optimize(example_data)
 print(
@@ -421,7 +428,11 @@ def get_study() -> Study:
 
 
 opti_early_stop = OptunaSearchEarlyStopping(
-    pipe, get_study, create_search_space=create_search_space, score_function=f1_score, n_trials=10,
+    pipe,
+    get_study,
+    create_search_space=create_search_space,
+    score_function=f1_score,
+    n_trials=10,
 )
 
 opti_early_stop.optimize(example_data)

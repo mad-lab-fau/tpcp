@@ -1,4 +1,5 @@
 """Base class for all datasets."""
+import dataclasses
 from typing import Dict, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, cast, overload
 
 import numpy as np
@@ -10,6 +11,7 @@ from tpcp._base import BaseTpcpObject
 DatasetT = TypeVar("DatasetT", bound="Dataset")
 
 
+@dataclasses.dataclass
 class Dataset(BaseTpcpObject, _skip_validation=True):
     """Baseclass for tpcp Dataset objects.
 
@@ -189,17 +191,8 @@ class Dataset(BaseTpcpObject, _skip_validation=True):
 
     """
 
-    groupby_cols: Optional[Union[List[str], str]]
-    subset_index: Optional[pd.DataFrame]
-
-    def __init__(  # noqa: super-init-not-called
-        self,
-        *,
-        groupby_cols: Optional[Union[List[str], str]] = None,
-        subset_index: Optional[pd.DataFrame] = None,
-    ):
-        self.groupby_cols = groupby_cols
-        self.subset_index = subset_index
+    groupby_cols: Optional[Union[List[str], str]] = None
+    subset_index: Optional[pd.DataFrame] = None
 
     @property
     def index(self) -> pd.DataFrame:
