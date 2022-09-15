@@ -181,7 +181,7 @@ class TestCustomOptunaOptimize:
 
         opti = DummyOptunaOptimizer(
             pipe,
-            _get_study,
+            lambda: create_study(sampler=GridSampler({"para_1": list(scores.keys())}), direction="maximize"),
             scoring=scoring,
             create_search_space=create_search_space,
             n_trials=3,
