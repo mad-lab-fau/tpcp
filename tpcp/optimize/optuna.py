@@ -52,13 +52,18 @@ class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         A tpcp pipeline with some hyper-parameters that should be optimized.
         This can either be a normal pipeline or an optimizable-pipeline.
         This fully depends on your implementation of the `create_objective` method.
-    study
-        The optuna :class:`~optuna.Study` that should be used for optimization.
+    create_study
+        A callable that returns an optuna study instance to be used for the optimization.
+        It will be called as part of the `optimize` method without parameters.
+        The resulting study object can be accessed via `self.study_` after the optimization is finished.
+        Creating the study is handled via a callable, instead of providing the study object itself, to make it
+        possible to create individual studies, when CustomOptuna optimize is called by an external wrapper
+        (i.e. `cross_validate`).
     n_trials
         The number of trials.
         If this argument is set to :obj:`None`, there is no limitation on the number of trials.
         In this case you should use :obj:`timeout` instead.
-        Because optuna is called internally by this wrapper, you can not setup a study without limits and end it
+        Because optuna is called internally by this wrapper, you can not set up a study without limits and end it
         using CTRL+C (as suggested by the Optuna docs).
         In this case the entire execution flow would be stopped.
     timeout
@@ -166,7 +171,7 @@ class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     """
 
     pipeline: PipelineT
-    study: Study
+    create_study: Callable[[], Study]
 
     return_optimized: bool
 
@@ -183,7 +188,7 @@ class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     def __init__(
         self,
         pipeline: PipelineT,
-        study: Study,
+        create_study:Callable[[], Study],
         *,
         n_trials: Optional[int] = None,
         timeout: Optional[float] = None,
@@ -193,7 +198,7 @@ class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         return_optimized: bool = True,
     ) -> None:  # noqa: super-init-not-called
         self.pipeline = pipeline
-        self.study = study
+        self.create_study = create_study
 
         self.n_trials = n_trials
         self.timeout = timeout
@@ -254,7 +259,7 @@ class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         """Best trial in the :class:`~optuna.study.Study`."""
         return self.study_.best_trial
 
-    def optimize(self, dataset: DatasetT, **_: Any) -> Self:
+    def optimize(self, dataset: DatasetT, **kwargs: Any) -> Self:
         """Optimize the objective over the dataset and find the best parameter combination.
 
         This method calls `self.create_objective` to obtain the objective function that should be optimized.
@@ -263,6 +268,8 @@ class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         ----------
         dataset
             The dataset used for optimization.
+        kwargs
+            Kwargs are forwarded to the `self.create_study`
 
         """
         if self.timeout is None and self.n_trials is None:
@@ -274,7 +281,8 @@ class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         self.dataset = dataset
 
         objective = self._create_objective(self.pipeline, dataset=dataset)
-        self.study_ = self._call_optimize(self.study, objective)
+        study = self.create_study()
+        self.study_ = self._call_optimize(study, objective)
 
         if self.return_optimized:
             self.optimized_pipeline_ = self.return_optimized_pipeline(clone(self.pipeline), dataset, self.study_)

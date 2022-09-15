@@ -194,7 +194,7 @@ class OptunaSearch(CustomOptunaOptimize[PipelineT, DatasetT]):
     def __init__(
         self,
         pipeline: PipelineT,
-        study: Study,
+        create_study: Callable[[], Study],
         create_search_space: Callable[[Trial], None],
         score_function: Callable[[PipelineT, DatasetT], float],
         *,
@@ -204,7 +204,7 @@ class OptunaSearch(CustomOptunaOptimize[PipelineT, DatasetT]):
     ) -> None:
         self.create_search_space = create_search_space
         self.score_function = score_function
-        super().__init__(pipeline, study, n_trials=n_trials, timeout=timeout, return_optimized=return_optimized)
+        super().__init__(pipeline, create_study, n_trials=n_trials, timeout=timeout, return_optimized=return_optimized)
 
     def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
         # Here we define our objective function
@@ -240,10 +240,14 @@ class OptunaSearch(CustomOptunaOptimize[PipelineT, DatasetT]):
 # search space:
 from optuna import create_study, samplers
 
-# We use a simple RandomSampler, but every optuna sampler will work
-sampler = samplers.RandomSampler(seed=42)
 # We use a simple in-memory study with the direction "maximize", as we want to optimize for the highest f1-score
-study = create_study(direction="maximize", sampler=sampler)
+# However, we wrap it by a callable to ensure that we get a new and independent study everytime our Optuna optimizer
+# is called.
+def get_study():
+    # We use a simple RandomSampler, but every optuna sampler will work
+    sampler = samplers.RandomSampler(seed=42)
+    return create_study(direction="maximize", sampler=sampler)
+
 
 # %%
 # The search space function requires a little more explanation:
@@ -265,13 +269,7 @@ def create_search_space(trial: Trial):
 # Finally, we are ready to run the pipeline.
 # We create a new instance and set the stopping criteria (in this case 10 random trials).
 # Then we can use the familiar :class:`~tpcp.optimize.Optimize` interface to run everything.
-opti = OptunaSearch(
-    pipe,
-    study,
-    create_search_space=create_search_space,
-    score_function=f1_score,
-    n_trials=10,
-)
+opti = OptunaSearch(pipe, get_study, create_search_space=create_search_space, score_function=f1_score, n_trials=10,)
 
 opti = opti.optimize(example_data)
 print(
@@ -363,7 +361,7 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize[PipelineT, DatasetT]):
     def __init__(
         self,
         pipeline: PipelineT,
-        study: Study,
+        create_study: Callable[[], Study],
         create_search_space: Callable[[Trial], None],
         score_function: Callable[[PipelineT, DatasetT], float],
         *,
@@ -373,7 +371,7 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize[PipelineT, DatasetT]):
     ) -> None:
         self.create_search_space = create_search_space
         self.score_function = score_function
-        super().__init__(pipeline, study, n_trials=n_trials, timeout=timeout, return_optimized=return_optimized)
+        super().__init__(pipeline, create_study, n_trials=n_trials, timeout=timeout, return_optimized=return_optimized)
 
     def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
         def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
@@ -417,15 +415,13 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize[PipelineT, DatasetT]):
 # %%
 # Running the new Optimizer stays the same (we even reuse the search space).
 # We only need to add an instance of our pruner to the study.
-sampler = samplers.RandomSampler(seed=42)
-study = create_study(direction="maximize", sampler=sampler, pruner=MinDatapointPerformancePruner(0.3))
+def get_study() -> Study:
+    sampler = samplers.RandomSampler(seed=42)
+    return create_study(direction="maximize", sampler=sampler, pruner=MinDatapointPerformancePruner(0.3))
+
 
 opti_early_stop = OptunaSearchEarlyStopping(
-    pipe,
-    study,
-    create_search_space=create_search_space,
-    score_function=f1_score,
-    n_trials=10,
+    pipe, get_study, create_search_space=create_search_space, score_function=f1_score, n_trials=10,
 )
 
 opti_early_stop.optimize(example_data)

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - unreleased
+
+### Changed
+
+- `CustomOptunaOptimize` now expects a callable to define the study, instead of taking a study object itself. 
+  This ensures that the study objects can be independent when the class is called as part of `cross_validate`. 
+
 ## [0.10.0] - 2022-09-09
 
 ### Changed
