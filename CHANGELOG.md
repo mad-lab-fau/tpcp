@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.11.0] - unreleased
 
+### Added
+
+- Support for Optuna >3.0
+
 ### Changed
 
 - `CustomOptunaOptimize` now expects a callable to define the study, instead of taking a study object itself. 
