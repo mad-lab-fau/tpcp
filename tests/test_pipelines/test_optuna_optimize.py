@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 import pytest
 from optuna import Study, Trial, create_study
 from optuna.samplers import GridSampler, RandomSampler
-from optuna.structs import FrozenTrial
+from optuna.trial import FrozenTrial
 
 from tests.mixins.test_algorithm_mixin import TestAlgorithmMixin
 from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline, DummyPipeline, dummy_single_score_func

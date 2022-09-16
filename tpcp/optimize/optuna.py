@@ -1,6 +1,8 @@
 """Implementation of methods and classes to wrap the optimization Framework `Optuna`."""
 import warnings
 
+from optuna.trial import FrozenTrial
+
 try:
     import optuna  # noqa: unused-import
 except ImportError as e:
@@ -12,7 +14,6 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 from optuna import Study, Trial
-from optuna.structs import FrozenTrial
 from optuna.study.study import ObjectiveFuncType
 from typing_extensions import Self
 
