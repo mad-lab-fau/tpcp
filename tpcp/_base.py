@@ -327,7 +327,7 @@ class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
         return "".join(result) + ")"
 
     def __post_init__(self):
-        """Replace all parameters that use the `CloneFactory` with the actual values.
+        """Replace all parameters that use the `CloneFactory` with the actual values and perform parameter validation.
 
         This will either be called by `dataclasses.dataclass` or by in the modified `__init__` tpcp creates for
         normal classes.
