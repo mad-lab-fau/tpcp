@@ -11,7 +11,7 @@ from tpcp._base import BaseTpcpObject
 DatasetT = TypeVar("DatasetT", bound="_Dataset")
 
 
-class _Dataset(BaseTpcpObject, _skip_validation=True):
+class _Dataset(BaseTpcpObject):
     groupby_cols: Optional[Union[List[str], str]]
     subset_index: Optional[pd.DataFrame]
 
@@ -355,7 +355,7 @@ class _Dataset(BaseTpcpObject, _skip_validation=True):
         raise NotImplementedError()
 
 
-class Dataset(_Dataset, _skip_validation=True):
+class Dataset(_Dataset):
     """Baseclass for tpcp Dataset objects.
 
     This class provides fundamental functionality like iteration, getting subsets, and compatibility with `sklearn`'s

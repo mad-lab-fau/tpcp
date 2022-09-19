@@ -1,5 +1,5 @@
 """Base Classes for custom pipelines."""
-from typing import Dict, Generic, Tuple, TypeVar, Union
+from typing import ClassVar, Dict, Generic, Tuple, TypeVar, Union
 
 from typing_extensions import Self
 
@@ -11,13 +11,13 @@ PipelineT = TypeVar("PipelineT", bound="Pipeline")
 OptimizablePipelineT = TypeVar("OptimizablePipelineT", bound="OptimizablePipeline")
 
 
-class Pipeline(Algorithm, Generic[DatasetT], _skip_validation=True):
+class Pipeline(Algorithm, Generic[DatasetT]):
     """Baseclass for all custom pipelines.
 
     To create your own custom pipeline, subclass this class and implement `run`.
     """
 
-    _action_methods: Tuple[str, ...] = ("safe_run", "run")
+    _action_methods: ClassVar[Tuple[str, str]] = ("safe_run", "run")
 
     datapoint: DatasetT
 
@@ -96,7 +96,7 @@ class Pipeline(Algorithm, Generic[DatasetT], _skip_validation=True):
         raise NotImplementedError()  # pragma: no cover
 
 
-class OptimizablePipeline(Pipeline[DatasetT], _skip_validation=True):
+class OptimizablePipeline(Pipeline[DatasetT]):
     """Pipeline with custom ways to optimize and/or train input parameters.
 
     OptimizablePipelines are expected to implement a concrete way to train internal models or optimize parameters.

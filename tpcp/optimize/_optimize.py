@@ -37,7 +37,7 @@ from tpcp.validate._scorer import ScorerTypes, _validate_scorer
 T = TypeVar("T")
 
 
-class DummyOptimize(BaseOptimize[PipelineT, DatasetT], _skip_validation=True):
+class DummyOptimize(BaseOptimize[PipelineT, DatasetT]):
     """Provide API compatibility for SimplePipelines in optimize wrappers.
 
     This is a simple dummy Optimizer that will **not** optimize anything, but just provide the correct API so that

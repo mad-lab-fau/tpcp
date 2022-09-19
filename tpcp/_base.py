@@ -291,7 +291,7 @@ class _BaseTpcpObject:
         setattr(cls, "__init__", _replace_defaults_wrapper(cls.__init__))
 
 
-class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
+class BaseTpcpObject(_BaseTpcpObject):
     """Baseclass for all tpcp objects."""
 
     def get_params(self: Self, deep: bool = True) -> Dict[str, Any]:

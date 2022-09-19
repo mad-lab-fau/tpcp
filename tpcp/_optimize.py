@@ -2,7 +2,7 @@
 
 This is in a separate file to avoid circular imports.
 """
-from typing import Any, Dict, Generic, Tuple, Union
+from typing import Any, ClassVar, Dict, Generic, Tuple, Union
 
 from typing_extensions import Self
 
@@ -11,10 +11,10 @@ from tpcp._dataset import DatasetT
 from tpcp._pipeline import PipelineT
 
 
-class BaseOptimize(Algorithm, Generic[PipelineT, DatasetT], _skip_validation=True):
+class BaseOptimize(Algorithm, Generic[PipelineT, DatasetT]):
     """Base class for all optimizer."""
 
-    _action_methods: Union[Tuple[str, ...], str] = "optimize"
+    _action_methods: ClassVar[str] = "optimize"
 
     pipeline: Parameter[PipelineT]
 

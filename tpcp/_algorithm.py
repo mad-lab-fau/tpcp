@@ -9,7 +9,7 @@ from tpcp._base import BaseTpcpObject
 AlgorithmT = TypeVar("AlgorithmT", bound="Algorithm")
 
 
-class Algorithm(BaseTpcpObject, _skip_validation=True):
+class Algorithm(BaseTpcpObject):
     """Base class for all algorithms.
 
     All type-specific algorithm classes should inherit from this class and need to
