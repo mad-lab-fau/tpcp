@@ -1,8 +1,8 @@
 r"""
 .. _dataclasses:
 
-Dataclasses support
-===================
+Dataclass and Attrs support
+===========================
 
 When using `tpcp` you have to write a lot of classes with a lot of parameters.
 For each class you need to repeat all parameter names up to 3 times, even before writing any documentation.

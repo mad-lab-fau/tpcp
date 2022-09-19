@@ -9,11 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Support for Optuna >3.0
+- Example on how to use `attrs` and `dataclass` with tpcp
+- Added versions for `Dataset` and `CustomOptunaOptimize` that work with dataclasses and attrs. 
 
 ### Changed
 
 - `CustomOptunaOptimize` now expects a callable to define the study, instead of taking a study object itself. 
   This ensures that the study objects can be independent when the class is called as part of `cross_validate`. 
+- Parameters are only validated when `get_params` is called. This reduces the reliance on `__init_subclass__` and that 
+  we correctly wrap the init.
+  This makes it possible to easier support `attrs` and `dataclass`
 
 ## [0.10.0] - 2022-09-09
 
