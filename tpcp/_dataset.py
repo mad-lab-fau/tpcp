@@ -1,6 +1,6 @@
 """Base class for all datasets."""
 import dataclasses
-from typing import Dict, Iterator, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast, overload
+from typing import Dict, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, cast, overload
 
 import numpy as np
 import pandas as pd

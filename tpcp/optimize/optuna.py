@@ -8,7 +8,7 @@ except ImportError as e:
 
 import dataclasses
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Sequence, Type, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, TypeVar, Union
 
 import numpy as np
 from optuna import Study, Trial
