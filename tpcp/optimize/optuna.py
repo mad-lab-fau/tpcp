@@ -345,7 +345,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         self.return_optimized = return_optimized
 
     @staticmethod
-    def as_dataclass() -> Type[CustomOptunaOptimizeT]:
+    def as_dataclass():
         """Return a version of the Dataset class that can be subclassed using dataclasses."""
 
         @dataclasses.dataclass(eq=False, repr=False, order=False)
@@ -370,7 +370,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         return CustomOptunaOptimizeDc
 
     @staticmethod
-    def as_attrs() -> Type[CustomOptunaOptimizeT]:
+    def as_attrs():
         """Return a version of the Dataset class that can be subclassed using `attrs` defined classes.
 
         Note, this requires `attrs` to be installed!

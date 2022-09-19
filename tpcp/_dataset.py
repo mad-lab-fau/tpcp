@@ -544,7 +544,7 @@ class Dataset(_Dataset):
         self.subset_index = subset_index
 
     @staticmethod
-    def as_dataclass() -> Type[DatasetT]:
+    def as_dataclass():
         """Return a version of the Dataset class that can be subclassed using dataclasses."""
 
         @dataclasses.dataclass(eq=False, repr=False, order=False)
@@ -557,7 +557,7 @@ class Dataset(_Dataset):
         return DatasetDc
 
     @staticmethod
-    def as_attrs() -> Type[DatasetT]:
+    def as_attrs():
         """Return a version of the Dataset class that can be subclassed using `attrs` defined classes.
 
         Note, this requires `attrs` to be installed!
