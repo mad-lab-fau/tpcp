@@ -348,7 +348,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     def as_dataclass():
         """Return a version of the Dataset class that can be subclassed using dataclasses."""
 
-        @dataclasses.dataclass(eq=False, repr=False, order=False)
+        @dataclasses.dataclass(eq=False, repr=False, order=False, slots=False)
         class CustomOptunaOptimizeDc(_CustomOptunaOptimize[PipelineT, DatasetT]):
             """Dataclass version of CustomOptunaOptimize."""
 
@@ -377,7 +377,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         """
         from attrs import define, field  # noqa: import-outside-toplevel
 
-        @define(eq=False, repr=False, order=False, kw_only=True)
+        @define(eq=False, repr=False, order=False, kw_only=True, slots=False)
         class CustomOptunaOptimizeAt(_CustomOptunaOptimize[PipelineT, DatasetT]):
             """Attrs version of CustomOptunaOptimize."""
 

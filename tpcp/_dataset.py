@@ -547,7 +547,7 @@ class Dataset(_Dataset):
     def as_dataclass():
         """Return a version of the Dataset class that can be subclassed using dataclasses."""
 
-        @dataclasses.dataclass(eq=False, repr=False, order=False)
+        @dataclasses.dataclass(eq=False, repr=False, order=False, slots=False)
         class DatasetDc(_Dataset):
             """Dataclass version of Dataset."""
 
@@ -564,7 +564,7 @@ class Dataset(_Dataset):
         """
         from attrs import define  # noqa: import-outside-toplevel
 
-        @define(eq=False, repr=False, order=False, kw_only=True)
+        @define(eq=False, repr=False, order=False, kw_only=True, slots=False)
         class DatasetAt(_Dataset):
             """Attrs version of Dataset."""
 
