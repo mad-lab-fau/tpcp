@@ -320,6 +320,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     multiprocessing.
 
     """
+
     def __init__(
         self,
         pipeline: PipelineT,
