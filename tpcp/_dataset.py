@@ -547,7 +547,7 @@ class Dataset(_Dataset):
     def as_dataclass():
         """Return a version of the Dataset class that can be subclassed using dataclasses."""
 
-        @dataclasses.dataclass(eq=False, repr=False, order=False, slots=False)
+        @dataclasses.dataclass(eq=False, repr=False, order=False)
         class DatasetDc(_Dataset):
             """Dataclass version of Dataset."""
 
