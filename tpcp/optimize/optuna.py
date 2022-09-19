@@ -363,8 +363,8 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
             return_optimized: bool = True
 
-            optimized_pipeline_: PipelineT = dataclasses.field(init=False)
-            study_: Study = dataclasses.field(init=False)
+            optimized_pipeline_: PipelineT = dataclasses.field(init=False, repr=False)
+            study_: Study = dataclasses.field(init=False, repr=False)
 
         return CustomOptunaOptimizeDc
 
@@ -392,7 +392,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
             return_optimized: bool = True
 
-            optimized_pipeline_: PipelineT = field(init=False)
-            study_: Study = field(init=False)
+            optimized_pipeline_: PipelineT = field(init=False, repr=False)
+            study_: Study = field(init=False, repr=False)
 
         return CustomOptunaOptimizeAt

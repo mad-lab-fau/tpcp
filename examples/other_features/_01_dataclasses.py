@@ -56,7 +56,7 @@ from dataclasses import dataclass, field
 from typing import ClassVar
 
 
-@dataclass
+@dataclass(repr=False)  # We disable the automatic repr generation, as we have one. The default one might cause errors.
 class QRSDetector(Algorithm):
     _action_methods: ClassVar[str] = "detect"
 
@@ -67,7 +67,7 @@ class QRSDetector(Algorithm):
 
     # Results
     # We need to add the special field annotation, to exclude the parameter from the init
-    r_peak_positions_: pd.Series = field(init=False)
+    r_peak_positions_: pd.Series = field(init=False, repr=False)
 
     # Some internal constants
     # Using the ClassVar annotation, will mark this value as a constant and dataclasses will ignore it.
@@ -89,7 +89,7 @@ QRSDetector(high_pass_filter_cutoff_hz=4, max_heart_rate_bpm=200, min_r_peak_hei
 #                To avoid passing the wrong values to the wrong parameters, we highly recommend to pass parameters
 #                only by name and not by position, or use the `kw_only` parameter of dataclasses supported in Python
 #                >=3.10.
-@dataclass
+@dataclass(repr=False)
 class ModifiedQRSDetector(QRSDetector):
     new_parameter: Parameter[float] = 3
 
@@ -98,7 +98,6 @@ ModifiedQRSDetector(
     high_pass_filter_cutoff_hz=4, max_heart_rate_bpm=200, min_r_peak_height_over_baseline=1, new_parameter=3
 )
 
-from itertools import product
 
 # %%
 # Inheritance from complex tpcp classes
@@ -115,10 +114,12 @@ from itertools import product
 # which already have an init and you need to subclass to work with them.
 # For these two classes (and other classes with predefined inits, we expect you to subclass from), we provide a
 # `as_dataclass` class method that returns a data class version of the respective class:
+from itertools import product
+
 from tpcp import Dataset
 
 
-@dataclass()
+@dataclass(repr=False)
 class CustomDataset(Dataset.as_dataclass()):  # Note the `as_dataclass` call here!
     def create_index(self) -> pd.DataFrame:
         return pd.DataFrame(
@@ -139,7 +140,7 @@ CustomDataset(custom_param=3)
 # However, when using dataclasses, we can use the (more elegant) `field` annotation to define mutable defaults.
 
 
-@dataclass
+@dataclass(repr=False)
 class FilterAlgorithm(Algorithm):
     _action_methods: ClassVar = "filter"
 
@@ -148,7 +149,7 @@ class FilterAlgorithm(Algorithm):
     order: Parameter[int] = 5
 
     # Results
-    filtered_signal_: pd.Series = field(init=False)
+    filtered_signal_: pd.Series = field(init=False, repr=False)
 
 
 @dataclass
@@ -176,11 +177,15 @@ nested_object_is_different
 # Further, `attrs` has a `field` function, that works like `dataclasses.field`.
 # Only the `default_factory` is called `factory`.
 #
+# .. warning:: `attrs` creates classes using `slots` instead of `__dict__` by default.
+#              This does not work nicely with tpcp!
+#              Use the `slot=False` parameter of define.
+#
 # Here are all the classes from above using attrs.
 from attrs import Factory, define, field
 
 
-@define
+@define(kw_only=True, slots=False, repr=False)  # Slots Don't play nice with tpcp!
 class QRSDetector(Algorithm):
     _action_methods: ClassVar[str] = "detect"
 
@@ -196,7 +201,7 @@ class QRSDetector(Algorithm):
     _HIGH_PASS_FILTER_ORDER: ClassVar[int] = 4
 
 
-@define
+@define(kw_only=True, slots=False, repr=False)  # Slots Don't play nice with tpcp!
 class FilterAlgorithm(Algorithm):
     _action_methods: ClassVar = "filter"
 
@@ -208,16 +213,17 @@ class FilterAlgorithm(Algorithm):
     filtered_signal_: pd.Series = field(init=False)
 
 
-@define
+@define(kw_only=True, slots=False, repr=False)  # Slots Don't play nice with tpcp!
 class HigherLevelFilter(QRSDetector):
-    filter_algorithm: Parameter[FilterAlgorithm] = Factory(lambda: FilterAlgorithm(3, 2))
+    filter_algorithm: Parameter[FilterAlgorithm] = Factory(lambda: FilterAlgorithm(cutoff_hz=3, order=2))
 
 
+HigherLevelFilter()
 # %%
 # To support subclassing tpcp parameters with existing inits, we provide a `as_attrs` method on the respective classes.
 
 
-@define(kw_only=True, slots=False)  # Slots sometimes don't play nicely with multiple inherantance
+@define(kw_only=True, slots=False, repr=False)  # Slots Don't play nice with tpcp!
 class CustomDataset(Dataset.as_attrs()):  # Note the `as_attrs` call here!
     def create_index(self) -> pd.DataFrame:
         return pd.DataFrame(
