@@ -183,7 +183,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         return pipeline_with_best_params
 
 
-class CustomOptunaOptimize(_CustomOptunaOptimize):
+class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     """Base class for custom Optuna optimizer.
 
     This provides a relatively simple tpcp compatible interface to Optuna.
@@ -320,22 +320,6 @@ class CustomOptunaOptimize(_CustomOptunaOptimize):
     multiprocessing.
 
     """
-
-    pipeline: PipelineT
-    create_study: Callable[[], Study]
-
-    return_optimized: bool
-
-    # Optuna Parameters that are directly forwarded to study.optimize
-    n_trials: Optional[int]
-    timeout: Optional[float]
-    callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]]
-    gc_after_trial: bool
-    show_progress_bar: bool
-
-    optimized_pipeline_: PipelineT
-    study_: Study
-
     def __init__(
         self,
         pipeline: PipelineT,
@@ -364,7 +348,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize):
         """Return a version of the Dataset class that can be subclassed using dataclasses."""
 
         @dataclasses.dataclass(eq=False, repr=False, order=False)
-        class CustomOptunaOptimizeDc(_CustomOptunaOptimize):
+        class CustomOptunaOptimizeDc(_CustomOptunaOptimize[PipelineT, DatasetT]):
             """Dataclass version of CustomOptunaOptimize."""
 
             pipeline: PipelineT
@@ -393,7 +377,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize):
         from attrs import define, field  # noqa: import-outside-toplevel
 
         @define(eq=False, repr=False, order=False, kw_only=True)
-        class CustomOptunaOptimizeAt(_CustomOptunaOptimize):
+        class CustomOptunaOptimizeAt(_CustomOptunaOptimize[PipelineT, DatasetT]):
             """Attrs version of CustomOptunaOptimize."""
 
             pipeline: PipelineT
