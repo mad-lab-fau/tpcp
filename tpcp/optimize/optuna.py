@@ -1,4 +1,5 @@
 """Implementation of methods and classes to wrap the optimization Framework `Optuna`."""
+import dataclasses
 import warnings
 
 from optuna.trial import FrozenTrial
@@ -10,7 +11,7 @@ except ImportError as e:
         "To use the tpcp Optuna interface, you first need to install optuna (`pip install optuna`)"
     ) from e
 
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union, Type, TypeVar
 
 import numpy as np
 from optuna import Study, Trial
@@ -33,7 +34,158 @@ warnings.warn(
 )
 
 
-class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
+CustomOptunaOptimizeT = TypeVar("CustomOptunaOptimizeT", bound="_CustomOptunaOptimize")
+
+
+class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
+    pipeline: PipelineT
+    create_study: Callable[[], Study]
+
+    return_optimized: bool
+
+    # Optuna Parameters that are directly forwarded to study.optimize
+    n_trials: Optional[int]
+    timeout: Optional[float]
+    callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]]
+    gc_after_trial: bool
+    show_progress_bar: bool
+
+    optimized_pipeline_: PipelineT
+    study_: Study
+
+    @property
+    def search_results_(self) -> Dict[str, Sequence[Any]]:
+        """Detailed results of the study.
+
+        This basically contains the same information as `self.study_.trials_dataframe()`, with some small modifications:
+
+        - columns starting with "params_" are renamed to "param_"
+        - a new column called "params" containing all parameters as dict is added
+        - "value" is renamed to score"
+        - the score of pruned trials is set to `np.nan`
+
+        These changes are made to make the output comparable to the output of :class:`~tpcp.optimize.GridSearch` and
+        :class:`~tpcp.optimize.GridSearchCV`.
+        """
+
+        def rename_param_columns(name: str):
+            param_start = "params_"
+            if name.startswith(param_start):
+                return "param_" + name[len(param_start) :]
+            return name
+
+        base_df = (
+            self.study_.trials_dataframe()
+            .drop("number", axis=1)
+            .rename(columns={"value": "score"})
+            .rename(columns=rename_param_columns)
+        )
+        base_df["params"] = [t.params for t in self.study_.trials]
+
+        # If a trial is pruned we set the score to nan.
+        # This is clearer than showing the last step value.
+        # If this is required people should report them as user values in their objective function
+        base_df.loc[base_df["state"] == "PRUNED", "score"] = np.nan
+
+        return base_df.to_dict(orient="list")
+
+    @property
+    def best_params_(self) -> Dict[str, Any]:
+        """Parameters of the best trial in the :class:`~optuna.study.Study`."""
+        return self.study_.best_params
+
+    @property
+    def best_score_(self) -> float:
+        """Best score reached in the study."""
+        return self.study_.best_value
+
+    @property
+    def best_trial_(self) -> FrozenTrial:
+        """Best trial in the :class:`~optuna.study.Study`."""
+        return self.study_.best_trial
+
+    def optimize(self, dataset: DatasetT, **_: Any) -> Self:
+        """Optimize the objective over the dataset and find the best parameter combination.
+
+        This method calls `self.create_objective` to obtain the objective function that should be optimized.
+
+        Parameters
+        ----------
+        dataset
+            The dataset used for optimization.
+
+        """
+        if self.timeout is None and self.n_trials is None:
+            raise ValueError(
+                "You need to set either `timeout` or `n_trials` to a proper value."
+                "Otherwise the optimization will not stop und run until infinity."
+            )
+
+        self.dataset = dataset
+
+        objective = self._create_objective(self.pipeline, dataset=dataset)
+        study = self.create_study()
+        self.study_ = self._call_optimize(study, objective)
+
+        if self.return_optimized:
+            self.optimized_pipeline_ = self.return_optimized_pipeline(clone(self.pipeline), dataset, self.study_)
+        return self
+
+    def _call_optimize(self, study: Study, objective: ObjectiveFuncType) -> Study:
+        """Call the optuna study.
+
+        This is a separate method to make it easy to modify how the study is called.
+        """
+        study.optimize(
+            objective,
+            n_trials=self.n_trials,
+            timeout=self.timeout,
+            callbacks=self.callbacks,
+            gc_after_trial=self.gc_after_trial,
+            show_progress_bar=self.show_progress_bar,
+        )
+        return study
+
+    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
+        """Return the objective function that should be optimized.
+
+        This method should be implemented by a child class and return an objective function that is compatible with
+        Optuna.
+        However, compared to a normal Optuna objective function, the function should expect a pipeline and a dataset
+        object as additional inputs to the optimization Trial object.
+        """
+        raise NotImplementedError()
+
+    def _create_objective(self, pipeline: PipelineT, dataset: DatasetT) -> ObjectiveFuncType:
+        inner_objective = self.create_objective()
+
+        def objective(trial: Trial):
+            inner_pipe = clone(pipeline)
+            return inner_objective(trial, inner_pipe, dataset)
+
+        return objective
+
+    def return_optimized_pipeline(  # noqa: no-self-use
+        self, pipeline: PipelineT, dataset: DatasetT, study: Study
+    ) -> PipelineT:
+        """Return the pipeline with the best parameters of a study.
+
+        This either just returns the pipeline with the best parameters set, or if the pipeline is a subclass of
+        `OptimizablePipeline` it attempts a re-optimization of the pipeline using the provided dataset.
+
+        This functionality is a sensible default, but it is expected to overwrite this method in custom subclasses,
+        if specific behaviour is needed.
+
+        Don't call this function on its own! It is only expected to be called internally by optimize.
+        """
+        # Pipeline that will be passed here is already cloned, so no need to clone again.
+        pipeline_with_best_params = pipeline.set_params(**study.best_params)
+        if isinstance(pipeline_with_best_params, OptimizablePipeline):
+            return Optimize(pipeline_with_best_params).optimize(dataset).optimized_pipeline_
+        return pipeline_with_best_params
+
+
+class CustomOptunaOptimize(_CustomOptunaOptimize):
     """Base class for custom Optuna optimizer.
 
     This provides a relatively simple tpcp compatible interface to Optuna.
@@ -197,7 +349,7 @@ class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         gc_after_trial: bool = False,
         show_progress_bar: bool = False,
         return_optimized: bool = True,
-    ) -> None:  # noqa: super-init-not-called
+    ):
         self.pipeline = pipeline
         self.create_study = create_study
 
@@ -209,133 +361,52 @@ class CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
 
         self.return_optimized = return_optimized
 
-    @property
-    def search_results_(self) -> Dict[str, Sequence[Any]]:
-        """Detailed results of the study.
+    @staticmethod
+    def as_dataclass() -> Type[CustomOptunaOptimizeT]:
+        """Return a version of the Dataset class that can be subclassed using dataclasses."""
 
-        This basically contains the same information as `self.study_.trials_dataframe()`, with some small modifications:
+        @dataclasses.dataclass(eq=False, repr=False, order=False)
+        class CustomOptunaOptimizeDc(_CustomOptunaOptimize):
+            pipeline: PipelineT
+            create_study: Callable[[], Study]
 
-        - columns starting with "params_" are renamed to "param_"
-        - a new column called "params" containing all parameters as dict is added
-        - "value" is renamed to score"
-        - the score of pruned trials is set to `np.nan`
+            # Optuna Parameters that are directly forwarded to study.optimize
+            n_trials: Optional[int] = None
+            timeout: Optional[float] = None
+            callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None
+            gc_after_trial: bool = False
+            show_progress_bar: bool = False
 
-        These changes are made to make the output comparable to the output of :class:`~tpcp.optimize.GridSearch` and
-        :class:`~tpcp.optimize.GridSearchCV`.
+            return_optimized: bool = True
+
+            optimized_pipeline_: PipelineT = dataclasses.field(init=False)
+            study_: Study = dataclasses.field(init=False)
+
+        return CustomOptunaOptimizeDc
+
+    @staticmethod
+    def as_attrs() -> Type[CustomOptunaOptimizeT]:
+        """Return a version of the Dataset class that can be subclassed using `attrs` defined classes.
+
+        Note, this requires `attrs` to be installed!
         """
+        from attrs import define, field
 
-        def rename_param_columns(name: str):
-            param_start = "params_"
-            if name.startswith(param_start):
-                return "param_" + name[len(param_start) :]
-            return name
+        @define(eq=False, repr=False, order=False, kw_only=True)
+        class CustomOptunaOptimizeAt(_CustomOptunaOptimize):
+            pipeline: PipelineT
+            create_study: Callable[[], Study]
 
-        base_df = (
-            self.study_.trials_dataframe()
-            .drop("number", axis=1)
-            .rename(columns={"value": "score"})
-            .rename(columns=rename_param_columns)
-        )
-        base_df["params"] = [t.params for t in self.study_.trials]
+            # Optuna Parameters that are directly forwarded to study.optimize
+            n_trials: Optional[int] = None
+            timeout: Optional[float] = None
+            callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None
+            gc_after_trial: bool = False
+            show_progress_bar: bool = False
 
-        # If a trial is pruned we set the score to nan.
-        # This is clearer than showing the last step value.
-        # If this is required people should report them as user values in their objective function
-        base_df.loc[base_df["state"] == "PRUNED", "score"] = np.nan
+            return_optimized: bool = True
 
-        return base_df.to_dict(orient="list")
+            optimized_pipeline_: PipelineT = field(init=False)
+            study_: Study = field(init=False)
 
-    @property
-    def best_params_(self) -> Dict[str, Any]:
-        """Parameters of the best trial in the :class:`~optuna.study.Study`."""
-        return self.study_.best_params
-
-    @property
-    def best_score_(self) -> float:
-        """Best score reached in the study."""
-        return self.study_.best_value
-
-    @property
-    def best_trial_(self) -> FrozenTrial:
-        """Best trial in the :class:`~optuna.study.Study`."""
-        return self.study_.best_trial
-
-    def optimize(self, dataset: DatasetT, **_: Any) -> Self:
-        """Optimize the objective over the dataset and find the best parameter combination.
-
-        This method calls `self.create_objective` to obtain the objective function that should be optimized.
-
-        Parameters
-        ----------
-        dataset
-            The dataset used for optimization.
-
-        """
-        if self.timeout is None and self.n_trials is None:
-            raise ValueError(
-                "You need to set either `timeout` or `n_trials` to a proper value."
-                "Otherwise the optimization will not stop und run until infinity."
-            )
-
-        self.dataset = dataset
-
-        objective = self._create_objective(self.pipeline, dataset=dataset)
-        study = self.create_study()
-        self.study_ = self._call_optimize(study, objective)
-
-        if self.return_optimized:
-            self.optimized_pipeline_ = self.return_optimized_pipeline(clone(self.pipeline), dataset, self.study_)
-        return self
-
-    def _call_optimize(self, study: Study, objective: ObjectiveFuncType) -> Study:
-        """Call the optuna study.
-
-        This is a separate method to make it easy to modify how the study is called.
-        """
-        study.optimize(
-            objective,
-            n_trials=self.n_trials,
-            timeout=self.timeout,
-            callbacks=self.callbacks,
-            gc_after_trial=self.gc_after_trial,
-            show_progress_bar=self.show_progress_bar,
-        )
-        return study
-
-    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
-        """Return the objective function that should be optimized.
-
-        This method should be implemented by a child class and return an objective function that is compatible with
-        Optuna.
-        However, compared to a normal Optuna objective function, the function should expect a pipeline and a dataset
-        object as additional inputs to the optimization Trial object.
-        """
-        raise NotImplementedError()
-
-    def _create_objective(self, pipeline: PipelineT, dataset: DatasetT) -> ObjectiveFuncType:
-        inner_objective = self.create_objective()
-
-        def objective(trial: Trial):
-            inner_pipe = clone(pipeline)
-            return inner_objective(trial, inner_pipe, dataset)
-
-        return objective
-
-    def return_optimized_pipeline(  # noqa: no-self-use
-        self, pipeline: PipelineT, dataset: DatasetT, study: Study
-    ) -> PipelineT:
-        """Return the pipeline with the best parameters of a study.
-
-        This either just returns the pipeline with the best parameters set, or if the pipeline is a subclass of
-        `OptimizablePipeline` it attempts a re-optimization of the pipeline using the provided dataset.
-
-        This functionality is a sensible default, but it is expected to overwrite this method in custom subclasses,
-        if specific behaviour is needed.
-
-        Don't call this function on its own! It is only expected to be called internally by optimize.
-        """
-        # Pipeline that will be passed here is already cloned, so no need to clone again.
-        pipeline_with_best_params = pipeline.set_params(**study.best_params)
-        if isinstance(pipeline_with_best_params, OptimizablePipeline):
-            return Optimize(pipeline_with_best_params).optimize(dataset).optimized_pipeline_
-        return pipeline_with_best_params
+        return CustomOptunaOptimizeAt
