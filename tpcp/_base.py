@@ -227,7 +227,7 @@ def _validate_parameter(instance: _BaseTpcpObject):
 
 
 class _BaseTpcpObject:
-    __field_annotations_cache__: Union[_Nothing, Dict[str, _ParaTypes]]
+    __field_annotations_cache__: Tuple[int, Dict[str, _ParaTypes]]
     __skip_validation__: bool
     __tpcp_cls_processed__: bool
 
@@ -238,23 +238,28 @@ class _BaseTpcpObject:
         We implement that as property to move the extraction of the annotations as far down in the initialization as
         possible, when we are sure the cls definition is properly finalized (i.e. dataclass decorators are run)
         """
-        if getattr(self, "__field_annotations_cache__", NOTHING) is NOTHING:
-            fields = _get_init_defaults(type(self))
-            cls = type(self)
-            field_annotations = _extract_annotations(cls, fields)
-            # We only validate the annotations here. If the user is not using the annotations, no need to bother them
-            # with useless error messages
-            _annotations_are_valid(field_annotations, fields, cls_name=cls.__name__)
-            # We set the cache on the cls, so that only one instance is required to process it.
-            cls.__field_annotations_cache__ = field_annotations
-        return self.__field_annotations_cache__
+        cls = type(self)
+        # We check if we have a cache, and if it is our cache or the cache inherited by the parent class.
+        # If it is from the parent class, we make sure, we create our own.
+        if cache := getattr(self, "__field_annotations_cache__", None):
+            identifier, cache = cache
+            if identifier == id(cls):
+                return cache
+        # We need to create a new cache!
+        fields = _get_init_defaults(cls)
+        field_annotations = _extract_annotations(cls, fields)
+        # We only validate the annotations here. If the user is not using the annotations, no need to bother them
+        # with useless error messages
+        _annotations_are_valid(field_annotations, fields, cls_name=cls.__name__)
+        # We set the cache on the cls, so that only one instance is required to process it.
+        cls.__field_annotations_cache__ = (id(cls), field_annotations)
+        return field_annotations
 
     def __init_subclass__(cls, *, _skip_validation: bool = False, **kwargs: Any):
         super().__init_subclass__(**kwargs)
         cls.__skip_validation__ = _skip_validation
         # We set that here to make sure the value is not inherited from the parent class.
         cls.__tpcp_cls_processed__ = False
-        cls.__field_annotations_cache__ = NOTHING
 
         # If the class has no init or is a dataclass (aka a subclass of a dataclass), we don't need to do anything.
         # It could be that it is a dataclass, but then the dataclass wrapper will already call the post_init
