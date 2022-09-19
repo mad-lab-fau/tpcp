@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Tuple, TypeVar, Union, ClassVar
+from typing import ClassVar, Tuple, TypeVar, Union
 
 from tpcp._base import BaseTpcpObject
 

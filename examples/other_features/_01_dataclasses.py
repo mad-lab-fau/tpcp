@@ -98,6 +98,8 @@ ModifiedQRSDetector(
     high_pass_filter_cutoff_hz=4, max_heart_rate_bpm=200, min_r_peak_height_over_baseline=1, new_parameter=3
 )
 
+from itertools import product
+
 # %%
 # Inheritance from complex tpcp classes
 # --------------------------------------
@@ -114,7 +116,6 @@ ModifiedQRSDetector(
 # For these two classes (and other classes with predefined inits, we expect you to subclass from), we provide a
 # `as_dataclass` class method that returns a data class version of the respective class:
 from tpcp import Dataset
-from itertools import product
 
 
 @dataclass()
@@ -176,7 +177,7 @@ nested_object_is_different
 # Only the `default_factory` is called `factory`.
 #
 # Here are all the classes from above using attrs.
-from attrs import define, field, Factory
+from attrs import Factory, define, field
 
 
 @define

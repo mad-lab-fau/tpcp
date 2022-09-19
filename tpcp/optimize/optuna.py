@@ -1,9 +1,4 @@
 """Implementation of methods and classes to wrap the optimization Framework `Optuna`."""
-import dataclasses
-import warnings
-
-from optuna.trial import FrozenTrial
-
 try:
     import optuna  # noqa: unused-import
 except ImportError as e:
@@ -11,11 +6,14 @@ except ImportError as e:
         "To use the tpcp Optuna interface, you first need to install optuna (`pip install optuna`)"
     ) from e
 
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union, Type, TypeVar
+import dataclasses
+import warnings
+from typing import Any, Callable, Dict, List, Optional, Sequence, Type, TypeVar, Union
 
 import numpy as np
 from optuna import Study, Trial
 from optuna.study.study import ObjectiveFuncType
+from optuna.trial import FrozenTrial
 from typing_extensions import Self
 
 from tpcp import OptimizablePipeline, clone
@@ -24,7 +22,7 @@ from tpcp._optimize import BaseOptimize
 from tpcp._pipeline import PipelineT
 from tpcp.optimize import Optimize
 
-__all__ = ["CustomOptunaOptimize"]
+__all__ = ["CustomOptunaOptimize", "CustomOptunaOptimizeT"]
 
 warnings.warn(
     "The Optuna interface in tpcp is still experimental and we are testing if the workflow makes "
@@ -367,6 +365,8 @@ class CustomOptunaOptimize(_CustomOptunaOptimize):
 
         @dataclasses.dataclass(eq=False, repr=False, order=False)
         class CustomOptunaOptimizeDc(_CustomOptunaOptimize):
+            """Dataclass version of CustomOptunaOptimize."""
+
             pipeline: PipelineT
             create_study: Callable[[], Study]
 
@@ -390,10 +390,12 @@ class CustomOptunaOptimize(_CustomOptunaOptimize):
 
         Note, this requires `attrs` to be installed!
         """
-        from attrs import define, field
+        from attrs import define, field  # noqa: import-outside-toplevel
 
         @define(eq=False, repr=False, order=False, kw_only=True)
         class CustomOptunaOptimizeAt(_CustomOptunaOptimize):
+            """Attrs version of CustomOptunaOptimize."""
+
             pipeline: PipelineT
             create_study: Callable[[], Study]
 

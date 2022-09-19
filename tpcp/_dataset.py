@@ -1,6 +1,6 @@
 """Base class for all datasets."""
 import dataclasses
-from typing import Dict, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, cast, overload, Type
+from typing import Dict, Iterator, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast, overload
 
 import numpy as np
 import pandas as pd
@@ -531,7 +531,7 @@ class Dataset(_Dataset, _skip_validation=True):
 
     """
 
-    def __init__(  # noqa: super-init-not-called
+    def __init__(
         self, *, groupby_cols: Optional[Union[List[str], str]] = None, subset_index: Optional[pd.DataFrame] = None,
     ):
         self.groupby_cols = groupby_cols
@@ -543,6 +543,8 @@ class Dataset(_Dataset, _skip_validation=True):
 
         @dataclasses.dataclass(eq=False, repr=False, order=False)
         class DatasetDc(_Dataset):
+            """Dataclass version of Dataset."""
+
             groupby_cols: Optional[Union[List[str], str]] = None
             subset_index: Optional[pd.DataFrame] = None
 
@@ -554,10 +556,12 @@ class Dataset(_Dataset, _skip_validation=True):
 
         Note, this requires `attrs` to be installed!
         """
-        from attrs import define
+        from attrs import define  # noqa: import-outside-toplevel
 
         @define(eq=False, repr=False, order=False, kw_only=True)
         class DatasetAt(_Dataset):
+            """Attrs version of Dataset."""
+
             groupby_cols: Optional[Union[List[str], str]] = None
             subset_index: Optional[pd.DataFrame] = None
 
