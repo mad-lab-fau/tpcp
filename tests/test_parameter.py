@@ -50,3 +50,54 @@ def test_annotations_nested():
     test = Test(1)
 
     assert test.__field_annotations__ == {"hyper": _ParaTypes.HYPER, "nested_hyper__nested_para": _ParaTypes.HYPER}
+
+
+def test_field_annotations_cache():
+    class Test(BaseTpcpObject):
+        hyper: HyperPara[int]
+        nested_hyper__nested_para: HyperPara[str]
+
+        def __init__(self, hyper: int):
+            self.hyper = hyper
+
+    test = Test(1)
+    annots = test.__field_annotations__
+    cache = Test.__field_annotations_cache__
+    cache_id = id(cache)
+    assert (
+        annots
+        == cache
+        == {"hyper": _ParaTypes.HYPER, "nested_hyper__nested_para": _ParaTypes.HYPER}
+    )
+    # When called again, the cache shouldn't change
+    test2 = Test(2)
+    annots = test.__field_annotations__
+    assert id(Test.__field_annotations_cache__) == cache_id
+    assert id(annots) == cache_id
+
+
+def test_annotation_inherting():
+    class Test(BaseTpcpObject):
+        hyper: HyperPara[int]
+        nested_hyper__nested_para: HyperPara[str]
+
+        def __init__(self, hyper: int):
+            self.hyper = hyper
+
+    class Test2(Test):
+        other_val: HyperPara[float]
+
+        def __init__(self, hyper: int, other_val: float):
+            self.other_val = other_val
+            super().__init__(hyper)
+
+    assert Test2(1, 2).__field_annotations__ == {
+        "hyper": _ParaTypes.HYPER,
+        "nested_hyper__nested_para": _ParaTypes.HYPER,
+        "other_val": _ParaTypes.HYPER,
+    }
+
+    assert Test(1).__field_annotations__ == {
+        "hyper": _ParaTypes.HYPER,
+        "nested_hyper__nested_para": _ParaTypes.HYPER,
+    }

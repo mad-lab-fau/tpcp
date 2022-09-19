@@ -97,8 +97,15 @@ def _replace_defaults_wrapper(old_init: Callable) -> Callable:
     def new_init(self: BaseTpcpObject, *args: Any, **kwargs: Any) -> None:
         # call the old init.
         old_init(self, *args, **kwargs)
-        self.__post_init__()
 
+        # Check if any of the initial values has a "default parameter flag".
+        # If yes we replace it with a clone (in case of a tpcp object) or a deepcopy in case of other objects.
+        # This is handled by the factory `get_value` method.
+        for p in get_param_names(self):
+            if isinstance(val := getattr(self, p), BaseFactory):
+                setattr(self, p, val.get_value())
+
+    # This is just for introspection, in case we want to know if we have a modified init.
     new_init.__tpcp_wrapped__ = True
 
     return new_init
@@ -210,26 +217,39 @@ def _validate_parameter(instance: _BaseTpcpObject):
     fields = _get_init_defaults(type(instance))
 
     # Validation
-    if instance.__skip_validation__ is not True:
-        _has_dangerous_mutable_default(fields, instance)
-        _has_invalid_name(fields, instance)
+    _has_dangerous_mutable_default(fields, instance)
+    _has_invalid_name(fields, instance)
 
-    if dataclasses.is_dataclass(instance) and any(isinstance(field.default, BaseFactory) for field in fields.values()):
-        # If the class is already a data class when this check runs (aka when it is triggered by the custom
-        # decorator), then we don't need to do anything.
-        # The BaseTpcpObject already implements the post_init method to handly all factory stuff.
-        # However, when you are already using dataclasses, you should probably use their factory methods.
-        warnings.warn(
+    if (
+        dataclasses.is_dataclass(instance)
+        or getattr(
+            instance, "__attrs_attrs__", False
+        )  # This checks if the class it an `attrs` class, without importing `attrs`
+    ) and any(isinstance(field.default, BaseFactory) for field in fields.values()):
+        # When you are already using dataclasses or attrs, you must use their factory methods, as we don't overwrite
+        # the init to support CloneFactory anymore.
+        raise ValidationError(
             "You are using the tpcp default factory (`cf`/`CloneFactory`) in combination with "
-            "`dataclasses`. "
-            "Consider using the `factory` option of `dataclasses.field` instead."
+            "`dataclasses` or `attrs`. "
+            "Use the `default_factory`/`factory` option of `dataclasses.field`/`attrs.field` instead."
         )
 
 
+def _get_tpcp_validated(cls_or_instance: Union[Type[_BaseTpcpObject], _BaseTpcpObject]):
+    cls = cls_or_instance if isinstance(cls_or_instance, type) else type(cls_or_instance)
+    return cls.__dict__.get("__tpcp_validated_hidden__", False)
+
+
+def _set_tpcp_validated(cls_or_instance: Union[Type[_BaseTpcpObject], _BaseTpcpObject], value: bool):
+    cls = cls_or_instance if isinstance(cls_or_instance, type) else type(cls_or_instance)
+    cls.__tpcp_validated_hidden__ = value
+
+
 class _BaseTpcpObject:
-    __field_annotations_cache__: Tuple[int, Dict[str, _ParaTypes]]
-    __skip_validation__: bool
-    __tpcp_cls_processed__: bool
+    # These two parameters should be initialized once per class.
+    # This means, when we read them, we always check in the dictionary if they are defined.
+    __field_annotations_cache__: Dict[str, _ParaTypes]
+    __tpcp_validated_hidden__: bool
 
     @property
     def __field_annotations__(self) -> Dict[str, _ParaTypes]:
@@ -241,10 +261,8 @@ class _BaseTpcpObject:
         cls = type(self)
         # We check if we have a cache, and if it is our cache or the cache inherited by the parent class.
         # If it is from the parent class, we make sure, we create our own.
-        if cache := getattr(self, "__field_annotations_cache__", None):
-            identifier, cache = cache
-            if identifier == id(cls):
-                return cache
+        if cache := cls.__dict__.get("__field_annotations_cache__", None):
+            return cache
         # We need to create a new cache!
         fields = _get_init_defaults(cls)
         field_annotations = _extract_annotations(cls, fields)
@@ -252,33 +270,24 @@ class _BaseTpcpObject:
         # with useless error messages
         _annotations_are_valid(field_annotations, fields, cls_name=cls.__name__)
         # We set the cache on the cls, so that only one instance is required to process it.
-        cls.__field_annotations_cache__ = (id(cls), field_annotations)
+        cls.__field_annotations_cache__ = field_annotations
         return field_annotations
 
     def __init_subclass__(cls, *, _skip_validation: bool = False, **kwargs: Any):
         super().__init_subclass__(**kwargs)
-        cls.__skip_validation__ = _skip_validation
-        # We set that here to make sure the value is not inherited from the parent class.
-        cls.__tpcp_cls_processed__ = False
-
-        # If the class has no init or is a dataclass (aka a subclass of a dataclass), we don't need to do anything.
-        # It could be that it is a dataclass, but then the dataclass wrapper will already call the post_init
-        # correctly.
-        #
-        # If our class simply does not have an __init__ and will not get one via the dataclass wrapper, there is
-        # nothing to do anyway.
-        if cls.__init__ is object.__init__ or dataclasses.is_dataclass(cls):
+        # Todo: Deprecate this parameter
+        if _skip_validation:
+            warnings.warn(
+                "`_skip_validation` is deprecated and has no effect."
+                "Validation is now performed when the class is actually used and hence has no runtime cost "
+                "during class definition."
+            )
+        # If the class has no init or did inherit its init from the parent (i.e. it is not in its own dict), there is
+        # nothing to do.
+        if "__init__" not in cls.__dict__:
             return
 
-        # We also don't want to wrap the init again, if it is the init of the parent.
-        # If users call "super" within the init, we can of cause not detect that and will wrap an init,
-        # that will call a wrapped init internally again.
-        # However, we use the `__tpcp_cls_processed__` parameter to reduce the runtime cost of this case and will not
-        # check the parameters multiple time, we still need to call a set of wrappers of course.
-        if getattr(cls.__init__, "__tpcp_wrapped__", False) is True:
-            return
-
-        # If we have a custom init, we need to wrap it to call the post_init method.
+        # If we have a custom init, we need to wrap it with a method that replaces our default values on init.
         setattr(cls, "__init__", _replace_defaults_wrapper(cls.__init__))
 
 
@@ -331,33 +340,22 @@ class BaseTpcpObject(_BaseTpcpObject, _skip_validation=True):
             result.extend((name, "=", repr(para)))
         return "".join(result) + ")"
 
-    def __post_init__(self):
-        """Replace all parameters that use the `CloneFactory` with the actual values and perform parameter validation.
-
-        This will either be called by `dataclasses.dataclass` or by in the modified `__init__` tpcp creates for
-        normal classes.
-        """
-        # When using dataclasses, this method will be called, even if our custom processing did not run.
-        # However, this is an issue, and we need to force users to apply the custom decorator.
-        if not self.__tpcp_cls_processed__:
-            # The first time we run an init of this class we run our parameter validation.
-            # Running that in the init for the first time, makes sure that it runs after any processing run on the class
-            # itself (i.e. when a dataclass decorator is used).
-            _validate_parameter(self)
-            type(self).__tpcp_cls_processed__ = True
-
-        # Check if any of the initial values has a "default parameter flag".
-        # If yes we replace it with a clone (in case of a tpcp object) or a deepcopy in case of other objects.
-        # This is handled by the factory `get_value` method.
-        for k, v in self.get_params(deep=False).items():
-            if isinstance(v, BaseFactory):
-                setattr(self, k, v.get_value())
-
 
 # TODO: Make public api
 def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
-    valid_fields = get_param_names(type(instance))
+    # At some point, we want to validate that the user defined the class correctly.
+    # To allow for all strange modifications of the class, we run the validation, when we actully need the parameters.
+    # This usually required a call to `get_params`.
+    # Hence, we run the validation here.
+    # To avoid running this validation on every get_params call, we use `__tpcp_validated__` to make sure it runs only
+    # once per class.
+    # Note, that we need to check the class dict and not just the parameter.
+    # Otherwise, the parameter might have been specified on the parent.
+    if not _get_tpcp_validated(instance):
+        _validate_parameter(instance)
+        _set_tpcp_validated(instance, True)
 
+    valid_fields = get_param_names(type(instance))
     out: Dict[str, Any] = {}
     for key in valid_fields:
         value = getattr(instance, key)

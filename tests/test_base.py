@@ -17,7 +17,7 @@ from tpcp._algorithm_utils import (
     get_results,
     is_action_applied,
 )
-from tpcp._base import _validate_parameter
+from tpcp._base import _validate_parameter, _get_tpcp_validated
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, ValidationError
 
@@ -274,10 +274,10 @@ def test_mutable_default_nested_objects_error():
     nested_instance = create_test_class("nested", params={"nested1": "n1", "nested2": "n2"})
 
     with pytest.raises(MutableDefaultsError):
-        create_test_class("test", params={"normal": "n1", "mutable": nested_instance})
+        create_test_class("test", params={"normal": "n1", "mutable": nested_instance}).get_params()
 
     # When wrapped in default, no error is raised
-    create_test_class("mutable", params={"normal": "n1", "mutable": cf(nested_instance)})
+    create_test_class("mutable", params={"normal": "n1", "mutable": cf(nested_instance)}).get_params()
 
 
 def test_nested_mutable_algorithm_copy():
@@ -301,21 +301,21 @@ def test_invalid_parameter_names():
             self.invalid__name = invalid__name
 
     with pytest.raises(ValidationError) as e:
-        Test(invalid__name="test")
+        Test(invalid__name="test").get_params()
 
     assert "double-underscore" in str(e)
 
 
 @patch("tpcp._base._validate_parameter", wraps=_validate_parameter)
-def test_processing_is_only_run_on_first_init(mock_process):
+def test_processing_is_only_run_once_on_get_params(mock_process):
     class Test(Algorithm):
         def __init__(self, name):
             self.name = name
 
-    Test("test")
-    Test("test2")
+    Test("test").get_params()
+    Test("test2").get_params()
 
-    assert Test.__tpcp_cls_processed__ is True
+    assert _get_tpcp_validated(Test) is True
     assert mock_process.call_count == 1
 
 
@@ -328,10 +328,10 @@ def test_processing_is_correctly_called_on_all_subclasses(mock_process):
     class Test2(Test):
         pass
 
-    Test("test")
-    assert Test2.__tpcp_cls_processed__ is False
-    Test2("test")
-    assert Test2.__tpcp_cls_processed__ is True
+    Test("test").get_params()
+    assert _get_tpcp_validated(Test2) is False
+    Test2("test").get_params()
+    assert _get_tpcp_validated(Test2) is True
 
     assert mock_process.call_count == 2
 
@@ -343,14 +343,14 @@ def test_processing_is_correctly_called_on_all_subclasses_2(mock_process):
             self.name = name
 
     # We force processing, before the second class is created
-    Test("test")
+    Test("test").get_params()
 
     class Test2(Test):
         pass
 
-    assert Test2.__tpcp_cls_processed__ is False
-    Test2("test")
-    assert Test2.__tpcp_cls_processed__ is True
+    assert _get_tpcp_validated(Test2) is False
+    Test2("test").get_params()
+    assert _get_tpcp_validated(Test2) is True
 
     assert mock_process.call_count == 2
 
@@ -405,7 +405,7 @@ def test_dataclass_with_nested_para_is_invalid():
         c__a: int = 3
 
     with pytest.raises(ValidationError):
-        dataclasses.dataclass(Test)()
+        dataclasses.dataclass(Test)().get_params()
 
 
 def test_dataclass_warns_when_cf_is_used():
@@ -414,8 +414,5 @@ def test_dataclass_warns_when_cf_is_used():
         b: int
         a: OptiPara[int] = cf("test")
 
-    with pytest.warns(UserWarning) as w:
-        Test(b=2)
-
-    assert len(w) == 1
-    assert "factory" in str(w[0].message)
+    with pytest.raises(ValidationError) as e:
+        Test(b=2).get_params()
