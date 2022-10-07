@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for Optuna >3.0
 - Example on how to use `attrs` and `dataclass` with tpcp
 - Added versions for `Dataset` and `CustomOptunaOptimize` that work with dataclasses and attrs. 
+- Added first class support for composite objects (e.g. objects that need a list of other objects as parameters).
+  This is basically sklearn pipelines with fewer restrictions (https://github.com/mad-lab-fau/tpcp/pull/48).
 
 ### Changed
 
