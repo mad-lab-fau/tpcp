@@ -294,7 +294,9 @@ class _BaseTpcpObject:
 class BaseTpcpObject(_BaseTpcpObject):
     """Baseclass for all tpcp objects."""
 
-    def get_params(self: Self, deep: bool = True) -> Dict[str, Any]:
+    _composite_params: ClassVar[Optional[Tuple[str, ...]]] = None
+
+    def get_params(self, deep: bool = True) -> Dict[str, Any]:
         """Get parameters for this algorithm.
 
         Parameters
@@ -312,7 +314,7 @@ class BaseTpcpObject(_BaseTpcpObject):
         """
         return _get_params(self, deep)
 
-    def set_params(self: Self, **params: Any) -> Self:
+    def set_params(self, **params: Any) -> Self:
         """Set the parameters of this Algorithm.
 
         To set parameters of nested objects use `nested_object_name__para_name=`.
@@ -341,7 +343,24 @@ class BaseTpcpObject(_BaseTpcpObject):
         return "".join(result) + ")"
 
 
-# TODO: Make public api
+def _get_deep_params(obj, parent_key) -> Dict[str, Any]:
+    # This is a little magic, that also gets the parameters of nested sklearn classifiers.
+    if hasattr(obj, "get_params"):
+        deep_items = obj.get_params(deep=True).items()
+        return {parent_key + "__" + k: val for k, val in deep_items}
+    return {}
+
+
+def _assert_is_allowed_composite_value(val, parent_key: str, iteration: int):
+    if (not isinstance(val, tuple)) or (len(val) != 2) or (not isinstance(val[0], str)):
+        raise ValidationError(
+            f"The provided parameters for the composite field {parent_key} does not seem to be the "
+            "right type. "
+            "It should be a sequence of `(name, value)` tuples, but the obj at position "
+            f"{iteration} in the sequence was not a tuple but:\n`{val}`"
+        )
+
+
 def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
     # At some point, we want to validate that the user defined the class correctly.
     # To allow for all strange modifications of the class, we run the validation, when we actully need the parameters.
@@ -356,13 +375,25 @@ def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
         _set_tpcp_validated(instance, True)
 
     valid_fields = get_param_names(type(instance))
+    comp_fields = getattr(instance, "_composite_params", None)
     out: Dict[str, Any] = {}
     for key in valid_fields:
         value = getattr(instance, key)
-        # This is a little magic, that also gets the parameters of nested sklearn classifiers.
-        if deep and hasattr(value, "get_params"):
-            deep_items = value.get_params(deep=True).items()
-            out.update((key + "__" + k, val) for k, val in deep_items)
+        if deep:
+            if value is not None and comp_fields and key in comp_fields:
+                # Here we handle composite field (i.e. fields that contain sequences of (name, tpcp_obj_instance)
+                # tuples.
+                # We basically flatten the list by storing the instance under the name `{key}__{name}` and then add
+                # all the nested parameters
+                for i, v in enumerate(value):
+                    _assert_is_allowed_composite_value(v, key, i)
+                    name, obj = v
+                    nested_key = f"{key}__{name}"
+                    out[nested_key] = obj
+                    if deep:
+                        out.update(**_get_deep_params(obj, nested_key))
+            else:
+                out.update(**_get_deep_params(value, key))
         out[key] = value
     return out
 
@@ -584,6 +615,9 @@ class BaseFactory:
         This method will be called every time a new instance of a class is created.
         """
         raise NotImplementedError()
+
+    def __call__(self) -> Any:
+        return self.get_value()
 
 
 class CloneFactory(BaseFactory, Generic[T]):
