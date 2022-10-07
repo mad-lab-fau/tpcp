@@ -17,7 +17,7 @@ attribute:
 """
 import dataclasses
 import traceback
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 from tpcp import CloneFactory, Pipeline
 from tpcp.exceptions import ValidationError
@@ -31,6 +31,7 @@ class Workflow(Pipeline):
 
     def __init__(self, pipelines=None):
         self.pipelines = pipelines
+
 
 # %%
 # That's it!
@@ -55,6 +56,7 @@ class MyPipeline(Pipeline):
     param: float = 4
     param2: int = 10
 
+
 workflow_instance = Workflow(pipelines=[("pipe1", MyPipeline()), ("pipe2", MyPipeline(param2=5))])
 # %%
 # We can now use `get_params` to get a deep inspection of the nested objects:
@@ -62,7 +64,7 @@ workflow_instance.get_params(deep=True)
 
 # %%
 # Or we can set params using the following syntax:
-workflow_instance = workflow_instance.set_params(pipelines__pipe1__param = 2, pipelines__pipe2 = MyPipeline(param2=2))
+workflow_instance = workflow_instance.set_params(pipelines__pipe1__param=2, pipelines__pipe2=MyPipeline(param2=4))
 workflow_instance.get_params(deep=True)
 
 # %%
