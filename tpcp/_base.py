@@ -421,12 +421,14 @@ def _set_comp_field(instance, field_name, params):
         new_list.append((key, new_value))
     if comp_params:
         # Some values are left over -> aka they are invalid
-        raise ValueError(f"You are trying to set values for a compound field {field_name} with the identifiers "
-                         f"{list(comp_params.keys())}. "
-                         "These identifiers could not be found within the existing list of identifiers for this "
-                         f"field ({[c[0] for c in comp_list]}. "
-                         "We don't support setting params on not existent value in a compound field. "
-                         "Recreate the entire field if you want to add or delete entries from a compound field.")
+        raise ValueError(
+            f"You are trying to set values for a compound field {field_name} with the identifiers "
+            f"{list(comp_params.keys())}. "
+            "These identifiers could not be found within the existing list of identifiers for this "
+            f"field ({[c[0] for c in comp_list]}. "
+            "We don't support setting params on not existent value in a compound field. "
+            "Recreate the entire field if you want to add or delete entries from a compound field."
+        )
 
     setattr(instance, field_name, new_list)
 
