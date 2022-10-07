@@ -417,7 +417,8 @@ def _set_comp_field(instance, field_name, params):
             new_value = old_value
         else:
             new_value = nested_values.pop("*")
-        new_value = new_value.set_params(**nested_values)
+        if nested_values:
+            new_value = new_value.set_params(**nested_values)
         new_list.append((key, new_value))
     if comp_params:
         # Some values are left over -> aka they are invalid

@@ -111,3 +111,10 @@ def test_custom_scorer():
     assert group_weighted_agg["f1_score__group_mean"] == 0.7089727629059107
     for i in range(1, 4):
         assert f"f1_score__group_{i}" in group_weighted_agg
+
+
+def test_composite_objects():
+    from examples.other_features._02_composite_objects import workflow_instance
+
+    assert workflow_instance.get_params()["pipelines__pipe1__param"] == 2
+    assert workflow_instance.get_params()["pipelines__pipe2__param2"] == 4

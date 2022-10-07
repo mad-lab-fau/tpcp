@@ -44,9 +44,7 @@ def test_composite_deep_get_params():
 )
 def test_raises_with_invalid_composite(values):
     test_instance = create_test_class(
-        "test",
-        params={"nested": None},
-        private_params={"_composite_params": ("nested",)},
+        "test", params={"nested": None}, private_params={"_composite_params": ("nested",)},
     )
     test_instance.set_params(nested=values[0])
     if values[1]:
@@ -54,3 +52,57 @@ def test_raises_with_invalid_composite(values):
     else:
         with pytest.raises(ValidationError):
             test_instance.get_params()
+
+
+def test_set_params_simple():
+    test_instance = create_test_class(
+        "test", params={"nested": None}, private_params={"_composite_params": ("nested",)},
+    )
+
+    test_instance.nested = [("bla", 2)]
+
+    assert test_instance.nested[0][1] == 2
+    test_instance.set_params(nested__bla=3)
+    assert test_instance.nested[0][1] == 3
+
+
+def test_set_params_nested_obj():
+    test_instance = create_test_class(
+        "test", params={"nested": None}, private_params={"_composite_params": ("nested",)},
+    )
+    nested_instance = create_test_class("nested", params={"nested1": "n1", "nested2": "n2"})
+
+    test_instance.nested = [("bla", nested_instance)]
+
+    assert test_instance.nested[0][1] == nested_instance
+    test_instance.set_params(nested__bla__nested1="changed_value")
+    assert test_instance.nested[0][1].nested1 == "changed_value"
+
+
+def test_set_params_order():
+    """This tests that we always set the least nested values first."""
+    test_instance = create_test_class(
+        "test", params={"nested": None}, private_params={"_composite_params": ("nested",)},
+    )
+    nested_instance = create_test_class("nested", params={"nested1": "n1", "nested2": "n2"})
+
+    test_instance.nested = [("bla", nested_instance)]
+
+    assert test_instance.nested[0][1] == nested_instance
+    test_instance.set_params(
+        nested__bla=nested_instance.clone().set_params(nested1="first_changed_value", nested2="first_changed_value"),
+        nested__bla__nested1="changed_value",
+    )
+    assert test_instance.nested[0][1].nested1 == "changed_value"
+    assert test_instance.nested[0][1].nested2 == "first_changed_value"
+
+
+def test_raises_when_setting_unknown():
+    test_instance = create_test_class(
+        "test", params={"nested": None}, private_params={"_composite_params": ("nested",)},
+    )
+
+    test_instance.nested = [("bla", 2)]
+
+    with pytest.raises(ValueError):
+        test_instance.set_params(nested__blub=3)
