@@ -48,6 +48,13 @@ This means, if you want to use tpcp to train a neuronal network, some data struc
 one of the parameters.
 You can learn more about that in the `optimization guide <optimization>`_.
 
+Composite Parameters
+--------------------
+Sometimes it is required for a Pipeline or Algorithm to take a list of parameters or other algorithm objects as input.
+We support that via compound fields.
+
+Read more about this advanced feature in `our example <compositeobjects>`_.
+
 Results
 -------
 
