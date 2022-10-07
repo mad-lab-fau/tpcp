@@ -294,7 +294,7 @@ class _BaseTpcpObject:
 class BaseTpcpObject(_BaseTpcpObject):
     """Baseclass for all tpcp objects."""
 
-    _composite_params: ClassVar[Optional[Tuple[str, ...]]] = None
+    _composite_params: ClassVar[Tuple[str, ...]] = tuple()
 
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
         """Get parameters for this algorithm.
@@ -375,7 +375,7 @@ def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
         _set_tpcp_validated(instance, True)
 
     valid_fields = get_param_names(type(instance))
-    comp_fields = getattr(instance, "_composite_params", None)
+    comp_fields = getattr(instance, "_composite_params", tuple())
     out: Dict[str, Any] = {}
     for key in valid_fields:
         value = getattr(instance, key)
@@ -398,6 +398,39 @@ def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
     return out
 
 
+def _set_comp_field(instance, field_name, params):
+    # We first partition our field names to know to which index they belong
+    comp_params: DefaultDict[str, Any] = defaultdict(dict)
+    for key, value in params.items():
+        key, delim, sub_key = key.partition("__")
+        if delim:
+            comp_params[key][sub_key] = value
+        else:
+            comp_params[key]["*"] = value
+
+    # Then we iterate over existing values in the compound field and recreate it
+    new_list = []
+    comp_list = list(getattr(instance, field_name))
+    for key, old_value in comp_list:
+        nested_values = comp_params.pop(key, {})
+        if "*" not in nested_values:
+            new_value = old_value
+        else:
+            new_value = nested_values.pop("*")
+        new_value = new_value.set_params(**nested_values)
+        new_list.append((key, new_value))
+    if comp_params:
+        # Some values are left over -> aka they are invalid
+        raise ValueError(f"You are trying to set values for a compound field {field_name} with the identifiers "
+                         f"{list(comp_params.keys())}. "
+                         "These identifiers could not be found within the existing list of identifiers for this "
+                         f"field ({[c[0] for c in comp_list]}. "
+                         "We don't support setting params on not existent value in a compound field. "
+                         "Recreate the entire field if you want to add or delete entries from a compound field.")
+
+    setattr(instance, field_name, new_list)
+
+
 def _set_params(instance: BaseTpcpObjectObjT, **params: Any) -> BaseTpcpObjectObjT:
     """Set the parameters of an instance.
 
@@ -407,6 +440,7 @@ def _set_params(instance: BaseTpcpObjectObjT, **params: Any) -> BaseTpcpObjectOb
     if not params:
         return instance
     valid_params = instance.get_params(deep=True)
+    comp_fields = getattr(instance, "_composite_params", tuple())
 
     nested_params: DefaultDict[str, Any] = defaultdict(dict)  # grouped by prefix
     for key, value in params.items():
@@ -421,7 +455,10 @@ def _set_params(instance: BaseTpcpObjectObjT, **params: Any) -> BaseTpcpObjectOb
             valid_params[key] = value
 
     for key, sub_params in nested_params.items():
-        valid_params[key].set_params(**sub_params)
+        if key in comp_fields:
+            _set_comp_field(instance, key, sub_params)
+        else:
+            valid_params[key].set_params(**sub_params)
     return instance
 
 
