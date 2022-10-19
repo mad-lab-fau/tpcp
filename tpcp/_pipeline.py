@@ -1,12 +1,11 @@
 """Base Classes for custom pipelines."""
-import inspect
-from typing import ClassVar, Dict, Generic, Tuple, TypeVar, Union, Any
+from typing import Any, ClassVar, Dict, Generic, Tuple, TypeVar, Union
 
 from typing_extensions import Self
 
 from tpcp import NOTHING
 from tpcp._algorithm import Algorithm
-from tpcp._algorithm_utils import make_action_safe, make_optimize_safe
+from tpcp._algorithm_utils import make_action_safe
 from tpcp._dataset import DatasetT
 
 PipelineT = TypeVar("PipelineT", bound="Pipeline")
@@ -132,6 +131,7 @@ class OptimizablePipeline(Pipeline[DatasetT]):
         .. note::
             The optimizations must only modify the input parameters (aka `self.clone` should retain the optimization
             results).
+            If you need to return further information, implement `self_optimize_with_info` instead.
 
         Parameters
         ----------
@@ -150,14 +150,36 @@ class OptimizablePipeline(Pipeline[DatasetT]):
         """
         try:
             # This seems hacky, but is used to avoid infinite recursion
-            self.__optimize_not_implemented__ = True
+            setattr(self, "__optimize_not_implemented__", True)
             out = self.self_optimize_with_info(dataset, **kwargs)[0]
-            del self.__optimize_not_implemented__
+            delattr(self, "__optimize_not_implemented__")
             return out
         except NotImplementedError as e:
             raise NotImplementedError() from e  # pragma: no cover
 
     def self_optimize_with_info(self, dataset: DatasetT, **kwargs) -> Tuple[Self, Any]:
+        """Optimize the input parameters of the pipeline or algorithm using any logic.
+
+        This is equivalent to `self_optimize`, but allows you to return additional information as a second return value.
+        If you implement this method, there is no need to implement `self_optimize` as well.
+
+        Parameters
+        ----------
+        dataset
+            An instance of a :class:`tpcp.dataset.Dataset` containing one or multiple data points that can
+            be used for training.
+            The structure of the data and the available reference information will depend on the dataset.
+        kwargs
+            Additional parameters required for the optimization process.
+
+        Returns
+        -------
+        self
+            The class instance with optimized input parameters.
+        info
+            An arbitrary piece of information
+
+        """
         try:
             if getattr(self, "__optimize_not_implemented__", False):
                 raise NotImplementedError()

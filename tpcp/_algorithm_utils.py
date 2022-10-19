@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Ty
 
 from typing_extensions import Concatenate, ParamSpec
 
-from tpcp._base import _get_annotated_fields_of_type, NOTHING
+from tpcp._base import NOTHING, _get_annotated_fields_of_type
 from tpcp._hash import custom_hash
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import PotentialUserErrorWarning
@@ -249,7 +249,10 @@ def _get_nested_opti_paras(algorithm: Algorithm, opti_para_names: List[str]) -> 
     return optimizable_paras, other_paras
 
 
-def _check_safe_optimize(algorithm: OptimizableT, old_method: Callable, *args: Any, **kwargs: Any) -> OptimizableT:
+def _check_safe_optimize(  # noqa: MC0001
+    algorithm: OptimizableT, old_method: Callable, *args: Any, **kwargs: Any
+) -> OptimizableT:
+
     # record the hash of the pipeline to make an educated guess if the optimization works
     opti_para_names = _get_annotated_fields_of_type(algorithm, _ParaTypes.OPTI)
     optimizable_paras, other_paras = _get_nested_opti_paras(algorithm, opti_para_names)
@@ -272,15 +275,19 @@ def _check_safe_optimize(algorithm: OptimizableT, old_method: Callable, *args: A
     else:
         optimized_algorithm, other_returns = _split_returns(old_method(algorithm, *args, **kwargs))
     if old_method.__name__ == "self_optimize" and other_returns != (NOTHING, NOTHING):
-        raise ValueError("Calling `self_optimize` returned further return values beside `self`."
-                         "If you want to return other results besides the optimized pipeline itself, implement and "
-                         "use `self_optimize_with_info` instead of `self_optimize`.")
-    elif old_method.__name__ == "self_optimize_with_info" and other_returns == (NOTHING, NOTHING):
-        raise ValueError("Calling `self_optimize_with_info` returned only a single result."
-                         "This method is expected to return the optimized pipline/algorithm AND additional "
-                         "information from the optimization process."
-                         "If you don't have additional information to return, use/implement `self_optimize` instead "
-                         "of `self_optimize_with_info` or return `None` as additional information.")
+        raise ValueError(
+            "Calling `self_optimize` returned further return values beside `self`."
+            "If you want to return other results besides the optimized pipeline itself, implement and "
+            "use `self_optimize_with_info` instead of `self_optimize`."
+        )
+    if old_method.__name__ == "self_optimize_with_info" and other_returns == (NOTHING, NOTHING):
+        raise ValueError(
+            "Calling `self_optimize_with_info` returned only a single result."
+            "This method is expected to return the optimized pipline/algorithm AND additional "
+            "information from the optimization process."
+            "If you don't have additional information to return, use/implement `self_optimize` instead "
+            "of `self_optimize_with_info` or return `None` as additional information."
+        )
     if not isinstance(optimized_algorithm, type(algorithm)):
         raise ValueError(
             "Calling `self_optimize`/`self_optimize_with_info` did not return an instance of the algorithm/pipeline "

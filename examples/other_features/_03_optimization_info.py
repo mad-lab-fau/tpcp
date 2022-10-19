@@ -29,19 +29,21 @@ but it is relatively simple to implement yourself.
 In the following we will show how all of this works by expanding the QRS detection algorithm implemented in the other
 examples to return additional information from the optimization.
 """
-from typing import List, Tuple, Dict
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_curve
 from typing_extensions import Self
 
-from examples.algorithms.algorithms_qrs_detection_final import QRSDetector, match_events_with_reference, \
-    OptimizableQrsDetector
+from examples.algorithms.algorithms_qrs_detection_final import (
+    OptimizableQrsDetector,
+    QRSDetector,
+    match_events_with_reference,
+)
 from examples.datasets.datasets_final_ecg import ECGExampleData
-from tpcp import OptimizableParameter, HyperParameter, make_optimize_safe, OptimizablePipeline, Parameter, cf
+from tpcp import HyperParameter, OptimizableParameter, OptimizablePipeline, Parameter, cf, make_optimize_safe
 from tpcp.optimize import Optimize
-
 
 # %%
 # In the algorithm class below, we basically reimplemented the `OptimizableQrsDetector` from the algorithm example.
@@ -50,6 +52,7 @@ from tpcp.optimize import Optimize
 #
 # To ensure interface compatibility with other algorithms, we also provided a `self_optimize` method, that simply calls
 # `self_optimize_with_info` under the hood.
+
 
 class OptimizableQrsDetectorWithInfo(QRSDetector):
     min_r_peak_height_over_baseline: OptimizableParameter[float]
@@ -107,6 +110,7 @@ class OptimizableQrsDetectorWithInfo(QRSDetector):
     def self_optimize(self, ecg_data: List[pd.Series], r_peaks: List[pd.Series], sampling_rate_hz: float) -> Self:
         return self.self_optimize_with_info(ecg_data=ecg_data, r_peaks=r_peaks, sampling_rate_hz=sampling_rate_hz)[0]
 
+
 # %%
 # To use this algorithm in an optimization, we need a pipeline to wrap it.
 # Below we can find a reimplementation of the pipline from the "Optimizable Pipeline" example.
@@ -116,6 +120,7 @@ class OptimizableQrsDetectorWithInfo(QRSDetector):
 #
 # Note, that for pipelines, we don't need to implement a dummy `self_optimize` method.
 # Our baseclass already takes care of that.
+
 
 class MyPipeline(OptimizablePipeline[ECGExampleData]):
     algorithm: Parameter[OptimizableQrsDetectorWithInfo]
@@ -142,6 +147,7 @@ class MyPipeline(OptimizablePipeline[ECGExampleData]):
 
         self.r_peak_positions_ = algo.r_peak_positions_
         return self
+
 
 # %%
 # Let's test this class!
@@ -197,6 +203,3 @@ optimizer.optimized_pipeline_
 # Sometimes it might be a good idea to provide separate implementation of `self_optimize` and `self_optimize_with_info`.
 # This might be required, when collecting and calculating the additional info creates a relevant computational overhead.
 # However, you should make sure, that the two methods return the same optimization result otherwise.
-
-
-
