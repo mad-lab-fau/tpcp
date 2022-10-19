@@ -182,6 +182,7 @@ class OptimizablePipeline(Pipeline[DatasetT]):
         """
         try:
             if getattr(type(self), "__optimize_not_implemented__", False):
+                delattr(type(self), "__optimize_not_implemented__")
                 raise NotImplementedError()
             return self.self_optimize(dataset, **kwargs), NOTHING
         except NotImplementedError as e:
