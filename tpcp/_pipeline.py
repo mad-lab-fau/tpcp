@@ -1,8 +1,10 @@
 """Base Classes for custom pipelines."""
-from typing import ClassVar, Dict, Generic, Tuple, TypeVar, Union
+import inspect
+from typing import ClassVar, Dict, Generic, Tuple, TypeVar, Union, Any
 
 from typing_extensions import Self
 
+from tpcp import NOTHING
 from tpcp._algorithm import Algorithm
 from tpcp._algorithm_utils import make_action_safe, make_optimize_safe
 from tpcp._dataset import DatasetT
@@ -121,7 +123,6 @@ class OptimizablePipeline(Pipeline[DatasetT]):
     optimized pipeline.
     """
 
-    @make_optimize_safe
     def self_optimize(self, dataset: DatasetT, **kwargs) -> Self:
         """Optimize the input parameters of the pipeline or algorithm using any logic.
 
@@ -147,4 +148,19 @@ class OptimizablePipeline(Pipeline[DatasetT]):
             The class instance with optimized input parameters.
 
         """
-        raise NotImplementedError()  # pragma: no cover
+        try:
+            # This seems hacky, but is used to avoid infinite recursion
+            self.__optimize_not_implemented__ = True
+            out = self.self_optimize_with_info(dataset, **kwargs)[0]
+            del self.__optimize_not_implemented__
+            return out
+        except NotImplementedError as e:
+            raise NotImplementedError() from e  # pragma: no cover
+
+    def self_optimize_with_info(self, dataset: DatasetT, **kwargs) -> Tuple[Self, Any]:
+        try:
+            if getattr(self, "__optimize_not_implemented__", False):
+                raise NotImplementedError()
+            return self.self_optimize(dataset, **kwargs), NOTHING
+        except NotImplementedError as e:
+            raise NotImplementedError() from e
