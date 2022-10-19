@@ -440,3 +440,11 @@ def test_with_info_calls_self_optimize():
     test.self_optimize(None)
 
     assert test.result_ == "optimized"
+
+
+@pytest.mark.parametrize("method", ("self_optimize_with_info", "self_optimize"))
+def test_not_implemented_error_if_no_opti_method(method):
+    # If both methods are not implemented, we should get a NotImplemented Error
+
+    with pytest.raises(NotImplementedError):
+        getattr(OptimizablePipeline(), method)(None)

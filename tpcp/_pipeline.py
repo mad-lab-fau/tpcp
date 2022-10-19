@@ -155,7 +155,7 @@ class OptimizablePipeline(Pipeline[DatasetT]):
             delattr(type(self), "__optimize_not_implemented__")
             return out
         except NotImplementedError as e:
-            raise NotImplementedError() from e  # pragma: no cover
+            raise NotImplementedError() from e
 
     def self_optimize_with_info(self, dataset: DatasetT, **kwargs) -> Tuple[Self, Any]:
         """Optimize the input parameters of the pipeline or algorithm using any logic.
@@ -183,8 +183,6 @@ class OptimizablePipeline(Pipeline[DatasetT]):
         try:
             if getattr(type(self), "__optimize_not_implemented__", False):
                 raise NotImplementedError()
-            if hasattr(type(self), "__optimize_not_implemented__"):
-                delattr(type(self), "__optimize_not_implemented__")
             return self.self_optimize(dataset, **kwargs), NOTHING
         except NotImplementedError as e:
             raise NotImplementedError() from e
