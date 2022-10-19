@@ -118,3 +118,9 @@ def test_composite_objects():
 
     assert workflow_instance.get_params()["pipelines__pipe1__param"] == 2
     assert workflow_instance.get_params()["pipelines__pipe2__param2"] == 4
+
+
+def test_optimization_info():
+    from examples.other_features._03_optimization_info import optimizer
+
+    assert len(optimizer.optimization_info["thresholds"]) == 50
