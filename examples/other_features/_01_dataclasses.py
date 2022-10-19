@@ -13,7 +13,7 @@ Even though it has only 3 parameters, it requires over 20 lines of code to defin
 
 import pandas as pd
 
-from tpcp import Algorithm, Parameter, OptimizablePipeline, OptiPara
+from tpcp import Algorithm, Parameter
 
 
 class QRSDetector(Algorithm):

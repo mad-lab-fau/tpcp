@@ -18,7 +18,7 @@ from typing_extensions import Self
 
 from tpcp import OptimizablePipeline
 from tpcp._algorithm_utils import OPTIMIZE_METHOD_INDICATOR, _check_safe_optimize
-from tpcp._base import _get_annotated_fields_of_type
+from tpcp._base import _get_annotated_fields_of_type, NOTHING
 from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
 from tpcp._parameters import Parameter, _ParaTypes
@@ -133,6 +133,9 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
     optimized_pipeline_
         The optimized version of the pipeline.
         That is a copy of the input pipeline with modified params.
+    optimization_info_
+        If the optimized pipeline implements a `self_optimize_with_info` method, this parameter contains the
+        additional information provided as second return value from this method.
 
     """
 
@@ -140,6 +143,7 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
     safe_optimize: bool
 
     optimized_pipeline_: OptimizablePipelineT
+    optimization_info_: Any
 
     def __init__(  # noqa: super-init-not-called
         self, pipeline: OptimizablePipelineT, *, safe_optimize: bool = True
@@ -177,14 +181,18 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
         pipeline: OptimizablePipeline = self.pipeline.clone()
         if self.safe_optimize is True:
             # We check here, if the pipeline already has the safe decorator and if yes just call it.
-            if getattr(pipeline.self_optimize, OPTIMIZE_METHOD_INDICATOR, False) is True:
-                optimized_pipeline = pipeline.self_optimize(dataset, **optimize_params)
+            if getattr(pipeline.self_optimize_with_info, OPTIMIZE_METHOD_INDICATOR, False) is True:
+                optimized_pipeline, other_info = pipeline.self_optimize_with_info(dataset, **optimize_params)
             else:
-                optimized_pipeline = _check_safe_optimize(pipeline, pipeline.self_optimize, dataset, **optimize_params)
+                optimized_pipeline, other_info = _check_safe_optimize(
+                    pipeline, pipeline.self_optimize_with_info, dataset, **optimize_params
+                )
         else:
-            optimized_pipeline = pipeline.self_optimize(dataset, **optimize_params)
+            optimized_pipeline, other_info = pipeline.self_optimize_with_info(dataset, **optimize_params)
         # We clone again, just to be sure
         self.optimized_pipeline_ = optimized_pipeline.clone()
+        if other_info is not NOTHING:
+            self.optimization_info_ = other_info
         return self
 
 
@@ -362,10 +370,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         self.multimetric_ = isinstance(first_test_score, dict)
         _validate_return_optimized(self.return_optimized, self.multimetric_, first_test_score)
 
-        results = self._format_results(
-            list(self.parameter_grid),
-            results,
-        )
+        results = self._format_results(list(self.parameter_grid), results,)
 
         if self.return_optimized:
             return_optimized = "score"
@@ -404,16 +409,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         # Use one MaskedArray and mask all the places where the param is not
         # applicable for that candidate. Use defaultdict as each candidate may
         # not contain all the params
-        param_results = defaultdict(
-            partial(
-                MaskedArray,
-                np.empty(
-                    n_candidates,
-                ),
-                mask=True,
-                dtype=object,
-            )
-        )
+        param_results = defaultdict(partial(MaskedArray, np.empty(n_candidates,), mask=True, dtype=object,))
         for cand_idx, params in enumerate(candidate_params):
             for name, value in params.items():
                 # An all masked empty array gets created for the key
@@ -801,16 +797,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         # Use one MaskedArray and mask all the places where the param is not
         # applicable for that candidate. Use defaultdict as each candidate may
         # not contain all the params
-        param_results: Dict = defaultdict(
-            partial(
-                MaskedArray,
-                np.empty(
-                    n_candidates,
-                ),
-                mask=True,
-                dtype=object,
-            )
-        )
+        param_results: Dict = defaultdict(partial(MaskedArray, np.empty(n_candidates,), mask=True, dtype=object,))
         for cand_idx, params in enumerate(candidate_params):
             for name, value in params.items():
                 # An all masked empty array gets created for the key

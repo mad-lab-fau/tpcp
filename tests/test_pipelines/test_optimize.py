@@ -577,11 +577,13 @@ class TestOptimize:
         """Test that we do not check twice"""
         optimized_pipe = DummyOptimizablePipelineUnsafe()
         ds = DummyDataset()
-        with patch.object(DummyOptimizablePipelineUnsafe, "self_optimize", return_value=optimized_pipe) as mock:
-            mock.__name__ = "self_optimize"
+        with patch.object(
+            DummyOptimizablePipelineUnsafe, "self_optimize_with_info", return_value=(optimized_pipe, None)
+        ) as mock:
+            mock.__name__ = "self_optimize_with_info"
             if wrap:
-                DummyOptimizablePipelineUnsafe.self_optimize = make_optimize_safe(
-                    DummyOptimizablePipelineUnsafe.self_optimize
+                DummyOptimizablePipelineUnsafe.self_optimize_with_info = make_optimize_safe(
+                    DummyOptimizablePipelineUnsafe.self_optimize_with_info
                 )
             with pytest.warns(PotentialUserErrorWarning) as w:
                 Optimize(DummyOptimizablePipelineUnsafe()).optimize(ds)

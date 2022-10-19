@@ -199,7 +199,7 @@ class TestSafeOptimize:
             with pytest.raises(ValueError) as e:
                 DummyOptimizablePipelineUnsafe().self_optimize(ds)
 
-        assert "Calling `self_optimize` did not return an instance" in str(e.value)
+        assert "Calling `self_optimize`/`self_optimize_with_info` did not return an instance" in str(e.value)
 
     class PipelineNoOptiParas(OptimizablePipeline):
         para: Parameter[int]

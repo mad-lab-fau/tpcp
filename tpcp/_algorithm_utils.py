@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Ty
 
 from typing_extensions import Concatenate, ParamSpec
 
-from tpcp._base import _get_annotated_fields_of_type
+from tpcp._base import _get_annotated_fields_of_type, NOTHING
 from tpcp._hash import custom_hash
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import PotentialUserErrorWarning
@@ -27,6 +27,16 @@ OPTIMIZE_METHOD_INDICATOR = "__tpcp_optimize_method"
 
 
 P = ParamSpec("P")
+
+
+def _split_returns(values):
+    if isinstance(values, (list, tuple)):
+        value, *other = values
+    else:
+        value = values
+        # We use this sentinal here, to allow NOTHING to be returned.
+        other = (NOTHING, NOTHING)
+    return value, other
 
 
 def get_action_method(instance: Algorithm, method_name: Optional[str] = None) -> Callable:
@@ -258,13 +268,23 @@ def _check_safe_optimize(algorithm: OptimizableT, old_method: Callable, *args: A
     optimized_algorithm: OptimizableT
     if hasattr(old_method, "__self__"):
         # In this case the method is already bound and we do not need to pass the algo as first argument
-        optimized_algorithm = old_method(*args, **kwargs)
+        optimized_algorithm, other_returns = _split_returns(old_method(*args, **kwargs))
     else:
-        optimized_algorithm = old_method(algorithm, *args, **kwargs)
+        optimized_algorithm, other_returns = _split_returns(old_method(algorithm, *args, **kwargs))
+    if old_method.__name__ == "self_optimize" and other_returns != (NOTHING, NOTHING):
+        raise ValueError("Calling `self_optimize` returned further return values beside `self`."
+                         "If you want to return other results besides the optimized pipeline itself, implement and "
+                         "use `self_optimize_with_info` instead of `self_optimize`.")
+    elif old_method.__name__ == "self_optimize_with_info" and other_returns == (NOTHING, NOTHING):
+        raise ValueError("Calling `self_optimize_with_info` returned only a single result."
+                         "This method is expected to return the optimized pipline/algorithm AND additional "
+                         "information from the optimization process."
+                         "If you don't have additional information to return, use/implement `self_optimize` instead "
+                         "of `self_optimize_with_info` or return `None` as additional information.")
     if not isinstance(optimized_algorithm, type(algorithm)):
         raise ValueError(
-            "Calling `self_optimize` did not return an instance of the algorithm/pipeline itself! "
-            "Normally, this method should return `self`."
+            "Calling `self_optimize`/`self_optimize_with_info` did not return an instance of the algorithm/pipeline "
+            "itself! Normally, this method should return `self`."
         )
     # We calculate the hash afterwards twice.
     # Once directly after the optimization and once after cloning.
@@ -310,9 +330,9 @@ def _check_safe_optimize(algorithm: OptimizableT, old_method: Callable, *args: A
         raise RuntimeError(
             "Optimizing the pipeline has modified the following parameters, that were not marked as optimizable: "
             f"{changed_paras}. "
-            "Double check the implementation of `self_optimize` and either mark the changing parameters as "
-            "optimizable by adding `OptiPara`/`OptimizableParameter` as type annotation or make sure that they are not "
-            "accidentally modified in your implementation."
+            "Double check the implementation of `self_optimize`/`self_optimize_with_info` and either mark the changing "
+            "parameters as optimizable by adding `OptiPara`/`OptimizableParameter` as type annotation or make sure "
+            "that they are not accidentally modified in your implementation."
         )
     if before_hash_optimizable == after_hash_optimizable:
         # If the hash didn't change the object didn't change.
@@ -323,6 +343,8 @@ def _check_safe_optimize(algorithm: OptimizableT, old_method: Callable, *args: A
             "This could indicate an implementation error of the `self_optimize` method.",
             PotentialUserErrorWarning,
         )
+    if other_returns != (NOTHING, NOTHING):
+        return optimized_algorithm, other_returns
     return optimized_algorithm
 
 
@@ -348,8 +370,8 @@ def make_optimize_safe(
 
     Examples
     --------
-    >>> from tpcp import OptimizableAlgorithm, make_optimize_safe
-    >>> class MyAlgorithm(OptimizableAlgorithm):
+    >>> from tpcp import Algorithm, make_optimize_safe
+    >>> class MyAlgorithm(Algorithm):
     ...     def __init__(self, para_1: int = 4):
     ...         self.para_1 = para_1
     ...
@@ -368,7 +390,7 @@ def make_optimize_safe(
 
     @wraps(self_optimize_method)
     def safe_wrapped(self: OptimizableT, *args: P.args, **kwargs: P.kwargs) -> OptimizableT:
-        if self_optimize_method.__name__ != "self_optimize":
+        if self_optimize_method.__name__ not in ("self_optimize", "self_optimize_with_info"):
             warnings.warn(
                 "The `make_optimize_safe` decorator is only meant for the `self_optimize` method, but you applied it "
                 f"to the `{self_optimize_method.__name__}` method.",

@@ -17,7 +17,8 @@ class Algorithm(BaseTpcpObject):
     1. overwrite `_action_method` with the name of the actual action method of this class type
     2. implement a stub for the action method
 
-    If you want to create an optimizable algorithm, add a `self_optimize` method to your class.
+    If you want to create an optimizable algorithm, add a `self_optimize` or (`self_optimize_with_info`) method to your
+    class.
     We do not provide a separate base class for that, as we can make no assumptions about the call signature of your
     custom `self_optimize` method.
     If you need an "optimizable" version for a group of algorithms you are working with, create a custom
