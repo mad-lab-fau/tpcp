@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [0.12.0] - unreleased
+
+### Added
+
+- Added the concept of the `self_optimize_with_info` method that can be implemented instead or in addition to the 
+  `self_optimize` method.
+  This method should be used when an optimize method requires to return/output additional information besides the main
+  result and is supported by the `Optimize` wrapper.
+  (https://github.com/mad-lab-fau/tpcp/pull/49)
+
 ## [0.11.0] - 2022-10-17
 
 ### Added
