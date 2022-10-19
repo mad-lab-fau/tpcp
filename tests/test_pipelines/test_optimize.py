@@ -12,6 +12,7 @@ from tests.mixins.test_algorithm_mixin import TestAlgorithmMixin
 from tests.test_pipelines.conftest import (
     DummyDataset,
     DummyOptimizablePipeline,
+    DummyOptimizablePipelineWithInfo,
     DummyPipeline,
     MutableCustomClass,
     MutableParaPipeline,
@@ -65,7 +66,7 @@ class TestMetaFunctionalityOptimize(TestAlgorithmMixin):
 
     @pytest.fixture()
     def after_action_instance(self) -> Optimize:
-        gs = self.algorithm_class(DummyOptimizablePipeline())
+        gs = self.algorithm_class(DummyOptimizablePipelineWithInfo())
         gs.optimize(DummyDataset())
         return gs
 
@@ -590,6 +591,21 @@ class TestOptimize:
 
             # If we double wrap, the warning should appear twice
             assert len(w) == 1
+
+    @pytest.mark.parametrize("use_with_info", (True, False))
+    def test_correct_method_called(self, use_with_info):
+        optimized_pipe = DummyOptimizablePipeline()
+        ds = DummyDataset()
+        with patch.object(
+            DummyOptimizablePipeline, "self_optimize_with_info", return_value=(optimized_pipe, None)
+        ) as mock_with_info:
+            with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
+                mock_with_info.__name__ = "self_optimize_with_info"
+                mock.__name__ = "self_optimize"
+                Optimize(DummyOptimizablePipeline(), optimize_with_info=use_with_info).optimize(ds)
+
+                assert mock_with_info.call_count == int(use_with_info)
+                assert mock.call_count == int(not use_with_info)
 
 
 class TestDummyOptimize:

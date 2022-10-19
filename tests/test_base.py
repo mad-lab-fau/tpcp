@@ -9,7 +9,7 @@ import joblib
 import pytest
 
 from tests.conftest import _get_params_without_nested_class
-from tpcp import Algorithm, OptiPara, Para, cf, clone
+from tpcp import Algorithm, OptimizablePipeline, OptiPara, Para, cf, clone
 from tpcp._algorithm_utils import (
     get_action_method,
     get_action_methods_names,
@@ -416,3 +416,27 @@ def test_dataclass_warns_when_cf_is_used():
 
     with pytest.raises(ValidationError) as e:
         Test(b=2).get_params()
+
+
+def test_self_optimize_calls_with_info():
+    class OnlyOptimize(OptimizablePipeline):
+        def self_optimize(self, dataset, **kwargs):
+            self.result_ = "optimized"
+            return self
+
+    test = OnlyOptimize()
+    test.self_optimize_with_info(None)
+
+    assert test.result_ == "optimized"
+
+
+def test_with_info_calls_self_optimize():
+    class OnlyWithInfo(OptimizablePipeline):
+        def self_optimize_with_info(self, dataset, **kwargs):
+            self.result_ = "optimized"
+            return self, None
+
+    test = OnlyWithInfo()
+    test.self_optimize(None)
+
+    assert test.result_ == "optimized"

@@ -122,6 +122,10 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
         If True, we add additional checks to make sure the `self_optimize` method of the pipeline is correctly
         implemented.
         See :func:`~tpcp.make_optimize_safe` for more info.
+    optimize_with_info
+        If True, Optimize will try to call `self_optimize_with_info` by default and will fall back to `self_optimize`.
+        If you want to force optimize to use `self_optimize`, even if an implementation of `self_optimize_with_info`
+        exists, set this parameter to False.
 
     Other Parameters
     ----------------
@@ -514,6 +518,10 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         If True, we add additional checks to make sure the `self_optimize` method of the pipeline is correctly
         implemented.
         See :func:`~tpcp.make_optimize_safe` for more info.
+    optimize_with_info
+        If True, Optimize will try to call `self_optimize_with_info` by default and will fall back to `self_optimize`.
+        If you want to force the optimization to use `self_optimize`, even if an implementation of
+        `self_optimize_with_info` exists, set this parameter to False.
 
     Other Parameters
     ----------------

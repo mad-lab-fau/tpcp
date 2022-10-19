@@ -31,6 +31,22 @@ class DummyOptimizablePipeline(OptimizablePipeline):
         return self
 
 
+class DummyOptimizablePipelineWithInfo(OptimizablePipeline):
+    optimized: OptimizableParameter[bool]
+    para_1: PureParameter
+    para_2: HyperParameter
+
+    def __init__(self, para_1=None, para_2=None, optimized=False):
+        self.para_1 = para_1
+        self.para_2 = para_2
+        self.optimized = optimized
+
+    @make_optimize_safe
+    def self_optimize_with_info(self, dataset: Dataset, **kwargs):
+        self.optimized = self.para_2
+        return self, "info"
+
+
 class MutableCustomClass:
     test: str
 

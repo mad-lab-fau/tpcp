@@ -131,6 +131,7 @@ class MyPipeline(OptimizablePipeline[ECGExampleData]):
     def __init__(self, algorithm: OptimizableQrsDetectorWithInfo = cf(OptimizableQrsDetectorWithInfo())):
         self.algorithm = algorithm
 
+    @make_optimize_safe
     def self_optimize_with_info(self, dataset: ECGExampleData, **kwargs):
         ecg_data = [d.data["ecg"] for d in dataset]
         r_peaks = [d.r_peak_positions_["r_peak_position"] for d in dataset]
