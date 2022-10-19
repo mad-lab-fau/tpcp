@@ -13,7 +13,7 @@ Even though it has only 3 parameters, it requires over 20 lines of code to defin
 
 import pandas as pd
 
-from tpcp import Algorithm, Parameter
+from tpcp import Algorithm, Parameter, OptimizablePipeline, OptiPara
 
 
 class QRSDetector(Algorithm):
@@ -225,13 +225,14 @@ HigherLevelFilter()
 
 @define(kw_only=True, slots=False, repr=False)  # Slots Don't play nice with tpcp!
 class CustomDataset(Dataset.as_attrs()):  # Note the `as_attrs` call here!
+
+    custom_param: float  # We don't need a default, as we are using `kw_only` in define
+
     def create_index(self) -> pd.DataFrame:
         return pd.DataFrame(
             list(product(("patient_1", "patient_2", "patient_3"), ("test_1", "test_2"), ("1", "2"))),
             columns=["patient", "test", "extra"],
         )
-
-    custom_param: float  # We don't need a default, as we are using `kw_only` in define
 
 
 CustomDataset(custom_param=3)
