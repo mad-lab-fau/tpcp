@@ -150,9 +150,9 @@ class OptimizablePipeline(Pipeline[DatasetT]):
         """
         try:
             # This seems hacky, but is used to avoid infinite recursion
-            setattr(self, "__optimize_not_implemented__", True)
+            setattr(type(self), "__optimize_not_implemented__", True)
             out = self.self_optimize_with_info(dataset, **kwargs)[0]
-            delattr(self, "__optimize_not_implemented__")
+            delattr(type(self), "__optimize_not_implemented__")
             return out
         except NotImplementedError as e:
             raise NotImplementedError() from e  # pragma: no cover
@@ -181,8 +181,10 @@ class OptimizablePipeline(Pipeline[DatasetT]):
 
         """
         try:
-            if getattr(self, "__optimize_not_implemented__", False):
+            if getattr(type(self), "__optimize_not_implemented__", False):
                 raise NotImplementedError()
+            if hasattr(type(self), "__optimize_not_implemented__"):
+                delattr(type(self), "__optimize_not_implemented__")
             return self.self_optimize(dataset, **kwargs), NOTHING
         except NotImplementedError as e:
             raise NotImplementedError() from e

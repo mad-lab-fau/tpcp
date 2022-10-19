@@ -61,7 +61,7 @@ import pandas as pd
 
 from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDetector
 from examples.datasets.datasets_final_ecg import ECGExampleData
-from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf
+from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf, make_optimize_safe
 
 
 class MyPipeline(OptimizablePipeline[ECGExampleData]):
@@ -73,6 +73,7 @@ class MyPipeline(OptimizablePipeline[ECGExampleData]):
     def __init__(self, algorithm: OptimizableQrsDetector = cf(OptimizableQrsDetector())):
         self.algorithm = algorithm
 
+    @make_optimize_safe
     def self_optimize(self, dataset: ECGExampleData, **kwargs):
         ecg_data = [d.data["ecg"] for d in dataset]
         r_peaks = [d.r_peak_positions_["r_peak_position"] for d in dataset]
