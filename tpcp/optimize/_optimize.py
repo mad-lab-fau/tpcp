@@ -17,7 +17,7 @@ from tqdm.auto import tqdm
 from typing_extensions import Self
 
 from tpcp import OptimizablePipeline
-from tpcp._algorithm_utils import OPTIMIZE_METHOD_INDICATOR, _check_safe_optimize
+from tpcp._algorithm_utils import OPTIMIZE_METHOD_INDICATOR, _check_safe_optimize, _split_returns
 from tpcp._base import _get_annotated_fields_of_type, NOTHING
 from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
@@ -141,15 +141,17 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
 
     pipeline: Parameter[OptimizablePipelineT]
     safe_optimize: bool
+    optimize_with_info: bool
 
     optimized_pipeline_: OptimizablePipelineT
     optimization_info_: Any
 
     def __init__(  # noqa: super-init-not-called
-        self, pipeline: OptimizablePipelineT, *, safe_optimize: bool = True
+        self, pipeline: OptimizablePipelineT, *, safe_optimize: bool = True, optimize_with_info: bool = True
     ) -> None:
         self.pipeline = pipeline
         self.safe_optimize = safe_optimize
+        self.optimize_with_info = optimize_with_info
 
     def optimize(self, dataset: DatasetT, **optimize_params: Any) -> Self:
         """Run the self-optimization defined by the pipeline.
@@ -179,19 +181,20 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
             )
         # We clone just to make sure runs are independent
         pipeline: OptimizablePipeline = self.pipeline.clone()
+        method = pipeline.self_optimize_with_info if self.optimize_with_info else pipeline.self_optimize
         if self.safe_optimize is True:
             # We check here, if the pipeline already has the safe decorator and if yes just call it.
-            if getattr(pipeline.self_optimize_with_info, OPTIMIZE_METHOD_INDICATOR, False) is True:
-                optimized_pipeline, other_info = pipeline.self_optimize_with_info(dataset, **optimize_params)
+            if getattr(method, OPTIMIZE_METHOD_INDICATOR, False) is True:
+                optimized_pipeline, other_info = _split_returns(method(dataset, **optimize_params))
             else:
-                optimized_pipeline, other_info = _check_safe_optimize(
-                    pipeline, pipeline.self_optimize_with_info, dataset, **optimize_params
+                optimized_pipeline, other_info = _split_returns(
+                    _check_safe_optimize(pipeline, method, dataset, **optimize_params)
                 )
         else:
-            optimized_pipeline, other_info = pipeline.self_optimize_with_info(dataset, **optimize_params)
+            optimized_pipeline, other_info = _split_returns(method(dataset, **optimize_params))
         # We clone again, just to be sure
         self.optimized_pipeline_ = optimized_pipeline.clone()
-        if other_info is not NOTHING:
+        if self.optimize_with_info and other_info is not NOTHING:
             self.optimization_info_ = other_info
         return self
 
@@ -586,6 +589,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
     pre_dispatch: Union[int, str]
     progress_bar: bool
     safe_optimize: bool
+    optimize_with_info: bool
 
     groups: Optional[List[Union[str, Tuple[str, ...]]]]
     mock_labels: Optional[List[Union[str, Tuple[str, ...]]]]
@@ -612,6 +616,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         pre_dispatch: Union[int, str] = "n_jobs",
         progress_bar: bool = True,
         safe_optimize: bool = True,
+        optimize_with_info: bool = True,
     ) -> None:
         self.pipeline = pipeline
         self.parameter_grid = parameter_grid
@@ -625,6 +630,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         self.pre_dispatch = pre_dispatch
         self.progress_bar = progress_bar
         self.safe_optimize = safe_optimize
+        self.optimize_with_info = optimize_with_info
 
     def optimize(
         self, dataset: DatasetT, *, groups=None, mock_labels=None, **optimize_params
@@ -654,7 +660,9 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
 
         # We need to wrap our pipeline for a consistent interface.
         # In the future we might be able to allow objects with optimizer Interface as input directly.
-        optimizer = Optimize(self.pipeline, safe_optimize=self.safe_optimize)
+        optimizer = Optimize(
+            self.pipeline, safe_optimize=self.safe_optimize, optimize_with_info=self.optimize_with_info
+        )
 
         # For each para combi, we separate the pure parameters (parameters that do not affect the optimization) and
         # the hyperparameters.

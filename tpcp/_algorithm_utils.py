@@ -31,7 +31,7 @@ P = ParamSpec("P")
 
 def _split_returns(values):
     if isinstance(values, (list, tuple)):
-        value, *other = values
+        value, other = values
     else:
         value = values
         # We use this sentinal here, to allow NOTHING to be returned.
