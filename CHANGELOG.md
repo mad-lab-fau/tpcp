@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This method should be used when an optimize method requires to return/output additional information besides the main
   result and is supported by the `Optimize` wrapper.
   (https://github.com/mad-lab-fau/tpcp/pull/49)
+- Added a new method called `__clone_param__` that gives a class control over how params are cloned.
+  This can be helpful, if for some reason objects don't behave well with deepcopy.
 
 ## [0.11.0] - 2022-10-17
 

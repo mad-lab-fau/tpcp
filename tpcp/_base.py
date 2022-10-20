@@ -342,6 +342,9 @@ class BaseTpcpObject(_BaseTpcpObject):
             result.extend((name, "=", repr(para)))
         return "".join(result) + ")"
 
+    @classmethod
+    def __clone_param__(cls, param_name: str, value: Any) -> Any:
+        return clone(value, safe=False)
 
 def _get_deep_params(obj, parent_key) -> Dict[str, Any]:
     # This is a little magic, that also gets the parameters of nested sklearn classifiers.
@@ -631,7 +634,7 @@ def clone(algorithm: T, *, safe: bool = False) -> T:
     klass = algorithm.__class__
     new_object_params = algorithm.get_params(deep=False)
     for name, param in new_object_params.items():
-        new_object_params[name] = clone(param, safe=False)
+        new_object_params[name] = klass.__clone_param__(name, param)
     new_object = klass(**new_object_params)
     params_set = new_object.get_params(deep=False)
 
