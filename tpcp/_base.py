@@ -343,8 +343,29 @@ class BaseTpcpObject(_BaseTpcpObject):
         return "".join(result) + ")"
 
     @classmethod
-    def __clone_param__(cls, param_name: str, value: Any) -> Any:
+    def __clone_param__(cls, param_name: str, value: Any) -> Any:  # noqa: unused-argument
+        """Handle cloning of specific parameters of the object.
+
+        This method exists only to allow object the handling of "strange" python datatypes that can not be deepcopied
+        for some reason.
+        This can happen when library authors overwrite deepcopy behaviour or if handling objects can not be easily
+        deepcopied as there are implemented in Cython (or similar).
+
+        In such cases you can overwrite how certain objects should be cloned using this method.
+        Note, that you are on your own, when you do that.
+        I.e. we will not check that you do it correctly and that you ensure that the new object is really independent of
+        the old or any other things you might run into.
+
+        If you are using this method, we recommend to at least check that the cloned object is identical to the
+        original based on our implemented hashing method.
+
+        >>> from tpcp._hash import custom_hash
+        >>> assert custom_hash(my_obj) == custom_hash(my_obj.clone())
+
+        If this doesn't pass, many other features in tpcp will not work as well.
+        """
         return clone(value, safe=False)
+
 
 def _get_deep_params(obj, parent_key) -> Dict[str, Any]:
     # This is a little magic, that also gets the parameters of nested sklearn classifiers.
@@ -617,9 +638,9 @@ def clone(algorithm: T, *, safe: bool = False) -> T:
     # XXX: not handling dictionaries
     if isinstance(algorithm, (list, tuple, set, frozenset)):
         return type(algorithm)([clone(a, safe=safe) for a in algorithm])  # noqa: to-many-function-args
-    # Compared to sklearn, we check specifically for _BaseSerializable and not just if `get_params` is defined on the
+    # Compared to sklearn, we check specifically for BaseTpcpObject and not just if `get_params` is defined on the
     # object.
-    # Due to the way algorithms/pipelines in tpcp work, they need to inherit from _BaseSerializable.
+    # Due to the way algorithms/pipelines in tpcp work, they need to inherit from BaseTpcpObject.
     # Therefore, we check explicitly for that, as we do not want to accidentally treat a sklearn algo (or similar) as
     # algorithm
     if not isinstance(algorithm, BaseTpcpObject):
@@ -634,6 +655,8 @@ def clone(algorithm: T, *, safe: bool = False) -> T:
     klass = algorithm.__class__
     new_object_params = algorithm.get_params(deep=False)
     for name, param in new_object_params.items():
+        # We defer the actual cloning of the parameters to the class itself to allow to handle stupid edge cases on
+        # user side without modifying tpcp itself.
         new_object_params[name] = klass.__clone_param__(name, param)
     new_object = klass(**new_object_params)
     params_set = new_object.get_params(deep=False)
