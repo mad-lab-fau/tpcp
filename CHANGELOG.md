@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (https://github.com/mad-lab-fau/tpcp/pull/49)
 - Added a new method called `__clone_param__` that gives a class control over how params are cloned.
   This can be helpful, if for some reason objects don't behave well with deepcopy.
+- Added a new method called `__repr_parameters__` that gives a class control over how params are represented.
+  This can be used to customize the representation of individual parameters in the `__repr__` method.
 
 ## [0.11.0] - 2022-10-17
 

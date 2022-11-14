@@ -448,3 +448,28 @@ def test_not_implemented_error_if_no_opti_method(method):
 
     with pytest.raises(NotImplementedError):
         getattr(OptimizablePipeline(), method)(None)
+
+
+def test_object_representation():
+    class Test(Algorithm):
+        def __init__(self, a, b):
+            self.a = a
+            self.b = b
+
+    test = Test(1, 2)
+    assert repr(test) == "Test(a=1, b=2)"
+
+
+def test_custom_object_representation():
+    class Test(Algorithm):
+        def __init__(self, a, b):
+            self.a = a
+            self.b = b
+
+        def __repr_parameter__(self, name: str, value: Any) -> str:
+            if name == "a":
+                return "a=`custom`"
+            return f"{name}={value}"
+
+    test = Test(1, 2)
+    assert repr(test) == "Test(a=`custom`, b=2)"

@@ -328,6 +328,27 @@ class BaseTpcpObject(_BaseTpcpObject):
         """
         return clone(self, safe=True)
 
+    def __repr_parameter__(self, name: str, value: Any) -> str:
+        """Format a parameter for the __repr__ method.
+
+        This method is used to format the parameters for the __repr__ method.
+        It is called for each parameter and can be overwritten to customize the output.
+
+        Parameters
+        ----------
+        name
+            The name of the parameter
+        value
+            The value of the parameter
+
+        Returns
+        -------
+        str
+            The formatted string for the parameter
+
+        """
+        return f"{name}={value!r}"
+
     def __repr__(self):
         """Provide generic representation for the object based on all parameters."""
         class_name = type(self).__name__
@@ -339,7 +360,7 @@ class BaseTpcpObject(_BaseTpcpObject):
                 first = False
             else:
                 result.append(", ")
-            result.extend((name, "=", repr(para)))
+            result.append(self.__repr_parameter__(name, para))
         return "".join(result) + ")"
 
     @classmethod
