@@ -723,7 +723,8 @@ class CloneFactory(BaseFactory, Generic[T]):
         return clone(self.default_value)
 
     def __repr__(self) -> str:
-        return f"cf({self.default_value:r})"
+        """Print the representation for the factory."""
+        return f"cf({self.default_value!r})"
 
 
 # The typing here is obviously wrong and a hack to make object that are wrapped by clone factory seem to be just of

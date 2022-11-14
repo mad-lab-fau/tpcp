@@ -17,7 +17,7 @@ from tpcp._algorithm_utils import (
     get_results,
     is_action_applied,
 )
-from tpcp._base import _get_tpcp_validated, _validate_parameter
+from tpcp._base import CloneFactory, _get_tpcp_validated, _validate_parameter
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, ValidationError
 
@@ -469,7 +469,18 @@ def test_custom_object_representation():
         def __repr_parameter__(self, name: str, value: Any) -> str:
             if name == "a":
                 return "a=`custom`"
-            return f"{name}={value}"
+            return super().__repr_parameter__(name, value)
 
     test = Test(1, 2)
     assert repr(test) == "Test(a=`custom`, b=2)"
+
+
+def test_clone_factory_repr():
+    class Test(Algorithm):
+        def __init__(self, a, b):
+            self.a = a
+            self.b = b
+
+    test = Test(1, 2)
+    clone = CloneFactory(test)
+    assert repr(clone) == "cf(Test(a=1, b=2))"
