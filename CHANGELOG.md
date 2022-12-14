@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `safe_run` method did unintentionally double-wrap the run method, if it already had a `make_action_safe` 
   decorator. This is now fixed.
 
+### Fixed
+- Under certain conditions hashing of an object defined in the `__main__` module failed.
+  This release implements a workaround for this issue, that should hopefully resolve most cases.
+
 ## [0.12.0] - 2022-11-15
 
 ### Added
