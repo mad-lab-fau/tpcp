@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.12.2] - 2022-12-14
 
 ### Fixed
-- The previous for fixing hashing of objects defined in the __main__ module was not working
+- The previous for fixing hashing of objects defined in the `__main__` module was not working
   This should now be fixed.
 
 ## [0.12.1] - 2022-12-14
