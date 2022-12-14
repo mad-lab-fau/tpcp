@@ -1,4 +1,5 @@
 from typing import Dict
+from unittest import mock
 from unittest.mock import patch
 
 import pytest
@@ -348,3 +349,27 @@ class TestSafeOptimize:
         make_optimize_safe(self.PipelineModifyNestedParasWorks.self_optimize)(
             self.PipelineModifyNestedParasWorks(), DummyDataset()
         )
+
+
+class TestPipelineSafeRun:
+    @pytest.mark.parametrize("wrapped", (True, False))
+    def test_checks_only_performed_once(self, wrapped):
+        # We mock _check_safe_run from _algorithm_utils.py to test if it is really only called once
+        with mock.patch("tpcp._algorithm_utils._check_safe_run") as mock_check:
+            # We need to mock both imported places
+            with mock.patch("tpcp._pipeline._check_safe_run") as mock_check_2:
+                decorator = make_action_safe if wrapped else lambda x: x
+
+                class PipelineWithManualWrappedRun(Pipeline):
+                    @decorator
+                    def run(self, datapoint: Dataset):
+                        return self
+
+                PipelineWithManualWrappedRun().safe_run(DummyDataset())
+
+                if wrapped:
+                    assert mock_check.call_count == 1
+                    assert mock_check_2.call_count == 0
+                else:
+                    assert mock_check.call_count == 0
+                    assert mock_check_2.call_count == 1

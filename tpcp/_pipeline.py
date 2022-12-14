@@ -5,7 +5,7 @@ from typing_extensions import Self
 
 from tpcp import NOTHING
 from tpcp._algorithm import Algorithm
-from tpcp._algorithm_utils import make_action_safe
+from tpcp._algorithm_utils import ACTION_METHOD_INDICATOR, _check_safe_run, make_action_safe
 from tpcp._dataset import DatasetT
 
 PipelineT = TypeVar("PipelineT", bound="Pipeline")
@@ -44,7 +44,6 @@ class Pipeline(Algorithm, Generic[DatasetT]):
         """
         raise NotImplementedError()  # pragma: no cover
 
-    @make_action_safe
     def safe_run(self, datapoint: DatasetT) -> Self:
         """Run the pipeline with some additional checks.
 
@@ -70,7 +69,10 @@ class Pipeline(Algorithm, Generic[DatasetT]):
             The class instance with all result attributes populated
 
         """
-        return self.run(datapoint)
+        run_method = self.run
+        if getattr(run_method, ACTION_METHOD_INDICATOR, False) is True:
+            return run_method(datapoint)
+        return _check_safe_run(self, run_method, datapoint)
 
     def score(self, datapoint: DatasetT) -> Union[float, Dict[str, float]]:
         """Calculate performance of the pipeline on a datapoint with reference information.
