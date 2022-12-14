@@ -41,13 +41,15 @@ class NoMemoizeHasher(Hasher):
         modules_modified = []
         if getattr(obj, "__module__", None) == "__main__":
             try:
-                name = obj.__name__
+                name = obj.__qualname__
+                to_add_obj = obj
             except AttributeError:
-                name = obj.__class__.__name__
+                name = obj.__class__.__qualname__
+                to_add_obj = obj.__class__
             mod = sys.modules["__main__"]
             if not hasattr(mod, name):
                 modules_modified.append((mod, name))
-                setattr(mod, name, obj)
+                setattr(mod, name, to_add_obj)
         try:
             return super().hash(obj, return_digest)
         except RecursionError as e:
