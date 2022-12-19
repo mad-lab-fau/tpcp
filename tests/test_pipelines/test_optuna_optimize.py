@@ -1,3 +1,4 @@
+import time
 from typing import Callable, List, Optional, Sequence, Union
 from unittest.mock import Mock, patch
 

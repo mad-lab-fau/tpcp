@@ -176,7 +176,12 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
             # This solution is based on the solution proposed here:
             # https://github.com/optuna/optuna/issues/2862
             def _multi_process_call_optimize(n_trials: int):
-                study = optuna.load_study(study_name=self.study_.study_name, storage=self.study_._storage)
+                study = optuna.load_study(
+                    study_name=self.study_.study_name,
+                    storage=self.study_._storage,
+                    sampler=self.study_.sampler,
+                    pruner=self.study_.pruner,
+                )
                 self._call_optimize_multi_process(study, objective, n_trials)
 
             parallel = joblib.Parallel(self.n_jobs)
