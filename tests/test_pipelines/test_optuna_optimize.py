@@ -29,6 +29,7 @@ class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
         gc_after_trial: bool = False,
         show_progress_bar: bool = False,
         return_optimized: bool = True,
+        n_jobs: int = 1,
         mock_objective=None,
     ) -> None:
         self.scoring = scoring
@@ -43,6 +44,7 @@ class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
             gc_after_trial=gc_after_trial,
             show_progress_bar=show_progress_bar,
             return_optimized=return_optimized,
+            n_jobs=n_jobs,
         )
 
     def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
@@ -169,7 +171,8 @@ class TestCustomOptunaOptimize:
         assert mock.call_args[0][1] is dataset
 
     @pytest.mark.parametrize("pipe", (DummyOptimizablePipeline(), DummyPipeline()))
-    def test_correct_paras_selected(self, pipe):
+    @pytest.mark.parametrize("n_jobs", (1, 2))
+    def test_correct_paras_selected(self, pipe, n_jobs, tmp_path):
         # Should select 1, as it has the highest score
         scores = {0: 1, 1: 2, 2: 0}
 
@@ -179,12 +182,23 @@ class TestCustomOptunaOptimize:
         def scoring(pipe, _):
             return scores[pipe.para_1]
 
+        if n_jobs > 1:
+            storage = f"sqlite:///{tmp_path}/test.db"
+        else:
+            storage = None
+
         opti = DummyOptunaOptimizer(
             pipe,
-            lambda: create_study(sampler=GridSampler({"para_1": list(scores.keys())}), direction="maximize"),
+            lambda: create_study(
+                sampler=GridSampler({"para_1": list(scores.keys())}), direction="maximize", storage=storage
+            ),
             scoring=scoring,
             create_search_space=create_search_space,
-            n_trials=3,
+            # In case of the multiprocessing backend, we need to set n_trials to a value > len(scores), as we can not
+            # guarantee that the different trails will not choose the same parameters due to timing issues.
+            # See docu for `GridSampler` in optuna.
+            n_trials=6,
+            n_jobs=n_jobs,
             timeout=None,
             return_optimized=True,
         ).optimize(DummyDataset())

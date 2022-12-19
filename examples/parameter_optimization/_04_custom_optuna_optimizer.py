@@ -9,6 +9,12 @@ Custom Optuna Optimizer
              To make this example understandable, you should make yourself familiar with Optuna first and understand
              how it works, before trying to go through this example.
 
+.. note:: This example uses the `dataclass` version of `CustomOptunaOptimize`.
+          To learn more about dataclass interfaces, checkout this example: :ref:`dataclasses`.
+          When working with dataclasses, be aware that the order of your parameters when inheriting from an other
+          dataclass can not be controlled.
+          Therefore, we heavily recommend passing the parameters as keyword arguments.
+
 The most popular method of (hyper-)parameter optimization is GridSearch (or GridSearchCV for optimizable pipelines).
 These methods perform an exhaustive search of the parameter space by simply testing every option.
 Considering that training and testing an algorithm can be very costly, exhaustive gridsearch takes a long time and is
@@ -137,8 +143,6 @@ def f1_score(pipeline: MyPipeline, datapoint: ECGExampleData) -> float:
     return f1_score_
 
 
-from optuna import Study, Trial
-
 # %%
 # The Custom Optimizer
 # --------------------
@@ -182,40 +186,35 @@ from optuna import Study, Trial
 # :class:`~tpcp.validate.Scorer` handles looping and aggregating results over multiple datapoints.
 #
 # With that, our implementation looks as follows:
+from dataclasses import dataclass
+
+from optuna import Study, Trial
+
 from tpcp.optimize.optuna import CustomOptunaOptimize
 from tpcp.types import DatasetT, PipelineT
 from tpcp.validate import Scorer
 
 
-class OptunaSearch(CustomOptunaOptimize[PipelineT, DatasetT]):
-    create_search_space: Parameter[Callable[[Trial], None]]
-    score_function: Parameter[Callable[[PipelineT, DatasetT], float]]
-
-    def __init__(
-        self,
-        pipeline: PipelineT,
-        create_study: Callable[[], Study],
-        create_search_space: Callable[[Trial], None],
-        score_function: Callable[[PipelineT, DatasetT], float],
-        *,
-        n_trials: Optional[int] = None,
-        timeout: Optional[float] = None,
-        return_optimized: bool = True,
-    ) -> None:
-        self.create_search_space = create_search_space
-        self.score_function = score_function
-        super().__init__(pipeline, create_study, n_trials=n_trials, timeout=timeout, return_optimized=return_optimized)
+@dataclass(repr=False)
+class OptunaSearch(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT]):
+    # We need to provide default values in Python <3.10, as we can not use the keyword-only syntax for dataclasses.
+    create_search_space: Optional[Callable[[Trial], None]] = None
+    score_function: Optional[Callable[[PipelineT, DatasetT], float]] = None
 
     def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
         # Here we define our objective function
 
         def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
             # First we need to select parameters for the current trial
+            if self.create_search_space is None:
+                raise ValueError("No valid search space parameter.")
             self.create_search_space(trial)
             # Then we apply these parameters to the pipeline
             pipeline = pipeline.set_params(**trial.params)
 
             # We wrap the score function with a scorer to avoid writing our own for-loop to aggregate the results.
+            if self.score_function is None:
+                raise ValueError("No valid score function.")
             scorer = Scorer(self.score_function)
 
             # In the end, we calculate the results per datapoint.
@@ -361,28 +360,17 @@ class MinDatapointPerformancePruner(BasePruner):
 from optuna import TrialPruned
 
 
-class OptunaSearchEarlyStopping(CustomOptunaOptimize[PipelineT, DatasetT]):
-    create_search_space: Parameter[Callable[[Trial], None]]
-    score_function: Parameter[Callable[[PipelineT, DatasetT], float]]
-
-    def __init__(
-        self,
-        pipeline: PipelineT,
-        create_study: Callable[[], Study],
-        create_search_space: Callable[[Trial], None],
-        score_function: Callable[[PipelineT, DatasetT], float],
-        *,
-        n_trials: Optional[int] = None,
-        timeout: Optional[float] = None,
-        return_optimized: bool = True,
-    ) -> None:
-        self.create_search_space = create_search_space
-        self.score_function = score_function
-        super().__init__(pipeline, create_study, n_trials=n_trials, timeout=timeout, return_optimized=return_optimized)
+@dataclass(repr=False)
+class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT]):
+    # We need to provide default values in Python <3.10, as we can not use the keyword-only syntax for dataclasses.
+    create_search_space: Optional[Callable[[Trial], None]] = None
+    score_function: Optional[Callable[[PipelineT, DatasetT], float]] = None
 
     def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
         def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
             # First, we need to select parameters for the current trial
+            if self.create_search_space is None:
+                raise ValueError("No valid search space parameter.")
             self.create_search_space(trial)
             # Then, we apply these parameters to the pipeline
             pipeline = pipeline.set_params(**trial.params)
@@ -404,6 +392,8 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize[PipelineT, DatasetT]):
             # We wrap the score function with a Scorer object to avoid writing our own for-loop to aggregate the
             # results. We pass our callback and `trial` which is passed as a generic kwarg to scorer and hence can be
             # accessed from within our callback.
+            if self.score_function is None:
+                raise ValueError("No valid score function.")
             scorer = Scorer(self.score_function, single_score_callback=single_score_callback)
 
             # Calculate the results per datapoint.
@@ -461,7 +451,7 @@ pd.DataFrame(opti_early_stop.search_results_)
 #    `set_user_attr` parameter of the :class:`~optuna.Trial` object.
 # 6. (optional) Early stopping and other Pruners can be implemented identical to Optuna.
 #    Using the callback option of :class:`~tpcp.validate.Scorer` you can even hook into the datapoint iteration to
-#    trigger early stopping.
+#    trigger early stopping during the iteration over the dataset.
 
 
 # %%

@@ -1,4 +1,6 @@
 """Implementation of methods and classes to wrap the optimization Framework `Optuna`."""
+import multiprocessing
+
 try:
     import optuna  # noqa: unused-import
 except ImportError as e:
@@ -10,6 +12,7 @@ import dataclasses
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Sequence, TypeVar, Union
 
+import joblib
 import numpy as np
 from optuna import Study, Trial
 from optuna.study.study import ObjectiveFuncType
@@ -24,15 +27,24 @@ from tpcp.optimize import Optimize
 
 __all__ = ["CustomOptunaOptimize", "CustomOptunaOptimizeT"]
 
-warnings.warn(
-    "The Optuna interface in tpcp is still experimental and we are testing if the workflow makes "
-    "sense even for larger projects. "
-    "This means, the interface for `CustomOptunaOptimize` will likely change in the future.",
-    UserWarning,
-)
+if multiprocessing.parent_process() is None:
+    # We want to avoid spamming the user with warnings if they are running multiple processes
+    warnings.warn(
+        "The Optuna interface in tpcp is still experimental and we are testing if the workflow makes "
+        "sense even for larger projects. "
+        "This means, the interface for `CustomOptunaOptimize` will likely change in the future.",
+        UserWarning,
+    )
 
 
 CustomOptunaOptimizeT = TypeVar("CustomOptunaOptimizeT", bound="_CustomOptunaOptimize")
+
+
+def _split_trials(n_trials, n_jobs):
+    n_per_job, remaining = divmod(n_trials, n_jobs)
+    for _ in range(n_jobs):
+        yield n_per_job + (1 if remaining > 0 else 0)
+        remaining -= 1
 
 
 class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
@@ -47,6 +59,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]]
     gc_after_trial: bool
     show_progress_bar: bool
+    n_jobs: int
 
     optimized_pipeline_: PipelineT
     study_: Study
@@ -122,14 +135,61 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         self.dataset = dataset
 
         objective = self._create_objective(self.pipeline, dataset=dataset)
-        study = self.create_study()
-        self.study_ = self._call_optimize(study, objective)
+        self.study_ = self.create_study()
+
+        if not isinstance(self.study_._storage, optuna.storages.InMemoryStorage):
+            warnings.warn(
+                "You are using a persistent storage for the study. "
+                "This means, that the study will be saved and likely be available after this script "
+                "terminates. "
+                "To avoid issues and make sure that runs of your optimizations are reproducible and "
+                "independent, make sure to cleanup the persistent storage once the results are not needed "
+                "anymore.\n"
+                "You can use use `optuna.delete_study(study_name=opti_instance.study_.study_name, "
+                "storage=opti_instance.study_._storage)`. "
+                "Note that all result object that depend on the study are not available anymore after deletion."
+            )
+
+        if self.n_jobs == 1:
+            self._call_optimize(self.study_, objective)
+        else:
+            if isinstance(self.study_._storage, optuna.storages.InMemoryStorage):
+                raise ValueError(
+                    "You are using the InMemoryStorage with n_jobs > 1. "
+                    "This will lead to problems as the storage is not persistent and thread safe. "
+                    "Use a persistent database based storage instead."
+                )
+            if self.timeout is not None:
+                raise ValueError(
+                    "You are using timeout with n_jobs > 1. "
+                    "This parameter does not make sense in this case. "
+                    "You `n_trials` instead to limit for how long the optimization should run."
+                )
+
+            if self.show_progress_bar:
+                warnings.warn(
+                    "You are using a progress bar with n_jobs > 1. "
+                    "This might lead to strange behaviour, as each process will launch its own process bar with "
+                    "n_trials/n_jobs steps."
+                )
+
+            # This solution is based on the solution proposed here:
+            # https://github.com/optuna/optuna/issues/2862
+            def _multi_process_call_optimize(n_trials: int):
+                study = optuna.load_study(study_name=self.study_.study_name, storage=self.study_._storage)
+                self._call_optimize_multi_process(study, objective, n_trials)
+
+            parallel = joblib.Parallel(self.n_jobs)
+            parallel(
+                joblib.delayed(_multi_process_call_optimize)(n_trials=n_trials_i)
+                for n_trials_i in _split_trials(self.n_trials, self.n_jobs)
+            )
 
         if self.return_optimized:
             self.optimized_pipeline_ = self.return_optimized_pipeline(clone(self.pipeline), dataset, self.study_)
         return self
 
-    def _call_optimize(self, study: Study, objective: ObjectiveFuncType) -> Study:
+    def _call_optimize(self, study: Study, objective: ObjectiveFuncType):
         """Call the optuna study.
 
         This is a separate method to make it easy to modify how the study is called.
@@ -141,6 +201,17 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
             callbacks=self.callbacks,
             gc_after_trial=self.gc_after_trial,
             show_progress_bar=self.show_progress_bar,
+        )
+        return study
+
+    def _call_optimize_multi_process(self, study: Study, objective: ObjectiveFuncType, n_trials: int):
+        study.optimize(
+            objective,
+            n_trials=n_trials,
+            timeout=None,  # This does not work with multiprocessing
+            callbacks=self.callbacks,
+            gc_after_trial=self.gc_after_trial,
+            show_progress_bar=self.show_progress_bar,  # This is a little strange. We warn about it above
         )
         return study
 
@@ -236,10 +307,17 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         List of callback functions that are invoked at the end of each trial.
         Each function must accept two parameters with the following types in this order:
         :class:`~optuna.study.Study` and :class:`~optuna.FrozenTrial`.
+    n_jobs
+        Number of parallel jobs to use (default = 1 -> single process, -1 -> all available cores).
+        This uses joblib with the multiprocessing backend to parallelize the optimization.
+        If this is set to -1, all available cores are used.
+
+        .. warning:: Read the notes on multiprocessing below before using this feature.
+
     show_progress_bar
         Flag to show progress bars or not.
     gc_after_trial
-        Run the garbage collerctor after each trial.
+        Run the garbage collector after each trial.
         Check the optuna documentation for more detail
 
     Other Parameters
@@ -311,13 +389,40 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
     Notes
     -----
-    As this wrapper attempts to fully encapsule all Optuna calls to make it possible to be run seamlessly in a
-    cross-validation (or similar), you can not start multiple optuna optimizations at the same time which is the
-    preffered way of multi-processing for optuna.
-    In result, you are limited to single-process operations.
-    If you want to get "hacky" you can try the approach suggested
-    `here <https://github.com/optuna/optuna/issues/2862>`__ to create a study that uses joblib for internal
-    multiprocessing.
+    Multiprocessing
+    ***************
+    This class provides a relatively hacky implementation of multiprocessing.
+    The implementation is based on the suggestions made here: https://github.com/optuna/optuna/issues/2862
+    However, it depends on internal optuna APIs and might break in future versions.
+
+    To use multiprocessing, the provided `create_study` function must return a study with a persistent backend (
+    i.e. not the default InMemoryStorage), that can be written to by multiple processes.
+    To make sure that your individual runs are independent and you don't leave behind any files, make sure you clean
+    up your study after each run. You can use `optuna.delete_study(study_name=opti_instance.study_.study_name,
+    storage=opti_instance.study_._storage)` for this.
+
+    From the implementation perspective, we split the number of trials into `n_jobs` chunks and then spawn one study
+    per job.
+    This study is a copy of the study from the main process and hence, points to the same database.
+    Each process will then complete its chunk of trials and then terminate.
+    This is a relatively naive implementation, but it avoids the overhead of spawning a new process for each trial.
+    If this is always the best idea, is unclear.
+
+    One downside of using multiprocessing is, that your runs will not be reproducible, as the order of the trials is not
+    guraranteed and depends on when the individual processes finish.
+    This can lead to different suggested parameters when non-trivial samplers are used.
+    Note that this is not a specific problem of our implementation, but a general problem of using multiprocessing with
+    optuna.
+
+    Further, the use of `show_progress_bar` is not recommended when using multiprocessing, as one progress bar per
+    process is
+    created and the output is not very readable.
+    It might still be helpful to see that something is happening.
+
+    .. note:: Using SQLite as backend is known to cause issues with multiprocessing, when the database is
+              stored on a network drive (e.g. as typically done on a cluster).
+              On most clusters, you should use the local storage of your node for the database or use a
+              different backend (e.g. Redis, MySQL), if multiple nodes need to access the database at once.
 
     """
 
@@ -330,6 +435,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         timeout: Optional[float] = None,
         callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None,
         gc_after_trial: bool = False,
+        n_jobs: int = 1,
         show_progress_bar: bool = False,
         return_optimized: bool = True,
     ):
@@ -341,7 +447,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         self.callbacks = callbacks
         self.gc_after_trial = gc_after_trial
         self.show_progress_bar = show_progress_bar
-
+        self.n_jobs = n_jobs
         self.return_optimized = return_optimized
 
     @staticmethod
@@ -362,6 +468,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             gc_after_trial: bool = False
             show_progress_bar: bool = False
 
+            n_jobs: int = 1
             return_optimized: bool = True
 
             optimized_pipeline_: PipelineT = dataclasses.field(init=False, repr=False)
@@ -391,6 +498,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             gc_after_trial: bool = False
             show_progress_bar: bool = False
 
+            n_jobs: int = (1,)
             return_optimized: bool = True
 
             optimized_pipeline_: PipelineT = field(init=False, repr=False)
