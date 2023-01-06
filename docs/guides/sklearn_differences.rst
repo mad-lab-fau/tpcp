@@ -1,5 +1,6 @@
 Sklearn Differences
 ===================
+.. _sklearn_differences:
 
 The core of the tpcp API is inspired by the scikit-learn API.
 However, sklearn (by nature) is focused on supervised machine learning algorithms and hence, their focus is on making

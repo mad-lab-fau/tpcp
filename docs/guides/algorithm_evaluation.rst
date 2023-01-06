@@ -63,8 +63,8 @@ Group 1
     Traditional algorithms without any data-trained aspects fall into this group.
     Hence, this group has just *parameters*.
     All "traditional" algorithm fall into this category.
-    For example, in the context of biosignal analysis, the Pan-Tompkins algorithm to detect R-peaks in a ECG signal or
-    the algorithm by Rammpp et al. to detect heel strikes in a IMU data of walking (TODO: add cites).
+    For example, in the context of biosignal analysis, the Pan-Tompkins algorithm to detect R-peaks in a ECG signal [1]_
+    or the algorithm by Rammpp et al. to detect heel strikes in a IMU data of walking [2]_.
     Such algorithms, have a couple of parameters (like filter coefficients or the size of search windows), that can
     either be kept at there "default" values provided in literature or could be optimized by using a brute-force method,
     to improve results for certain scenarios.
@@ -683,3 +683,10 @@ While this might be less robust, or even might lead to accidental train-test lea
 to human biases, it is better than not being able to do an experiment at all.
 This should absolutely not incentivize you to do the same, if you are annoyed by your computer needing to work for
 5 min, but it should simply show you that this guide assumes an "ideal world", which you can not always expect.
+
+
+References
+==========
+
+.. [1] Pan and Tompkins, “A Real-Time QRS Detection Algorithm.”
+.. [2] Rampp et al., “Inertial Sensor-Based Stride Parameter Calculation From Gait Sequences in Geriatric Patients.”

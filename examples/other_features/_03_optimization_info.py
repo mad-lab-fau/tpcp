@@ -196,7 +196,6 @@ optimizer.optimized_pipeline_
 # %%
 # As `Optimize` is aware of this and stores the info as a result attribute, the information is also available in the
 # output of a cross validation.
-# TODO: Make GridSearchCV aware of it!
 
 # %%
 # Further Notes

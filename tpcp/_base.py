@@ -184,8 +184,8 @@ def _custom_get_type_hints(cls: Type[_BaseTpcpObject]) -> Dict[str, Any]:
             if value is None:
                 value = type(None)
             elif isinstance(value, str):
-                # TODO: This does not check if the str is a valid expression.
-                #   This might not be an issue, but could lead to obscure error messages.
+                # NOTE: This does not check if the str is a valid expression.
+                #       This might not be an issue, but could lead to obscure error messages.
                 value = _retry_eval_with_missing_locals(value, base_globals)
             hints[name] = value
     return hints
@@ -634,7 +634,7 @@ def clone(algorithm: T, *, safe: bool = False) -> T:
                   This clone method, will deepcopy sklearn models.
                   This means fitted models will be copied and are still available afterwards.
                   For more information have a look at the documentation about "inputs and results" in tpcp.
-                  TODO: Link
+                  (see :ref:`general concepts <general_concepts>` and :ref:`sklearn differences <sklearn_differences>`)
 
     Parameters
     ----------
