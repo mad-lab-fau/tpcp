@@ -6,6 +6,7 @@ ignore-paths:
   - tests
   - _tasks.py
   - examples
+  - example_data
 
 pycodestyle:
   options:
@@ -14,6 +15,12 @@ pycodestyle:
     - E127
     - W391
     - E203 # ignoring white space before colon :
+
+mccabe:
+  disable:
+    # Disable complexity checks for now, as they seems to be no way to just disable the complexity check for a single
+    # function in the new prospector versions
+    - MC0001 # too complex
 
 pydocstyle:
   options:

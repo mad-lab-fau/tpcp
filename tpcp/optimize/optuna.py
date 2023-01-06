@@ -8,7 +8,6 @@ except ImportError as e:
         "To use the tpcp Optuna interface, you first need to install optuna (`pip install optuna`)"
     ) from e
 
-import dataclasses
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Sequence, TypeVar, Union
 
@@ -458,6 +457,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     @staticmethod
     def as_dataclass():
         """Return a version of the Dataset class that can be subclassed using dataclasses."""
+        import dataclasses  # pylint: disable=import-outside-toplevel
 
         @dataclasses.dataclass(eq=False, repr=False, order=False)
         class CustomOptunaOptimizeDc(_CustomOptunaOptimize[PipelineT, DatasetT]):
@@ -487,7 +487,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
         Note, this requires `attrs` to be installed!
         """
-        from attrs import define, field  # noqa: import-outside-toplevel
+        from attrs import define, field  # pylint: disable=import-outside-toplevel
 
         @define(eq=False, repr=False, order=False, kw_only=True, slots=False)
         class CustomOptunaOptimizeAt(_CustomOptunaOptimize[PipelineT, DatasetT]):

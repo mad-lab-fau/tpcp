@@ -1,5 +1,4 @@
 """Base class for all datasets."""
-import dataclasses
 from typing import Dict, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, cast, overload
 
 import numpy as np
@@ -150,10 +149,7 @@ class _Dataset(BaseTpcpObject):
         """
         if (
             list(
-                map(
-                    lambda x: x is None or (isinstance(x, dict) and len(x) == 0),
-                    (groups, index, bool_map, kwargs),
-                )
+                map(lambda x: x is None or (isinstance(x, dict) and len(x) == 0), (groups, index, bool_map, kwargs),)
             ).count(False)
             > 1
         ):
@@ -535,10 +531,7 @@ class Dataset(_Dataset):
     """
 
     def __init__(
-        self,
-        *,
-        groupby_cols: Optional[Union[List[str], str]] = None,
-        subset_index: Optional[pd.DataFrame] = None,
+        self, *, groupby_cols: Optional[Union[List[str], str]] = None, subset_index: Optional[pd.DataFrame] = None,
     ):
         self.groupby_cols = groupby_cols
         self.subset_index = subset_index
@@ -546,6 +539,7 @@ class Dataset(_Dataset):
     @staticmethod
     def as_dataclass():
         """Return a version of the Dataset class that can be subclassed using dataclasses."""
+        import dataclasses  # pylint: disable=import-outside-toplevel
 
         @dataclasses.dataclass(eq=False, repr=False, order=False)
         class DatasetDc(_Dataset):
@@ -562,7 +556,7 @@ class Dataset(_Dataset):
 
         Note, this requires `attrs` to be installed!
         """
-        from attrs import define  # noqa: import-outside-toplevel
+        from attrs import define  # pylint: disable=import-outside-toplevel
 
         @define(eq=False, repr=False, order=False, kw_only=True, slots=False)
         class DatasetAt(_Dataset):

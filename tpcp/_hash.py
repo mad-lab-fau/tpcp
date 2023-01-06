@@ -77,7 +77,7 @@ class TorchHasher(NoMemoizeNumpyHasher):
 
     def __init__(self, hash_name="md5", coerce_mmap=False):
         super().__init__(hash_name, coerce_mmap)
-        import torch  # noqa: import-outside-toplevel
+        import torch  # pylint: disable=import-outside-toplevel
 
         self.torch = torch
 

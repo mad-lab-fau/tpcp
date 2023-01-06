@@ -22,9 +22,9 @@ if TYPE_CHECKING:
     from tpcp._optimize import BaseOptimize
     from tpcp.validate import Scorer
 
-_SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
-_AGG_SCORE_TYPE = Union[Dict[str, float], float]  # noqa: invalid-name
-_SINGLE_SCORE_TYPE = Union[Dict[str, List[float]], List[float]]  # noqa: invalid-name
+_SCORE_TYPE = Union[Dict[str, float], float]  # pylint: disable=invalid-name
+_AGG_SCORE_TYPE = Union[Dict[str, float], float]  # pylint: disable=invalid-name
+_SINGLE_SCORE_TYPE = Union[Dict[str, List[float]], List[float]]  # pylint: disable=invalid-name
 
 
 class _ScoreResults(TypedDict, total=False):

@@ -765,7 +765,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
 
         return self
 
-    def _format_results(self, candidate_params, n_splits, out, more_results=None):  # noqa: MC0001
+    def _format_results(self, candidate_params, n_splits, out, more_results=None):  # mccabe: disable=MC0001
         """Format the final result dict.
 
         This function is adapted based on sklearn's `BaseSearchCV`.

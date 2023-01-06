@@ -249,7 +249,7 @@ def _get_nested_opti_paras(algorithm: Algorithm, opti_para_names: List[str]) -> 
     return optimizable_paras, other_paras
 
 
-def _check_safe_optimize(  # noqa: MC0001
+def _check_safe_optimize(  # pylint: disable=too-many-branches
     algorithm: OptimizableT, old_method: Callable, *args: Any, **kwargs: Any
 ) -> OptimizableT:
 

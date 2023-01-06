@@ -103,7 +103,9 @@ class NoAgg(Aggregator[Any]):
     """
 
     @classmethod
-    def aggregate(cls, /, values: Sequence[Any], datapoints: Sequence[Dataset]) -> _Nothing:  # noqa: unused-argument
+    def aggregate(  # pylint: disable=unused-argument
+        cls, /, values: Sequence[Any], datapoints: Sequence[Dataset]
+    ) -> _Nothing:
         """Return nothing, indicating no aggregation."""
         return NOTHING
 
@@ -178,7 +180,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         """
         return self._score(pipeline=pipeline, dataset=dataset)
 
-    def _aggregate(  # noqa: no-self-use
+    def _aggregate(  # mccabe: disable=MC0001
         self,
         scores: Union[Tuple[Type[Aggregator[T]], List[T]], Dict[str, Tuple[Type[Aggregator[T]], List[T]]]],
         datapoints: List[DatasetT],
@@ -253,11 +255,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             scores.append(score)
             if self._single_score_callback:
                 self._single_score_callback(
-                    step=i,
-                    scores=tuple(scores),
-                    scorer=self,
-                    pipeline=pipeline,
-                    dataset=dataset,
+                    step=i, scores=tuple(scores), scorer=self, pipeline=pipeline, dataset=dataset,
                 )
             datapoints.append(d)
 
@@ -285,7 +283,7 @@ def _validate_scorer(
             pipeline.score(Dataset())  # type: ignore
         except NotImplementedError as e:
             raise e
-        except Exception:  # noqa: broad-except
+        except Exception:  # pylint: disable=broad-except
             pass
         scoring = _passthrough_scoring
     if isinstance(scoring, base_class):
@@ -303,8 +301,10 @@ _non_homogeneous_scoring_error = ValidationError(
 )
 
 
-def _check_and_invert_score_dict(  # noqa: MC0001  I don't care that this is to complex, some things need to be complex
-    scores: List[ScoreTypeT[T]], default_agg: Type[Aggregator]
+def _check_and_invert_score_dict(  # mccabe: disable=MC0001
+    #  I don't care that this is to complex, some things need to be complex
+    scores: List[ScoreTypeT[T]],
+    default_agg: Type[Aggregator],
 ) -> Union[Tuple[Type[Aggregator[T]], List[T]], Dict[str, Tuple[Type[Aggregator[T]], List[T]]]]:
     """Invert the scores dictionary to a list of scores."""
     first_score = scores[0]

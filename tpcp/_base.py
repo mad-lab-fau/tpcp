@@ -123,7 +123,7 @@ def _retry_eval_with_missing_locals(
     # We use a value here instead of a "while True" to not get the program stuck in an endless loop.
     for _ in range(100):
         try:
-            val = eval(expression, globalns, localns)  # noqa: eval-used
+            val = eval(expression, globalns, localns)  # pylint: disable=eval-used
             break
         except NameError as e:
             missing = str(e).split("'")[1]
@@ -357,7 +357,7 @@ class BaseTpcpObject(_BaseTpcpObject):
         return "".join(result) + ")"
 
     @classmethod
-    def __clone_param__(cls, param_name: str, value: Any) -> Any:  # noqa: unused-argument
+    def __clone_param__(cls, param_name: str, value: Any) -> Any:  # pylint: disable=unused-argument
         """Handle cloning of specific parameters of the object.
 
         This method exists only to allow object the handling of "strange" python datatypes that can not be deepcopied
@@ -725,7 +725,7 @@ class CloneFactory(BaseFactory, Generic[T]):
 # Ideally clone factory would be some generic type of proxy, but it isn't.
 # Therefore, we fake the return type, so that external type checking in user code works without any errors.
 # As long as `cf` is used for its intended purpose that should not matter much.
-def cf(default_value: T) -> T:  # noqa: invalid-name
+def cf(default_value: T) -> T:  # pylint: disable=invalid-name
     """Wrap mutable default value with the `CloneFactory`.
 
     This is basically an alias for :class:`~tpcp.CloneFactory`
