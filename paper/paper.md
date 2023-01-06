@@ -76,7 +76,7 @@ algorithm interface.
 The second example is a comparison of stride detection algorithms based on IMU data recently published by @Roth2021a.
 The authors compared a custom Hidden Markov Model implemented using 
 [`pomegranate`](https://pomegranate.readthedocs.io/en/latest/) [@Schreiber2017] with an implementation of a template 
-matching algorithm based on [@Barth2013].
+matching algorithm based on @Barth2013.
 In their data, two recordings were available per participant – one in a controlled lab setting and one from an 
 unsupervised recording at home.
 As part of their analysis, the authors wanted to show that it is sufficient to train algorithms based on the lab data 
