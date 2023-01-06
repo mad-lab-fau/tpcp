@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.13.0] - unreleased
 
+### Changed
+- Some minor improvements to the documentation
+
 ### Added
 - Added an option to the optuna search to use multiprocessing using the suggestions made in 
   https://github.com/optuna/optuna/issues/2862 .

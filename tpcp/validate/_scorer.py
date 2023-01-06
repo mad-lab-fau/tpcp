@@ -103,9 +103,7 @@ class NoAgg(Aggregator[Any]):
     """
 
     @classmethod
-    def aggregate(  # pylint: disable=unused-argument
-        cls, /, values: Sequence[Any], datapoints: Sequence[Dataset]
-    ) -> _Nothing:
+    def aggregate(cls, /, values: Sequence[Any], datapoints: Sequence[Dataset]) -> _Nothing:
         """Return nothing, indicating no aggregation."""
         return NOTHING
 
