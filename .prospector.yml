@@ -57,3 +57,4 @@ pylint:
     - too-many-lines
     - bad-whitespace
     - cyclic-import # ignored because of false positive due to Type hints
+    - import-error # We check if our dependencies are installed in the tests, no need for the linter
