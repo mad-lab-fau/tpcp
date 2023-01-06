@@ -14,7 +14,7 @@ In this procedure, you perform multiple train-test splits and average the result
 For more information see our :ref:`evaluation guide <algorithm_evaluation>` and the `sklearn guide on cross
 validation <https://scikit-learn.org/stable/modules/cross_validation.html>`_.
 
-In this example, we will learn how to use the :func:`~tpcp.optimize.cross_validate` function implemented in
+In this example, we will learn how to use the :func:`~tpcp.validate.cross_validate` function implemented in
 tcpc.
 For this, we will redo the example on :ref:`optimizable pipelines <optimize_pipelines>` but we will perform the final
 evaluation via cross-validation.

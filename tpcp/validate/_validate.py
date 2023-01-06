@@ -41,14 +41,14 @@ def cross_validate(
     Parameters
     ----------
     optimizable
-        A optimizable class instance like :class:`~tpcp.GridSearch`/:class:`~tpcp.GridSearchCV` or a
+        A optimizable class instance like :class:`~tpcp.optimize.GridSearch`/:class:`~tpcp.optimize.GridSearchCV` or a
         :class:`~tpcp.Pipeline` wrapped in an `Optimize` object (:class:`~tpcp.OptimizablePipeline`).
     dataset
         A :class:`~tpcp.Dataset` containing all information.
     groups
         Group labels for samples used by the cross validation helper, in case a grouped CV is used (e.g.
         :class:`~sklearn.model_selection.GroupKFold`).
-        Check the documentation of the :class:`~tpcp.dataset.Dataset` class and the respective example for
+        Check the documentation of the :class:`~tpcp.Dataset` class and the respective example for
         information on how to generate group labels for tpcp datasets.
 
         The groups will be passed to the optimizers `optimize` method under the same name, if `propagate_groups` is
@@ -83,10 +83,12 @@ def cross_validate(
     optimize_params
         Additional parameter that are forwarded to the `optimize` method.
     propagate_groups
-        In case your optimizable is a cross validation based optimize (e.g. :class:`~tpcp.GridSearchCv`) and you are
-        using a grouped cross validation, you probably want to use the same grouped CV for the outer and the inner
-        cross validation. If `propagate_groups` is True, the group labels belonging to the training of each fold are
-        passed to the `optimize` method of the optimizable. This only has an effect if `groups` are specified.
+        In case your optimizable is a cross validation based optimize (e.g. :class:`~tpcp.optimize.GridSearchCv`) and
+        you are using a grouped cross validation, you probably want to use the same grouped CV for the outer and the
+        inner cross validation.
+        If `propagate_groups` is True, the group labels belonging to the training of each fold are passed to the
+        `optimize` method of the optimizable.
+        This only has an effect if `groups` are specified.
     propagate_mock_labels
         For the same reason as `propagate_groups`, you might also want to forward the value provided for
         `mock_labels` to the optimization workflow.

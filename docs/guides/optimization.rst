@@ -16,8 +16,8 @@ This can be traditional ML training of model weights, black-box optimizations of
 of thresholds in classical algorithms.
 Therefore, we attempt to have a unified interface for all these cases.
 
-This is achieved by defining "optimization" as any form of data-driven optimization of the "parameters"
-(see :ref:`parameters`) specified in the `__init__` of an algorithm.
+This is achieved by defining "optimization" as any form of data-driven optimization of the
+:ref:`"parameters" <parameters_ref>` specified in the `__init__` of an algorithm.
 This optimization can be performed via *internal* optimization implemented in a `self_optimize` method on the pipeline
 or via *external* optimization like the :class:`~tpcp.optimize.GridSearch` wrapper.
 
@@ -56,7 +56,7 @@ They can fall into three categories:
 2. hyper-parameters: These are parameters that change, how the optimization in `self_optimize` is performed.
 3. "normal" parameters: Basically everything else. These parameters do neither influence nor are influenced by
    `self_optimize`. They only influence the output of the `action` method of the pipeline. See the
-   `evaluation guide <algorithm_evaluation>`_ to better understand the distinction between parameters and
+   :ref:`evaluation guide <algorithm_evaluation>` to better understand the distinction between parameters and
    hyper-parameters.
 
 To make these distinction clear (for human and machine), `tpcp` provides a set of Type hints that can be applied
@@ -81,7 +81,7 @@ Such checks can be performed by :class:`~tpcp.optimize.Optimize` class or the :c
 decorators based on the provided parameter annotations.
 Have a look at the documentation there to understand which checks are performed.
 
-To see these parameter annotations in action, check out this `example <optimize_pipelines>`_.
+To see these parameter annotations in action, check out this :ref:`example <optimize_pipelines>`.
 
 .. note:: One special case of parameter annotations is the `tpcp.PureParameter`.
           It can be used to annotate a parameter that does **not** influence the `self_optmize` method of a pipeline.

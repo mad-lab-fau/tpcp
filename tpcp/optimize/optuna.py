@@ -288,15 +288,15 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         (i.e. `cross_validate`).
     n_trials
         The number of trials.
-        If this argument is set to :obj:`None`, there is no limitation on the number of trials.
-        In this case you should use :obj:`timeout` instead.
+        If this argument is set to `None`, there is no limitation on the number of trials.
+        In this case you should use `timeout` instead.
         Because optuna is called internally by this wrapper, you can not set up a study without limits and end it
         using CTRL+C (as suggested by the Optuna docs).
         In this case the entire execution flow would be stopped.
     timeout
         Stop study after the given number of second(s).
-        If this argument is set to :obj:`None`, the study is executed without time limitation.
-        In this case you should use :obj:`n_trials` to limit the execution.
+        If this argument is set to `None`, the study is executed without time limitation.
+        In this case you should use `n_trials` to limit the execution.
     return_optimized
         If True, a pipeline object with the overall best parameters is created and re-optimized using all provided data
         as input.
@@ -311,7 +311,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     callbacks
         List of callback functions that are invoked at the end of each trial.
         Each function must accept two parameters with the following types in this order:
-        :class:`~optuna.study.Study` and :class:`~optuna.FrozenTrial`.
+        :class:`~optuna.study.Study` and :class:`~optuna.trial.FrozenTrial`.
     n_jobs
         Number of parallel jobs to use (default = 1 -> single process, -1 -> all available cores).
         This uses joblib with the multiprocessing backend to parallelize the optimization.

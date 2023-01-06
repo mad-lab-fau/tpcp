@@ -147,7 +147,8 @@ intersphinx_module_mapping = {
     "matplotlib": (" https://matplotlib.org/stable/", None),
     "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", None),
     "sklearn": ("https://scikit-learn.org/stable/", None),
-    "optuna": ("https://optuna.readthedocs.io/en/stable", None)
+    "optuna": ("https://optuna.readthedocs.io/en/stable", None),
+    "joblib": ("https://joblib.readthedocs.io/en/latest/", None),
 }
 
 user_agent = "Mozilla/5.0 (X11; Linux x86_64; rv:25.0) Gecko/20100101 Firefox/25.0"

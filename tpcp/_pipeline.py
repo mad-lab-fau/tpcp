@@ -33,7 +33,7 @@ class Pipeline(Algorithm, Generic[DatasetT]):
         Parameters
         ----------
         datapoint
-            An instance of a :class:`tpcp.dataset.Dataset` containing only a single datapoint.
+            An instance of a :class:`tpcp.Dataset` containing only a single datapoint.
             The structure of the data will depend on the dataset.
 
         Returns
@@ -60,7 +60,7 @@ class Pipeline(Algorithm, Generic[DatasetT]):
         Parameters
         ----------
         datapoint
-            An instance of a :class:`tpcp.dataset.Dataset` containing only a single datapoint.
+            An instance of a :class:`tpcp.Dataset` containing only a single datapoint.
             The structure of the data will depend on the dataset.
 
         Returns
@@ -86,7 +86,7 @@ class Pipeline(Algorithm, Generic[DatasetT]):
         Parameters
         ----------
         datapoint
-            An instance of a :class:`tpcp.dataset.Dataset` containing only a single datapoint.
+            An instance of a :class:`tpcp.Dataset` containing only a single datapoint.
             The structure of the data and the available reference information will depend on the dataset.
 
         Returns
@@ -138,7 +138,7 @@ class OptimizablePipeline(Pipeline[DatasetT]):
         Parameters
         ----------
         dataset
-            An instance of a :class:`tpcp.dataset.Dataset` containing one or multiple data points that can
+            An instance of a :class:`tpcp.Dataset` containing one or multiple data points that can
             be used for training.
             The structure of the data and the available reference information will depend on the dataset.
         kwargs
@@ -168,7 +168,7 @@ class OptimizablePipeline(Pipeline[DatasetT]):
         Parameters
         ----------
         dataset
-            An instance of a :class:`tpcp.dataset.Dataset` containing one or multiple data points that can
+            An instance of a :class:`tpcp.Dataset` containing one or multiple data points that can
             be used for training.
             The structure of the data and the available reference information will depend on the dataset.
         kwargs

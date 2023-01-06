@@ -29,7 +29,7 @@ HyperParameter = Annotated[T, _ParaTypes.HYPER]
 HyperParameter.__doc__ = cleandoc(
     """Mark class attribute as a hyper-parameter for an algorithm or pipeline.
 
-Compared to normal parameters (:func:`~tpcp.parameter`), hyper-parameters must only be specified for optimizable
+Compared to normal parameters (:class:`~tpcp.Parameter`), hyper-parameters must only be specified for optimizable
 Algorithms or Pipelines.
 Hyper-Parameter are expected to change the outcome of the `self_optimize` method, but not change themself during the
 optimization procedure.
@@ -41,7 +41,7 @@ PureParameter = Annotated[T, _ParaTypes.PURE]
 PureParameter.__doc__ = cleandoc(
     """Mark a class attribute as pure parameter for an algorithm or pipeline.
 
-Compared to normal parameters (:func:`~tpcp.parameter`), pure parameters must only be specified for optimizable
+Compared to normal parameters (:class:`~tpcp.Parameter`), pure parameters must only be specified for optimizable
 Algorithms or Pipelines.
 Pure parameters are expected to **not** influence the outcome of self optimize.
 This information can be used for internal checks and performance optimizations.
@@ -59,7 +59,7 @@ OptimizableParameter = Annotated[T, _ParaTypes.OPTI]
 OptimizableParameter.__doc__ = cleandoc(
     """Mark class attribute as an optimizable parameter for an algorithm or pipeline.
 
-Compared to normal parameters (:func:`~tpcp.parameter`), optimizable parameters must only be specified for optimizable
+Compared to normal parameters (:class:`~tpcp.Parameter`), optimizable parameters must only be specified for optimizable
 Algorithms or Pipelines.
 Optimizable parameters are expected to be modified when calling `self_optimize`.
 This information can be used for internal checks and performance optimizations.

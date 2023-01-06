@@ -3,7 +3,7 @@ General Concepts
 
 Parameters
 ----------
-.. _parameters:
+.. _parameters_ref:
 
 Parameters define the behavior of an algorithm or a pipeline.
 They are knobs you can turn to make the analysis behave like you want to.
@@ -16,7 +16,7 @@ This means we can modify them when creating a new instance:
     >>> my_algo.para_1
     value1
 
-The initialization of objects in `tpcp` never has side effects (with the exceptions of `mutable handling <mutable_defaults>`_).
+The initialization of objects in `tpcp` never has side effects (with the exceptions of :ref:`mutable handling <mutable_defaults>`).
 This means all parameters will be added to the instance using the same name and without modification.
 
 Potential validation of parameters is only performed when the algorithm is actually run.
@@ -46,14 +46,14 @@ The latter becomes important, when we are talking about optimizing algorithms.
 Because only parameters exposed in the init can be optimized in tpcp.
 This means, if you want to use tpcp to train a neuronal network, some data structure representing the network must be
 one of the parameters.
-You can learn more about that in the `optimization guide <optimization>`_.
+You can learn more about that in the :ref:`optimization guide <optimization>`.
 
 Composite Parameters
 --------------------
 Sometimes it is required for a Pipeline or Algorithm to take a list of parameters or other algorithm objects as input.
 We support that via compound fields.
 
-Read more about this advanced feature in `our example <compositeobjects>`_.
+Read more about this advanced feature in :ref:`our example <compositeobjects>`.
 
 Results
 -------
@@ -108,7 +108,8 @@ For example, when iterating over a dataset and applying an algorithm to each dat
 instance of the algorithm to eliminate any chance of train-test leaks and to not overwrite the results stored on the
 algorithm object.
 In `tpcp` we use the `clone` method for that.
-It creates a new instance of an algorithm with the same parameters. All parameters are copied as well in case they are nested algorithms or other complex structures.
+It creates a new instance of an algorithm with the same parameters. All parameters are copied as well in case they are
+nested algorithms or other complex structures.
 
 .. code-block:: python
 

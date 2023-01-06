@@ -163,14 +163,14 @@ def f1_score(pipeline: MyPipeline, datapoint: ECGExampleData) -> float:
 #
 # Because we define the function nested within another method, we have access to all class parameters.
 # Hence, if we want to add certain configurations to our objective, we can add parameters to the
-# :class:`~tpcp.optimize.Optimizer` itself and then access it in the objective function.
+# Optimizer itself and then access it in the objective function.
 #
-# For the :class:`~tpcp.optimize.Optimizer` we want to build we primarily need two custom pieces of configuration:
+# For the Optimizer we want to build we primarily need two custom pieces of configuration:
 #
 # 1. The score function we want to use. We want to make that configurable and not hard-code "f1-score" into our
 #    optimizer.
 # 2. The search space for the parameter search. In Optuna the search space is defined by calls to methods on a
-#    :class:`optuna.Trial` object. Therefore, we take in a callable that gets the trial object passed and returns
+#    :class:`optuna.trial.Trial` object. Therefore, we take in a callable that gets the trial object passed and returns
 #    the selected parameters. You will see how this works later on.
 #
 # With these two pieces of configuration in place our objective needs to simply do four things:
@@ -188,7 +188,7 @@ def f1_score(pipeline: MyPipeline, datapoint: ECGExampleData) -> float:
 # With that, our implementation looks as follows:
 from dataclasses import dataclass
 
-from optuna import Study, Trial
+from optuna import Trial
 
 from tpcp.optimize.optuna import CustomOptunaOptimize
 from tpcp.types import DatasetT, PipelineT
@@ -442,13 +442,13 @@ pd.DataFrame(opti_early_stop.search_results_)
 #
 # 1. Create a custom optimizer than inherits from `CustomOptunaOptimize`
 # 2. Overwrite the `create_objective` method so that it returns a Callable.
-# 3. The returned callable should expect a :class:`~optuna.Trial`, a :class:`~tpcp.Pipeline`,
+# 3. The returned callable should expect a :class:`~optuna.trial.Trial`, a :class:`~tpcp.Pipeline`,
 #    and a :class:`~tpcp.Dataset` object as input.
 #    Otherwise, it is identical to the objective function you would write in "plain" Optuna, and hence, should only
 #    return a single cost value for the optimization.
 # 4. If your objective function requires parameter, add them as class attributes via the init.
 # 5. (optional) If you want to report additional values from your optimization, you can do that via the
-#    `set_user_attr` parameter of the :class:`~optuna.Trial` object.
+#    `set_user_attr` parameter of the :class:`~optuna.trial.Trial` object.
 # 6. (optional) Early stopping and other Pruners can be implemented identical to Optuna.
 #    Using the callback option of :class:`~tpcp.validate.Scorer` you can even hook into the datapoint iteration to
 #    trigger early stopping during the iteration over the dataset.

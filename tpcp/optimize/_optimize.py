@@ -165,7 +165,7 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
         Parameters
         ----------
         dataset
-            An instance of a :class:`~tpcp.dataset.Dataset` containing one or multiple data points that can
+            An instance of a :class:`~tpcp.Dataset` containing one or multiple data points that can
             be used for optimization.
             The structure of the data and the available reference information will depend on the dataset.
         optimize_params
@@ -259,7 +259,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
     ----------
     gs_results_
         A dictionary summarizing all results of the gridsearch.
-        The format of this dictionary is designed to be directly passed into the :class:`~pd.DataFrame` constructor.
+        The format of this dictionary is designed to be directly passed into the :class:`~pandas.DataFrame` constructor.
         Each column then represents the result for one set of parameters
 
         The dictionary contains the following entries:
@@ -491,7 +491,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         However, setting it incorrectly can lead detect errors that are very hard to detect in the final results.
 
         Instead of passing a list of names, you can also just set the value to `True`.
-        In this case all parameters of the provided pipeline that are marked as :func:`~tpcp.pure_parameter` are used.
+        In this case all parameters of the provided pipeline that are marked as :class:`~tpcp.PureParameter` are used.
         Note that pure parameters of nested objects are not considered, but only top-level attributes.
         If you need to mark nested parameters as pure, use the first method and pass the names (with `__`) as part of
         the list of names.
@@ -536,7 +536,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
     ----------
     cv_results_
         A dictionary summarizing all results of the gridsearch.
-        The format of this dictionary is designed to be directly passed into the `pd.DataFrame` constructor.
+        The format of this dictionary is designed to be directly passed into the :class:`~pandas.DataFrame` constructor.
         Each column then represents the result for one set of parameters.
 
         The dictionary contains the following entries:
