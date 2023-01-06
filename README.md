@@ -75,10 +75,10 @@ Other projects using Datasets:
 
 ### Parameter Optimization and Cross Validation
 
-**Maybe** - All parameter optimization features in tpcp exist to provide a unified API, in case other specific frameworks are to specialised.
+**Maybe** - All parameter optimization features in tpcp exist to provide a unified API, in case other specific frameworks are too specialised.
 In cases where all your algorithms can be abstracted by `sklearn`, `pytorch` (with the `skorch` wrapper), `tensorflow`/`Keras` (with the `scikeras` wrapper), 
 or any other framework that provides a nice scikit-learn API, you will get all the features tpcp can provide with much less boilerplate by just using `sklearn` and `optuna` directly.
-Even, if you need to implement completely custom algorithms, we would encourage you to see if you can emulate a sklearn-like API to make use of its fast ecosystem.
+Even, if you need to implement completely custom algorithms, we would encourage you to see if you can emulate a sklearn-like API to make use of its vast ecosystem.
 
 This will usually work well for all algorithms that can be abstracted by the fit-predict paradigm.
 However, for more "traditional" algorithms with no "fit" step or complicated optimizations, the `run` (with optional `self_optimize`) API of tpcp might be a better fit.
@@ -96,14 +96,17 @@ Learn more:
 We are using [poetry](https://python-poetry.org/) to manage dependencies and 
 [poethepoet](https://github.com/nat-n/poethepoet) to run and manage dev tasks.
 
-To set up the dev environment *including* the required dependencies for using `tpcp` together with `optuna` 
-run the following commands: 
+To set up the dev environment *including* the required dependencies for using and developing on `tpcp` run the following
+commands: 
 ```bash
 git clone https://github.com/mad-lab-fau/tpcp
 cd tpcp
 poetry install -E optuna -E torch # This might take a while
 ```
 
+Note, that this will fail at the moment for Python 3.11., as pytorch is not yet available for this version.
+You can safely skip the `-E torch` flag if you don't need the pytorch features.
+All tests that require pytorch will be skipped automatically.
 
 Afterwards you can start to develop and change things.
 If you want to run tests, format your code, build the docs, ..., you can run one of the following `poethepoet` commands
@@ -130,4 +133,4 @@ If you installed `poethepoet` globally, you can skip the `poetry run` part at th
 
 The entire development is managed via [GitHub](https://github.com/mad-lab-fau/tpcp).
 If you run into any issues, want to discuss certain decisions, want to contribute features or feature requests, just 
-reach out to us by [opening a new issue](https://github.com/mad-lab-fau/tpcp/issues/new/choose).
+reach out to us by [opening a new issue](https://github.com/mad-lab-fau/tpcp/issues/new/).
