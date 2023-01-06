@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This has not been extensively tested in real projects.
   Therefore, use with care and please report any issues you encounter.
 
+### Deprecated
+- Fully deprecated the `_skip_validation` parameter for base classes, which was briefly used for some old versions.
+
 ## [0.12.2] - 2022-12-14
 
 ### Fixed

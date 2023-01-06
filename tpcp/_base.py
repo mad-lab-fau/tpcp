@@ -273,15 +273,8 @@ class _BaseTpcpObject:
         cls.__field_annotations_cache__ = field_annotations
         return field_annotations
 
-    def __init_subclass__(cls, *, _skip_validation: bool = False, **kwargs: Any):
+    def __init_subclass__(cls, **kwargs: Any):
         super().__init_subclass__(**kwargs)
-        # Todo: Deprecate this parameter
-        if _skip_validation:
-            warnings.warn(
-                "`_skip_validation` is deprecated and has no effect."
-                "Validation is now performed when the class is actually used and hence has no runtime cost "
-                "during class definition."
-            )
         # If the class has no init or did inherit its init from the parent (i.e. it is not in its own dict), there is
         # nothing to do.
         if "__init__" not in cls.__dict__:
