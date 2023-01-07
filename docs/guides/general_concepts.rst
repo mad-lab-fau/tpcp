@@ -210,7 +210,7 @@ Note that we only explicitly check for a couple of common mutable types! Thus, y
 particular when you are working with non-standard objects and class instances as `__init__` parameters.
 
 We apply this check to all objects that inherit from our base classes.
-This means the class above would have raised an error at creation time:
+This means the class above would have raised an error when you try to initialize it:
 
 .. code-block:: python
 
@@ -218,6 +218,7 @@ This means the class above would have raised an error at creation time:
     >>> class MyAlgo(Algorithm):
     ...     def __init__(self, para=[]):
     ...         self.para = para
+    >>> MyAlgo()
     Traceback (most recent call last):
         ...
     tpcp.exceptions.MutableDefaultsError: The class MyAlgo contains mutable objects as default values (['para']). ...

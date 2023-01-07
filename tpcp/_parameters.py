@@ -38,6 +38,7 @@ This information can be used for internal checks and performance optimizations.
 )
 HyperPara = HyperParameter
 PureParameter = Annotated[T, _ParaTypes.PURE]
+# TODO: Link to guide once available.
 PureParameter.__doc__ = cleandoc(
     """Mark a class attribute as pure parameter for an algorithm or pipeline.
 
@@ -48,7 +49,7 @@ This information can be used for internal checks and performance optimizations.
 These are most typically used in pipelines with multiple steps, that have an initial ML part that can be optimized
 independently and a second non-ML part, that still has some parameters.
 The knowledge of what parameter do not influence the outcome of optimization can be used to dramatically reduce the
-complexity of black box based parameter optimizations (learn more TODO).
+complexity of black box based parameter optimizations (learn more TODO: Link to guide once available.).
 However, using `pure_parameter` incorrectly can lead to hard to detect issues.
 If you are unsure, just mark a parameter as `parameter` as `pure_parameter`.
 This has no negative side effect, besides disabling potential performance optimizations.
