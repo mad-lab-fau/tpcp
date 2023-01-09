@@ -69,9 +69,8 @@ From our experience, even if you ignore all the other tpcp features, Datasets ca
 ([Examples](https://tpcp.readthedocs.io/en/latest/auto_examples/index.html#datasets))
 
 Other projects using Datasets:
-- [sensor_position_dataset_helper](https://github.com/mad-lab-fau/sensor_position_dataset_helper/blob/master/sensor_position_dataset_helper/tpcp_dataset.py)
+- [gaitmap-datasets](https://github.com/mad-lab-fau/gaitmap-datasets)
 - [cold-face-test-analysis](https://github.com/mad-lab-fau/cft-analysis/tree/main/cft_analysis/datasets)
-- [mad-datasets](https://github.com/mad-lab-fau/mad-datasets)
 
 ### Parameter Optimization and Cross Validation
 
