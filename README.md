@@ -71,6 +71,7 @@ From our experience, even if you ignore all the other tpcp features, Datasets ca
 Other projects using Datasets:
 - [gaitmap-datasets](https://github.com/mad-lab-fau/gaitmap-datasets)
 - [cold-face-test-analysis](https://github.com/mad-lab-fau/cft-analysis/tree/main/cft_analysis/datasets)
+- [carwatch-analysis](https://github.com/mad-lab-fau/carwatch-analysis/tree/main/carwatch_analysis/datasets)
 
 ### Parameter Optimization and Cross Validation
 
