@@ -46,6 +46,12 @@ Keep in mind that this example should merely demonstrate the possibility to inte
 You are very much encouraged to read through the
 `Optuna documentation <https://optuna.readthedocs.io/en/stable/tutorial/index.html>`_ and create your
 own project-specific optimizers.
+
+.. note:: As some usecases are pretty common, we also provide explicit versions of Optuna optimize subclasses that
+          can be used without implementing your own subclass.
+          Check out the example about :ref:`built-in optuna optimizers <build_in_optuna_optimizer>` for more
+          information.
+
 """
 
 # %%
@@ -233,16 +239,22 @@ class OptunaSearch(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT]):
 
 
 # %%
+# .. note:: This implementation is nearly identical to the :class:`~tpcp.optimize.optuna.OptunaSearch` class.
+#           If you really just need a Grid Search equivalent with optuna as backend, you should use this class.
+#           Otherwise, the custom class build in this example is a good starting point for further experimentation.
+#
+#
 # Running the optimization
 # ------------------------
 # To run the optimization, we need to create a new Optuna study, a custom sampler and the function that defines our
 # search space:
-from optuna import create_study, samplers
-
-
+#
 # We use a simple in-memory study with the direction "maximize", as we want to optimize for the highest f1-score
 # However, we wrap it by a callable to ensure that we get a new and independent study everytime our Optuna optimizer
 # is called.
+from optuna import create_study, samplers
+
+
 def get_study():
     # We use a simple RandomSampler, but every optuna sampler will work
     sampler = samplers.RandomSampler(seed=42)

@@ -34,3 +34,4 @@ Optuna Interface
    :template: class_with_private.rst
 
     optuna.CustomOptunaOptimize
+    optuna.OptunaSearch

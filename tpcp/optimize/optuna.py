@@ -1,5 +1,4 @@
 """Implementation of methods and classes to wrap the optimization Framework `Optuna`."""
-import multiprocessing
 
 try:
     import optuna
@@ -8,14 +7,16 @@ except ImportError as e:
         "To use the tpcp Optuna interface, you first need to install optuna (`pip install optuna`)"
     ) from e
 
+import multiprocessing
 import warnings
+from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional, Sequence, TypeVar, Union
 
 import joblib
 import numpy as np
-from optuna import Study, Trial
 from optuna.study.study import ObjectiveFuncType
-from optuna.trial import FrozenTrial
+from optuna.trial import FrozenTrial, Trial
+from optuna import Study
 from typing_extensions import Self
 
 from tpcp import OptimizablePipeline, clone
@@ -23,8 +24,9 @@ from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
 from tpcp._pipeline import PipelineT
 from tpcp.optimize import Optimize
+from tpcp.validate._scorer import ScorerTypes, _validate_scorer
 
-__all__ = ["CustomOptunaOptimize", "CustomOptunaOptimizeT"]
+__all__ = ["CustomOptunaOptimize", "CustomOptunaOptimizeT", "OptunaSearch"]
 
 if multiprocessing.parent_process() is None:
     # We want to avoid spamming the user with warnings if they are running multiple processes
@@ -344,12 +346,11 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         params
             A dictionary representing all parameters.
         state
-            Whether the trial was completed, pruned, or any type of error occured
-        user_attrs
+            Whether the trial was completed, pruned, or any type of error occurred
         datetime_start
             When the trial was started
         datetime_complete
-            When the trial endend
+            When the trial ended
         duration
             The duration of the trial
         user_attrs_...
@@ -417,8 +418,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     optuna.
 
     Further, the use of `show_progress_bar` is not recommended when using multiprocessing, as one progress bar per
-    process is
-    created and the output is not very readable.
+    process is created and the output is not very readable.
     It might still be helpful to see that something is happening.
 
     .. note:: Using SQLite as backend is known to cause issues with multiprocessing, when the database is
@@ -508,3 +508,259 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             study_: Study = field(init=False, repr=False)
 
         return CustomOptunaOptimizeAt
+
+
+T = TypeVar("T")
+
+
+class OptunaSearch(CustomOptunaOptimize[PipelineT, DatasetT]):
+    """GridSearch equivalent using Optuna.
+
+    An opinionated parameter optimization for simple (i.e. non-optimizable) pipelines that can be used as a
+    replacement to GridSearch.
+
+    Parameters
+    ----------
+    pipeline
+        A tpcp pipeline with some hyper-parameters that should be optimized.
+        This should be a normal (i.e. non-optimizable pipeline) when using this class.
+    create_study
+        A callable that returns an optuna study instance to be used for the optimization.
+        It will be called as part of the `optimize` method without parameters.
+        The resulting study object can be accessed via `self.study_` after the optimization is finished.
+        Creating the study is handled via a callable, instead of providing the study object itself, to make it
+        possible to create individual studies, when CustomOptuna optimize is called by an external wrapper
+        (i.e. `cross_validate`).
+    create_search_space
+        A callable that takes a :class:`~optuna.trial.Trial` object as input and calls `suggest_*` methods on it to
+        define the search space.
+    scoring
+        A callable that can score a single data point given a pipeline.
+        This function should return either a single score or a dictionary of scores.
+        If scoring is `None` the default `score` method of the pipeline is used instead.
+
+        Note that if scoring returns a dictionary, `score_name` must be set to the name of the score that should be used
+        for ranking.
+    score_name
+        The name of the score that should be used for ranking in case the scoring function returns a dictionary of
+        values.
+    n_trials
+        The number of trials.
+        If this argument is set to `None`, there is no limitation on the number of trials.
+        In this case you should use `timeout` instead.
+        Because optuna is called internally by this wrapper, you can not set up a study without limits and end it
+        using CTRL+C (as suggested by the Optuna docs).
+        In this case the entire execution flow would be stopped.
+    timeout
+        Stop study after the given number of second(s).
+        If this argument is set to `None`, the study is executed without time limitation.
+        In this case you should use `n_trials` to limit the execution.
+    return_optimized
+        If True, a pipeline object with the overall best parameters is created.
+        The optimized pipeline object is stored as `optimized_pipeline_`.
+    callbacks
+        List of callback functions that are invoked at the end of each trial.
+        Each function must accept two parameters with the following types in this order:
+        :class:`~optuna.study.Study` and :class:`~optuna.trial.FrozenTrial`.
+    n_jobs
+        Number of parallel jobs to use (default = 1 -> single process, -1 -> all available cores).
+        This uses joblib with the multiprocessing backend to parallelize the optimization.
+        If this is set to -1, all available cores are used.
+
+        .. warning:: Read the notes in :class:`~tpcp.optimize.optuna.CustomOptunaOptimize` on multiprocessing below
+                     before using this feature.
+
+    show_progress_bar
+        Flag to show progress bars or not.
+    gc_after_trial
+        Run the garbage collector after each trial.
+        Check the optuna documentation for more detail
+
+    Other Parameters
+    ----------------
+    dataset
+        The dataset instance passed to the optimize method
+
+    Attributes
+    ----------
+    search_results_
+        A dictionary containing all relevant results of the parameter search.
+        The format of this dictionary is designed to be directly passed into the `pd.DataFrame` constructor.
+        Each column then represents the result for one set of parameters.
+
+        The dictionary contains the following entries:
+
+        score / {scorer-name}
+            The aggregated value of a score over all data-points.
+            If a single score is used for scoring, then the generic name "score" is used.
+            Otherwise, multiple columns with the name of the respective scorer exist
+        param_*
+            The value of a respective parameter
+        params
+            A dictionary representing all parameters
+        state
+            Whether the trial was completed, pruned, or any type of error occurred
+        datetime_start
+            When the trial was started
+        datetime_complete
+            When the trial ended
+        duration
+            The duration of the trial
+        user_attrs_...
+            User attributes set within the objective function
+        system_attrs_...
+            System attributes set internally by optuna (usually empty)
+
+        If you need access to further parameter, inspect `self.study_` directly.
+    optimized_pipeline_
+        An instance of the input pipeline with the best parameter set.
+        This is only available if `return_optimized` is not False.
+    best_params_
+        The parameter combination identified in the study
+    best_score_
+        The score achieved in the best trial
+    best_trial_
+        The trial object that resulted in the best results
+    study_
+        The study object itself.
+        This should usually be identical to `self.study`.
+
+    """
+
+    create_search_space: Callable[[Trial], None]
+    scoring: ScorerTypes[PipelineT, DatasetT, T]
+    score_name: Optional[str]
+
+    multimetric_: bool
+
+    def __init__(
+        self,
+        pipeline: PipelineT,
+        create_study: Callable[[], Study],
+        create_search_space: Callable[[Trial], None],
+        *,
+        scoring: ScorerTypes[PipelineT, DatasetT, T],
+        score_name: Optional[str] = None,
+        n_trials: Optional[int] = None,
+        timeout: Optional[float] = None,
+        callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None,
+        gc_after_trial: bool = False,
+        n_jobs: int = 1,
+        show_progress_bar: bool = False,
+        return_optimized: bool = True,
+    ):
+        self.create_search_space = create_search_space
+        self.scoring = scoring
+        self.score_name = score_name
+        super().__init__(
+            pipeline,
+            create_study,
+            n_trials=n_trials,
+            timeout=timeout,
+            callbacks=callbacks,
+            gc_after_trial=gc_after_trial,
+            n_jobs=n_jobs,
+            show_progress_bar=show_progress_bar,
+            return_optimized=return_optimized,
+        )
+
+    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
+        # Here we define our objective function
+
+        scoring = _validate_scorer(self.scoring, self.pipeline)
+
+        def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
+            # First we need to select parameters for the current trial
+            if self.create_search_space is None:
+                raise ValueError("No valid search space parameter.")
+            self.create_search_space(trial)
+            # Then we apply these parameters to the pipeline
+            pipeline = pipeline.set_params(**trial.params)
+
+            average_scores, single_scores = scoring(pipeline, dataset)
+
+            if not hasattr(self, "multimetric_"):
+                if isinstance(average_scores, dict):
+                    self.multimetric_ = True
+                else:
+                    self.multimetric_ = False
+
+            if self.multimetric_:
+                if self.score_name is None:
+                    raise ValueError("score_name must be set if scoring returns a dictionary of scores")
+                if self.score_name not in average_scores:
+                    raise ValueError(f"score_name '{self.score_name}' not in scoring results ({average_scores.keys()})")
+                score = average_scores[self.score_name]
+            else:
+                if self.score_name is not None:
+                    warnings.warn(
+                        "score_name is ignored if scoring returns a single score", UserWarning,
+                    )
+                score = average_scores
+
+            # As a bonus, we use the custom params option of optuna to store the individual scores per datapoint and the
+            # respective data labels
+            if self.multimetric_:
+                trial.set_user_attr("__average_scores", average_scores)
+            trial.set_user_attr("__single_scores", single_scores)
+            trial.set_user_attr("__data_labels", dataset.groups)
+
+            return score
+
+        return objective
+
+    @property
+    def search_results_(self) -> Dict[str, Sequence[Any]]:
+        search_results = super().search_results_
+        search_results["data_labels"] = search_results.pop("user_attrs___data_labels")
+
+        if self.multimetric_:
+            search_results.pop("score")
+            search_results.update(
+                {
+                    f"single_{k}": v
+                    for k, v in _invert_list_of_dicts(search_results.pop("user_attrs___single_scores")).items()
+                }
+            )
+        search_results.update(_invert_list_of_dicts(search_results.pop("user_attrs___average_scores")))
+        # We add params back to the end of the dict to make it easier to read
+        search_results["params"] = search_results.pop("params")
+        return search_results
+
+    def return_optimized_pipeline(  # noqa: no-self-use
+        self, pipeline: PipelineT, dataset: DatasetT, study: Study
+    ) -> PipelineT:
+        """Return the pipeline with the best parameters of a study."""
+        # Pipeline that will be passed here is already cloned, so no need to clone again.
+        pipeline_with_best_params = pipeline.set_params(**study.best_params)
+        return pipeline_with_best_params
+
+    @staticmethod
+    def as_dataclass():
+        """Return a version of the Dataset class that can be subclassed using `dataclasses` defined classes.
+
+        .. warning:: This is not implemented for the `OptunaSearch` subclass! Use the parent class directly.
+        """
+        raise NotImplementedError(
+            "OptunaSearch does not support dataclasses subclassing. "
+            "Only the parent class `CustomOptunaOptimize` does."
+        )
+
+    @staticmethod
+    def as_attrs():
+        """Return a version of the Dataset class that can be subclassed using `attrs` defined classes.
+
+        .. warning:: This is not implemented for the `OptunaSearch` subclass! Use the parent class directly.
+        """
+        raise NotImplementedError(
+            "OptunaSearch does not support attrs subclassing. "
+            "Only the parent class `CustomOptunaOptimize` does."
+        )
+
+
+def _invert_list_of_dicts(list_of_dicts: List[Dict[str, Any]]) -> Dict[str, List]:
+    inverted = defaultdict(list)
+    for d in list_of_dicts:
+        for k, v in d.items():
+            inverted[k].append(v)
+    return dict(inverted)
