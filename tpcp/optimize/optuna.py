@@ -14,9 +14,9 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, TypeVar, Union
 
 import joblib
 import numpy as np
+from optuna import Study
 from optuna.study.study import ObjectiveFuncType
 from optuna.trial import FrozenTrial, Trial
-from optuna import Study
 from typing_extensions import Self
 
 from tpcp import OptimizablePipeline, clone
@@ -666,6 +666,10 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         self.return_optimized = return_optimized
 
     def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
+        """Create the objective function for optuna.
+
+        This is an internal function and should not be called directly.
+        """
         # Here we define our objective function
 
         scoring = _validate_scorer(self.scoring, self.pipeline)
@@ -695,7 +699,8 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
             else:
                 if self.score_name is not None:
                     warnings.warn(
-                        "score_name is ignored if scoring returns a single score", UserWarning,
+                        "score_name is ignored if scoring returns a single score",
+                        UserWarning,
                     )
                 score = average_scores
 
@@ -711,7 +716,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         return objective
 
     @property
-    def search_results_(self) -> Dict[str, Sequence[Any]]:
+    def search_results_(self) -> Dict[str, Sequence[Any]]:  # noqa: D102
         search_results = super().search_results_
         search_results["data_labels"] = search_results.pop("user_attrs___data_labels")
 
@@ -726,10 +731,11 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         search_results["params"] = search_results.pop("params")
         return search_results
 
-    def return_optimized_pipeline(  # noqa: no-self-use
-        self, pipeline: PipelineT, dataset: DatasetT, study: Study
-    ) -> PipelineT:
-        """Return the pipeline with the best parameters of a study."""
+    def return_optimized_pipeline(self, pipeline: PipelineT, dataset: DatasetT, study: Study) -> PipelineT:  # noqa: ARG002
+        """Return the pipeline with the best parameters of a study.
+
+        This is an internal function and should not be called directly.
+        """
         # Pipeline that will be passed here is already cloned, so no need to clone again.
         pipeline_with_best_params = pipeline.set_params(**study.best_params)
         return pipeline_with_best_params

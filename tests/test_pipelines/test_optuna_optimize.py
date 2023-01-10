@@ -214,7 +214,6 @@ class TestCustomOptunaOptimize:
             assert opti.optimized_pipeline_.optimized == opti.optimized_pipeline_.para_2
 
 
-
 class TestMetaFunctionalityOptunaSearch(TestAlgorithmMixin):
     __test__ = True
     algorithm_class = OptunaSearch
