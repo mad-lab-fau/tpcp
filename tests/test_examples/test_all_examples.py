@@ -79,6 +79,16 @@ def test_optuna():
     assert opti_early_stop.best_score_ == 0.858757056619628
 
 
+def test_optuna_search():
+    from examples.parameter_optimization._05_optuna_search import opti
+
+    assert opti.best_params_ == {
+        "algorithm__min_r_peak_height_over_baseline": 0.4,
+        "algorithm__high_pass_filter_cutoff_hz": 0.4,
+    }
+    assert opti.best_score_ == 0.858757056619628
+
+
 def test_dataclasses():
     from examples.other_features._01_dataclasses import nested_object_is_different
 
