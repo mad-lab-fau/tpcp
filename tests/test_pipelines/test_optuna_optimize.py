@@ -11,7 +11,7 @@ from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline
 from tpcp import make_optimize_safe
 from tpcp._dataset import DatasetT
 from tpcp._pipeline import OptimizablePipeline, PipelineT
-from tpcp.optimize.optuna import CustomOptunaOptimize
+from tpcp.optimize.optuna import CustomOptunaOptimize, OptunaSearch
 from tpcp.validate import Scorer
 
 
@@ -212,3 +212,25 @@ class TestCustomOptunaOptimize:
         if isinstance(pipe, OptimizablePipeline):
             # That is expected when self_optimize was called correctly.
             assert opti.optimized_pipeline_.optimized == opti.optimized_pipeline_.para_2
+
+
+
+class TestMetaFunctionalityOptunaSearch(TestAlgorithmMixin):
+    __test__ = True
+    algorithm_class = OptunaSearch
+
+    @pytest.fixture()
+    def after_action_instance(self) -> OptunaSearch:
+
+        gs = OptunaSearch(
+            DummyOptimizablePipeline(),
+            _get_study,
+            dummy_search_space,
+            scoring=dummy_single_score_func,
+            n_trials=1,
+        )
+        gs.optimize(DummyDataset())
+        return gs
+
+    def test_empty_init(self):
+        pytest.skip()
