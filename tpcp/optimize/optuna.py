@@ -513,7 +513,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
 T = TypeVar("T")
 
 
-class OptunaSearch(CustomOptunaOptimize[PipelineT, DatasetT]):
+class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
     """GridSearch equivalent using Optuna.
 
     An opinionated parameter optimization for simple (i.e. non-optimizable) pipelines that can be used as a
@@ -652,17 +652,16 @@ class OptunaSearch(CustomOptunaOptimize[PipelineT, DatasetT]):
         self.create_search_space = create_search_space
         self.scoring = scoring
         self.score_name = score_name
-        super().__init__(
-            pipeline,
-            create_study,
-            n_trials=n_trials,
-            timeout=timeout,
-            callbacks=callbacks,
-            gc_after_trial=gc_after_trial,
-            n_jobs=n_jobs,
-            show_progress_bar=show_progress_bar,
-            return_optimized=return_optimized,
-        )
+
+        self.pipeline = pipeline
+        self.create_study = create_study
+        self.n_trials = n_trials
+        self.timeout = timeout
+        self.callbacks = callbacks
+        self.gc_after_trial = gc_after_trial
+        self.n_jobs = n_jobs
+        self.show_progress_bar = show_progress_bar
+        self.return_optimized = return_optimized
 
     def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
         # Here we define our objective function
@@ -734,28 +733,6 @@ class OptunaSearch(CustomOptunaOptimize[PipelineT, DatasetT]):
         # Pipeline that will be passed here is already cloned, so no need to clone again.
         pipeline_with_best_params = pipeline.set_params(**study.best_params)
         return pipeline_with_best_params
-
-    @staticmethod
-    def as_dataclass():
-        """Return a version of the Dataset class that can be subclassed using `dataclasses` defined classes.
-
-        .. warning:: This is not implemented for the `OptunaSearch` subclass! Use the parent class directly.
-        """
-        raise NotImplementedError(
-            "OptunaSearch does not support dataclasses subclassing. "
-            "Only the parent class `CustomOptunaOptimize` does."
-        )
-
-    @staticmethod
-    def as_attrs():
-        """Return a version of the Dataset class that can be subclassed using `attrs` defined classes.
-
-        .. warning:: This is not implemented for the `OptunaSearch` subclass! Use the parent class directly.
-        """
-        raise NotImplementedError(
-            "OptunaSearch does not support attrs subclassing. "
-            "Only the parent class `CustomOptunaOptimize` does."
-        )
 
 
 def _invert_list_of_dicts(list_of_dicts: List[Dict[str, Any]]) -> Dict[str, List]:
