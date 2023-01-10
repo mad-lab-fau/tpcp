@@ -624,6 +624,8 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
     study_
         The study object itself.
         This should usually be identical to `self.study`.
+    multimetric_
+        If the scorer returned multiple scores
 
     """
 
@@ -715,13 +717,11 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
         if self.multimetric_:
             search_results.pop("score")
-            search_results.update(
-                {
-                    f"single_{k}": v
-                    for k, v in _invert_list_of_dicts(search_results.pop("user_attrs___single_scores")).items()
-                }
-            )
-        search_results.update(_invert_list_of_dicts(search_results.pop("user_attrs___average_scores")))
+            if single_scores := search_results.pop("user_attrs___average_scores", None):
+                search_results.update({f"single_{k}": v for k, v in _invert_list_of_dicts(single_scores).items()})
+
+        if average_scores := search_results.pop("user_attrs___average_scores", None):
+            search_results.update(_invert_list_of_dicts(average_scores))
         # We add params back to the end of the dict to make it easier to read
         search_results["params"] = search_results.pop("params")
         return search_results
