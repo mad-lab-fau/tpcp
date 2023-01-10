@@ -29,8 +29,6 @@ As example, we are going to Gridsearch some parameters of the `QRSDetector` we i
 # For our GridSearch, we need an instance of this dataset.
 from pathlib import Path
 
-import numpy as np
-
 from examples.datasets.datasets_final_ecg import ECGExampleData
 
 try:
