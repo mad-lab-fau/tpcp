@@ -4,10 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.13.0] - unreleased
+## [0.13.0] - 2023-01-11
 
 ### Changed
-- Some minor improvements to the documentation
+- Some improvements to the documentation
 
 ### Added
 - Added an option to the optuna search to use multiprocessing using the suggestions made in 
