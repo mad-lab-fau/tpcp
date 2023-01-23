@@ -9,9 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Added
 - Custom Aggregators can now use the `RETURN_RAW_SCORES` class variable to specify, if their raw input scores should be 
   returned.
+  (https://github.com/mad-lab-fau/tpcp/pull/58)
 
 ## Fixed
 - GridSearch and GridSearchCV now correctly handle custom aggregators that return scores with new names.
+  (https://github.com/mad-lab-fau/tpcp/pull/58)
 
 ## [0.13.0] - 2023-01-11
 
