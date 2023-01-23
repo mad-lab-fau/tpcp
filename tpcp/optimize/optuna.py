@@ -383,7 +383,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     ...     def create_objective(self):
     ...         def objective(trial: Trial, pipeline: Pipeline, dataset: Dataset):
     ...             trial.suggest_float("my_pipeline_para", 0, 3)
-    ...             mean_score = Scorer(lambda dp: pipeline.score(dp))
+    ...             mean_score, _ = Scorer(lambda pipe, dp: pipe.score(dp))(pipeline, dataset)
     ...             return mean_score
     ...         return objective
     >>>
