@@ -195,7 +195,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         """
         return self._score(pipeline=pipeline, dataset=dataset)
 
-    def _aggregate(  # mccabe: disable=MC0001
+    def _aggregate(  # mccabe: disable=MC0001, pylint: disable=too-many-branches
         self,
         scores: Union[Tuple[Type[Aggregator[T]], List[T]], Dict[str, Tuple[Type[Aggregator[T]], List[T]]]],
         datapoints: List[DatasetT],
