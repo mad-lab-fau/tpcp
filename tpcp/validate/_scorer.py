@@ -2,7 +2,22 @@
 from __future__ import annotations
 
 import traceback
-from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Set, Tuple, Type, TypeVar, Union, cast
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import numpy as np
 from typing_extensions import Protocol
@@ -52,6 +67,8 @@ class Aggregator(Generic[T]):
     """
 
     _value: T
+
+    RETURN_RAW_SCORES: ClassVar[bool] = True
 
     def __init__(self, _value: T):
         self._value = _value
@@ -165,7 +182,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
     # scores
     def __call__(
         self, pipeline: PipelineT, dataset: DatasetT
-    ) -> Tuple[Union[float, Dict[str, float]], Union[List[Any], Dict[str, List[Any]]]]:
+    ) -> Tuple[Union[float, Dict[str, float]], Union[Optional[List[T]], Dict[str, List[T]]]]:
         """Score the pipeline with the provided data.
 
         Returns
@@ -182,7 +199,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         self,
         scores: Union[Tuple[Type[Aggregator[T]], List[T]], Dict[str, Tuple[Type[Aggregator[T]], List[T]]]],
         datapoints: List[DatasetT],
-    ) -> Tuple[Union[float, Dict[str, float]], Union[List[T], Dict[str, List[T]]]]:
+    ) -> Tuple[Union[float, Dict[str, float]], Union[Optional[List[T]], Dict[str, List[T]]]]:
         if not isinstance(scores, dict):
             aggregator_single, raw_scores_single = scores
             if aggregator_single is NoAgg:
@@ -205,12 +222,15 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
                     )
             elif not isinstance(agg_val, (int, float)):
                 raise ValidationError(f"The final aggregated score must be a numbers. Instead it is:\n{agg_val}")
+            if aggregator_single.RETURN_RAW_SCORES is False:
+                return agg_val, NOTHING
             return agg_val, list(raw_scores_single)
 
         raw_scores: Dict[str, List[T]] = {}
         agg_scores: Dict[str, float] = {}
         for name, (aggregator, raw_score) in scores.items():
-            raw_scores[name] = list(raw_score)
+            if aggregator.RETURN_RAW_SCORES is True:
+                raw_scores[name] = list(raw_score)
             agg_score = aggregator(None).aggregate(values=raw_score, datapoints=datapoints)
             if agg_score is NOTHING or isinstance(agg_score, _Nothing):
                 # This is the case with the NoAgg Scorer
@@ -230,9 +250,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             )
         return agg_scores, raw_scores
 
-    def _score(
-        self, pipeline: PipelineT, dataset: DatasetT
-    ) -> Tuple[Union[float, Dict[str, float]], Union[List[Any], Dict[str, List[Any]]]]:
+    def _score(self, pipeline: PipelineT, dataset: DatasetT):
         # `float` because the return value in case of an exception will always be float
         scores: List[ScoreTypeT[T]] = []
         datapoints: List[DatasetT] = []
