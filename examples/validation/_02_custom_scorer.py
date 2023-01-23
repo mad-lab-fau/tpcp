@@ -278,6 +278,18 @@ complicated_agg
 # The raw matches array is still available in the `single` results.
 complicated_single["per_sample"]
 
+# %%
+# However, we can customize this behaviour for our aggregator by setting the `RETURN_RAW_SCORE` class variable to False:
+SingleValuePrecisionRecallF1.RETURN_RAW_SCORES = False
+
+
+# %%
+# Now we can see that the raw matches array is not returned anymore.
+# In case of a single scorer, the single return value would just be `None`, instead of a dict with the respective key
+# missing.
+complicated_agg_now_raw, complicated_single_no_raw = Scorer(score)(pipe, example_data)
+complicated_single_no_raw.keys()
+
 
 # %%
 # Weighted Aggregation

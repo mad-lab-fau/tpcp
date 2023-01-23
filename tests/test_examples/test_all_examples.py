@@ -89,6 +89,7 @@ def test_custom_scorer():
     from examples.validation._02_custom_scorer import (
         baseline_results_agg,
         complicated_agg,
+        complicated_single_no_raw,
         group_weighted_agg,
         median_results_agg,
         multi_agg_agg,
@@ -111,6 +112,8 @@ def test_custom_scorer():
     assert group_weighted_agg["f1_score__group_mean"] == 0.7089727629059107
     for i in range(1, 4):
         assert f"f1_score__group_{i}" in group_weighted_agg
+
+    assert "per_sample" not in complicated_single_no_raw
 
 
 def test_composite_objects():
