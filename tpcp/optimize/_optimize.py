@@ -406,11 +406,14 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
 
         results = {}
 
-        scores_dict = _normalize_score_results(out["scores"])
-        single_scores_dict = _normalize_score_results(out["single_scores"])
+        scores_dict = _normalize_score_results(out["scores"]) or {}
+        single_scores_dict = _normalize_score_results(out["single_scores"]) or {}
         for c, v in scores_dict.items():
             results[c] = v
             results[f"rank_{c}"] = np.asarray(rankdata(-v, method="min"), dtype=np.int32)
+        for c, v in single_scores_dict.items():
+            # Because of custom aggregators, it can be that single scores dicts have different keys than the aggregated
+            # scores.
             results[f"single_{c}"] = single_scores_dict[c]
 
         results["data_labels"] = out["data_labels"]
@@ -846,18 +849,23 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         # Store a list of param dicts at the key 'params'
         results["params"] = candidate_params
 
-        test_scores_dict = _normalize_score_results(out["test_scores"])
-        test_single_scores_dict = _normalize_score_results(out["test_single_scores"])
+        test_scores_dict = _normalize_score_results(out["test_scores"]) or {}
+        test_single_scores_dict = _normalize_score_results(out["test_single_scores"]) or {}
 
         for scorer_name in test_scores_dict:
             # Computed the (weighted) mean and std for test scores alone
             _store(f"test_{scorer_name}", test_scores_dict[scorer_name], splits=True, rank=True, weights=None)
+        for scorer_name in test_single_scores_dict:
+            # Because of custom aggregators, it can be that single scores dicts have different keys than the aggregated
+            # scores.
             _store_non_numeric(f"test_single_{scorer_name}", test_single_scores_dict[scorer_name])
-            if self.return_train_score:
-                train_scores_dict = _normalize_score_results(out["train_scores"])
-                train_single_scores_dict = _normalize_score_results(out["train_single_scores"])
 
+        if self.return_train_score:
+            train_scores_dict = _normalize_score_results(out["train_scores"])
+            train_single_scores_dict = _normalize_score_results(out["train_single_scores"])
+            for scorer_name in train_scores_dict:
                 _store(f"train_{scorer_name}", train_scores_dict[scorer_name], splits=True)
+            for scorer_name in train_single_scores_dict:
                 _store_non_numeric(f"train_single_{scorer_name}", train_single_scores_dict[scorer_name])
 
         return results

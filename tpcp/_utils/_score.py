@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 _SCORE_TYPE = Union[Dict[str, float], float]  # pylint: disable=invalid-name
 _AGG_SCORE_TYPE = Union[Dict[str, float], float]  # pylint: disable=invalid-name
-_SINGLE_SCORE_TYPE = Union[Dict[str, List[float]], List[float]]  # pylint: disable=invalid-name
+_SINGLE_SCORE_TYPE = Union[Dict[str, List[float]], Optional[List[float]]]  # pylint: disable=invalid-name
 
 
 class _ScoreResults(TypedDict, total=False):
