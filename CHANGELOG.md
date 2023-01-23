@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [unreleased]
+
+## Added
+- Custom Aggregators can now use the `RETURN_RAW_SCORES` class variable to specify, if their raw input scores should be 
+  returned.
+
+## Fixed
+- GridSearch and GridSearchCV now correctly handle custom aggregators that return scores with new names.
+
 ## [0.13.0] - 2023-01-11
 
 ### Changed
