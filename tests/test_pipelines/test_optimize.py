@@ -27,7 +27,7 @@ from tpcp._optimize import BaseOptimize
 from tpcp._utils._score import _optimize_and_score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.optimize import DummyOptimize, GridSearch, GridSearchCV, Optimize
-from tpcp.validate import Scorer
+from tpcp.validate import Aggregator, Scorer
 
 
 class TestMetaFunctionalityGridSearch(TestAlgorithmMixin):
@@ -262,6 +262,46 @@ class TestGridSearch:
         assert list(results["score_2"]) == [3, 3]
 
         assert gs.multimetric_ is True
+
+    @pytest.mark.parametrize("return_raw_scores", (False, True))
+    def test_with_custom_aggregator(self, return_raw_scores):
+        # This aggregator returns values with new names
+        class Agg(Aggregator):
+            RETURN_RAW_SCORES = return_raw_scores
+
+            @classmethod
+            def aggregate(cls, /, values, datapoints):
+                return {"new_score_name": np.mean(values)}
+
+        def scoring(pipeline, data_point):
+            return {
+                "score_1": data_point.groups[0],
+                "score_2": data_point.groups[0] + 1,
+                "custom_agg": Agg(data_point.groups[0]),
+            }
+
+        gs = GridSearch(
+            DummyPipeline(),
+            ParameterGrid({"para_1": [1, 2]}),
+            scoring=scoring,
+            return_optimized=False,
+        )
+        gs.optimize(DummyDataset())
+        results = gs.gs_results_
+        results_df = pd.DataFrame(results)
+
+        # We don't expect an aggregated value with the name of the aggregator, as it returned a dict
+        assert "custom_agg" not in results_df.columns
+
+        # But we expect an agg value with the nested name
+        assert "custom_agg__new_score_name" in results_df.columns
+        assert "rank_custom_agg__new_score_name" in results_df.columns
+
+        # If we have the raw values depends on the settings of the aggregator
+        assert ("single_custom_agg" in results_df.columns) == return_raw_scores
+
+        # Wo don't expect a non-aggreagted version with the name of the final agg value
+        assert "single_custom_agg__new_score_name" not in results_df.columns
 
 
 class TestGridSearchCV:
@@ -512,6 +552,51 @@ class TestGridSearchCV:
                 assert result["optimizer"].optimized_pipeline_.para_1 == "some_value"
                 assert result["optimizer"].optimized_pipeline_.para_2 == "some_other_value"
                 assert result["optimizer"].optimized_pipeline_.optimized == "some_other_value"
+
+    @pytest.mark.parametrize("return_raw_scores", (False, True))
+    def test_with_custom_aggregator(self, return_raw_scores):
+        cv = PredefinedSplit(test_fold=[0, 0, 1, 1, 1])  # Test Fold 0 has len==2 and 1 has len == 3
+
+        # This aggregator returns values with new names
+        class Agg(Aggregator):
+            RETURN_RAW_SCORES = return_raw_scores
+
+            @classmethod
+            def aggregate(cls, /, values, datapoints):
+                return {"new_score_name": np.mean(values)}
+
+        def scoring(pipeline, data_point):
+            return {
+                "score_1": data_point.groups[0],
+                "score_2": data_point.groups[0] + 1,
+                "custom_agg": Agg(data_point.groups[0]),
+            }
+
+        gs = GridSearchCV(
+            DummyOptimizablePipeline(),
+            ParameterGrid({"para_1": [1, 2]}),
+            scoring=scoring,
+            return_optimized=False,
+            cv=cv,
+        )
+        gs.optimize(DummyDataset())
+        results = gs.cv_results_
+        results_df = pd.DataFrame(results)
+
+        for split in range(2):
+            # We don't expect an aggregated value with the name of the aggregator, as it returned a dict
+            assert f"split{split}_test_custom_agg" not in results_df.columns
+
+            # But we expect an agg value with the nested name
+            assert f"split{split}_test_custom_agg__new_score_name" in results_df.columns
+
+            # If we have the raw values depends on the settings of the aggregator
+            assert (f"split{split}_test_single_custom_agg" in results_df.columns) == return_raw_scores
+
+            # Wo don't expect a non-aggreagted version with the name of the final agg value
+            assert f"split{split}_test_single_custom_agg__new_score_name" not in results_df.columns
+
+        assert "mean_test_custom_agg__new_score_name" in results_df.columns
 
 
 class TestOptimize:
