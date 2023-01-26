@@ -48,7 +48,7 @@ def _create_valid_index(input_dict=None, columns_names=None):
     output = {column_name: [] for column_name in columns_names}
 
     for key, value in input_dict.items():
-        combinations = list(product(*([[key]] + list(map(itemgetter(1), value.items())))))
+        combinations = list(product(*([[key], *list(map(itemgetter(1), value.items()))])))
 
         for i in range(len(combinations[0])):
             for val in map(itemgetter(i), combinations):
@@ -64,7 +64,7 @@ def _create_random_bool_map(n, seed):
 
 class TestDataset:
     @pytest.mark.parametrize(
-        "groupby,length",
+        ("groupby", "length"),
         [
             ("patients", 3),
             (["patients"], 3),
@@ -102,7 +102,7 @@ class TestDataset:
             ds.groupby("invalid_column_name")
 
     @pytest.mark.parametrize(
-        "index,bool_map,kwargs,what_to_expect,expect_error",
+        ("index", "bool_map", "kwargs", "what_to_expect", "expect_error"),
         [
             (
                 None,
@@ -128,7 +128,7 @@ class TestDataset:
             df.get_subset(index=index, bool_map=bool_map, **kwargs)
 
     @pytest.mark.parametrize(
-        "index,what_to_expect",
+        ("index", "what_to_expect"),
         [
             (
                 _create_valid_index(
@@ -148,7 +148,7 @@ class TestDataset:
         )
 
     @pytest.mark.parametrize(
-        "groups,what_to_expect",
+        ("groups", "what_to_expect"),
         [
             (
                 [("patient_1", "test_2", "0")],
@@ -172,7 +172,7 @@ class TestDataset:
         )
 
     @pytest.mark.parametrize(
-        "groups,what_to_expect",
+        ("groups", "what_to_expect"),
         [
             (
                 [("patient_1", "test_2")],
@@ -200,7 +200,7 @@ class TestDataset:
         )
 
     @pytest.mark.parametrize(
-        "index,what_to_expect",
+        ("index", "what_to_expect"),
         [
             (
                 pd.DataFrame(),
@@ -213,7 +213,7 @@ class TestDataset:
             Dataset(subset_index=_create_valid_index()).get_subset(index=index)
 
     @pytest.mark.parametrize(
-        "bool_map,what_to_expect",
+        ("bool_map", "what_to_expect"),
         [
             (
                 _create_random_bool_map(12, 68752868),
@@ -227,7 +227,7 @@ class TestDataset:
         )
 
     @pytest.mark.parametrize(
-        "bool_map,what_to_expect",
+        ("bool_map", "what_to_expect"),
         [
             (
                 _create_random_bool_map(12, 68752868)[:-1],
@@ -240,7 +240,7 @@ class TestDataset:
             Dataset(subset_index=_create_valid_index()).get_subset(bool_map=bool_map)
 
     @pytest.mark.parametrize(
-        "kwargs,what_to_expect",
+        ("kwargs", "what_to_expect"),
         [
             (
                 {"patients": ["patient_1", "patient_3"], "tests": ["test_2", "test_3"], "extra with space": ["0"]},
@@ -260,7 +260,7 @@ class TestDataset:
         )
 
     @pytest.mark.parametrize(
-        "kwargs,what_to_expect",
+        ("kwargs", "what_to_expect"),
         [
             (
                 {"wrong": ["patient_1", "patient_3"], "tests": ["test_2", "test_3"], "extra with space": ["0"]},
@@ -273,7 +273,7 @@ class TestDataset:
             Dataset(subset_index=_create_valid_index()).get_subset(**kwargs)
 
     @pytest.mark.parametrize(
-        "subscript,groupby,what_to_expect",
+        ("subscript", "groupby", "what_to_expect"),
         [
             (
                 0,
@@ -316,7 +316,7 @@ class TestDataset:
         )
 
     @pytest.mark.parametrize(
-        "subscript,select_lvl,what_to_expect",
+        ("subscript", "select_lvl", "what_to_expect"),
         [
             (
                 4,
@@ -418,7 +418,7 @@ class TestDataset:
             _ = Dataset().index
 
     @pytest.mark.parametrize(
-        "n_splits,groupby,what_to_expect",
+        ("n_splits", "groupby", "what_to_expect"),
         [
             (
                 5,
@@ -448,7 +448,7 @@ class TestDataset:
         pd.testing.assert_frame_equal(left=what_to_expect[1], right=df[test].index)
 
     @pytest.mark.parametrize(
-        "n_splits,select_lvl,what_to_expect",
+        ("n_splits", "select_lvl", "what_to_expect"),
         [
             (13, "extra with space", "Cannot have number of splits"),
         ],
@@ -458,7 +458,7 @@ class TestDataset:
             next(KFold(n_splits=n_splits).split(Dataset(subset_index=_create_valid_index(), groupby_cols=select_lvl)))
 
     @pytest.mark.parametrize(
-        "select_lvl,what_to_expect",
+        ("select_lvl", "what_to_expect"),
         [
             (
                 "patients",
@@ -496,7 +496,7 @@ class TestDataset:
         )
 
     @pytest.mark.parametrize(
-        "level,what_to_expect",
+        ("level", "what_to_expect"),
         [
             (
                 "extra with space",
@@ -537,7 +537,7 @@ class TestDataset:
         pd.testing.assert_frame_equal(left=what_to_expect, right=values[0].index)
 
     @pytest.mark.parametrize(
-        "level,what_to_expect",
+        ("level", "what_to_expect"),
         [
             (
                 "wrong",
@@ -550,7 +550,7 @@ class TestDataset:
             next(Dataset(subset_index=_create_valid_index()).iter_level(level=level))
 
     @pytest.mark.parametrize(
-        "groupby,groupby_labels,unique",
+        ("groupby", "groupby_labels", "unique"),
         (
             (None, "patients", 3),
             (None, ["patients"], 3),

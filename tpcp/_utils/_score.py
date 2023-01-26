@@ -1,4 +1,6 @@
-"""This is a modified version of sklearn fit and score functionality.
+"""Score and fit results.
+
+This is a modified version of sklearn fit and score functionality.
 
 The original code is licenced under BSD-3: https://github.com/scikit-learn/scikit-learn
 """
@@ -115,7 +117,7 @@ def _score(
     return result
 
 
-def _optimize_and_score(  # noqa: too-many-branches
+def _optimize_and_score(
     optimizer: BaseOptimize,
     dataset: Dataset,
     scorer: Scorer,

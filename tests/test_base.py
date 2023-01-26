@@ -60,22 +60,22 @@ def create_test_class(
 
 @pytest.fixture(
     params=[
-        dict(
-            action_method_name="test",
-            attributes={"attr1_": "test1"},
-            params={},
-            other_params={},
-            private_params={},
-            action_method_callable=None,
-        ),
-        dict(
-            action_method_name="test",
-            attributes={"attr1_": "test1", "attr2_": "test2"},
-            params={"para1": "test1", "para2": "test2"},
-            other_params={"other_para1": "other_test1", "other_para2": "other_test2"},
-            private_params={"_private": "private_test"},
-            action_method_callable=lambda self=None: "test",
-        ),
+        {
+            "action_method_name": "test",
+            "attributes": {"attr1_": "test1"},
+            "params": {},
+            "other_params": {},
+            "private_params": {},
+            "action_method_callable": None,
+        },
+        {
+            "action_method_name": "test",
+            "attributes": {"attr1_": "test1", "attr2_": "test2"},
+            "params": {"para1": "test1", "para2": "test2"},
+            "other_params": {"other_para1": "other_test1", "other_para2": "other_test2"},
+            "private_params": {"_private": "private_test"},
+            "action_method_callable": lambda self=None: "test",
+        },
     ]
 )
 def example_test_class_initialised(request) -> Tuple[Algorithm, Dict[str, Any]]:
@@ -414,7 +414,7 @@ def test_dataclass_warns_when_cf_is_used():
         b: int
         a: OptiPara[int] = cf("test")
 
-    with pytest.raises(ValidationError) as e:
+    with pytest.raises(ValidationError):
         Test(b=2).get_params()
 
 

@@ -18,7 +18,7 @@ class TestScoreMock:
         self.dummy_paras = (pipe, dataset, scorer)
 
     @pytest.mark.parametrize(
-        "enable_output, out_para",
+        ("enable_output", "out_para"),
         (("return_parameters", "parameters"), ("return_data_labels", "data_labels"), ("return_times", "score_time")),
     )
     def test_result_params(self, enable_output, out_para):
@@ -32,7 +32,7 @@ class TestScoreMock:
         scorer = self.dummy_paras[2]
 
         out_paras = scorer.call_args[0][0].get_params()
-        assert {k: out_paras[k] for k in paras.keys()} == paras
+        assert {k: out_paras[k] for k in paras} == paras
         assert id(scorer.call_args[0][0]) == id(self.dummy_paras[0])
 
     def test_parameter_clone(self):

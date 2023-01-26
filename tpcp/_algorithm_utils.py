@@ -159,7 +159,7 @@ def _check_safe_run(algorithm: AlgorithmT, old_method: Callable, *args: Any, **k
             "algorithm."
         )
     if not isinstance(output, type(algorithm)):
-        raise ValueError(
+        raise TypeError(
             f"The `{old_method.__name__}` method of {type(algorithm).__name__} must return `self` or in rare cases a "
             f"new instance of {type(algorithm).__name__}. "
             f"But the return value had the type {type(output)}."
@@ -249,7 +249,7 @@ def _get_nested_opti_paras(algorithm: Algorithm, opti_para_names: List[str]) -> 
     return optimizable_paras, other_paras
 
 
-def _check_safe_optimize(  # pylint: disable=too-many-branches
+def _check_safe_optimize(  # noqa: C901
     algorithm: OptimizableT, old_method: Callable, *args: Any, **kwargs: Any
 ) -> OptimizableT:
 
@@ -289,7 +289,7 @@ def _check_safe_optimize(  # pylint: disable=too-many-branches
             "of `self_optimize_with_info` or return `None` as additional information."
         )
     if not isinstance(optimized_algorithm, type(algorithm)):
-        raise ValueError(
+        raise TypeError(
             "Calling `self_optimize`/`self_optimize_with_info` did not return an instance of the algorithm/pipeline "
             "itself! Normally, this method should return `self`."
         )

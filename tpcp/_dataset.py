@@ -147,15 +147,9 @@ class _Dataset(BaseTpcpObject):
             New dataset object filtered by specified parameters.
 
         """
-        if (
-            list(
-                map(
-                    lambda x: x is None or (isinstance(x, dict) and len(x) == 0),
-                    (groups, index, bool_map, kwargs),
-                )
-            ).count(False)
-            > 1
-        ):
+        if [x is None or (isinstance(x, dict) and len(x) == 0) for x in [groups, index, bool_map, kwargs]].count(
+            False
+        ) > 1:
             raise ValueError("Only one of `groups`, `selected_keys`, `index`, `bool_map` or kwarg can be set!")
 
         if groups is not None:
@@ -192,19 +186,13 @@ class _Dataset(BaseTpcpObject):
 
     def __repr__(self) -> str:
         """Return string representation of the dataset object."""
-        if self.groupby_cols is None:
-            repr_index = self.index
-        else:
-            repr_index = self.grouped_index
+        repr_index = self.index if self.groupby_cols is None else self.grouped_index
         repr_index = str(repr_index).replace("\n", "\n   ")
         return f"{self.__class__.__name__} [{self.shape[0]} groups/rows]\n\n   {repr_index}\n\n   "[:-5]
 
     def _repr_html_(self) -> str:
         """Return html representation of the dataset object."""
-        if self.groupby_cols is None:
-            repr_index = self.index
-        else:
-            repr_index = self.grouped_index
+        repr_index = self.index if self.groupby_cols is None else self.grouped_index
 
         df_repr = (
             repr_index._repr_html_()

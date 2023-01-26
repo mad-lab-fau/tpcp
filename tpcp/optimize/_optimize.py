@@ -69,10 +69,10 @@ class DummyOptimize(BaseOptimize[PipelineT, DatasetT]):
 
     optimized_pipeline_: PipelineT
 
-    def __init__(self, pipeline: PipelineT) -> None:  # noqa: super-init-not-called
+    def __init__(self, pipeline: PipelineT) -> None:
         self.pipeline = pipeline
 
-    def optimize(self, dataset: DatasetT, **optimize_params: Any) -> Self:
+    def optimize(self, dataset: DatasetT, **optimize_params: Any) -> Self:  # noqa: ARG002
         """Run the "dummy" optimization.
 
         Parameters
@@ -150,7 +150,7 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
     optimized_pipeline_: OptimizablePipelineT
     optimization_info_: Any
 
-    def __init__(  # noqa: super-init-not-called
+    def __init__(
         self, pipeline: OptimizablePipelineT, *, safe_optimize: bool = True, optimize_with_info: bool = True
     ) -> None:
         self.pipeline = pipeline
@@ -311,7 +311,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
     best_score_: float
     multimetric_: bool
 
-    def __init__(  # noqa: super-init-not-called
+    def __init__(
         self,
         pipeline: PipelineT,
         parameter_grid: ParameterGrid,
@@ -396,7 +396,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
 
         return self
 
-    def _format_results(self, candidate_params, out):  # noqa: no-self-use
+    def _format_results(self, candidate_params, out):
         """Format the final result dict.
 
         This function is adapted based on sklearn's `BaseSearchCV`
@@ -411,7 +411,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         for c, v in scores_dict.items():
             results[c] = v
             results[f"rank_{c}"] = np.asarray(rankdata(-v, method="min"), dtype=np.int32)
-        for c, v in single_scores_dict.items():
+        for c, _v in single_scores_dict.items():
             # Because of custom aggregators, it can be that single scores dicts have different keys than the aggregated
             # scores.
             results[f"single_{c}"] = single_scores_dict[c]
@@ -624,7 +624,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
     multimetric_: bool
     final_optimize_time_: float
 
-    def __init__(  # noqa: super-init-not-called
+    def __init__(
         self,
         pipeline: OptimizablePipelineT,
         parameter_grid: ParameterGrid,
@@ -655,9 +655,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         self.safe_optimize = safe_optimize
         self.optimize_with_info = optimize_with_info
 
-    def optimize(
-        self, dataset: DatasetT, *, groups=None, mock_labels=None, **optimize_params
-    ) -> Self:  # noqa: arguments-differ
+    def optimize(self, dataset: DatasetT, *, groups=None, mock_labels=None, **optimize_params) -> Self:
         """Run the GridSearchCV on the given dataset.
 
         Parameters
@@ -768,7 +766,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
 
         return self
 
-    def _format_results(self, candidate_params, n_splits, out, more_results=None):  # mccabe: disable=MC0001
+    def _format_results(self, candidate_params, n_splits, out, more_results=None):  # noqa: C901
         """Format the final result dict.
 
         This function is adapted based on sklearn's `BaseSearchCV`.

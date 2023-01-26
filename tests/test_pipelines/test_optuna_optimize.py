@@ -1,4 +1,3 @@
-import time
 from typing import Callable, List, Optional, Sequence, Union
 from unittest.mock import Mock, patch
 
@@ -183,10 +182,7 @@ class TestCustomOptunaOptimize:
         def scoring(pipe, _):
             return scores[pipe.para_1]
 
-        if n_jobs > 1:
-            storage = f"sqlite:///{tmp_path}/test.db"
-        else:
-            storage = None
+        storage = f"sqlite:///{tmp_path}/test.db" if n_jobs > 1 else None
 
         opti = DummyOptunaOptimizer(
             pipe,
@@ -211,7 +207,7 @@ class TestCustomOptunaOptimize:
         r = opti.search_results_
 
         assert set(r["param_para_1"]) == set(scores.keys())
-        assert set(tuple(p.items()) for p in r["params"]) == set((("para_1", k),) for k in scores.keys())
+        assert {tuple(p.items()) for p in r["params"]} == {(("para_1", k),) for k in scores}
 
         if isinstance(pipe, OptimizablePipeline):
             # That is expected when self_optimize was called correctly.

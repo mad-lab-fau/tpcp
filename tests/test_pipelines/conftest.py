@@ -95,7 +95,7 @@ def dummy_multi_score_func(pipeline, data_point):
 
 def dummy_error_score_func(pipeline, data_point):
     if data_point.groups[0] in [0, 2, 4]:
-        raise ValueError("Dummy Error for {}".format(data_point.groups[0]))
+        raise ValueError(f"Dummy Error for {data_point.groups[0]}")
     return data_point.groups[0]
 
 

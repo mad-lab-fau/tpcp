@@ -12,7 +12,7 @@ from tests.test_pipelines.conftest import (
     dummy_multi_score_func,
     dummy_single_score_func,
 )
-from tpcp.exceptions import ScorerFailed, ValidationError
+from tpcp.exceptions import ScorerFailedError, ValidationError
 from tpcp.validate import Scorer
 from tpcp.validate._scorer import Aggregator, NoAgg, _passthrough_scoring, _validate_scorer
 
@@ -25,7 +25,7 @@ class TestScorerCalls:
         self.scorer = Scorer(lambda x: x)
 
     def test_score_func_called(self):
-        """Test that the score func is called once per dataset"""
+        """Test that the score func is called once per dataset."""
         mock_score_func = Mock(return_value=1)
         scorer = Scorer(mock_score_func)
         pipe = DummyOptimizablePipeline()
@@ -72,7 +72,7 @@ class TestScorer:
 
     @pytest.mark.parametrize("bad_scorer", (lambda x, y: "test", lambda x, y: {"val": "test"}))
     def test_bad_scorer(self, bad_scorer):
-        """Check that we catch cases where the scoring func returns invalid values independent of the error_score val"""
+        """Check that we catch cases where the scoring func returns invalid values independent of the error_score val."""
         scorer = Scorer(bad_scorer)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
@@ -95,7 +95,7 @@ class TestScorer:
 
         assert mock_callback.call_count == len(DummyDataset())
         for call, i in zip(mock_callback.call_args_list, range(len(DummyDataset()))):
-            assert call[0] == tuple()
+            assert call[0] == ()
             kwargs = call[1]
             assert kwargs.pop("scorer") == scorer
             assert kwargs.pop("scores") == (1,) * (i + 1)
@@ -151,7 +151,7 @@ class TestScorer:
         scorer = Scorer(score_func)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
-        with pytest.raises(ScorerFailed) as e:
+        with pytest.raises(ScorerFailedError) as e:
             scorer(pipe, data)
 
         assert 'Exception("test")' in str(e)
@@ -167,7 +167,7 @@ def _dummy_func_2(x):
 
 class TestScorerUtils:
     @pytest.mark.parametrize(
-        "scoring, expected",
+        ("scoring", "expected"),
         (
             (None, Scorer(_passthrough_scoring)),
             (_dummy_func, Scorer(_dummy_func)),
@@ -201,7 +201,7 @@ class TestCustomAggregator:
             return {"mean": float(np.mean(values)), "std": float(np.std(values))}
 
     @pytest.mark.parametrize(
-        "score_type, scorefunc", [("single", lambda x, y: 3), ("multi", lambda x, y: {"value": 3})]
+        ("score_type", "scorefunc"), [("single", lambda x, y: 3), ("multi", lambda x, y: {"value": 3})]
     )
     def test_multi_agg(self, score_type, scorefunc):
         scorer = Scorer(scorefunc, default_aggregator=self.MultiAgg)
@@ -240,7 +240,7 @@ class TestCustomAggregator:
         assert mock_aggregate.call_count == expected_called
 
     @pytest.mark.parametrize(
-        "scorer_return,expected_val",
+        ("scorer_return", "expected_val"),
         (
             (1, 0),
             ({"val": 1}, 0),
@@ -367,11 +367,17 @@ class TestCustomAggregator:
     @mock.patch("tests.test_pipelines.test_scorer.TestCustomAggregator.DatapointAgg.aggregate", return_value=1)
     def test_datapoints_forwarded_to_agg(self, mock_method, score_func_type):
         if score_func_type == "single":
-            score_func = lambda x, y: self.DatapointAgg(y)
+
+            def score_func(x, y):
+                return self.DatapointAgg(y)
+
         else:
-            score_func = lambda x, y: {"val": self.DatapointAgg(y)}
+
+            def score_func(x, y):
+                return {"val": self.DatapointAgg(y)}
+
         scorer = Scorer(score_func)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         _ = scorer(pipe, data)
-        assert mock_method.called_with(values=[d for d in data], datapoints=[d for d in data])
+        assert mock_method.called_with(values=list(data), datapoints=list(data))

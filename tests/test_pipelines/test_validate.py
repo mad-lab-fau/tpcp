@@ -92,7 +92,7 @@ class TestCrossValidate:
             assert r["train_score"] == np.mean(all_ids)
 
     @pytest.mark.parametrize(
-        "kwargs,expected",
+        ("kwargs", "expected"),
         (
             ({"return_optimizer": True}, ("optimizer",)),
             ({"return_train_score": True}, ("train_score", "train_single_score")),
@@ -107,7 +107,7 @@ class TestCrossValidate:
         assert set(results_additionally.keys()) - set(results.keys()) == set(expected)
 
     def test_returned_optimizer_per_fold_independent(self):
-        """Double check that the optimizer is cloned correctly"""
+        """Double check that the optimizer is cloned correctly."""
         optimizer = Optimize(DummyOptimizablePipeline())
         results = cross_validate(
             Optimize(DummyOptimizablePipeline()), DummyDataset(), scoring=dummy_single_score_func, return_optimizer=True

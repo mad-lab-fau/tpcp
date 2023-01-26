@@ -27,19 +27,19 @@ jobs:
     - name: Install dependencies (<3.11)
       if: ${{ matrix.python-version != '3.11' }}
       run: |
-          poetry install -E optuna -E torch
+          poetry install --all-extras
     - name: Install dependencies (3.11)
       # In this case we need to skip the installation of torch
       if: ${{ matrix.python-version == '3.11' }}
       run: |
-          poetry install -E optuna
+          poetry install -E optuna -E attrs
     - name: Testing
       run: |
         poetry run poe test
     - name: Linting
       if: ${{ matrix.python-version == '3.9' }}
       run: |
-        poetry run poe check
+        poetry run poe ci_check
     - name: "Upload coverage to Codecov"
       if: ${{ matrix.python-version == '3.9' }}
       uses: codecov/codecov-action@v2

@@ -53,7 +53,7 @@ class _Nothing:
 
     def __new__(cls) -> _Nothing:
         if _Nothing._singleton is None:
-            _Nothing._singleton = super(_Nothing, cls).__new__(cls)
+            _Nothing._singleton = super().__new__(cls)
         return _Nothing._singleton
 
     def __repr__(self) -> str:
@@ -123,7 +123,7 @@ def _retry_eval_with_missing_locals(
     # We use a value here instead of a "while True" to not get the program stuck in an endless loop.
     for _ in range(100):
         try:
-            val = eval(expression, globalns, localns)  # pylint: disable=eval-used
+            val = eval(expression, globalns, localns)  # noqa: PGH001
             break
         except NameError as e:
             missing = str(e).split("'")[1]
@@ -287,7 +287,7 @@ class _BaseTpcpObject:
 class BaseTpcpObject(_BaseTpcpObject):
     """Baseclass for all tpcp objects."""
 
-    _composite_params: ClassVar[Tuple[str, ...]] = tuple()
+    _composite_params: ClassVar[Tuple[str, ...]] = ()
 
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
         """Get parameters for this algorithm.
@@ -413,7 +413,7 @@ def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
         _set_tpcp_validated(instance, True)
 
     valid_fields = get_param_names(type(instance))
-    comp_fields = getattr(instance, "_composite_params", tuple())
+    comp_fields = getattr(instance, "_composite_params", ())
     out: Dict[str, Any] = {}
     for key in valid_fields:
         value = getattr(instance, key)
@@ -451,10 +451,7 @@ def _set_comp_field(instance, field_name, params):
     comp_list = list(getattr(instance, field_name))
     for key, old_value in comp_list:
         nested_values = comp_params.pop(key, {})
-        if "*" not in nested_values:
-            new_value = old_value
-        else:
-            new_value = nested_values.pop("*")
+        new_value = old_value if "*" not in nested_values else nested_values.pop("*")
         if nested_values:
             new_value = new_value.set_params(**nested_values)
         new_list.append((key, new_value))
@@ -481,7 +478,7 @@ def _set_params(instance: BaseTpcpObjectObjT, **params: Any) -> BaseTpcpObjectOb
     if not params:
         return instance
     valid_params = instance.get_params(deep=True)
-    comp_fields = getattr(instance, "_composite_params", tuple())
+    comp_fields = getattr(instance, "_composite_params", ())
 
     nested_params: DefaultDict[str, Any] = defaultdict(dict)  # grouped by prefix
     for key, value in params.items():
@@ -648,10 +645,10 @@ def clone(algorithm: T, *, safe: bool = False) -> T:
         return algorithm
     # Handle named tuple
     if isinstance(algorithm, tuple) and hasattr(algorithm, "_asdict") and hasattr(algorithm, "_fields"):
-        return type(algorithm)(*(clone(a, safe=safe) for a in algorithm))  # noqa: to-many-function-args
+        return type(algorithm)(*(clone(a, safe=safe) for a in algorithm))
     # XXX: not handling dictionaries
     if isinstance(algorithm, (list, tuple, set, frozenset)):
-        return type(algorithm)([clone(a, safe=safe) for a in algorithm])  # noqa: to-many-function-args
+        return type(algorithm)([clone(a, safe=safe) for a in algorithm])
     # Compared to sklearn, we check specifically for BaseTpcpObject and not just if `get_params` is defined on the
     # object.
     # Due to the way algorithms/pipelines in tpcp work, they need to inherit from BaseTpcpObject.
@@ -730,4 +727,4 @@ def cf(default_value: T) -> T:  # pylint: disable=invalid-name
 
     This is basically an alias for :class:`~tpcp.CloneFactory`
     """
-    return CloneFactory(default_value)  # type: ignore
+    return CloneFactory(default_value)  # type: ignore  # noqa: PGH003

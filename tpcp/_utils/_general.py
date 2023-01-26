@@ -3,12 +3,9 @@ from __future__ import annotations
 
 import copy
 import numbers
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-
-if TYPE_CHECKING:
-    pass
 
 
 def _aggregate_final_results(results: List) -> Dict:

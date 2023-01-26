@@ -66,7 +66,7 @@ def test_field_annotations_cache():
     cache_id = id(cache)
     assert annots == cache == {"hyper": _ParaTypes.HYPER, "nested_hyper__nested_para": _ParaTypes.HYPER}
     # When called again, the cache shouldn't change
-    test2 = Test(2)
+    Test(2)
     annots = test.__field_annotations__
     assert id(Test.__field_annotations_cache__) == cache_id
     assert id(annots) == cache_id

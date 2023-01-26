@@ -84,7 +84,7 @@ class TestSafeAction:
         assert before_wrap_id != wrapped_id
         assert second_wrapped_id == wrapped_id
 
-    @pytest.mark.parametrize("name,warn", (("run", False), ("other_name", True)))
+    @pytest.mark.parametrize(("name", "warn"), (("run", False), ("other_name", True)))
     def test_wrapper_checks_name(self, name, warn):
         test_func = DummyActionPipelineUnsafe.run
         test_func.__name__ = name
@@ -107,7 +107,7 @@ class TestSafeAction:
     def test_no_self_return(self):
         pipe = DummyActionPipelineUnsafe
         pipe.run = lambda p, d: "some Value"
-        with pytest.raises(ValueError) as e:
+        with pytest.raises(TypeError) as e:
             make_action_safe(pipe.run)(pipe(), DummyDataset()[0])
 
         assert "method of DummyActionPipelineUnsafe must return `self`" in str(e)
@@ -142,7 +142,7 @@ class TestSafeOptimize:
         assert before_wrap_id != wrapped_id
         assert second_wrapped_id == wrapped_id
 
-    @pytest.mark.parametrize("name,warn", (("self_optimize", False), ("other_name", True)))
+    @pytest.mark.parametrize(("name", "warn"), (("self_optimize", False), ("other_name", True)))
     def test_wrapper_checks_name(self, name, warn):
         test_func = DummyOptimizablePipelineUnsafe.self_optimize
         test_func.__name__ = name
@@ -155,7 +155,7 @@ class TestSafeOptimize:
         if warn:
             assert "The `make_optimize_safe` decorator is only meant for the `self_optimize`" in str(w[0])
 
-    @pytest.mark.parametrize("output,warn", (({}, True), (dict(optimized=True), False)))
+    @pytest.mark.parametrize(("output", "warn"), (({}, True), ({"optimized": True}, False)))
     def test_optimize_warns(self, output, warn):
         optimized_pipe = DummyOptimizablePipelineUnsafe()
         for k, v in output.items():
@@ -173,7 +173,7 @@ class TestSafeOptimize:
             if len(w) > 0:
                 assert "Optimizing the algorithm doesn't seem to have changed" in str(w[0])
 
-    @pytest.mark.parametrize("output", (dict(some_random_para_="val"), dict(optimized=True, some_random_para_="val")))
+    @pytest.mark.parametrize("output", ({"some_random_para_": "val"}, {"optimized": True, "some_random_para_": "val"}))
     def test_other_para_modified_error(self, output):
         optimized_pipe = DummyOptimizablePipelineUnsafe()
         for k, v in output.items():
@@ -197,7 +197,7 @@ class TestSafeOptimize:
             DummyOptimizablePipelineUnsafe.self_optimize = make_optimize_safe(
                 DummyOptimizablePipelineUnsafe.self_optimize
             )
-            with pytest.raises(ValueError) as e:
+            with pytest.raises(TypeError) as e:
                 DummyOptimizablePipelineUnsafe().self_optimize(ds)
 
         assert "Calling `self_optimize`/`self_optimize_with_info` did not return an instance" in str(e.value)

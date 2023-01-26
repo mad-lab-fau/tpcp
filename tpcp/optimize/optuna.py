@@ -2,7 +2,7 @@
 import multiprocessing
 
 try:
-    import optuna  # noqa: unused-import
+    import optuna
 except ImportError as e:
     raise ImportError(
         "To use the tpcp Optuna interface, you first need to install optuna (`pip install optuna`)"
@@ -238,9 +238,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
 
         return objective
 
-    def return_optimized_pipeline(  # noqa: no-self-use
-        self, pipeline: PipelineT, dataset: DatasetT, study: Study
-    ) -> PipelineT:
+    def return_optimized_pipeline(self, pipeline: PipelineT, dataset: DatasetT, study: Study) -> PipelineT:
         """Return the pipeline with the best parameters of a study.
 
         This either just returns the pipeline with the best parameters set, or if the pipeline is a subclass of

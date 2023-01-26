@@ -1,5 +1,7 @@
 """A set of tests for parameters that specifically tests potential issues with different type of type import and uses
-the text-annotations future"""
+the text-annotations future
+.
+"""
 
 from __future__ import annotations
 
@@ -36,9 +38,7 @@ def test_basic_annotation_collection():
 
 def test_import_forward():
     if TYPE_CHECKING:
-        from tpcp import optimize
-
-        renamed_optimize = optimize.GridSearch
+        pass
 
     class Test(BaseTpcpObject):
         hyper: HyperPara[int]

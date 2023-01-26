@@ -5,7 +5,7 @@ class PotentialUserErrorWarning(UserWarning):
     """A warning indicating that the user might not use certain features correctly."""
 
 
-class ScorerFailed(Exception):
+class ScorerFailedError(Exception):
     """A error indicating that a scorer failed."""
 
 

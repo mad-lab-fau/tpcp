@@ -8,7 +8,7 @@ from joblib.hashing import Hasher, NumpyHasher
 class NoMemoizeHasher(Hasher):
     """A joblib hasher with all memoize features disabled."""
 
-    def memoize(self, obj):
+    def memoize(self, obj):  # noqa: ARG002
         # We skip memoization here, as it can cause some issues with nested objects.
         # https://github.com/joblib/joblib/issues/1283
         # In particular with the way cloning is implemented in tpcp, such bugs might occur more often than in other
@@ -21,7 +21,7 @@ class NoMemoizeHasher(Hasher):
         # For now, we accept the recursion issue, as I think this might happen less often by accident.
         return
 
-    def hash(self, obj, return_digest=True):
+    def hash(self, obj, return_digest=True):  # noqa: A003
         """Get hash while handling some edgecases.
 
         Namely, this implementation fixes the following issues:
@@ -83,7 +83,7 @@ class TorchHasher(NoMemoizeNumpyHasher):
 
     def save(self, obj):
         if isinstance(obj, (self.torch.nn.Module, self.torch.Tensor)):
-            b = bytes()
+            b = b""
             buffer = io.BytesIO(b)
             self.torch.save(obj, buffer)
             self._hash.update(b)

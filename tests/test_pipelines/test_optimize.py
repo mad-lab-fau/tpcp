@@ -486,7 +486,7 @@ class TestGridSearchCV:
         # Final optimize was called with all the data.
         assert len(mock.call_args_list[-1][0][1]) == 5
 
-    @pytest.mark.parametrize("pure_paras,call_count", ((False, 6 * 2), (True, 2 * 2), (["para_1"], 2 * 2)))
+    @pytest.mark.parametrize(("pure_paras", "call_count"), ((False, 6 * 2), (True, 2 * 2), (["para_1"], 2 * 2)))
     def test_pure_parameters(self, pure_paras, call_count):
         optimized_pipe = DummyOptimizablePipeline()
         optimized_pipe.optimized = True
@@ -660,7 +660,7 @@ class TestOptimize:
 
     @pytest.mark.parametrize("wrap", (True, False))
     def test_double_wrap(self, wrap):
-        """Test that we do not check twice"""
+        """Test that we do not check twice."""
         optimized_pipe = DummyOptimizablePipelineUnsafe()
         ds = DummyDataset()
         with patch.object(
@@ -732,7 +732,7 @@ class TestOptimizeBase:
         return_val = "return_val"
         self.optimizer.optimized_pipeline_ = DummyOptimizablePipeline()
         with patch.object(DummyOptimizablePipeline, "run", return_value=return_val) as mock_method:
-            out = getattr(self.optimizer, "run")(ds)
+            out = self.optimizer.run(ds)
 
         assert mock_method.called_with(ds)
         assert return_val == out

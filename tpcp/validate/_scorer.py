@@ -26,7 +26,7 @@ from tpcp import NOTHING
 from tpcp._base import _Nothing
 from tpcp._dataset import Dataset, DatasetT
 from tpcp._pipeline import Pipeline, PipelineT
-from tpcp.exceptions import ScorerFailed, ValidationError
+from tpcp.exceptions import ScorerFailedError, ValidationError
 
 T = TypeVar("T")
 AggReturnType = Union[float, Dict[str, float], _Nothing]
@@ -91,13 +91,13 @@ class MeanAggregator(Aggregator[float]):
     """Aggregator that calculates the mean of the values."""
 
     @classmethod
-    def aggregate(cls, /, values: Sequence[float], datapoints: Sequence[Dataset]) -> float:
+    def aggregate(cls, /, values: Sequence[float], datapoints: Sequence[Dataset]) -> float:  # noqa: ARG003
         """Aggregate a sequence of floats by taking the mean."""
         try:
             return float(np.mean(values))
         except TypeError as e:
             raise ValidationError(
-                "MeanAggregator can only be used with float values. " f"Got the following values instead:\n\n{values}"
+                f"MeanAggregator can only be used with float values. Got the following values instead:\n\n{values}"
             ) from e
 
 
@@ -120,7 +120,7 @@ class NoAgg(Aggregator[Any]):
     """
 
     @classmethod
-    def aggregate(cls, /, values: Sequence[Any], datapoints: Sequence[Dataset]) -> _Nothing:
+    def aggregate(cls, /, values: Sequence[Any], datapoints: Sequence[Dataset]) -> _Nothing:  # noqa: ARG003
         """Return nothing, indicating no aggregation."""
         return NOTHING
 
@@ -195,7 +195,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         """
         return self._score(pipeline=pipeline, dataset=dataset)
 
-    def _aggregate(  # mccabe: disable=MC0001, pylint: disable=too-many-branches
+    def _aggregate(  # mccabe: disable=MC0001, pylint: disable=too-many-branches  # noqa: C901
         self,
         scores: Union[Tuple[Type[Aggregator[T]], List[T]], Dict[str, Tuple[Type[Aggregator[T]], List[T]]]],
         datapoints: List[DatasetT],
@@ -259,7 +259,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
                 score = self._score_func(pipeline.clone(), d)
             except Exception as e:  # noqa: broad-except
-                raise ScorerFailed(
+                raise ScorerFailedError(
                     f"Scorer raised an exception while scoring data point {i}. "
                     "Tpcp does not support that (compared to sklearn) and you need to handle error cases yourself "
                     "within the scoring function."
@@ -300,10 +300,10 @@ def _validate_scorer(
         # If scoring is None, we will try to use the score method of the pipeline
         # However, we run score once with an empty dataset and check if it is actually implemented:
         try:
-            pipeline.score(Dataset())  # type: ignore
+            pipeline.score(Dataset())  # type: ignore  # noqa: PGH003
         except NotImplementedError as e:
-            raise e
-        except Exception:  # pylint: disable=broad-except
+            raise e  # noqa: TRY201
+        except Exception:  # noqa: BLE001
             pass
         scoring = _passthrough_scoring
     if isinstance(scoring, base_class):
@@ -321,7 +321,7 @@ _non_homogeneous_scoring_error = ValidationError(
 )
 
 
-def _check_and_invert_score_dict(  # mccabe: disable=MC0001
+def _check_and_invert_score_dict(  # noqa: C901
     #  I don't care that this is to complex, some things need to be complex
     scores: List[ScoreTypeT[T]],
     default_agg: Type[Aggregator],
@@ -336,9 +336,7 @@ def _check_and_invert_score_dict(  # mccabe: disable=MC0001
         if any(isinstance(s, dict) for s in scores):
             raise _non_homogeneous_scoring_error
         # We check that the score types are consistent for all datatypes.
-        types = cast(
-            Set[Type[Aggregator]], set((type(s) if isinstance(s, Aggregator) else default_agg) for s in scores)
-        )
+        types = cast(Set[Type[Aggregator]], {(type(s) if isinstance(s, Aggregator) else default_agg) for s in scores})
         if len(types) > 1:
             raise ValidationError(
                 f"The score values are not consistent. The following aggregation types were found: {types}"
