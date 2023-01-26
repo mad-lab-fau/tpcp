@@ -127,9 +127,23 @@ add_function_parentheses = False
 #
 # Activate the theme.
 html_theme = "pydata_sphinx_theme"
+
 html_theme_options = {
     "github_url": "https://github.com/mad-lab-fau/tpcp",
+    "use_edit_page_button": True,
     "show_prev_next": False,
+    # Workaround until pydata-sphinx-theme 0.13 is released (https://github.com/pydata/pydata-sphinx-theme/issues/1094)
+    "logo": {
+        "image_light": "logo/gaitmap_logo.png",
+        "image_dark": "logo/gaitmap_logo.png",
+    }
+}
+
+html_context = {
+    "github_user": "mad-lab-fau",
+    "github_repo": "tpcp",
+    "github_version": "main",
+    "doc_path": "docs",
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
