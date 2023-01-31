@@ -1,10 +1,11 @@
+import doctest
 from itertools import product
 from operator import itemgetter
 
 import numpy as np
 import pandas as pd
 import pytest
-from sklearn.model_selection import KFold
+from sklearn.model_selection import GroupKFold, KFold
 
 from tpcp import Dataset
 
@@ -602,3 +603,39 @@ class TestDataset:
 
         with pytest.raises(ValueError, match="only a single group left"):
             _ = ds.group
+
+    def test_doctest(self):
+        from tpcp import _dataset
+
+        doctest_results = doctest.testmod(m=_dataset)
+        assert doctest_results.failed == 0
+
+
+class TestGroupLabelsKFold:
+    def test_simple_group_labels(self):
+        index = _create_valid_index(
+            {
+                "patient_1": {"a": ["test_1"], "b": ["0", "1", "3", "4"]},
+                "patient_3": {"a": ["test_2"], "b": ["0", "1", "3", "4"]},
+            },
+            columns_names=["patients", "tests", "extra with space"],
+        )
+        # We sample the index to make sure the split can not be simple be performed by taking the first k
+        ds = Dataset(subset_index=index.sample(frac=1))
+
+        group_labels = ds.create_group_labels(["patients", "tests"])
+
+        kfold = GroupKFold(n_splits=2)
+        splits = kfold.split(
+            X=ds,
+            y=None,
+            groups=group_labels,
+        )
+
+        assert len(list(splits)) == 2
+
+        for split in splits:
+            train, test = split
+            # With the grouping we should have two splits that should always be uniform in their group.
+            assert ds[train].is_single(["patients", "tests"])
+            assert ds[test].is_single(["patients", "tests"])
