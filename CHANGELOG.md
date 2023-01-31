@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Fixed
 - GridSearch and GridSearchCV now correctly handle custom aggregators that return scores with new names.
   (https://github.com/mad-lab-fau/tpcp/pull/58)
+- When using the `create_group_labels` method on dataset with multiple groupby columns, the method returned a list of 
+  tuples.
+  This caused issues with `GroupKFold`, as the method internally flattens the list of tuples.
+  To avoid this, the method now return a list of strings.
+  The respective sting is simply the string representation of the tuple that was returned before.
+  (https://github.com/mad-lab-fau/tpcp/pull/59)
 
 ## [0.13.0] - 2023-01-11
 
