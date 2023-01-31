@@ -300,7 +300,7 @@ class _Dataset(BaseTpcpObject):
                 f" only a single group left in a data subset. " + group_error_str
             )
 
-    def create_group_labels(self, label_cols: Union[str, List[str]]):
+    def create_group_labels(self, label_cols: Union[str, List[str]]) -> List[str]:
         """Generate a list of labels for each group/row in the dataset.
 
         .. note::
@@ -321,7 +321,7 @@ class _Dataset(BaseTpcpObject):
         """
         unique_index = self._get_unique_groups().to_frame()
         try:
-            return unique_index.set_index(label_cols).index.to_list()
+            return [str(g) for g in unique_index.set_index(label_cols).index.to_list()]
         except KeyError as e:
             if self.groupby_cols is not None:
                 raise KeyError(
@@ -498,6 +498,7 @@ class Dataset(_Dataset):
 
     If we want to use datasets in combination with :class:`~sklearn.model_selection.GroupKFold`, we can generate
     valid group labels as follows.
+    These grouplabels are strings representing the unique value of the index at the specified levels.
 
     .. note::
         You usually don't want to use that in combination with `self.groupby`.
@@ -505,19 +506,19 @@ class Dataset(_Dataset):
     >>> # We are using the ungrouped dataset again!
     >>> group_labels = dataset.create_group_labels(["patient", "test"])
     >>> pd.concat([dataset.index, pd.Series(group_labels, name="group_labels")], axis=1)
-          patient    test extra         group_labels
-    0   patient_1  test_1     1  (patient_1, test_1)
-    1   patient_1  test_1     2  (patient_1, test_1)
-    2   patient_1  test_2     1  (patient_1, test_2)
-    3   patient_1  test_2     2  (patient_1, test_2)
-    4   patient_2  test_1     1  (patient_2, test_1)
-    5   patient_2  test_1     2  (patient_2, test_1)
-    6   patient_2  test_2     1  (patient_2, test_2)
-    7   patient_2  test_2     2  (patient_2, test_2)
-    8   patient_3  test_1     1  (patient_3, test_1)
-    9   patient_3  test_1     2  (patient_3, test_1)
-    10  patient_3  test_2     1  (patient_3, test_2)
-    11  patient_3  test_2     2  (patient_3, test_2)
+          patient    test extra             group_labels
+    0   patient_1  test_1     1  ('patient_1', 'test_1')
+    1   patient_1  test_1     2  ('patient_1', 'test_1')
+    2   patient_1  test_2     1  ('patient_1', 'test_2')
+    3   patient_1  test_2     2  ('patient_1', 'test_2')
+    4   patient_2  test_1     1  ('patient_2', 'test_1')
+    5   patient_2  test_1     2  ('patient_2', 'test_1')
+    6   patient_2  test_2     1  ('patient_2', 'test_2')
+    7   patient_2  test_2     2  ('patient_2', 'test_2')
+    8   patient_3  test_1     1  ('patient_3', 'test_1')
+    9   patient_3  test_1     2  ('patient_3', 'test_1')
+    10  patient_3  test_2     1  ('patient_3', 'test_2')
+    11  patient_3  test_2     2  ('patient_3', 'test_2')
 
     """
 
