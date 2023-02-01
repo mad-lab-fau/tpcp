@@ -18,8 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tuples.
   This caused issues with `GroupKFold`, as the method internally flattens the list of tuples.
   To avoid this, the method now return a list of strings.
-  The respective sting is simply the string representation of the tuple that was returned before.
+  The respective string is simply the string representation of the tuple that was returned before.
   (https://github.com/mad-lab-fau/tpcp/pull/59)
+- The fix provided in 0.12.1 to fix hashing of objects defined in the `__main__` module was only partially working.
+  When the object in question was nested in another object, the hashing would still fail.
+  This is hopefully now fixed for good.
+  ()
 
 ## [0.13.0] - 2023-01-11
 
