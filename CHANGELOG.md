@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The fix provided in 0.12.1 to fix hashing of objects defined in the `__main__` module was only partially working.
   When the object in question was nested in another object, the hashing would still fail.
   This is hopefully now fixed for good.
-  ()
+  (https://github.com/mad-lab-fau/tpcp/pull/60)
 
 ## [0.13.0] - 2023-01-11
 
