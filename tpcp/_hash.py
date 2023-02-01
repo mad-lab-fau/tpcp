@@ -1,8 +1,12 @@
 """A custom hash function implementation that properly supports pytorch."""
 import io
+import pickle
+import struct
 import sys
 
 from joblib.hashing import Hasher, NumpyHasher
+
+Pickler = pickle._Pickler
 
 
 class NoMemoizeHasher(Hasher):
@@ -28,41 +32,74 @@ class NoMemoizeHasher(Hasher):
 
         - Because we skip memoization, we need to handle the case where the object is self-referential.
           We just catch the error and raise a more descriptive error message.
-        - We need to handle the case where the object is defined in the `__main__` module.
-          For some reason, this can lead to pickle issues.
-          Based on some information I found, this should not happen, but it still does...
-          To fix it, we detect, when an object is defined in `__main__` and temporarily add it to the "real" module
-          representing the main function.
-          Afterwards we do some cleanup.
-          Not sure if really required, but it seems to work.
-          Overall very hacky, but I don't see a better way to fix this.
+
 
         """
-        modules_modified = []
-        if getattr(obj, "__module__", None) == "__main__":
-            try:
-                name = obj.__qualname__
-                to_add_obj = obj
-            except AttributeError:
-                name = obj.__class__.__qualname__
-                to_add_obj = obj.__class__
-            mod = sys.modules["__main__"]
-            if not hasattr(mod, name):
-                modules_modified.append((mod, name))
-                setattr(mod, name, to_add_obj)
         try:
             return super().hash(obj, return_digest)
         except RecursionError as e:
             raise ValueError(
                 "The custom hasher used in tpcp does not support hashing of self-referential objects."
             ) from e
-        finally:
-            # Remove all new entries made to the main module.
-            for mod, name in modules_modified:
-                delattr(mod, name)
+
+    def save_global(self, obj, name=None, pack=struct.pack):
+        """We overwrite this method to fix the issue with objects defined in the `__main__` module.
+
+        We need to handle the case where the object is defined in the `__main__` module.
+        For some reason, this can lead to pickle issues.
+        Based on some information I found, this should not happen, but it still does...
+        To fix it, we detect, when an object is defined in `__main__` and temporarily add it to the "real" module
+        representing the main function.
+        Afterwards we do some cleanup.
+        Not sure if really required, but it seems to work.
+        Overall very hacky, but I don't see a better way to fix this.
+
+        The implementation provided by the parent class (joblib.hashing.Hasher) should work, but it does not.
+        I think the second call to `save_global` there is causing the issue.
+        In our version we first fix the module before calling save_global again.
+
+        Note that we are not using super() here, as we want to skip the faulty implementation in the parent class.
+
+        We also need to modify the dispatch table to force our custom save_global method.
+        See below this method for the implementation.
+        """
+        kwargs = {"name": name, "pack": pack}
+        del kwargs["pack"]
+        try:
+            Pickler.save_global(self, obj, **kwargs)
+        except pickle.PicklingError:
+            modules_modified = []
+            if getattr(obj, "__module__", None) == "__main__":
+                try:
+                    name = obj.__qualname__
+                    to_add_obj = obj
+                except AttributeError:
+                    name = obj.__class__.__qualname__
+                    to_add_obj = obj.__class__
+                mod = sys.modules["__main__"]
+                if not hasattr(mod, name):
+                    modules_modified.append((mod, name))
+                    setattr(mod, name, to_add_obj)
+            try:
+                Pickler.save_global(self, obj, **kwargs)
+            finally:
+                # Remove all new entries made to the main module.
+                for mod, name in modules_modified:
+                    delattr(mod, name)
+
+    # We also need to rewrite the dispatch table to force our custom save_global method.
+    dispatch = Hasher.dispatch.copy()
+    # builtin
+    dispatch[type(len)] = save_global
+    # type
+    dispatch[type(object)] = save_global
+    # classobj
+    dispatch[type(Hasher)] = save_global
+    # function
+    dispatch[type(pickle.dump)] = save_global
 
 
-class NoMemoizeNumpyHasher(NumpyHasher, NoMemoizeHasher):
+class NoMemoizeNumpyHasher(NoMemoizeHasher, NumpyHasher):
     """A joblib numpy hasher with all memoize features disabled."""
 
 
