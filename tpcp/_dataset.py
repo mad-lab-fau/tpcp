@@ -18,9 +18,39 @@ class _Dataset(BaseTpcpObject):
     def index(self) -> pd.DataFrame:
         """Get index."""
         if self.subset_index is None:
-            return self.create_index()
+            return self._create_check_index()
 
         return self.subset_index
+
+    def _create_check_index(self):
+        """Check the index creation.
+
+        We create the index twice to check if the index creation is deterministic.
+        If not we raise an error.
+        This is fundamentally important for datasets to be deterministic.
+        While we can not catch all related issues (i.e. determinism across different machines), this should catch the
+        most obvious ones.
+
+        In case, creating the index twice is too expensive, users can overwrite this method.
+        But better to catch errors early.
+        """
+        index_1 = self.create_index()
+        index_2 = self.create_index()
+        if not index_1.equals(index_2):
+            raise RuntimeError(
+                "Index creation is not deterministic! "
+                "This is a fundamental requirement for datasets to be deterministic otherwise you might run into all "
+                "kinds of issues. "
+                "Please check your implementation of the `create_index` method.\n\n"
+                "Typically sources of non-deteminism are:\n"
+                " - Using `random` somewhere in the code\n"
+                " - Storing (intermediate) data in non-sorted containers (e.g. `set`)\n"
+                " - Relying on the ordering of files from the file system\n\n"
+                "For the last to cases we recommend to use sort the dataframe you return from `create_index` "
+                "explicitly using `sort_values`."
+            )
+
+        return index_1
 
     @property
     def groups(self) -> List[Union[str, Tuple[str, ...]]]:
