@@ -537,6 +537,15 @@ class TestDataset:
         values = list(Dataset(subset_index=_create_valid_index()).iter_level(level=level))
         pd.testing.assert_frame_equal(left=what_to_expect, right=values[0].index)
 
+    def test_error_non_deterministic_create_index(self):
+        class TestDataset(Dataset):
+            def create_index(self):
+                # Return a non-deterministic index
+                return pd.DataFrame(np.random.rand(10, 3), columns=["a", "b", "c"])
+
+        with pytest.raises(RuntimeError):
+            _ = TestDataset().index
+
     @pytest.mark.parametrize(
         ("level", "what_to_expect"),
         [
