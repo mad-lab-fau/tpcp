@@ -181,7 +181,7 @@ keep-runtime-typing = true
 _format_black = "black ."
 _format_ruff = "ruff . --fix-only --exit-zero"
 format = ["_format_black", "_format_ruff", "_format_black"]
-lint = { cmd = "ruff tpcp --fix", help = "Lint all files with Prospector." }
+lint = { cmd = "ruff tpcp --fix", help = "Lint all files with ruff." }
 _lint_ci = "ruff tpcp --format=github"
 _check_black = "black . --check"
 ci_check = { sequence = ["_check_black", "_lint_ci"], help = "Check all potential format and linting issues." }
