@@ -1,13 +1,20 @@
 from typing import Callable, List, Optional, Sequence, Union
 from unittest.mock import Mock, patch
 
+import numpy as np
 import pytest
 from optuna import Study, Trial, create_study
 from optuna.samplers import GridSampler, RandomSampler
 from optuna.trial import FrozenTrial
 
 from tests.mixins.test_algorithm_mixin import TestAlgorithmMixin
-from tests.test_pipelines.conftest import DummyDataset, DummyOptimizablePipeline, DummyPipeline, dummy_single_score_func
+from tests.test_pipelines.conftest import (
+    DummyDataset,
+    DummyOptimizablePipeline,
+    DummyPipeline,
+    dummy_multi_score_func,
+    dummy_single_score_func,
+)
 from tpcp import make_optimize_safe
 from tpcp._dataset import DatasetT
 from tpcp._pipeline import OptimizablePipeline, PipelineT
@@ -72,7 +79,7 @@ def _get_study():
     return create_study(sampler=RandomSampler(42))
 
 
-class TestMetaFunctionalityGridSearch(TestAlgorithmMixin):
+class TestMetaFunctionalityOptuna(TestAlgorithmMixin):
     __test__ = True
     algorithm_class = DummyOptunaOptimizer
     _ignored_names = ("create_search_space", "scoring", "mock_objective")
@@ -233,3 +240,83 @@ class TestMetaFunctionalityOptunaSearch(TestAlgorithmMixin):
 
     def test_empty_init(self):
         pytest.skip()
+
+
+class TestOptunaSearch:
+    def test_single_score(self):
+        optuna_search = OptunaSearch(
+            DummyOptimizablePipeline(),
+            _get_study,
+            dummy_search_space,
+            scoring=dummy_single_score_func,
+            n_trials=1,
+        )
+
+        optuna_search.optimize(DummyDataset())
+        results = optuna_search.search_results_
+
+        assert "param_para_1" in results
+        assert "score" in results
+        assert results["score"][0] == np.mean(range(5))
+        assert "single_score" in results
+        assert results["single_score"][0] == list(range(5))
+        assert "data_labels" in results
+
+        assert not any(c.startswith("user_attrs_") for c in results)
+
+        assert optuna_search.optimized_pipeline_.get_params()["para_1"] == optuna_search.best_params_["para_1"]
+
+    @pytest.mark.parametrize("score_name", ("score_2", "score_1"))
+    def test_search_result_columns_multi_score(self, score_name):
+        optuna_search = OptunaSearch(
+            DummyOptimizablePipeline(),
+            _get_study,
+            dummy_search_space,
+            scoring=dummy_multi_score_func,
+            score_name=score_name,
+            n_trials=1,
+        )
+
+        optuna_search.optimize(DummyDataset())
+        results = optuna_search.search_results_
+
+        assert "param_para_1" in results
+        assert "score_1" in results
+        assert results["score_1"][0] == np.mean(range(5))
+        assert "score_2" in results
+        assert results["score_2"][0] == np.mean(range(5)) + 1
+        assert "single_score_1" in results
+        assert results["single_score_1"][0] == list(range(5))
+        assert "single_score_2" in results
+        assert results["single_score_2"][0] == list(range(1, 6))
+        assert "data_labels" in results
+
+        assert not any(c.startswith("user_attrs_") for c in results)
+
+        assert optuna_search.optimized_pipeline_.get_params()["para_1"] == optuna_search.best_params_["para_1"]
+
+        # The dummy scorer returns the datapoint id for score 1 and the datapoint id + 1 for score 2.
+        assert optuna_search.best_score_ == np.mean(range(5)) + int(score_name == "score_2")
+
+    @pytest.mark.parametrize("score_name", ("score_3", False, None))
+    def test_multi_metric_wrong_score_name(self, score_name):
+        with pytest.raises(ValueError):
+            OptunaSearch(
+                DummyOptimizablePipeline(),
+                _get_study,
+                dummy_search_space,
+                scoring=dummy_multi_score_func,
+                score_name=score_name,
+                n_trials=1,
+            ).optimize(DummyDataset())
+
+    def test_warns_single_score_score_name(self):
+        with pytest.warns(UserWarning):
+            OptunaSearch(
+                DummyOptimizablePipeline(),
+                _get_study,
+                dummy_search_space,
+                scoring=dummy_single_score_func,
+                score_name="score_1",
+                n_trials=1,
+            ).optimize(DummyDataset())

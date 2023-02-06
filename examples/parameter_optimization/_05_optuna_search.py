@@ -94,8 +94,7 @@ from examples.algorithms.algorithms_qrs_detection_final import match_events_with
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
-    # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
-    # will clone it again.
+    # We don't need to clone the pipeline here, as OptunaSearch will already clone the pipeline internally.
     pipeline = pipeline.safe_run(datapoint)
     tolerance_s = 0.02  # We just use 20 ms for this example
     matches = match_events_with_reference(
