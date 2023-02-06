@@ -708,7 +708,11 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
             # respective data labels
             if self.multimetric_:
                 trial.set_user_attr("__average_scores", average_scores)
-            trial.set_user_attr("__single_scores", single_scores)
+                trial.set_user_attr("__single_scores", single_scores)
+            else:
+                # No need to set average scores, as their is only one score and that is returned by the objective
+                # function and will be included in the results by optuna
+                trial.set_user_attr("__single_scores", {"score": single_scores})
             trial.set_user_attr("__data_labels", dataset.groups)
 
             return score
@@ -722,16 +726,22 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
         if self.multimetric_:
             search_results.pop("score")
-            if single_scores := search_results.pop("user_attrs___average_scores", None):
-                search_results.update({f"single_{k}": v for k, v in _invert_list_of_dicts(single_scores).items()})
+            if average_scores := search_results.pop("user_attrs___average_scores", None):
+                search_results.update(_invert_list_of_dicts(average_scores))
 
-        if average_scores := search_results.pop("user_attrs___average_scores", None):
-            search_results.update(_invert_list_of_dicts(average_scores))
+        if single_scores := search_results.pop("user_attrs___single_scores", None):
+            search_results.update({f"single_{k}": v for k, v in _invert_list_of_dicts(single_scores).items()})
+
         # We add params back to the end of the dict to make it easier to read
         search_results["params"] = search_results.pop("params")
         return search_results
 
-    def return_optimized_pipeline(self, pipeline: PipelineT, dataset: DatasetT, study: Study) -> PipelineT:  # noqa: ARG002
+    def return_optimized_pipeline(
+        self,
+        pipeline: PipelineT,
+        dataset: DatasetT,  # noqa: ARG002
+        study: Study,
+    ) -> PipelineT:
         """Return the pipeline with the best parameters of a study.
 
         This is an internal function and should not be called directly.
