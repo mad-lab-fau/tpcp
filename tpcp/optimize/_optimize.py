@@ -248,7 +248,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         If multiple parameter combinations have the same score, the one tested first will be used.
         By default, the value with the best `rank` (i.e. higher score) is used.
         If you want to select the value with the lowest score, set `return_optimized` to the name of the score prefixed
-        with a minus sign, e.g. `-f1_score`.
+        with a minus sign, e.g. `-rmse`.
         In case of a single score, use `-score` to select the value with the lowest score.
     progress_bar
         True/False to enable/disable a tqdm progress bar.
@@ -483,7 +483,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         used.
         By default, the value with the best `rank` (i.e. higher score) is used.
         If you want to select the value with the lowest score, set `return_optimized` to the name of the score prefixed
-        with a minus sign, e.g. `-f1_score`.
+        with a minus sign, e.g. `-rmse`.
         In case of a single score, use `-score` to select the value with the lowest score.
     cv
         An integer specifying the number of folds in a K-Fold cross validation or a valid cross validation helper.
