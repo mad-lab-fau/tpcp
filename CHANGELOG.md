@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   To do that, you can set the `return_optimized` parameter of these classes to the name of metric prefixed with a `-`.
   (e.g. `return_optimized="-rmse"`).
   (https://github.com/mad-lab-fau/tpcp/pull/61)
+- A new Optimization Algorithm called `OptunaSearch`. This is a (nearly) drop-in replacement for `GridSearch` using 
+  Optuna under the hood.
+  It can be used to quickly implement parameter searches with different samplers for non-optimizable algorithms.
+  (https://github.com/mad-lab-fau/tpcp/pull/57)
 
 ## [0.14.0] - 2023-02-01
 
