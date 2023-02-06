@@ -102,7 +102,7 @@ class TestGridSearchCommon:
     def gridsearch(self, request):
         self.optimizer = request.param.clone()
 
-    @pytest.mark.parametrize("return_optimized", (True, False, "some_str"))
+    @pytest.mark.parametrize("return_optimized", (True, False, "some_str", "score", "-score"))
     def test_return_optimized_single(self, return_optimized):
         gs = self.optimizer
         gs.set_params(
@@ -111,18 +111,24 @@ class TestGridSearchCommon:
             scoring=create_dummy_score_func("para_1"),
         )
         warning = None
-        if isinstance(return_optimized, str):
+        if isinstance(return_optimized, str) and not return_optimized.endswith("score"):
             warning = UserWarning
 
         with pytest.warns(warning) as w:
             gs.optimize(DummyDataset())
 
-        if isinstance(return_optimized, str):
+        if isinstance(return_optimized, str) and not return_optimized.endswith("score"):
             assert "return_optimize" in str(w[0])
         else:
             assert len(w) == 0
 
-        if return_optimized:  # True or str
+        if return_optimized == "-score":
+            assert gs.best_params_ == {"para_1": 1}
+            assert gs.best_index_ == 0
+            assert gs.best_score_ == 1
+            assert isinstance(gs.optimized_pipeline_, DummyOptimizablePipeline)
+            assert gs.optimized_pipeline_.para_1 == gs.best_params_["para_1"]
+        elif return_optimized:  # True or str
             assert gs.best_params_ == {"para_1": 2}
             assert gs.best_index_ == 1
             assert gs.best_score_ == 2
