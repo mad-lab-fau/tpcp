@@ -22,6 +22,13 @@ Datasets work best in combination with `Pipelines` and are further compatible wi
 # `create_index` method.
 # This method should return a dataframe describing all the data-points that should be available in the dataset.
 #
+# .. warning:: Make absolutely sure that the dataframe you return is deterministic and does not change between runs!
+#              This can lead to some nasty bugs!
+#              We try to catch them internally, but it is not always possible.
+#              As tips, avoid reliance on random numbers and sort the dataframe before returning it, to make sure
+#              that the order is not depend on things like file system order, when creating an index by scanning a
+#              directory.
+#
 # In the following we will create an example dataset, without any real world data,
 # but it can be used to demonstrate most functionality.
 # At the end we will discuss, how gait specific data should be integrated.
