@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
-from typing import Any, ContextManager, Dict, Generic, Iterator, List, Optional, Tuple, TypeVar, Union
+from typing import Any, ContextManager, Dict, Generic, Iterator, List, Optional, Tuple, TypeVar, Union, Literal
 
 import numpy as np
 from joblib import Memory, delayed
@@ -273,7 +273,9 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
             If a single score is used for scoring, then the generic name "score" is used.
             Otherwise, multiple columns with the name of the respective scorer exist
         rank_score / rank_{scorer-name}
-            A sorting for each score from the highest to the lowest value
+            A sorting for each score from the highest to the lowest value.
+            If lower or higher values are better, depends on the scoring function and needs to be interpreted
+            accordingly.
         single_score / single_{scorer-name}
             The individual scores per data point for each parameter combination.
             This is a list of values with the `len(dataset)`.
@@ -375,20 +377,19 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         # have handled issues with non-uniform cases already.
         first_test_score = results[0]["scores"]
         self.multimetric_ = isinstance(first_test_score, dict)
-        _validate_return_optimized(self.return_optimized, self.multimetric_, first_test_score)
 
         results = self._format_results(
             list(self.parameter_grid),
             results,
         )
 
-        if self.return_optimized:
-            return_optimized = "score"
-            if self.multimetric_ and isinstance(self.return_optimized, str):
-                return_optimized = self.return_optimized
-            self.best_index_ = results[f"rank_{return_optimized}"].argmin()
-            self.best_score_ = results[return_optimized][self.best_index_]
-            self.best_params_ = results["params"][self.best_index_]
+        reverse_ranking, return_optimized = _validate_return_optimized(
+            self.return_optimized, self.multimetric_, first_test_score
+        )
+        if return_optimized:
+            self.best_index_, self.best_score_, self.best_params_ = _extract_return_optimize_info(
+                return_optimized, reverse_ranking, results, rank_prefix="rank_", score_prefix=""
+            )
             # We clone twice, in case one of the params was itself an algorithm.
             self.optimized_pipeline_ = self.pipeline.clone().set_params(**self.best_params_).clone()
 
@@ -749,14 +750,13 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
 
         first_test_score = out[0]["test_scores"]
         self.multimetric_ = isinstance(first_test_score, dict)
-        _validate_return_optimized(self.return_optimized, self.multimetric_, first_test_score)
-        if self.return_optimized:
-            return_optimized = "score"
-            if self.multimetric_ and isinstance(self.return_optimized, str):
-                return_optimized = self.return_optimized
-            self.best_index_ = results[f"rank_test_{return_optimized}"].argmin()
-            self.best_score_ = results[f"mean_test_{return_optimized}"][self.best_index_]
-            self.best_params_ = results["params"][self.best_index_]
+        reverse_ranking, return_optimized = _validate_return_optimized(
+            self.return_optimized, self.multimetric_, first_test_score
+        )
+        if return_optimized:
+            self.best_index_, self.best_score_, self.best_params_ = _extract_return_optimize_info(
+                return_optimized, reverse_ranking, results, rank_prefix="rank_test_", score_prefix="mean_test_"
+            )
             # We clone twice, in case one of the params was itself an algorithm.
             best_optimizer = Optimize(self.pipeline.clone().set_params(**self.best_params_).clone())
             final_optimize_start_time = time.time()
@@ -869,18 +869,46 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         return results
 
 
-def _validate_return_optimized(return_optimized, multi_metric, results) -> None:
+def _validate_return_optimized(return_optimized, multi_metric, results) -> Tuple[bool, Union[str, Literal[False]]]:
     """Check if `return_optimize` fits to the multimetric output of the scorer."""
+    if return_optimized is False:
+        return False, False
+    # Sanitize return optimized
+    reverse = False
+    if isinstance(return_optimized, str) and return_optimized.startswith("-"):
+        return_optimized = return_optimized[1:].strip()
+        reverse = True
     if multi_metric is True:
         # In a multimetric case, return_optimized must either be False or a string
-        if return_optimized and (not isinstance(return_optimized, str) or return_optimized not in results):
+        if not isinstance(return_optimized, str) or return_optimized not in results:
             raise ValueError(
                 "If multi-metric scoring is used, `return_optimized` must be a str specifying the score that "
                 "should be used to select the best result."
             )
+        return reverse, return_optimized
     else:
+        if return_optimized == "score" or return_optimized is True:
+            return reverse, "score"
         if isinstance(return_optimized, str):
             warnings.warn(
                 "You set `return_optimized` to the name of a scorer, but the provided scorer only produces a "
-                "single score. `return_optimized` is set to True."
+                "single score."
+                "`return_optimized` is set to True. "
+                "The only allowed string value for `return_optimized` in a single metric case is `-score`, "
+                "to invert the metric before score selection."
             )
+            return reverse, "score"
+        raise ValueError("`return_optimized` must be a bool or explicitly `score` or `-score` in a single metric case.")
+
+
+def _extract_return_optimize_info(
+    return_optimized: str, reverse, results, rank_prefix: str = "rank_", score_prefix: str = ""
+) -> Tuple[int, Optional[float], Dict[str, Any]]:
+    """Extract the information from `return_optimized` and check if it is valid."""
+    if reverse:
+        best_index = (results[f"{rank_prefix}{return_optimized}"]).argmax()
+    else:
+        best_index = results[f"{rank_prefix}{return_optimized}"].argmin()
+    best_score = results[f"{score_prefix}{return_optimized}"][best_index]
+    best_params = results["params"][best_index]
+    return best_index, best_score, best_params
