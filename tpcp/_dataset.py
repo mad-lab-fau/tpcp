@@ -368,6 +368,10 @@ class _Dataset(BaseTpcpObject):
 
         This needs to be implemented by the subclass.
 
+        .. warning:: Make sure that the index you return is deterministic, i.e. the same index is returned when
+                     calling the method multiple times!
+                     Besides not using random numbers, it is a good idea to sort the index before returning it.
+
         """
         raise NotImplementedError()
 
