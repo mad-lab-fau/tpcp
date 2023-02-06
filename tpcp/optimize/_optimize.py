@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
-from typing import Any, ContextManager, Dict, Generic, Iterator, List, Optional, Tuple, TypeVar, Union, Literal
+from typing import Any, ContextManager, Dict, Generic, Iterator, List, Literal, Optional, Tuple, TypeVar, Union
 
 import numpy as np
 from joblib import Memory, delayed
@@ -246,7 +246,10 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         score that should be used to rank the results.
         If False, the respective result attributes will not be populated.
         If multiple parameter combinations have the same score, the one tested first will be used.
-        Otherwise, higher values are always considered better.
+        By default, the value with the best `rank` (i.e. higher score) is used.
+        If you want to select the value with the lowest score, set `return_optimized` to the name of the score prefixed
+        with a minus sign, e.g. `-f1_score`.
+        In case of a single score, use `-score` to select the value with the lowest score.
     progress_bar
         True/False to enable/disable a tqdm progress bar.
 
@@ -478,7 +481,10 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         If False, the respective result attributes will not be populated.
         If multiple parameter combinations have the same mean score over all CV folds, the one tested first will be
         used.
-        Otherwise, higher mean values are always considered better.
+        By default, the value with the best `rank` (i.e. higher score) is used.
+        If you want to select the value with the lowest score, set `return_optimized` to the name of the score prefixed
+        with a minus sign, e.g. `-f1_score`.
+        In case of a single score, use `-score` to select the value with the lowest score.
     cv
         An integer specifying the number of folds in a K-Fold cross validation or a valid cross validation helper.
         The default (`None`) will result in a 5-fold cross validation.
@@ -886,19 +892,19 @@ def _validate_return_optimized(return_optimized, multi_metric, results) -> Tuple
                 "should be used to select the best result."
             )
         return reverse, return_optimized
-    else:
-        if return_optimized == "score" or return_optimized is True:
-            return reverse, "score"
-        if isinstance(return_optimized, str):
-            warnings.warn(
-                "You set `return_optimized` to the name of a scorer, but the provided scorer only produces a "
-                "single score."
-                "`return_optimized` is set to True. "
-                "The only allowed string value for `return_optimized` in a single metric case is `-score`, "
-                "to invert the metric before score selection."
-            )
-            return reverse, "score"
-        raise ValueError("`return_optimized` must be a bool or explicitly `score` or `-score` in a single metric case.")
+    # Single metric:
+    if return_optimized == "score" or return_optimized is True:
+        return reverse, "score"
+    if isinstance(return_optimized, str):
+        warnings.warn(
+            "You set `return_optimized` to the name of a scorer, but the provided scorer only produces a "
+            "single score."
+            "`return_optimized` is set to True. "
+            "The only allowed string value for `return_optimized` in a single metric case is `-score`, "
+            "to invert the metric before score selection."
+        )
+        return reverse, "score"
+    raise ValueError("`return_optimized` must be a bool or explicitly `score` or `-score` in a single metric case.")
 
 
 def _extract_return_optimize_info(
