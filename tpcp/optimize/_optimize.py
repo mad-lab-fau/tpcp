@@ -735,10 +735,9 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
                 out = parallel(
                     delayed(_optimize_and_score)(
                         optimizer.clone(),
-                        dataset,
                         scoring,
-                        train,
-                        test,
+                        dataset[train],
+                        dataset[test],
                         optimize_params=optimize_params,
                         hyperparameters=_prefix_para_dict(hyper_paras, parameter_prefix),
                         pure_parameters=_prefix_para_dict(pure_paras, parameter_prefix),

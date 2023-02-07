@@ -541,15 +541,15 @@ class TestGridSearchCV:
         assert "Optimizing the pipeline modified a parameter marked as `pure`." in str(e)
 
     def test_parameters_set_correctly(self):
+        ds = DummyDataset()
         with TemporaryDirectory() as tmp:
             # We run that multiple times to trigger the cache
             for _ in range(2):
                 result = _optimize_and_score(
                     Optimize(DummyOptimizablePipeline()),
-                    DummyDataset(),
                     Scorer(dummy_single_score_func),
-                    np.array([0]),
-                    np.array([1]),
+                    ds[np.array([0])],
+                    ds[np.array([1])],
                     pure_parameters={"pipeline__para_1": "some_value"},
                     hyperparameters={"pipeline__para_2": "some_other_value"},
                     return_optimizer=True,

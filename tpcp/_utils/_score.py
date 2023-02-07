@@ -10,7 +10,6 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
-import numpy as np
 from joblib import Memory
 from typing_extensions import TypedDict
 
@@ -119,10 +118,9 @@ def _score(
 
 def _optimize_and_score(
     optimizer: BaseOptimize,
-    dataset: Dataset,
     scorer: Scorer,
-    train: np.ndarray,
-    test: np.ndarray,
+    train_set: Dataset,
+    test_set: Dataset,
     *,
     optimize_params: Optional[Dict] = None,
     hyperparameters: Optional[Dict] = None,
@@ -144,6 +142,19 @@ def _optimize_and_score(
     Note, that caching in this context should only be performed in the context of a single call to e.g. GridSearchCV
     and the cache should be deleted afterwards to avoid cache leak.
     Therefore, the cachedir should ideally be set to a random tmp dir by the caller.
+
+    Note: In the past, we only provided the index to the optimize method and not the subsets of the data directly.
+    We changed that, because in cases, where the data index is non-deterministic, the order of the dataset might
+    change between the point where we calculate the split (in the caller) and the point where we extract the respective
+    data points (here).
+    This might even happen in a different Python process (in the case of multiprocessing) where the dataset object was
+    recreated.
+    Hence, it might be that the dataobject recreated after pickling and unpickling is not the same as the original one.
+    To avoid this entirely, we split and extract the subset right here in the same process.
+    Really badly written Datasets might still get past this, but let's hope this rarely happens.
+    Note, that the Dataset object itself has a safeguard against non-deterministic indices, but this is not a guarantee.
+    Let's better be safe and reduce the surface for bugs even further here.
+
     """
     if memory is None:
         memory = Memory(None)
@@ -152,9 +163,6 @@ def _optimize_and_score(
     pure_parameters = _clone_parameter_dict(pure_parameters)
 
     optimize_params_clean: Dict = optimize_params or {}
-
-    train_set = dataset[train]
-    test_set = dataset[test]
 
     start_time = time.time()
     optimizer = _cached_optimize(optimizer, train_set, hyperparameters, pure_parameters, memory, optimize_params_clean)
