@@ -17,6 +17,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   It can be used to quickly implement parameter searches with different samplers for non-optimizable algorithms.
   (https://github.com/mad-lab-fau/tpcp/pull/57)
 
+### Changed
+- In this release we added multiple safe guards against edge cases related to non-deterministic dataset indices.
+  Most of these changes are internal and should not require any changes to your code.
+  Still, they don't solve all edge cases. Make sure your index is deterministic ;)
+  (https://github.com/mad-lab-fau/tpcp/pull/62)
+  - The index of datasets objects are now cached
+    The first time `create_index` is called, the index is stored in `subset_index` and used for subsequent calls.
+    This should avoid the overhead of creating the index every time (in particular if the index creation requires IO).
+    It should also help to avoid edge cases, where `create_index` is called multiple times and returns different results.
+  - When `create_index` of a dataset is called, we actually call it twice now, to check if the index is deterministic.
+    Having a non-deterministic index can lead to hard to debug issues, so we want to make sure that this is not the case.
+    It could still be that the index changes when using a different machine/OS (which is not ideal for reproducibility),
+    but this should prevent most cases leading to strange issues.
+  - Internally, the `_optimize_and_score` method now directly gets the subset of the dataset, instead of the indices of 
+    the train and test set.
+    This should again help to avoid issues, where the index of the dataset changes between calculating the splits and 
+    actually retrieving the data.
+
 ## [0.14.0] - 2023-02-01
 
 ## Added
