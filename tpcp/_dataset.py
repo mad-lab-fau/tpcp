@@ -42,7 +42,7 @@ class _Dataset(BaseTpcpObject):
                 "This is a fundamental requirement for datasets to be deterministic otherwise you might run into all "
                 "kinds of issues. "
                 "Please check your implementation of the `create_index` method.\n\n"
-                "Typically sources of non-deteminism are:\n"
+                "Typically sources of non-determinism are:\n"
                 " - Using `random` somewhere in the code\n"
                 " - Storing (intermediate) data in non-sorted containers (e.g. `set`)\n"
                 " - Relying on the ordering of files from the file system\n\n"
