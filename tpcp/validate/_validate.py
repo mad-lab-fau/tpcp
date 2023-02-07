@@ -162,10 +162,9 @@ def cross_validate(
     results = parallel(
         delayed(_optimize_and_score)(
             optimizable.clone(),
-            dataset,
             scoring,
-            train,
-            test,
+            dataset[train],
+            dataset[test],
             optimize_params={
                 **_propagate_values("groups", propagate_groups, groups, train),
                 **_propagate_values("mock_labels", propagate_mock_labels, mock_labels, train),
