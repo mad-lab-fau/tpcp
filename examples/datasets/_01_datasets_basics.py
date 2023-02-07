@@ -25,9 +25,11 @@ Datasets work best in combination with `Pipelines` and are further compatible wi
 # .. warning:: Make absolutely sure that the dataframe you return is deterministic and does not change between runs!
 #              This can lead to some nasty bugs!
 #              We try to catch them internally, but it is not always possible.
-#              As tips, avoid reliance on random numbers and sort the dataframe before returning it, to make sure
-#              that the order is not depend on things like file system order, when creating an index by scanning a
-#              directory.
+#              As tips, avoid reliance on random numbers and make sure that the order is not depend on things
+#              like file system order, when creating an index by scanning a directory.
+#              Particularly nasty are cases when using non-sorted container like `set`, that sometimes maintain
+#              their order, but sometimes don't.
+#              At the very least, we recommend to sort the final dataframe you return in `create_index`.
 #
 # In the following we will create an example dataset, without any real world data,
 # but it can be used to demonstrate most functionality.

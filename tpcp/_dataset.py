@@ -52,7 +52,7 @@ class _Dataset(BaseTpcpObject):
                 " - Using `random` somewhere in the code\n"
                 " - Storing (intermediate) data in non-sorted containers (e.g. `set`)\n"
                 " - Relying on the ordering of files from the file system\n\n"
-                "For the last to cases we recommend to use sort the dataframe you return from `create_index` "
+                "For the last to cases we recommend to sort the dataframe you return from `create_index` "
                 "explicitly using `sort_values`."
             )
 
@@ -374,9 +374,15 @@ class _Dataset(BaseTpcpObject):
 
         This needs to be implemented by the subclass.
 
-        .. warning:: Make sure that the index you return is deterministic, i.e. the same index is returned when
-                     calling the method multiple times!
-                     Besides not using random numbers, it is a good idea to sort the index before returning it.
+        .. warning:: Make absolutely sure that the dataframe you return is deterministic and does not change between
+                     runs!
+                     This can lead to some nasty bugs!
+                     We try to catch them internally, but it is not always possible.
+                     As tips, avoid reliance on random numbers and make sure that the order is not depend on things
+                     like file system order, when creating an index by scanning a directory.
+                     Particularly nasty are cases when using non-sorted container like `set`, that sometimes maintain
+                     their order, but sometimes don't.
+                     At the very least, we recommend to sort the final dataframe you return in `create_index`.
 
         """
         raise NotImplementedError()
