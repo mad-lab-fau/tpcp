@@ -18,7 +18,13 @@ class _Dataset(BaseTpcpObject):
     def index(self) -> pd.DataFrame:
         """Get index."""
         if self.subset_index is None:
-            return self._create_check_index()
+            # Note, in the past we recreated the index when ever there was a call to `self.index` and their was no
+            # subset index.
+            # To avoid unnecessary overhead and potential edgecases where the index creation is not deterministic (
+            # i.e. the data on disc changes between calls), we now only create the index once.
+            # This still doesn't solve the issues of having a non-deterministic index creation (still bad!),
+            # but the errors that you are running into are hopefully less obscure.
+            self.subset_index = self._create_check_index()
 
         return self.subset_index
 
@@ -398,6 +404,7 @@ class Dataset(_Dataset):
     index
         The index of the dataset.
         This returns either the `subset_index` or the base index returned by `create_index`.
+        Note, that after the first call to index, the index will be cached in `self.subset_index`.
     grouped_index
         The index, but all groupby columns are represented as MultiIndex.
         Note that the order can be different as the order of index.
