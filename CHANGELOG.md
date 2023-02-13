@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0]
+
+### Changed
+- We are now raising an explicit ValidationError, if any of the parameters of a class have a trailing underscore, as 
+  this syntax is reserved for result objects.
+  (https://github.com/mad-lab-fau/tpcp/pull/63)
+
 ## [0.15.0] - 2023-02-07
 
 ### Added
