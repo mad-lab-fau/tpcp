@@ -1,0 +1,42 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Küderle"
+  given-names: "Arne"
+  orcid: "https://orcid.org/0000-0002-5686-281X"
+- family-names: "Richer"
+  given-names: "Robert"
+  orcid: "https://orcid.org/0000-0003-0272-5403"
+- family-names: "Sîmpetru"
+  given-names: "Raul C."
+  orcid: "https://orcid.org/0000-0003-0455-0168"
+- family-names: "Eskofier"
+  given-names: "Bjoern M."
+  orcid: "https://orcid.org/0000-0002-0417-0336"
+title: "tpcp: Tiny Pipelines for Complex Problems - A set of framework independent helpers for algorithms development and evaluation"
+version: 0.13.0
+doi: 10.17605/OSF.IO/GKY2U
+url: "https://github.com/mad-lab-fau/tpcp"
+
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Küderle"
+      given-names: "Arne"
+      orcid: "https://orcid.org/0000-0002-5686-281X"
+    - family-names: "Richer"
+      given-names: "Robert"
+      orcid: "https://orcid.org/0000-0003-0272-5403"
+    - family-names: "Sîmpetru"
+      given-names: "Raul C."
+      orcid: "https://orcid.org/0000-0003-0455-0168"
+    - family-names: "Eskofier"
+      given-names: "Bjoern M."
+      orcid: "https://orcid.org/0000-0002-0417-0336"
+  doi: 10.21105/joss.04953
+  journal: "Journal of Open Source Software"
+  start: 4953
+  title: "tpcp: Tiny Pipelines for Complex Problems - A set of framework independent helpers for algorithms development and evaluation"
+  issue: 82
+  volume: 8
+  year: 2023
