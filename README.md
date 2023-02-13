@@ -4,6 +4,7 @@
 [![Test and Lint](https://github.com/mad-lab-fau/tpcp/actions/workflows/test-and-lint.yml/badge.svg?branch=main)](https://github.com/mad-lab-fau/tpcp/actions/workflows/test-and-lint.yml)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/tpcp)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.04953/status.svg)](https://doi.org/10.21105/joss.04953)
 
 # tpcp - Tiny Pipelines for Complex Problems
 
@@ -90,6 +91,37 @@ Learn more:
 [Parameter Optimization](https://tpcp.readthedocs.io/en/latest/auto_examples/index.html#parameter-optimization), 
 [Cross Validation](https://tpcp.readthedocs.io/en/latest/auto_examples/index.html#validation)
 
+## Citation
+
+If you use `tpcp` in your research, we would appreciate a citation to our JOSS paper.
+This helps us to justify putting time into maintaining and improving the library.
+
+```
+Küderle et al., (2023). tpcp: Tiny Pipelines for Complex Problems - 
+A set of framework independent helpers for algorithms development and evaluation. 
+Journal of Open Source Software, 8(82), 4953,
+https://doi.org/10.21105/joss.04953
+```
+
+```bibtex
+@article{
+  Küderle2023, 
+  doi = {10.21105/joss.04953},
+  url = {https://doi.org/10.21105/joss.04953},
+  year = {2023}, publisher = {The Open Journal},
+  volume = {8}, number = {82}, pages = {4953},
+  author = {Arne Küderle and Robert Richer and Raul C. Sîmpetru and Bjoern M. Eskofier},
+  title = {tpcp: Tiny Pipelines for Complex Problems - 
+           A set of framework independent helpers for algorithms development and evaluation},
+  journal = {Journal of Open Source Software}
+}
+```
+
+## Contribution
+
+The entire development is managed via [GitHub](https://github.com/mad-lab-fau/tpcp).
+If you run into any issues, want to discuss certain decisions, want to contribute features or feature requests, just 
+reach out to us by [opening a new issue](https://github.com/mad-lab-fau/tpcp/issues/new/).
 
 ## Dev Setup
 
@@ -128,9 +160,3 @@ poetry run poe <command name>
 ````
 
 If you installed `poethepoet` globally, you can skip the `poetry run` part at the beginning.
-
-## Contribution
-
-The entire development is managed via [GitHub](https://github.com/mad-lab-fau/tpcp).
-If you run into any issues, want to discuss certain decisions, want to contribute features or feature requests, just 
-reach out to us by [opening a new issue](https://github.com/mad-lab-fau/tpcp/issues/new/).
