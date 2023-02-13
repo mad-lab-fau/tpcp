@@ -539,6 +539,7 @@ def test_set_params_works_with_underscore_nested():
     assert test.test.a == 3
     assert test.test._b == 4
 
+
 def test_clone_works_with_underscore_nested():
     class Test(Algorithm):
         def __init__(self, test):
