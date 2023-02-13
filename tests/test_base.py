@@ -484,3 +484,81 @@ def test_clone_factory_repr():
     test = Test(1, 2)
     clone = CloneFactory(test)
     assert repr(clone) == "cf(Test(a=1, b=2))"
+
+
+def test_get_params_works_with_underscore():
+    class Test(Algorithm):
+        def __init__(self, a, _b):
+            self.a = a
+            self._b = _b
+
+    test = Test(1, 2)
+    assert test.get_params() == {"a": 1, "_b": 2}
+
+
+def test_get_params_works_with_underscore_nested():
+    class Test(Algorithm):
+        def __init__(self, test):
+            self.test = test
+
+    class Test2(Algorithm):
+        def __init__(self, a, _b):
+            self.a = a
+            self._b = _b
+
+    test = Test(Test2(1, 2))
+    test_params = test.get_params()
+    test_params.pop("test")
+    assert test_params == {"test__a": 1, "test___b": 2}
+
+
+def test_set_params_works_with_underscore():
+    class Test(Algorithm):
+        def __init__(self, a, _b):
+            self.a = a
+            self._b = _b
+
+    test = Test(1, 2)
+    test.set_params(a=3, _b=4)
+    assert test.a == 3
+    assert test._b == 4
+
+
+def test_set_params_works_with_underscore_nested():
+    class Test(Algorithm):
+        def __init__(self, test):
+            self.test = test
+
+    class Test2(Algorithm):
+        def __init__(self, a, _b):
+            self.a = a
+            self._b = _b
+
+    test = Test(Test2(1, 2))
+    test.set_params(test__a=3, test___b=4)
+    assert test.test.a == 3
+    assert test.test._b == 4
+
+def test_clone_works_with_underscore_nested():
+    class Test(Algorithm):
+        def __init__(self, test):
+            self.test = test
+
+    class Test2(Algorithm):
+        def __init__(self, a, _b):
+            self.a = a
+            self._b = _b
+
+    test = Test(Test2(1, 2))
+    test2 = test.clone()
+    assert test2.test.a == 1
+    assert test2.test._b == 2
+
+
+def test_trailing_underscore_parameter_raises():
+    class Test(Algorithm):
+        def __init__(self, test_):
+            self.test_ = test_
+
+    with pytest.raises(ValidationError):
+        Test(1).get_params()

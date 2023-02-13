@@ -596,6 +596,18 @@ def _has_invalid_name(fields: Dict[str, inspect.Parameter], instance: _BaseTpcpO
             "...    # second option\n"
             "...    other_nested__parameter: ClassVar[OptiPara[int]]\n\n"
         )
+    invalid_names = [f for f in fields if f.endswith("_")]
+    if len(invalid_names) > 0:
+        raise ValidationError(
+            f"The parameters {invalid_names} of {type(instance).__name__} have a trailing underscore in their name. "
+            "This is not allowed, as it interferes naming convention of result objects in tpcp. "
+            "Only result values are allowed to have a trailing underscore.\n\n"
+            "If you are seeing this while using `dataclasses` or `attrs` and trying to annotate types of result "
+            "objects, make sure to exclude them from the init using the explicit `field` syntax:\n\n"
+            ">>> @dataclasses.dataclass\n"
+            "... class MyClass(BaseTpcpObject):\n"
+            "...    result_: int = dataclasses.field(init=False)\n"
+        )
 
 
 def _get_dangerous_mutable_types() -> Tuple[type, ...]:
