@@ -1,4 +1,5 @@
 """Implementation of methods and classes to wrap the optimization Framework `Optuna`."""
+from functools import partial
 
 try:
     import optuna
@@ -10,11 +11,11 @@ except ImportError as e:
 import multiprocessing
 import warnings
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, Optional, Sequence, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, TypeVar, Union, Protocol, Tuple, Generic
 
 import joblib
 import numpy as np
-from optuna import Study
+from optuna import Study, TrialPruned
 from optuna.study.study import ObjectiveFuncType
 from optuna.trial import FrozenTrial, Trial
 from typing_extensions import Self
@@ -24,7 +25,7 @@ from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
 from tpcp._pipeline import PipelineT
 from tpcp.optimize import Optimize
-from tpcp.validate._scorer import ScorerTypes, _validate_scorer
+from tpcp.validate._scorer import ScorerTypes, _validate_scorer, ScoreTypeT, Scorer
 
 __all__ = ["CustomOptunaOptimize", "CustomOptunaOptimizeT", "OptunaSearch"]
 
@@ -513,7 +514,23 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
 T = TypeVar("T")
 
 
-class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
+class OptunaScoreCallback(Protocol[PipelineT, DatasetT, T]):
+    """Callback signature for scorer callbacks."""
+
+    def __call__(
+        self,
+        *,
+        trial: Trial,
+        step: int,
+        scores: Tuple[ScoreTypeT[T], ...],
+        scorer: Scorer[PipelineT, DatasetT, T],
+        pipeline: PipelineT,
+        dataset: DatasetT,
+    ) -> None:
+        ...
+
+
+class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT, T]):
     """GridSearch equivalent using Optuna.
 
     An opinionated parameter optimization for simple (i.e. non-optimizable) pipelines that can be used as a
@@ -646,6 +663,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         n_trials: Optional[int] = None,
         timeout: Optional[float] = None,
         callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None,
+        enable_single_score_pruner: bool = False,
         gc_after_trial: bool = False,
         n_jobs: int = 1,
         show_progress_bar: bool = False,
@@ -654,6 +672,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         self.create_search_space = create_search_space
         self.scoring = scoring
         self.score_name = score_name
+        self.enable_single_score_pruner = enable_single_score_pruner
 
         self.pipeline = pipeline
         self.create_study = create_study
@@ -670,15 +689,36 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
         This is an internal function and should not be called directly.
         """
-        # Here we define our objective function
-
-        scoring = _validate_scorer(self.scoring, self.pipeline)
+        scoring = clone(_validate_scorer(self.scoring, self.pipeline))
 
         def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
             # First we need to select parameters for the current trial
             if self.create_search_space is None:
                 raise ValueError("No valid search space parameter.")
             self.create_search_space(trial)
+
+            # We create the callback here to wrap over the trial
+            if self.enable_single_score_pruner is True:
+                if scoring._single_score_callback is not None:
+                    raise ValueError(
+                        "When using the `enable_single_score_pruner` parameter of `OptunaSearch`, you can not use a "
+                        "`single_score_callback` on the scorer directly."
+                    )
+
+                def single_score_pruning_callback(*, step: int, dataset: DatasetT, scores: Tuple[float, ...], **_: Any):
+                    trial.report(float(scores[step]), step)
+                    if trial.should_prune():
+                        # Apparently, our last value was bad, and we should abort.
+                        # However, before we do so, we will save the scores so far as debug information
+                        trial.set_user_attr("__single_scores", scores)
+                        trial.set_user_attr("__data_labels", dataset[: step + 1].groups)
+                        # And, finally, we abort the trial
+                        raise TrialPruned(
+                            f"Pruned at datapoint {step} ({dataset[step].group}) with value " f"{scores[step]}."
+                        )
+
+                scoring._single_score_callback = single_score_pruning_callback
+
             # Then we apply these parameters to the pipeline
             pipeline = pipeline.set_params(**trial.params)
 
