@@ -11,6 +11,7 @@ import inspect
 import sys
 import warnings
 from collections import defaultdict
+from contextlib import contextmanager
 from functools import wraps
 from types import MethodWrapperType
 from typing import (
@@ -26,7 +27,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
-    Union,
+    Union, ContextManager,
 )
 
 import numpy as np
@@ -284,10 +285,22 @@ class _BaseTpcpObject:
         setattr(cls, "__init__", _replace_defaults_wrapper(cls.__init__))
 
 
+
 class BaseTpcpObject(_BaseTpcpObject):
     """Baseclass for all tpcp objects."""
 
     _composite_params: ClassVar[Tuple[str, ...]] = ()
+    __context__: ClassVar[Dict[str, Any]]
+
+    def __getstate__(self):
+        ret = self.__dict__.copy()
+        ret['__tpcp_context'] = BaseTpcpObject.__context__
+        return ret
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        BaseTpcpObject.__context__ = state['__tpcp_context']
+
 
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
         """Get parameters for this algorithm.
@@ -379,6 +392,28 @@ class BaseTpcpObject(_BaseTpcpObject):
         If this doesn't pass, many other features in tpcp will not work as well.
         """
         return clone(value, safe=False)
+
+
+
+def set_global_context(name: str, value: Any):
+    """Set a context variable."""
+    if not hasattr(BaseTpcpObject, "__context__"):
+        BaseTpcpObject.__context__ = {}
+    BaseTpcpObject.__context__[name] = value
+
+def get_global_context(name: str) -> Any:
+    """Get a context variable."""
+    return BaseTpcpObject.__context__[name]
+
+@contextmanager
+def global_context(name: str, value: Any) -> ContextManager[None]:
+    """Context manager for global context variables."""
+    set_global_context(name, value)
+    print("set", name, value, BaseTpcpObject.__context__)
+    yield
+    print("del", name, value, BaseTpcpObject.__context__)
+    del BaseTpcpObject.__context__[name]
+
 
 
 def _get_deep_params(obj, parent_key) -> Dict[str, Any]:
