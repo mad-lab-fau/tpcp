@@ -1,4 +1,5 @@
 """Implementation of methods and classes to wrap the optimization Framework `Optuna`."""
+from ast import literal_eval
 
 try:
     import optuna
@@ -61,6 +62,8 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     gc_after_trial: bool
     show_progress_bar: bool
     n_jobs: int
+
+    eval_str_paras: Sequence[str]
 
     optimized_pipeline_: PipelineT
     study_: Study
@@ -231,6 +234,14 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         """
         raise NotImplementedError()
 
+    def sanitize_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Sanatize the parameters of a trial."""
+        final_params = {}
+        for k, v in params.items():
+            if k in self.eval_str_paras:
+                final_params[k] = literal_eval(v)
+        return final_params
+
     def _create_objective(self, pipeline: PipelineT, dataset: DatasetT) -> ObjectiveFuncType:
         inner_objective = self.create_objective()
 
@@ -252,7 +263,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         Don't call this function on its own! It is only expected to be called internally by optimize.
         """
         # Pipeline that will be passed here is already cloned, so no need to clone again.
-        pipeline_with_best_params = pipeline.set_params(**study.best_params)
+        pipeline_with_best_params = pipeline.set_params(**self.sanitize_params(study.best_params))
         if isinstance(pipeline_with_best_params, OptimizablePipeline):
             return Optimize(pipeline_with_best_params).optimize(dataset).optimized_pipeline_
         return pipeline_with_best_params
@@ -438,6 +449,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None,
         gc_after_trial: bool = False,
         n_jobs: int = 1,
+        eval_str_paras: Sequence[str] = tuple(),
         show_progress_bar: bool = False,
         return_optimized: bool = True,
     ):
@@ -450,6 +462,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         self.gc_after_trial = gc_after_trial
         self.show_progress_bar = show_progress_bar
         self.n_jobs = n_jobs
+        self.eval_str_paras = eval_str_paras
         self.return_optimized = return_optimized
 
     @staticmethod
@@ -648,6 +661,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None,
         gc_after_trial: bool = False,
         n_jobs: int = 1,
+        eval_str_paras: Sequence[str] = tuple(),
         show_progress_bar: bool = False,
         return_optimized: bool = True,
     ):
@@ -662,6 +676,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         self.callbacks = callbacks
         self.gc_after_trial = gc_after_trial
         self.n_jobs = n_jobs
+        self.eval_str_paras = eval_str_paras
         self.show_progress_bar = show_progress_bar
         self.return_optimized = return_optimized
 
@@ -680,7 +695,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
                 raise ValueError("No valid search space parameter.")
             self.create_search_space(trial)
             # Then we apply these parameters to the pipeline
-            pipeline = pipeline.set_params(**trial.params)
+            pipeline = pipeline.set_params(**self.sanitize_params(trial.params))
 
             average_scores, single_scores = scoring(pipeline, dataset)
 
@@ -747,7 +762,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         This is an internal function and should not be called directly.
         """
         # Pipeline that will be passed here is already cloned, so no need to clone again.
-        pipeline_with_best_params = pipeline.set_params(**study.best_params)
+        pipeline_with_best_params = pipeline.set_params(**self.sanitize_params(study.best_params))
         return pipeline_with_best_params
 
 

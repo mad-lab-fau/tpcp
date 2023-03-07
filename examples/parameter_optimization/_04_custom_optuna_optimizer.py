@@ -385,7 +385,9 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, D
                 raise ValueError("No valid search space parameter.")
             self.create_search_space(trial)
             # Then, we apply these parameters to the pipeline
-            pipeline = pipeline.set_params(**trial.params)
+            # Note, we use `get_trial_params` instead of getting the paras directly, as this method will transform
+            # the literal eval transform, if specified in the params.
+            pipeline = pipeline.set_params(**self.sanitize_params(trial.params))
 
             def single_score_callback(*, step: int, dataset: DatasetT, scores: Tuple[float, ...], **_: Any):
                 # We need to report the new score value.
