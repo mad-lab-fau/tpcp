@@ -95,7 +95,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
             .rename(columns={"value": "score"})
             .rename(columns=rename_param_columns)
         )
-        base_df["params"] = [t.params for t in self.study_.trials]
+        base_df["params"] = [self.sanitize_params(t.params) for t in self.study_.trials]
 
         # If a trial is pruned we set the score to nan.
         # This is clearer than showing the last step value.
@@ -107,7 +107,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     @property
     def best_params_(self) -> Dict[str, Any]:
         """Parameters of the best trial in the :class:`~optuna.study.Study`."""
-        return self.study_.best_params
+        return self.sanitize_params(self.study_.best_params)
 
     @property
     def best_score_(self) -> float:
@@ -240,6 +240,8 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         for k, v in params.items():
             if k in self.eval_str_paras:
                 final_params[k] = literal_eval(v)
+                continue
+            final_params[k] = v
         return final_params
 
     def _create_objective(self, pipeline: PipelineT, dataset: DatasetT) -> ObjectiveFuncType:
@@ -328,6 +330,32 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         If this is set to -1, all available cores are used.
 
         .. warning:: Read the notes on multiprocessing below before using this feature.
+    eval_str_paras
+        This can be a sequence (tuple/list) of parameter names used by Optuna that should be evaluated using
+        `literal_eval` instead of just set as string on the pipeline.
+        The main usecase of this is to allow the user to pass a list of strings to `suggest_categorical` but have the
+        actual pipeline recive the evaluated value of this string.
+        This is required, as many storage backends of optuna only support number or strings as categorical values.
+
+        A typical example would be wanting to select a set of axis for an algorithm that are expressed as a list/tuple
+        of strings.
+        In this case you would use a strinigfied version of these tuples as the categorical values in the optuna study
+        and then use `eval_str_paras` to evaluate the stringified version to the actual tuple.
+
+        >>> def search_space(trial):
+        ...     trial.suggest_categorical("axis", ["('x',)", "('y',)", "('z',)", "('x', 'y')"])
+        >>> optuna_opt = CustomOptunaOptimize(pipeline, ..., eval_str_paras=["axis"])
+
+        Note, that in your custom subclass, you need to wrap the trial params in `self.sanitize_params` to make sure
+        this sanitazation is applied to all parameters.
+
+        >>> # Inside your custom subclass
+        >>> def create_objective(self):
+        ...     def objective(trial, pipeline, dataset):
+        ...         params = self.sanitize_params(trial.params)
+        ...         pipeline.set_params(**params)
+
+        In all other places (e.g. when converting the final result table) this class handles sanitazation automatically.
 
     show_progress_bar
         Flag to show progress bars or not.
@@ -449,7 +477,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None,
         gc_after_trial: bool = False,
         n_jobs: int = 1,
-        eval_str_paras: Sequence[str] = tuple(),
+        eval_str_paras: Sequence[str] = (),
         show_progress_bar: bool = False,
         return_optimized: bool = True,
     ):
@@ -582,6 +610,20 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
         .. warning:: Read the notes in :class:`~tpcp.optimize.optuna.CustomOptunaOptimize` on multiprocessing below
                      before using this feature.
+    This can be a sequence (tuple/list) of parameter names used by Optuna that should be evaluated using
+        `literal_eval` instead of just set as string on the pipeline.
+        The main usecase of this is to allow the user to pass a list of strings to `suggest_categorical` but have the
+        actual pipeline recive the evaluated value of this string.
+        This is required, as many storage backends of optuna only support number or strings as categorical values.
+
+        A typical example would be wanting to select a set of axis for an algorithm that are expressed as a list/tuple
+        of strings.
+        In this case you would use a strinigfied version of these tuples as the categorical values in the optuna study
+        and then use `eval_str_paras` to evaluate the stringified version to the actual tuple.
+
+        >>> def search_space(trial):
+        ...     trial.suggest_categorical("axis", ["('x',)", "('y',)", "('z',)", "('x', 'y')"])
+        >>> optuna_opt = OptunaSearch(pipeline, ..., eval_str_paras=["axis"])
 
     show_progress_bar
         Flag to show progress bars or not.
@@ -661,7 +703,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None,
         gc_after_trial: bool = False,
         n_jobs: int = 1,
-        eval_str_paras: Sequence[str] = tuple(),
+        eval_str_paras: Sequence[str] = (),
         show_progress_bar: bool = False,
         return_optimized: bool = True,
     ):
@@ -748,7 +790,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
             search_results.update({f"single_{k}": v for k, v in _invert_list_of_dicts(single_scores).items()})
 
         # We add params back to the end of the dict to make it easier to read
-        search_results["params"] = search_results.pop("params")
+        search_results["params"] = [self.sanitize_params(p) for p in search_results.pop("params")]
         return search_results
 
     def return_optimized_pipeline(

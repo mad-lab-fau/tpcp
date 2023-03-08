@@ -37,6 +37,7 @@ class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
         show_progress_bar: bool = False,
         return_optimized: bool = True,
         n_jobs: int = 1,
+        eval_str_paras: Sequence[str] = (),
         mock_objective=None,
     ) -> None:
         self.scoring = scoring
@@ -52,12 +53,13 @@ class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
             show_progress_bar=show_progress_bar,
             return_optimized=return_optimized,
             n_jobs=n_jobs,
+            eval_str_paras=eval_str_paras,
         )
 
     def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
         def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
             self.create_search_space(trial)
-            pipeline = pipeline.set_params(**trial.params)
+            pipeline = pipeline.set_params(**self.sanitize_params(trial.params))
 
             scorer = Scorer(self.scoring)
 
@@ -220,6 +222,31 @@ class TestCustomOptunaOptimize:
             # That is expected when self_optimize was called correctly.
             assert opti.optimized_pipeline_.optimized == opti.optimized_pipeline_.para_2
 
+    def test_literal_string_eval(self):
+        # Note, this does not actually test, if the string is correctly evaluated before being passed to the pipeline.
+        def search_space(trial):
+            # This para should remain a string
+            trial.suggest_categorical("para_1", ["('a', 'b')"])
+            # This one will be evaluated
+            trial.suggest_categorical("para_2", ["('a', 'b')"])
+
+        optuna_search = DummyOptunaOptimizer(
+            DummyOptimizablePipeline(),
+            _get_study,
+            create_search_space=search_space,
+            scoring=dummy_single_score_func,
+            n_trials=1,
+            eval_str_paras=["para_2"],
+        )
+
+        optuna_search.optimize(DummyDataset())
+
+        assert optuna_search.optimized_pipeline_.get_params()["para_1"] == "('a', 'b')"
+        assert optuna_search.optimized_pipeline_.get_params()["para_2"] == ("a", "b")
+
+        assert optuna_search.best_params_["para_1"] == "('a', 'b')"
+        assert optuna_search.best_params_["para_2"] == ("a", "b")
+
 
 class TestMetaFunctionalityOptunaSearch(TestAlgorithmMixin):
     __test__ = True
@@ -320,3 +347,28 @@ class TestOptunaSearch:
                 score_name="score_1",
                 n_trials=1,
             ).optimize(DummyDataset())
+
+    def test_literal_string_eval(self):
+        # Note, this does not actually test, if the string is correctly evaluated before being passed to the pipeline.
+        def search_space(trial):
+            # This para should remain a string
+            trial.suggest_categorical("para_1", ["('a', 'b')"])
+            # This one will be evaluated
+            trial.suggest_categorical("para_2", ["('a', 'b')"])
+
+        optuna_search = OptunaSearch(
+            DummyOptimizablePipeline(),
+            _get_study,
+            search_space,
+            scoring=dummy_single_score_func,
+            n_trials=1,
+            eval_str_paras=["para_2"],
+        )
+
+        optuna_search.optimize(DummyDataset())
+
+        assert optuna_search.optimized_pipeline_.get_params()["para_1"] == "('a', 'b')"
+        assert optuna_search.optimized_pipeline_.get_params()["para_2"] == ("a", "b")
+
+        assert optuna_search.best_params_["para_1"] == "('a', 'b')"
+        assert optuna_search.best_params_["para_2"] == ("a", "b")
