@@ -614,7 +614,8 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
         .. warning:: Read the notes in :class:`~tpcp.optimize.optuna.CustomOptunaOptimize` on multiprocessing below
                      before using this feature.
-    This can be a sequence (tuple/list) of parameter names used by Optuna that should be evaluated using
+    eval_str_paras
+        This can be a sequence (tuple/list) of parameter names used by Optuna that should be evaluated using
         `literal_eval` instead of just set as string on the pipeline.
         The main usecase of this is to allow the user to pass a list of strings to `suggest_categorical` but have the
         actual pipeline recive the evaluated value of this string.
