@@ -17,7 +17,8 @@ from tpcp._algorithm_utils import (
     get_results,
     is_action_applied,
 )
-from tpcp._base import CloneFactory, _get_tpcp_validated, _validate_parameter
+from tpcp._base import CloneFactory, _get_tpcp_validated, _validate_parameter, global_context, get_global_context, \
+    BaseTpcpObject
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, ValidationError
 
@@ -563,3 +564,19 @@ def test_trailing_underscore_parameter_raises():
 
     with pytest.raises(ValidationError):
         Test(1).get_params()
+
+
+def test_global_context():
+    with global_context(test=3):
+        assert get_global_context()["test"] == 3
+
+    assert get_global_context() == {}
+    
+def test_global_context_multi_process():
+    def func(obj):
+        assert get_global_context()["test"] == 3
+
+    test = BaseTpcpObject()
+    with global_context(test=3):
+        joblib.Parallel(n_jobs=2)(joblib.delayed(func)(test) for _ in range(2))
+

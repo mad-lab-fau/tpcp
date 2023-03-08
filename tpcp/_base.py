@@ -27,7 +27,8 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
-    Union, ContextManager,
+    Union,
+    ContextManager,
 )
 
 import numpy as np
@@ -285,7 +286,6 @@ class _BaseTpcpObject:
         setattr(cls, "__init__", _replace_defaults_wrapper(cls.__init__))
 
 
-
 class BaseTpcpObject(_BaseTpcpObject):
     """Baseclass for all tpcp objects."""
 
@@ -293,14 +293,22 @@ class BaseTpcpObject(_BaseTpcpObject):
     __context__: ClassVar[Dict[str, Any]]
 
     def __getstate__(self):
+        """Overwrite the default pickle behavior to also save the context.
+
+        Note, that this has the downside that the context is saved for all tpcp objects.
+        I am not sure if pickle optimizes this internally to only save the context once.
+        For now, we will keep it that way and see if it becomes a problem.
+        """
         ret = self.__dict__.copy()
-        ret['__tpcp_context'] = BaseTpcpObject.__context__
+        if hasattr(BaseTpcpObject, "__context__"):
+            ret["__tpcp_context"] = BaseTpcpObject.__context__
         return ret
 
     def __setstate__(self, state):
+        """Overwrite the default pickle behavior to also load the context."""
         self.__dict__.update(state)
-        BaseTpcpObject.__context__ = state['__tpcp_context']
-
+        if "__tpcp_context" in state:
+            BaseTpcpObject.__context__ = state["__tpcp_context"]
 
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
         """Get parameters for this algorithm.
@@ -394,26 +402,33 @@ class BaseTpcpObject(_BaseTpcpObject):
         return clone(value, safe=False)
 
 
-
-def set_global_context(name: str, value: Any):
+def set_global_context(**kwargs: Any) -> None:
     """Set a context variable."""
     if not hasattr(BaseTpcpObject, "__context__"):
         BaseTpcpObject.__context__ = {}
-    BaseTpcpObject.__context__[name] = value
+    for name, value in kwargs.items():
+        BaseTpcpObject.__context__[name] = value
 
-def get_global_context(name: str) -> Any:
+
+def get_global_context() -> Dict[str, Any]:
     """Get a context variable."""
-    return BaseTpcpObject.__context__[name]
+    if not hasattr(BaseTpcpObject, "__context__"):
+        BaseTpcpObject.__context__ = {}
+    return BaseTpcpObject.__context__
+
+
+def delete_global_context(*names: str) -> None:
+    """Delete a context variable."""
+    for name in names:
+        del BaseTpcpObject.__context__[name]
 
 @contextmanager
-def global_context(name: str, value: Any) -> ContextManager[None]:
+def global_context(**kwargs: Any) -> ContextManager[None]:
     """Context manager for global context variables."""
-    set_global_context(name, value)
-    print("set", name, value, BaseTpcpObject.__context__)
+    all_names = set(kwargs.keys())
+    set_global_context(**kwargs)
     yield
-    print("del", name, value, BaseTpcpObject.__context__)
-    del BaseTpcpObject.__context__[name]
-
+    delete_global_context(*all_names)
 
 
 def _get_deep_params(obj, parent_key) -> Dict[str, Any]:
