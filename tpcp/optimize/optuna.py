@@ -519,6 +519,8 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             n_jobs: int = 1
             return_optimized: bool = True
 
+            eval_str_paras: Sequence[str] = ()
+
             optimized_pipeline_: PipelineT = dataclasses.field(init=False, repr=False)
             study_: Study = dataclasses.field(init=False, repr=False)
 
@@ -548,6 +550,8 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
             n_jobs: int = (1,)
             return_optimized: bool = True
+
+            eval_str_paras: Sequence[str] = ()
 
             optimized_pipeline_: PipelineT = field(init=False, repr=False)
             study_: Study = field(init=False, repr=False)
