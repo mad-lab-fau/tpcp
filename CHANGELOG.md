@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this syntax is reserved for result objects.
   (https://github.com/mad-lab-fau/tpcp/pull/63)
 
+### Added
+- The Optuna search methods have new parameter called `eval_str_paras` that allows to automatically turn categorical 
+  string parameters into python objects.
+  This can be usefull, if you want to select between complex objects and not just strings in your parameter search.
+  To use this in your subclasses, you need to wrap the use of `trial.params` with `self.sanitize_params(trial.params)`.
+  (https://github.com/mad-lab-fau/tpcp/pull/64)
+
 ## [0.15.0] - 2023-02-07
 
 ### Added

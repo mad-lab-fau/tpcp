@@ -235,7 +235,11 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         raise NotImplementedError()
 
     def sanitize_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Sanatize the parameters of a trial."""
+        """Sanatize the parameters of a trial.
+
+        This will apply the str evaluation controlled by `self.eval_str_paras` to the parameters.
+        Call this method before passing the parameters to the pipeline in your objective function.
+        """
         final_params = {}
         for k, v in params.items():
             if k in self.eval_str_paras:

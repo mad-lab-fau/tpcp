@@ -216,7 +216,7 @@ class OptunaSearch(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT]):
                 raise ValueError("No valid search space parameter.")
             self.create_search_space(trial)
             # Then we apply these parameters to the pipeline
-            pipeline = pipeline.set_params(**trial.params)
+            pipeline = pipeline.set_params(**self.sanitize_params(trial.params))
 
             # We wrap the score function with a scorer to avoid writing our own for-loop to aggregate the results.
             if self.score_function is None:
