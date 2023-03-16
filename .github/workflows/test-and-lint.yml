@@ -24,15 +24,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install poetry
         poetry config virtualenvs.in-project true
-    - name: Install dependencies (<3.11)
-      if: ${{ matrix.python-version != '3.11' }}
+    - name: Install dependencies
       run: |
           poetry install --all-extras
-    - name: Install dependencies (3.11)
-      # In this case we need to skip the installation of torch
-      if: ${{ matrix.python-version == '3.11' }}
-      run: |
-          poetry install -E optuna -E attrs
     - name: Testing
       run: |
         poetry run poe test
