@@ -3,14 +3,13 @@
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
-from joblib import delayed
 from sklearn.model_selection import BaseCrossValidator, check_cv
 from tqdm.auto import tqdm
 
 from tpcp import Dataset
 from tpcp._optimize import BaseOptimize
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results
-from tpcp._utils._multiprocess import TqdmParallel
+from tpcp._utils._multiprocess import TqdmParallel, delayed
 from tpcp._utils._score import _optimize_and_score
 from tpcp.validate._scorer import _validate_scorer
 

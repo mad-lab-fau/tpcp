@@ -1,6 +1,4 @@
 """Implementation of methods and classes to wrap the optimization Framework `Optuna`."""
-from ast import literal_eval
-
 try:
     import optuna
 except ImportError as e:
@@ -10,11 +8,12 @@ except ImportError as e:
 
 import multiprocessing
 import warnings
+from ast import literal_eval
 from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional, Sequence, TypeVar, Union
 
-import joblib
 import numpy as np
+from joblib import Parallel
 from optuna import Study
 from optuna.study.study import ObjectiveFuncType
 from optuna.trial import FrozenTrial, Trial
@@ -24,6 +23,7 @@ from tpcp import OptimizablePipeline, clone
 from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
 from tpcp._pipeline import PipelineT
+from tpcp._utils._multiprocess import delayed
 from tpcp.optimize import Optimize
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
 
@@ -188,9 +188,9 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
                 )
                 self._call_optimize_multi_process(study, objective, n_trials)
 
-            parallel = joblib.Parallel(self.n_jobs)
+            parallel = Parallel(self.n_jobs)
             parallel(
-                joblib.delayed(_multi_process_call_optimize)(n_trials=n_trials_i)
+                delayed(_multi_process_call_optimize)(n_trials=n_trials_i)
                 for n_trials_i in _split_trials(self.n_trials, self.n_jobs)
             )
 

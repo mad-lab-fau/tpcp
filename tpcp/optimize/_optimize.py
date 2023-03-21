@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from typing import Any, ContextManager, Dict, Generic, Iterator, List, Literal, Optional, Tuple, TypeVar, Union
 
 import numpy as np
-from joblib import Memory, delayed
+from joblib import Memory
 from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
@@ -29,7 +29,7 @@ from tpcp._utils._general import (
     _prefix_para_dict,
     _split_hyper_and_pure_parameters,
 )
-from tpcp._utils._multiprocess import TqdmParallel
+from tpcp._utils._multiprocess import TqdmParallel, delayed
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
