@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- We now have a workaround for global configuration that should be passed to worker processes when using 
+  multiprocessing.
+  This is a workaround to a [joblib issue](https://github.com/joblib/joblib/issues/1071) and is quite hacky.
+  If you want to use this feature with your own configs you can use `tpcp.parallel.register_global_parallel_callback`.
+  If you need to write your own parallel loop using joblib, you need to use `tpcp.parallel.delayed` instead of
+  `joblib.delayed`.
+  (https://github.com/mad-lab-fau/tpcp/pull/65)
+
 ## [0.16.0] - 2023-03-21
 
 ### Changed
