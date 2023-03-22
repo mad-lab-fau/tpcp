@@ -16,6 +16,7 @@ from scipy import signal
 from scipy.spatial import KDTree, cKDTree, minkowski_distance
 from sklearn.metrics import roc_curve
 
+import tpcp.parallel
 from tpcp import Algorithm, HyperParameter, OptimizableParameter, Parameter, make_action_safe, make_optimize_safe
 
 
@@ -54,8 +55,8 @@ def match_events_with_reference(events: np.ndarray, reference: np.ndarray, toler
     reference = np.atleast_1d(reference.squeeze())
     assert np.ndim(events) == 1, "Events must be a 1D-array"
     assert np.ndim(reference) == 1, "Reference must be a 1D-array"
-    events = np.atleast_2d(events).T
-    reference = np.atleast_2d(reference).T
+    events = tpcp.parallel.T
+    reference = tpcp.parallel.T
 
     right_tree = KDTree(reference)
     left_tree = KDTree(events)
@@ -195,8 +196,8 @@ class OptimizableQrsDetector(QRSDetector):
             # Determine the label for each peak, by matching them with our ground truth
             labels = np.zeros(potential_peaks.shape)
             matches = match_events_with_reference(
-                events=np.atleast_2d(potential_peaks).T,
-                reference=np.atleast_2d(p.to_numpy().astype(int)).T,
+                events=tpcp.parallel.T,
+                reference=tpcp.parallel.T,
                 tolerance=self.r_peak_match_tolerance_s * sampling_rate_hz,
             )
             tp_matches = matches[(~np.isnan(matches)).all(axis=1), 0].astype(int)
