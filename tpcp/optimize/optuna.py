@@ -23,8 +23,8 @@ from tpcp import OptimizablePipeline, clone
 from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
 from tpcp._pipeline import PipelineT
-from tpcp._utils._multiprocess import delayed
 from tpcp.optimize import Optimize
+from tpcp.parallel import delayed
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
 
 __all__ = ["CustomOptunaOptimize", "CustomOptunaOptimizeT", "OptunaSearch"]

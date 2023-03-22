@@ -29,9 +29,10 @@ from tpcp._utils._general import (
     _prefix_para_dict,
     _split_hyper_and_pure_parameters,
 )
-from tpcp._utils._multiprocess import TqdmParallel, delayed
+from tpcp._utils._multiprocess import TqdmParallel
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
+from tpcp.parallel import delayed
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
 
 T = TypeVar("T")
