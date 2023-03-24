@@ -36,7 +36,6 @@ import pandas as pd
 from sklearn.metrics import roc_curve
 from typing_extensions import Self
 
-import tpcp.parallel
 from examples.algorithms.algorithms_qrs_detection_final import (
     OptimizableQrsDetector,
     QRSDetector,
@@ -86,8 +85,8 @@ class OptimizableQrsDetectorWithInfo(QRSDetector):
             # Determine the label for each peak, by matching them with our ground truth
             labels = np.zeros(potential_peaks.shape)
             matches = match_events_with_reference(
-                events=tpcp.parallel.T,
-                reference=tpcp.parallel.T,
+                events=np.atleast_2d(potential_peaks).T,
+                reference=np.atleast_2d(p.to_numpy().astype(int)).T,
                 tolerance=self.r_peak_match_tolerance_s * sampling_rate_hz,
             )
             tp_matches = matches[(~np.isnan(matches)).all(axis=1), 0].astype(int)
