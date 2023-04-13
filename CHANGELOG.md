@@ -11,6 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   anymore.
   Now all classes remember their parameters when they are defined and don't try to access parameters that are not 
   defined in their own init.
+  (https://github.com/mad-lab-fau/tpcp/pull/69)
+
+### Changed
+- Validation is now performed recursively on all subclasses. Note like before validation is still only performed once 
+  per class.
+  But with this change, we can also validate base classes that are not used directly.
+  (https://github.com/mad-lab-fau/tpcp/pull/70)
+
+### Added
+- We validate now, if a child class implements all the parameters of its parent class.
+  While not strictly necessary, this is a sign of bad design, if not done.
+  It could also lead to issues with tpcps validation logic.
+  (https://github.com/mad-lab-fau/tpcp/pull/70)
+- It is now possible to hook into the validation and perform custom validation of classes.
+  (https://github.com/mad-lab-fau/tpcp/pull/70)
+- The dataset class now activly triggers validation and checks if the dataset subclass implements `groupby_cols` and 
+  `subset_index`.
+
 
 ## [0.17.0] - 2023-03-24
 
