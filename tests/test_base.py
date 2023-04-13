@@ -17,7 +17,7 @@ from tpcp._algorithm_utils import (
     get_results,
     is_action_applied,
 )
-from tpcp._base import CloneFactory, _get_tpcp_validated, _validate_parameter, BaseTpcpObject
+from tpcp._base import BaseTpcpObject, CloneFactory, _get_tpcp_validated, _validate_parameter
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, ValidationError
 
