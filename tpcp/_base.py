@@ -86,12 +86,16 @@ def _get_init_defaults(cls: Type[_BaseTpcpObject]) -> Dict[str, inspect.Paramete
     return defaults
 
 
-def _replace_defaults_wrapper(old_init: Callable) -> Callable:
+def _replace_defaults_wrapper(cls: Type[_BaseTpcpObject], old_init: Callable) -> Callable:
     """Decorate an init to create new instances of mutable defaults.
 
     This should only be used in combination with `default` and will be applied as part of `__init_subclass`.
     Direct usage of this decorator should not be required.
     """
+    # We get the params of the old inits here and not at runtime to avoid issues when the class is subclassed and
+    # super().__init__ is called before all parameters of the child object are set.
+    # This way, the param checks only concern the parameters of the current class.
+    params = get_param_names(cls)
 
     @wraps(old_init)
     def new_init(self: BaseTpcpObject, *args: Any, **kwargs: Any) -> None:
@@ -101,7 +105,7 @@ def _replace_defaults_wrapper(old_init: Callable) -> Callable:
         # Check if any of the initial values has a "default parameter flag".
         # If yes we replace it with a clone (in case of a tpcp object) or a deepcopy in case of other objects.
         # This is handled by the factory `get_value` method.
-        for p in get_param_names(self):
+        for p in params:
             if isinstance(val := getattr(self, p), BaseFactory):
                 setattr(self, p, val.get_value())
 
@@ -281,7 +285,7 @@ class _BaseTpcpObject:
             return
 
         # If we have a custom init, we need to wrap it with a method that replaces our default values on init.
-        setattr(cls, "__init__", _replace_defaults_wrapper(cls.__init__))
+        setattr(cls, "__init__", _replace_defaults_wrapper(cls, cls.__init__))
 
 
 class BaseTpcpObject(_BaseTpcpObject):
