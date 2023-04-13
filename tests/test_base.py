@@ -17,7 +17,7 @@ from tpcp._algorithm_utils import (
     get_results,
     is_action_applied,
 )
-from tpcp._base import CloneFactory, _get_tpcp_validated, _validate_parameter
+from tpcp._base import CloneFactory, _get_tpcp_validated, _validate_parameter, BaseTpcpObject
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, ValidationError
 
@@ -563,3 +563,17 @@ def test_trailing_underscore_parameter_raises():
 
     with pytest.raises(ValidationError):
         Test(1).get_params()
+
+
+def test_subclass_with_wrong_super_call_order():
+    class Foo(BaseTpcpObject):
+        def __init__(self, foo=cf("foo")):
+            self.foo = foo
+
+    class Bar(Foo):
+        def __init__(self, foo=cf("foo"), bar=cf("bar")):
+            super().__init__(foo)
+            self.bar = bar
+
+    bar = Bar()
+    assert bar.get_params() == {"foo": "foo", "bar": "bar"}

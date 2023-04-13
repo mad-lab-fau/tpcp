@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- When `super().__init__()` is called before all parameters of the child class are initialized, we don't get an error 
+  anymore.
+  Now all classes remember their parameters when they are defined and don't try to access parameters that are not 
+  defined in their own init.
+
 ## [0.17.0] - 2023-03-24
 
 ### Added
