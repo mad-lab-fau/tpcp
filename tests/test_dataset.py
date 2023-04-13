@@ -8,6 +8,7 @@ import pytest
 from sklearn.model_selection import GroupKFold, KFold
 
 from tpcp import Dataset
+from tpcp.exceptions import ValidationError
 
 
 def _create_valid_index(input_dict=None, columns_names=None):
@@ -618,6 +619,18 @@ class TestDataset:
 
         doctest_results = doctest.testmod(m=_dataset)
         assert doctest_results.failed == 0
+
+    def test_subclass_with_wrong_implementation_raises(self):
+        class TestDataset(Dataset):
+            # This init does not implement `groupby_cols` and `create_index`
+            def __init__(self, a):
+                self.a = a
+
+            def create_index(self):
+                return pd.DataFrame(np.random.rand(10, 3), columns=["a", "b", "c"])
+
+        with pytest.raises(ValidationError):
+            _ = TestDataset(1).index
 
 
 class TestGroupLabelsKFold:
