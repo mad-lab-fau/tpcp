@@ -216,18 +216,18 @@ def _extract_annotations(
     return para_annotations
 
 
-def _validate_parameter(instance: _BaseTpcpObject):
+def _validate_parameter(cls: Type[_BaseTpcpObject]):
     # We extract the fields of the init
-    fields = _get_init_defaults(type(instance))
+    fields = _get_init_defaults(cls)
 
     # Validation
-    _has_dangerous_mutable_default(fields, instance)
-    _has_invalid_name(fields, instance)
+    _has_dangerous_mutable_default(fields, cls)
+    _has_invalid_name(fields, cls)
 
     if (
-        dataclasses.is_dataclass(instance)
+        dataclasses.is_dataclass(cls)
         or getattr(
-            instance, "__attrs_attrs__", False
+            cls, "__attrs_attrs__", False
         )  # This checks if the class it an `attrs` class, without importing `attrs`
     ) and any(isinstance(field.default, BaseFactory) for field in fields.values()):
         # When you are already using dataclasses or attrs, you must use their factory methods, as we don't overwrite
@@ -237,6 +237,28 @@ def _validate_parameter(instance: _BaseTpcpObject):
             "`dataclasses` or `attrs`. "
             "Use the `default_factory`/`factory` option of `dataclasses.field`/`attrs.field` instead."
         )
+
+
+def _validate_all_parent_parameters_implemented(cls: Type[_BaseTpcpObject]):
+    """Validate that a class implements all parameters of its parents.
+
+    We don't raise an error in this case, we just warn the user.
+    """
+    param_names = set(get_param_names(cls))
+
+    for base in cls.__bases__:
+        if not issubclass(base, _BaseTpcpObject):
+            continue
+        base_params = set(get_param_names(base))
+        if not base_params.issubset(param_names):
+            missing_params = base_params - param_names
+            warnings.warn(
+                f"The class {cls.__name__} does not implement all parameters of its parent {base.__name__}. "
+                f"Missing parameters: {missing_params}\n"
+                "This might not be a problem, but indicates bad design and you might run into actual issues with some "
+                "of the validation magic `tpcp` does in the background. "
+                "We would recommend to implement all parameters of your parents in a subclass."
+            )
 
 
 def _get_tpcp_validated(cls_or_instance: Union[Type[_BaseTpcpObject], _BaseTpcpObject]):
@@ -286,6 +308,16 @@ class _BaseTpcpObject:
 
         # If we have a custom init, we need to wrap it with a method that replaces our default values on init.
         setattr(cls, "__init__", _replace_defaults_wrapper(cls, cls.__init__))
+
+    @classmethod
+    def __custom_tpcp_validation__(cls):
+        """Trigger custom validation.
+
+        This method can be overwritten by the user to implement custom validation.
+        The validation is triggered on the first call of `get_params.
+        Within the method, either raise a `ValidationError` or privide warnings to the user.
+        """
+        return
 
 
 class BaseTpcpObject(_BaseTpcpObject):
@@ -403,18 +435,29 @@ def _assert_is_allowed_composite_value(val, parent_key: str, iteration: int):
         )
 
 
+def _recursive_validate(cls: Type[_BaseTpcpObject]):
+    if not _get_tpcp_validated(cls):
+        _validate_parameter(cls)
+        _validate_all_parent_parameters_implemented(cls)
+        cls.__custom_tpcp_validation__()
+
+        _set_tpcp_validated(cls, True)
+
+        for base in cls.__bases__:
+            if issubclass(base, _BaseTpcpObject):
+                _recursive_validate(base)
+
+
 def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
     # At some point, we want to validate that the user defined the class correctly.
-    # To allow for all strange modifications of the class, we run the validation, when we actully need the parameters.
+    # To allow for all strange modifications of the class, we run the validation, when we actually need the parameters.
     # This usually required a call to `get_params`.
     # Hence, we run the validation here.
     # To avoid running this validation on every get_params call, we use `__tpcp_validated__` to make sure it runs only
     # once per class.
-    # Note, that we need to check the class dict and not just the parameter.
-    # Otherwise, the parameter might have been specified on the parent.
-    if not _get_tpcp_validated(instance):
-        _validate_parameter(instance)
-        _set_tpcp_validated(instance, True)
+    # We actually run this validation recusively for all base classes, in case `get_params` is never called on the base
+    # directly.
+    _recursive_validate(type(instance))
 
     valid_fields = get_param_names(type(instance))
     comp_fields = getattr(instance, "_composite_params", ())
@@ -540,7 +583,7 @@ def _get_annotated_fields_of_type(
     return [k for k, v in instance_or_cls.__field_annotations__.items() if v in field_type]
 
 
-def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], instance: _BaseTpcpObject) -> None:
+def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]) -> None:
     mutable_defaults = []
 
     for name, field in fields.items():
@@ -551,7 +594,7 @@ def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], instanc
 
     if len(mutable_defaults) > 0:
         raise MutableDefaultsError(
-            f"The class {type(instance).__name__} contains mutable objects as default values ({mutable_defaults}). "
+            f"The class {cls.__name__} contains mutable objects as default values ({mutable_defaults}). "
             "This can lead to unexpected and unpleasant issues! "
             "To solve this the default value should be generated by a factory that produces a new value for each "
             "instance. "
@@ -585,11 +628,11 @@ def _annotations_are_valid(
             )
 
 
-def _has_invalid_name(fields: Dict[str, inspect.Parameter], instance: _BaseTpcpObject) -> None:
+def _has_invalid_name(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]) -> None:
     invalid_names = [f for f in fields if "__" in f]
     if len(invalid_names) > 0:
         raise ValidationError(
-            f"The parameters {invalid_names} of {type(instance).__name__} have a double-underscore in their name. "
+            f"The parameters {invalid_names} of {cls.__name__} have a double-underscore in their name. "
             "This is not allowed, as it interferes with the nested naming conventions in tpcp.\n\n"
             "If you are seeing this while using `dataclasses`, and trying to annotate nested parameters, make sure to "
             "exclude from the init using the explicit `field` syntax or by wrapping it with `ClassVar`:\n\n"
@@ -603,7 +646,7 @@ def _has_invalid_name(fields: Dict[str, inspect.Parameter], instance: _BaseTpcpO
     invalid_names = [f for f in fields if f.endswith("_")]
     if len(invalid_names) > 0:
         raise ValidationError(
-            f"The parameters {invalid_names} of {type(instance).__name__} have a trailing underscore in their name. "
+            f"The parameters {invalid_names} of {cls.__name__} have a trailing underscore in their name. "
             "This is not allowed, as it interferes naming convention of result objects in tpcp. "
             "Only result values are allowed to have a trailing underscore.\n\n"
             "If you are seeing this while using `dataclasses` or `attrs` and trying to annotate types of result "

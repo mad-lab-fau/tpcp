@@ -577,3 +577,38 @@ def test_subclass_with_wrong_super_call_order():
 
     bar = Bar()
     assert bar.get_params() == {"foo": "foo", "bar": "bar"}
+
+
+def test_validate_all_parent_params_implemented():
+    class Parent(Algorithm):
+        def __init__(self, a):
+            self.a = a
+
+    class Child(Parent):
+        # The child does not implement the parameter a
+        def __init__(self, b):
+            self.b = b
+            super().__init__(1)
+
+    with pytest.warns(UserWarning) as w:
+        Child(2).get_params()
+
+    assert "Child" in str(w[0].message)
+    assert "Parent" in str(w[0].message)
+
+
+def test_validate_called_recursively():
+    class Parent(Algorithm):
+        # The default here should triggere a validation error
+        def __init__(self, a=[]):
+            self.a = a
+
+    class Child(Parent):
+        def __init__(self, a, b):
+            self.b = b
+            super().__init__(a)
+
+    with pytest.raises(MutableDefaultsError) as e:
+        Child(2, 1).get_params()
+
+    assert "Parent" in str(e.value)

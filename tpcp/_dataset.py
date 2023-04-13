@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 from typing_extensions import Self
 
-from tpcp._base import BaseTpcpObject
+from tpcp._base import BaseTpcpObject, _recursive_validate, get_param_names
+from tpcp.exceptions import ValidationError
 
 DatasetT = TypeVar("DatasetT", bound="_Dataset")
 
@@ -17,6 +18,11 @@ class _Dataset(BaseTpcpObject):
     @property
     def index(self) -> pd.DataFrame:
         """Get index."""
+        # Before we do anything, we call manually trigger validation.
+        # This is usually done by the `get_params` call, but for dataset classes there is a high chance that people
+        # use the class without ever (explicitly or implicitly) calling `get_params`.
+        _recursive_validate(type(self))
+
         if self.subset_index is None:
             # Note, in the past we recreated the index when ever there was a call to `self.index` and their was no
             # subset index.
@@ -27,6 +33,25 @@ class _Dataset(BaseTpcpObject):
             self.subset_index = self._create_check_index()
 
         return self.subset_index
+
+    @classmethod
+    def __custom_tpcp_validation__(cls):
+        """Run custom validation for dataset classes.
+
+        We check that the subclass correctly implements `groupby_cols` and `subset_index`.
+        """
+        if cls is _Dataset or cls is Dataset:
+            return
+        super().__custom_tpcp_validation__()
+        params = get_param_names(cls)
+        if "groupby_cols" not in params or "subset_index" not in params:
+            raise ValidationError(
+                f"Dataset classes must implement `groupby_cols` and `subset_index` as parameters and forward them to "
+                f"the `super().__init__` call.\n"
+                f"{cls.__name__} does only implement the following parameters: {params}\n\n"
+                "Add `groupby_cols: Optional[Union[List[str], str]] = None, subset_index: Optional[pd.DataFrame] = "
+                "None` to the end of your `__init__` method and forward them to the `super().__init__` call."
+            )
 
     def _create_check_index(self):
         """Check the index creation.
