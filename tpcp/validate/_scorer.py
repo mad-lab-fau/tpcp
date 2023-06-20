@@ -260,7 +260,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
                 score = self._score_func(pipeline.clone(), d)
             except Exception as e:  # noqa: broad-except
                 raise ScorerFailedError(
-                    f"Scorer raised an exception while scoring data point {i}. "
+                    f"Scorer raised an exception while scoring data point {i} ({d.group}). "
                     "Tpcp does not support that (compared to sklearn) and you need to handle error cases yourself "
                     "within the scoring function."
                     "\n\n"
