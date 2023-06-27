@@ -373,6 +373,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
                     return_parameters=True,
                     return_data_labels=True,
                     return_times=True,
+                    error_info=f"This error occurred for the following parameter:\n\n{paras}",
                 )
                 for paras in self.parameter_grid
             )
@@ -747,6 +748,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
                         return_data_labels=True,
                         return_times=True,
                         memory=tmp_cache,
+                        error_info=f"This error occurred in fold {split_idx} with parameters candidate {cand_idx}.",
                     )
                     for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in combinations
                 )

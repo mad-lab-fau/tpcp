@@ -176,8 +176,9 @@ def cross_validate(
             return_times=True,
             return_data_labels=True,
             return_optimizer=return_optimizer,
+            error_info=f"This error occurred in fold {i}.",
         )
-        for train, test in splits
+        for i, (train, test) in enumerate(splits)
     )
     assert results is not None  # For the typechecker
     results = _aggregate_final_results(results)

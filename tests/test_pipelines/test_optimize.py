@@ -25,7 +25,7 @@ from tests.test_safe_decorator import DummyOptimizablePipelineUnsafe
 from tpcp import clone, make_optimize_safe
 from tpcp._optimize import BaseOptimize
 from tpcp._utils._score import _optimize_and_score
-from tpcp.exceptions import PotentialUserErrorWarning
+from tpcp.exceptions import OptimizationError, PotentialUserErrorWarning
 from tpcp.optimize import DummyOptimize, GridSearch, GridSearchCV, Optimize
 from tpcp.validate import Aggregator, Scorer
 
@@ -528,7 +528,7 @@ class TestGridSearchCV:
         with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
             mock.__name__ = "self_optimize"
             DummyOptimizablePipeline.self_optimize = make_optimize_safe(DummyOptimizablePipeline.self_optimize)
-            with pytest.raises(ValueError) as e:
+            with pytest.raises(OptimizationError) as e:
                 GridSearchCV(
                     DummyOptimizablePipeline(),
                     ParameterGrid({"para_1": [1, 2, 3], "para_2": [0, 1]}),
@@ -538,7 +538,8 @@ class TestGridSearchCV:
                     return_optimized=False,
                 ).optimize(ds)
 
-        assert "Optimizing the pipeline modified a parameter marked as `pure`." in str(e)
+        # We check that the error message is in the error one up in the stack (__cause__)
+        assert "Optimizing the pipeline modified a parameter marked as `pure`." in str(e.value.__cause__)
 
     def test_parameters_set_correctly(self):
         ds = DummyDataset()

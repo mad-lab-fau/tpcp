@@ -6,7 +6,15 @@ class PotentialUserErrorWarning(UserWarning):
 
 
 class ScorerFailedError(Exception):
-    """A error indicating that a scorer failed."""
+    """An error indicating that a scorer failed."""
+
+
+class OptimizationError(Exception):
+    """An error indicating that the optimization of an algorithm failed."""
+
+
+class TestError(Exception):
+    """An error indicating that an error occurred on the testset failed."""
 
 
 class ValidationError(Exception):

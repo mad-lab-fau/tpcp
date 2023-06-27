@@ -18,6 +18,7 @@ from tpcp._dataset import Dataset
 from tpcp._hash import custom_hash
 from tpcp._pipeline import Pipeline
 from tpcp._utils._general import _get_nested_paras
+from tpcp.exceptions import OptimizationError, TestError
 
 if TYPE_CHECKING:
     from tpcp._optimize import BaseOptimize
@@ -61,6 +62,7 @@ def _score(
     return_parameters=False,
     return_data_labels=False,
     return_times=False,
+    error_info: Optional[str] = None,
 ) -> _ScoreResults:
     """Set parameters and return score.
 
@@ -102,9 +104,15 @@ def _score(
 
         pipeline = pipeline.set_params(**parameters)
 
-    start_time = time.time()
-    agg_scores, single_scores = scorer(pipeline, dataset)
-    score_time = time.time() - start_time
+    try:
+        start_time = time.time()
+        agg_scores, single_scores = scorer(pipeline, dataset)
+        score_time = time.time() - start_time
+    except Exception as e:  # noqa: BLE001
+        raise TestError(
+            f"Testing the algorithm on the dataset failed with the error above.\n{error_info or ''}\n\n"
+            f"The test-set is:\n{[d.groups for d in dataset]}"
+        ) from e
 
     result: _ScoreResults = {"scores": agg_scores, "single_scores": single_scores}
     if return_times:
@@ -116,7 +124,7 @@ def _score(
     return result
 
 
-def _optimize_and_score(
+def _optimize_and_score(  # noqa: C901
     optimizer: BaseOptimize,
     scorer: Scorer,
     train_set: Dataset,
@@ -131,6 +139,7 @@ def _optimize_and_score(
     return_data_labels=False,
     return_times=False,
     memory: Optional[Memory] = None,
+    error_info: Optional[str] = None,
 ) -> _OptimizeScoreResults:
     """Optimize and score the optimized pipeline on the train and test data, respectively.
 
@@ -150,7 +159,8 @@ def _optimize_and_score(
     This might even happen in a different Python process (in the case of multiprocessing) where the dataset object was
     recreated.
     Hence, it might be that the dataobject recreated after pickling and unpickling is not the same as the original one.
-    To avoid this entirely, we split and extract the subset right here in the same process.
+    To avoid this entirely, we split and extract the subset right in the same process in the caller and only pass
+    the subset to this method.
     Really badly written Datasets might still get past this, but let's hope this rarely happens.
     Note, that the Dataset object itself has a safeguard against non-deterministic indices, but this is not a guarantee.
     Let's better be safe and reduce the surface for bugs even further here.
@@ -164,9 +174,17 @@ def _optimize_and_score(
 
     optimize_params_clean: Dict = optimize_params or {}
 
-    start_time = time.time()
-    optimizer = _cached_optimize(optimizer, train_set, hyperparameters, pure_parameters, memory, optimize_params_clean)
-    optimize_time = time.time() - start_time
+    try:
+        start_time = time.time()
+        optimizer = _cached_optimize(
+            optimizer, train_set, hyperparameters, pure_parameters, memory, optimize_params_clean
+        )
+        optimize_time = time.time() - start_time
+    except Exception as e:  # noqa: BLE001
+        raise OptimizationError(
+            f"The optimization on the trainset failed with the error above.\n{error_info or ''}\n\n"
+            f"This optimization used the following trainset:\n{train_set}"
+        ) from e
 
     # Now we set the remaining paras.
     # Because, we need to set the parameters on the optimized pipeline and not the input pipeline we strip the
@@ -177,12 +195,25 @@ def _optimize_and_score(
     # beginning.
     optimizer = optimizer.set_params(**pure_parameters)
 
-    agg_scores, single_scores = scorer(optimizer.optimized_pipeline_, test_set)
-    score_time = time.time() - optimize_time - start_time
+    try:
+        agg_scores, single_scores = scorer(optimizer.optimized_pipeline_, test_set)
+        score_time = time.time() - optimize_time - start_time
+    except Exception as e:  # noqa: BLE001
+        raise TestError(
+            f"Testing the optimized algorithm on the test-set failed with the error above.\n{error_info or ''}\n\n"
+            f"The test-set is:\n{test_set}"
+        ) from e
 
     result: _OptimizeScoreResults = {"test_scores": agg_scores, "test_single_scores": single_scores}
     if return_train_score:
-        train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set)
+        try:
+            train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set)
+        except Exception as e:  # noqa: BLE001
+            raise TestError(
+                "Running the optimized algorithm on the train-set to calculate the train error failed with the error "
+                f"above.\n{error_info or ''}\n\n"
+                f"The train-set is:\n{[d.groups for d in test_set]}"
+            ) from e
         result["train_scores"] = train_agg_scores
         result["train_single_scores"] = train_single_scores
     if return_times:

@@ -11,8 +11,38 @@ from tests.test_pipelines.conftest import (
     DummyOptimizablePipeline,
     dummy_single_score_func,
 )
-from tpcp.optimize import Optimize
+from tpcp import Dataset, OptimizableParameter, OptimizablePipeline
+from tpcp.exceptions import OptimizationError, TestError
+from tpcp.optimize import DummyOptimize, Optimize
 from tpcp.validate import cross_validate
+
+
+class CustomOptimizablePipelineWithOptiError(OptimizablePipeline):
+    optimized: OptimizableParameter[bool]
+
+    def __init__(self, error_fold, optimized=False):
+        self.error_fold = error_fold
+        self.optimized = optimized
+
+    def self_optimize(self, dataset: Dataset, **kwargs):
+        if self.error_fold not in dataset.groups:
+            raise ValueError("This is an error")
+        return self
+
+
+class CustomOptimizablePipelineWithRunError(OptimizablePipeline):
+    optimized: OptimizableParameter[bool]
+
+    def __init__(self, error_fold, optimized=False):
+        self.error_fold = error_fold
+        self.optimized = optimized
+
+    def run(self, dataset: Dataset):
+        condition = self.error_fold == dataset.group
+        if condition:
+            raise ValueError("This is an error")
+        self.optimized = True
+        return self
 
 
 class TestCrossValidate:
@@ -165,3 +195,32 @@ class TestCrossValidate:
                 assert set(np.unique(call[1]["mock_labels"])) == set("abc")
             else:
                 assert "mock_labels" not in call[1]
+
+    @pytest.mark.parametrize("error_fold", (0, 2))
+    def test_cross_validate_opti_error(self, error_fold):
+
+        with pytest.raises(OptimizationError) as e:
+            cross_validate(
+                Optimize(CustomOptimizablePipelineWithOptiError(error_fold=error_fold)),
+                DummyDataset(),
+                scoring=dummy_single_score_func,
+                cv=5,
+            )
+
+        assert f"This error occurred in fold {error_fold}" in str(e.value)
+
+    @pytest.mark.parametrize("error_fold", (0, 2))
+    def test_cross_validate_test_error(self, error_fold):
+        def simple_scorer(pipeline, data_point):
+            pipeline.run(data_point)
+            return data_point.groups[0]
+
+        with pytest.raises(TestError) as e:
+            cross_validate(
+                DummyOptimize(CustomOptimizablePipelineWithRunError(error_fold=error_fold)),
+                DummyDataset(),
+                scoring=simple_scorer,
+                cv=5,
+            )
+
+        assert f"This error occurred in fold {error_fold}" in str(e.value)
