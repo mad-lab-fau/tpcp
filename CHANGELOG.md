@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- All optimization methods that do complicated loops (over parameters or CV-Folds) now raise new custom error messages
+  (OptimizationError and TestError) if they encounter an error.
+  These new errors have further information in which iteration of the loop the error occurred and should make it easier
+  to debug issues.
+- When a scorer fails, we now print the name (i.e. the group) of the datapoint that caused the error.
+  This should make it easier to debug issues with the scorer.
+
 ## [0.18.0] - 2023-04-13
 
 ### Fixed
