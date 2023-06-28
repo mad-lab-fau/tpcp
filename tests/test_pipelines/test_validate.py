@@ -224,3 +224,31 @@ class TestCrossValidate:
             )
 
         assert f"This error occurred in fold {error_fold}" in str(e.value)
+
+    @pytest.mark.parametrize("return_train_score", (True, False))
+    def test_cross_validate_train_error(self, return_train_score):
+        """Test that a different error message is used, if the error occurs during evaluating the train set.
+
+        We only trigger that for fold 0. Otherwise it would be to annoying to write a testcase for.
+        """
+        def simple_scorer(pipeline, data_point):
+            pipeline.run(data_point)
+            return data_point.groups[0]
+
+        with pytest.raises(TestError) as e:
+            cross_validate(
+                # We need to select any fold other than 0 as error fold to get the error triggered during training
+                DummyOptimize(CustomOptimizablePipelineWithRunError(error_fold=1)),
+                DummyDataset(),
+                scoring=simple_scorer,
+                return_train_score=return_train_score,
+                cv=5,
+            )
+
+        if return_train_score:
+            assert f"This error occurred in fold 0" in str(e.value)
+            assert "train-set" in str(e.value)
+        else:
+            assert f"This error occurred in fold 1" in str(e.value)
+            assert "test-set" in str(e.value)
+
