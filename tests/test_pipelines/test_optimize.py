@@ -22,10 +22,10 @@ from tests.test_pipelines.conftest import (
     dummy_single_score_func,
 )
 from tests.test_safe_decorator import DummyOptimizablePipelineUnsafe
-from tpcp import clone, make_optimize_safe
+from tpcp import NOTHING, OptimizableParameter, OptimizablePipeline, Pipeline, clone, make_optimize_safe
 from tpcp._optimize import BaseOptimize
 from tpcp._utils._score import _optimize_and_score
-from tpcp.exceptions import OptimizationError, PotentialUserErrorWarning
+from tpcp.exceptions import OptimizationError, PotentialUserErrorWarning, TestError
 from tpcp.optimize import DummyOptimize, GridSearch, GridSearchCV, Optimize
 from tpcp.validate import Aggregator, Scorer
 
@@ -58,6 +58,38 @@ class TestMetaFunctionalityGridSearchCV(TestAlgorithmMixin):
 
     def test_empty_init(self):
         pytest.skip()
+
+
+class CustomErrorPipeline(Pipeline):
+    def __init__(self, para=None, error_para=NOTHING):
+        self.para = para
+        self.error_para = error_para
+
+    def run(self, dataset):
+        condition = self.error_para == self.para
+        if condition:
+            raise ValueError("This is an error")
+        return self
+
+
+class OptimizableCustomErrorPipeline(OptimizablePipeline):
+    optimized: OptimizableParameter[bool]
+
+    def __init__(self, para=None, error_para=NOTHING, error_fold=NOTHING, optimized=False):
+        self.para = para
+        self.error_para = error_para
+        self.error_fold = error_fold
+        self.optimized = optimized
+
+    def self_optimize(self, dataset, **kwargs):
+        condition = (self.error_fold not in dataset.groups) and (self.error_para == self.para)
+        if condition:
+            raise ValueError("This is an error")
+        self.optimized = True
+        return self
+
+    def run(self, dataset):
+        return self
 
 
 class TestMetaFunctionalityOptimize(TestAlgorithmMixin):
@@ -308,6 +340,21 @@ class TestGridSearch:
 
         # Wo don't expect a non-aggreagted version with the name of the final agg value
         assert "single_custom_agg__new_score_name" not in results_df.columns
+
+    @pytest.mark.parametrize("error_para", (1, 2))
+    def test_custom_error_message(self, error_para):
+        def simple_scorer(pipeline, data_point):
+            pipeline.run(data_point)
+            return data_point.groups[0]
+
+        gs = GridSearch(
+            CustomErrorPipeline(error_para=error_para), ParameterGrid({"para": [1, 2]}), scoring=simple_scorer
+        )
+
+        with pytest.raises(TestError) as e:
+            gs.optimize(DummyDataset())
+
+        assert f"This error occurred for the following parameter:\n\n{{'para': {error_para}}}" in str(e.value)
 
 
 class TestGridSearchCV:
@@ -604,6 +651,25 @@ class TestGridSearchCV:
             assert f"split{split}_test_single_custom_agg__new_score_name" not in results_df.columns
 
         assert "mean_test_custom_agg__new_score_name" in results_df.columns
+
+    @pytest.mark.parametrize("error_fold", (0, 2))
+    @pytest.mark.parametrize("error_para", (1, 2))
+    def test_custom_error_message(self, error_para, error_fold):
+        def simple_scorer(pipeline, data_point):
+            pipeline.run(data_point)
+            return data_point.groups[0]
+
+        gs = GridSearchCV(
+            OptimizableCustomErrorPipeline(error_para=error_para, error_fold=error_fold),
+            ParameterGrid({"para": [1, 2]}),
+            cv=5,
+            scoring=simple_scorer,
+        )
+
+        with pytest.raises(OptimizationError) as e:
+            gs.optimize(DummyDataset())
+
+        assert f"This error occurred in fold {error_fold} with parameters candidate {error_para - 1}." in str(e.value)
 
 
 class TestOptimize:

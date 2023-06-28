@@ -231,6 +231,7 @@ class TestCrossValidate:
 
         We only trigger that for fold 0. Otherwise it would be to annoying to write a testcase for.
         """
+
         def simple_scorer(pipeline, data_point):
             pipeline.run(data_point)
             return data_point.groups[0]
@@ -246,9 +247,8 @@ class TestCrossValidate:
             )
 
         if return_train_score:
-            assert f"This error occurred in fold 0" in str(e.value)
+            assert "This error occurred in fold 0" in str(e.value)
             assert "train-set" in str(e.value)
         else:
-            assert f"This error occurred in fold 1" in str(e.value)
+            assert "This error occurred in fold 1" in str(e.value)
             assert "test-set" in str(e.value)
-
