@@ -136,10 +136,6 @@ cd tpcp
 poetry install --all-extras
 ```
 
-Note, that this will fail at the moment for Python 3.11., as pytorch is not yet available for this version.
-You can safely skip the `-E torch` flag if you don't need the pytorch features.
-All tests that require pytorch will be skipped automatically.
-
 Afterwards you can start to develop and change things.
 If you want to run tests, format your code, build the docs, ..., you can run one of the following `poethepoet` commands
 
