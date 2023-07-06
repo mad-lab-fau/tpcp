@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - When a scorer fails, we now print the name (i.e. the group) of the datapoint that caused the error.
   This should make it easier to debug issues with the scorer.
 
+### Changed
+
+- We dropped support for joblib<0.13.0. due to some changes in the API. We only support the new API now, which allowed 
+  us to simplify some of the multiprocessing code.
+
 ## [0.18.0] - 2023-04-13
 
 ### Fixed

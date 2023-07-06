@@ -8,6 +8,10 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 
+def _noop(*_, **__):
+    """No operation."""
+
+
 def _aggregate_final_results(results: List) -> Dict:
     """Aggregate the list of dict to dict of np ndarray/list.
 

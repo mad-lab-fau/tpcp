@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from typing import Any, ContextManager, Dict, Generic, Iterator, List, Literal, Optional, Tuple, TypeVar, Union
 
 import numpy as np
-from joblib import Memory
+from joblib import Memory, Parallel
 from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
@@ -25,11 +25,11 @@ from tpcp._parameters import Parameter, _ParaTypes
 from tpcp._pipeline import OptimizablePipelineT, PipelineT
 from tpcp._utils._general import (
     _aggregate_final_results,
+    _noop,
     _normalize_score_results,
     _prefix_para_dict,
     _split_hyper_and_pure_parameters,
 )
-from tpcp._utils._multiprocess import TqdmParallel
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.parallel import delayed
@@ -358,24 +358,30 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         # itself.
         # If not explicitly changed the scorer is an instance of `Scorer` that wraps the actual `scoring`
         # function provided by the user.
-        pbar: Optional[tqdm] = None
         if self.progress_bar:
-            pbar = tqdm(total=len(self.parameter_grid), desc="Parameter Combinations")
-        parallel = TqdmParallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch, pbar=pbar)
+            pbar = partial(tqdm, total=len(self.parameter_grid), desc="Parameter Combinations")
+        else:
+            pbar = _noop
+
+        parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch, return_as="generator")
         with parallel:
             # Evaluate each parameter combination
-            results = parallel(
-                delayed(_score)(
-                    self.pipeline.clone(),
-                    dataset,
-                    scoring,
-                    paras,
-                    return_parameters=True,
-                    return_data_labels=True,
-                    return_times=True,
-                    error_info=f"This error occurred for the following parameter:\n\n{paras}",
+            results = list(
+                pbar(
+                    parallel(
+                        delayed(_score)(
+                            self.pipeline.clone(),
+                            dataset,
+                            scoring,
+                            paras,
+                            return_parameters=True,
+                            return_data_labels=True,
+                            return_times=True,
+                            error_info=f"This error occurred for the following parameter:\n\n{paras}",
+                        )
+                        for paras in self.parameter_grid
+                    )
                 )
-                for paras in self.parameter_grid
             )
         assert results is not None  # For the typechecker
         # We check here if all results are dicts. We only check the dtype of the first value, as the scorer should
@@ -716,9 +722,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
             product(enumerate(split_parameters), enumerate(cv_checked.split(dataset, mock_labels, groups=groups)))
         )
 
-        pbar: Optional[tqdm] = None
-        if self.progress_bar:
-            pbar = tqdm(total=len(combinations), desc="Split-Para Combos")
+        pbar = partial(tqdm, total=len(combinations), desc="Split-Para Combos") if self.progress_bar else _noop
 
         # To enable the pure parameter performance improvement, we need to create a joblib cache in a temp dir that
         # is deleted after the run.
@@ -730,27 +734,32 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
             tmp_dir_context = TemporaryDirectory("joblib_tpcp_cache")
         with tmp_dir_context as cachedir:
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None
-            parallel = TqdmParallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch, pbar=pbar)
+            parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch, return_as="generator")
             # We use a similar structure to sklearn's GridSearchCV here (see GridSearch for more info).
             with parallel:
                 # Evaluate each parameter combination
-                out = parallel(
-                    delayed(_optimize_and_score)(
-                        optimizer.clone(),
-                        scoring,
-                        dataset[train],
-                        dataset[test],
-                        optimize_params=optimize_params,
-                        hyperparameters=_prefix_para_dict(hyper_paras, parameter_prefix),
-                        pure_parameters=_prefix_para_dict(pure_paras, parameter_prefix),
-                        return_train_score=self.return_train_score,
-                        return_parameters=False,
-                        return_data_labels=True,
-                        return_times=True,
-                        memory=tmp_cache,
-                        error_info=f"This error occurred in fold {split_idx} with parameters candidate {cand_idx}.",
+                out = list(
+                    pbar(
+                        parallel(
+                            delayed(_optimize_and_score)(
+                                optimizer.clone(),
+                                scoring,
+                                dataset[train],
+                                dataset[test],
+                                optimize_params=optimize_params,
+                                hyperparameters=_prefix_para_dict(hyper_paras, parameter_prefix),
+                                pure_parameters=_prefix_para_dict(pure_paras, parameter_prefix),
+                                return_train_score=self.return_train_score,
+                                return_parameters=False,
+                                return_data_labels=True,
+                                return_times=True,
+                                memory=tmp_cache,
+                                error_info=f"This error occurred in fold {split_idx} with parameters candidate "
+                                f"{cand_idx}.",
+                            )
+                            for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in combinations
+                        )
                     )
-                    for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in combinations
                 )
         assert out is not None  # For the type checker
         results = self._format_results(parameters, n_splits, out)

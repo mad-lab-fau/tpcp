@@ -1,15 +1,15 @@
 """Helper to validate/evaluate pipelines and Optimize."""
-
+from functools import partial
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
+from joblib import Parallel
 from sklearn.model_selection import BaseCrossValidator, check_cv
 from tqdm.auto import tqdm
 
 from tpcp import Dataset
 from tpcp._optimize import BaseOptimize
-from tpcp._utils._general import _aggregate_final_results, _normalize_score_results
-from tpcp._utils._multiprocess import TqdmParallel
+from tpcp._utils._general import _aggregate_final_results, _noop, _normalize_score_results
 from tpcp._utils._score import _optimize_and_score
 from tpcp.parallel import delayed
 from tpcp.validate._scorer import _validate_scorer
@@ -153,33 +153,40 @@ def cross_validate(
             "Most likely you only want to use `propagate_groups`."
         )
     splits = list(cv_checked.split(dataset, mock_labels, groups=groups))
+
     # We clone the estimator to make sure that all the folds are
     # independent, and that it is pickle-able.
-    pbar: Optional[tqdm] = None
-    if progress_bar:
-        pbar = tqdm(desc="CV Folds", total=len(splits))
-    parallel = TqdmParallel(n_jobs=n_jobs, verbose=verbose, pre_dispatch=pre_dispatch, pbar=pbar)
-    results = parallel(
-        delayed(_optimize_and_score)(
-            optimizable.clone(),
-            scoring,
-            dataset[train],
-            dataset[test],
-            optimize_params={
-                **_propagate_values("groups", propagate_groups, groups, train),
-                **_propagate_values("mock_labels", propagate_mock_labels, mock_labels, train),
-                **optimize_params,
-            },
-            hyperparameters=None,
-            pure_parameters=None,
-            return_train_score=return_train_score,
-            return_times=True,
-            return_data_labels=True,
-            return_optimizer=return_optimizer,
-            error_info=f"This error occurred in fold {i}.",
+    optimizable = optimizable.clone()
+
+    pbar = partial(tqdm, total=len(splits), desc="CV Folds") if progress_bar else _noop
+
+    parallel = Parallel(n_jobs=n_jobs, verbose=verbose, pre_dispatch=pre_dispatch, return_as="generator")
+    with parallel:
+        results = list(
+            pbar(
+                parallel(
+                    delayed(_optimize_and_score)(
+                        optimizable,
+                        scoring,
+                        dataset[train],
+                        dataset[test],
+                        optimize_params={
+                            **_propagate_values("groups", propagate_groups, groups, train),
+                            **_propagate_values("mock_labels", propagate_mock_labels, mock_labels, train),
+                            **optimize_params,
+                        },
+                        hyperparameters=None,
+                        pure_parameters=None,
+                        return_train_score=return_train_score,
+                        return_times=True,
+                        return_data_labels=True,
+                        return_optimizer=return_optimizer,
+                        error_info=f"This error occurred in fold {i}.",
+                    )
+                    for i, (train, test) in enumerate(splits)
+                )
+            )
         )
-        for i, (train, test) in enumerate(splits)
-    )
     assert results is not None  # For the typechecker
     results = _aggregate_final_results(results)
     score_results = {}
