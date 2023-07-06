@@ -133,7 +133,7 @@ commands:
 ```bash
 git clone https://github.com/mad-lab-fau/tpcp
 cd tpcp
-poetry install -E optuna -E torch # This might take a while
+poetry install --all-extras
 ```
 
 Note, that this will fail at the moment for Python 3.11., as pytorch is not yet available for this version.
