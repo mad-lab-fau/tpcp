@@ -255,6 +255,8 @@ class OptunaSearch(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT]):
 # for each run.
 # This method gets a random seed as input.
 # We use that to control the random sampler of Optuna.
+# This way, we ensure that a new random seed is used for each process, in case we use multiprocessing.
+# If we passed a fixed seed to the sampler, we would get the same results for each process.
 #
 # We use a simple in-memory study with the direction "maximize", as we want to optimize for the highest f1-score
 # However, we wrap it by a callable to ensure that we get a new and independent study everytime our Optuna optimizer

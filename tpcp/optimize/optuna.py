@@ -329,12 +329,13 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         Creating the study is handled via a callable, instead of providing the parameters or the study object directly,
         to make it possible to create individual studies, when CustomOptuna optimize is called by an external wrapper
         (i.e. `cross_validate`).
-        Further, the provided fucntion is called with a single parameter `seed` that can be used to create a samplers
-        and pruners with different random seeds.
-        This is important for multi-processing (see more in Notes).
+        Further, the provided function is called with a single parameter `seed` that can be used to create a samplers
+        and pruners with fixed random seeds.
+        Using the passed seed compared to a fix global seed is important, as otherwise the same sampler/pruner use the
+        same random numbers across multiple processes if `n_jobs > 1` (see more in Notes).
         Note, that this method should return consistent output when called multiple times with the same seed.
-        Otherwise, unexcepected behaviour can occur, where different processes use different samplers/pruners in a
-        multi-processing setting (`n_jobs > 1`).
+        Otherwise, unexpected behaviour can occur, where different processes use different samplers/pruners in a
+        multi-processing setting.
     n_trials
         The number of trials.
         If this argument is set to `None`, there is no limitation on the number of trials.
