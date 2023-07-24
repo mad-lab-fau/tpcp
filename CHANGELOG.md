@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Further, the expected call signature changed, as `get_study_params` now gets a seed as argument.
   This seed should be used to initialize the random number generator of the sampler and pruner of a study to ensure
   that each process gets a different seed and sampling process.
+  (https://github.com/mad-lab-fau/tpcp/pull/80)
   
   To migrate your code, you need to change the following:
   
