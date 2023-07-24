@@ -65,7 +65,7 @@ pipe = MyPipeline()
 #
 # .. note:: We use a in-memory study here, if you want to use multiprocessing or ensure that your search can be
 #           continued, use a different study backend.
-from optuna import Trial, create_study, samplers
+from optuna import Trial, samplers
 
 
 def get_study_params(seed):
