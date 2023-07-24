@@ -376,7 +376,6 @@ class TestOptunaSearch:
         assert optuna_search.best_params_["para_1"] == "('a', 'b')"
         assert optuna_search.best_params_["para_2"] == ("a", "b")
 
-
     @pytest.mark.parametrize("ignore_seed", (True, False, 42))
     def test_multiprocessing_does_not_repeat_trials(self, ignore_seed):
         # Note, we expect this test to path independent of the seed.
@@ -384,15 +383,15 @@ class TestOptunaSearch:
         # If None is passed for the seed variable, it used the current numpy to create a new seed.
         # However, we expect this to fail, if we set a fixed seed that is not None.
         with tempfile.TemporaryDirectory() as tmp_dir:
-            def get_study_params(seed):
-                if isinstance(ignore_seed, bool):
-                    seed = None if ignore_seed else seed
-                else:
-                    seed = ignore_seed
 
-                return dict(
-                    direction="maximize", storage=f"sqlite:///{tmp_dir}/optuna.db", sampler=TPESampler(seed=seed)
-                )
+            def get_study_params(seed):
+                seed = (None if ignore_seed else seed) if isinstance(ignore_seed, bool) else ignore_seed
+
+                return {
+                    "direction": "maximize",
+                    "storage": f"sqlite:///{tmp_dir}/optuna.db",
+                    "sampler": TPESampler(seed=seed),
+                }
 
             def search_space(trial):
                 trial.suggest_float("para_1", 0, 10)
@@ -413,4 +412,3 @@ class TestOptunaSearch:
             else:
                 # This is bad and happens if users set a fixed seed.
                 assert len({v["para_1"] for v in optuna_search.search_results_["params"]}) == 1
-
