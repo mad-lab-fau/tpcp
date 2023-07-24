@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
-from optuna import Study, Trial, create_study
+from optuna import Study, Trial
 from optuna.samplers import GridSampler, RandomSampler
 from optuna.trial import FrozenTrial
 
@@ -18,7 +18,7 @@ from tests.test_pipelines.conftest import (
 from tpcp import make_optimize_safe
 from tpcp._dataset import DatasetT
 from tpcp._pipeline import OptimizablePipeline, PipelineT
-from tpcp.optimize.optuna import CustomOptunaOptimize, OptunaSearch
+from tpcp.optimize.optuna import CustomOptunaOptimize, OptunaSearch, StudyParamsDict
 from tpcp.validate import Scorer
 
 
@@ -26,7 +26,7 @@ class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
     def __init__(
         self,
         pipeline: PipelineT,
-        create_study: Callable[[], Study],
+        get_study_params: Callable[[int], StudyParamsDict],
         scoring: Callable,
         create_search_space: Callable,
         *,
@@ -37,6 +37,7 @@ class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
         show_progress_bar: bool = False,
         return_optimized: bool = True,
         n_jobs: int = 1,
+        random_seed: Optional[int] = None,
         eval_str_paras: Sequence[str] = (),
         mock_objective=None,
     ) -> None:
@@ -45,7 +46,7 @@ class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
         self.mock_objective = mock_objective
         super().__init__(
             pipeline,
-            create_study,
+            get_study_params,
             n_trials=n_trials,
             timeout=timeout,
             callbacks=callbacks,
@@ -54,6 +55,7 @@ class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
             return_optimized=return_optimized,
             n_jobs=n_jobs,
             eval_str_paras=eval_str_paras,
+            random_seed=random_seed,
         )
 
     def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
@@ -76,9 +78,9 @@ def dummy_search_space(trial: Trial):
     trial.suggest_categorical("para_1", [1])
 
 
-def _get_study():
+def _get_study_params(seed):
     # We define it globally so that we can pickle it
-    return create_study(sampler=RandomSampler(42))
+    return {"sampler": RandomSampler(seed)}
 
 
 class TestMetaFunctionalityOptuna(TestAlgorithmMixin):
@@ -88,10 +90,9 @@ class TestMetaFunctionalityOptuna(TestAlgorithmMixin):
 
     @pytest.fixture()
     def after_action_instance(self) -> DummyOptunaOptimizer:
-
         gs = DummyOptunaOptimizer(
             DummyOptimizablePipeline(),
-            _get_study,
+            _get_study_params,
             scoring=dummy_single_score_func,
             create_search_space=dummy_search_space,
             n_trials=1,
@@ -108,7 +109,7 @@ class TestCustomOptunaOptimize:
         with pytest.raises(ValueError):
             DummyOptunaOptimizer(
                 DummyOptimizablePipeline(),
-                _get_study,
+                _get_study_params,
                 scoring=dummy_single_score_func,
                 create_search_space=dummy_search_space,
                 n_trials=None,  # These should not be both None
@@ -124,7 +125,7 @@ class TestCustomOptunaOptimize:
 
         DummyOptunaOptimizer(
             pipe,
-            _get_study,
+            _get_study_params,
             scoring=dummy_single_score_func,
             create_search_space=dummy_search_space,
             n_trials=n_trials,
@@ -146,7 +147,7 @@ class TestCustomOptunaOptimize:
 
         opti = DummyOptunaOptimizer(
             DummyOptimizablePipeline(),
-            _get_study,
+            _get_study_params,
             scoring=dummy_single_score_func,
             create_search_space=dummy_search_space,
             n_trials=1,
@@ -168,7 +169,7 @@ class TestCustomOptunaOptimize:
 
             DummyOptunaOptimizer(
                 DummyOptimizablePipeline(),
-                _get_study,
+                _get_study_params,
                 scoring=dummy_single_score_func,
                 create_search_space=dummy_search_space,
                 n_trials=1,
@@ -195,9 +196,11 @@ class TestCustomOptunaOptimize:
 
         opti = DummyOptunaOptimizer(
             pipe,
-            lambda: create_study(
-                sampler=GridSampler({"para_1": list(scores.keys())}), direction="maximize", storage=storage
-            ),
+            lambda _: {
+                "sampler": GridSampler({"para_1": list(scores.keys())}),
+                "direction": "maximize",
+                "storage": storage,
+            },
             scoring=scoring,
             create_search_space=create_search_space,
             # In case of the multiprocessing backend, we need to set n_trials to a value > len(scores), as we can not
@@ -232,7 +235,7 @@ class TestCustomOptunaOptimize:
 
         optuna_search = DummyOptunaOptimizer(
             DummyOptimizablePipeline(),
-            _get_study,
+            _get_study_params,
             create_search_space=search_space,
             scoring=dummy_single_score_func,
             n_trials=1,
@@ -254,10 +257,9 @@ class TestMetaFunctionalityOptunaSearch(TestAlgorithmMixin):
 
     @pytest.fixture()
     def after_action_instance(self) -> OptunaSearch:
-
         gs = OptunaSearch(
             DummyOptimizablePipeline(),
-            _get_study,
+            _get_study_params,
             dummy_search_space,
             scoring=dummy_single_score_func,
             n_trials=1,
@@ -273,7 +275,7 @@ class TestOptunaSearch:
     def test_single_score(self):
         optuna_search = OptunaSearch(
             DummyOptimizablePipeline(),
-            _get_study,
+            _get_study_params,
             dummy_search_space,
             scoring=dummy_single_score_func,
             n_trials=1,
@@ -297,7 +299,7 @@ class TestOptunaSearch:
     def test_search_result_columns_multi_score(self, score_name):
         optuna_search = OptunaSearch(
             DummyOptimizablePipeline(),
-            _get_study,
+            _get_study_params,
             dummy_search_space,
             scoring=dummy_multi_score_func,
             score_name=score_name,
@@ -330,7 +332,7 @@ class TestOptunaSearch:
         with pytest.raises(ValueError):
             OptunaSearch(
                 DummyOptimizablePipeline(),
-                _get_study,
+                _get_study_params,
                 dummy_search_space,
                 scoring=dummy_multi_score_func,
                 score_name=score_name,
@@ -341,7 +343,7 @@ class TestOptunaSearch:
         with pytest.warns(UserWarning):
             OptunaSearch(
                 DummyOptimizablePipeline(),
-                _get_study,
+                _get_study_params,
                 dummy_search_space,
                 scoring=dummy_single_score_func,
                 score_name="score_1",
@@ -358,7 +360,7 @@ class TestOptunaSearch:
 
         optuna_search = OptunaSearch(
             DummyOptimizablePipeline(),
-            _get_study,
+            _get_study_params,
             search_space,
             scoring=dummy_single_score_func,
             n_trials=1,

@@ -1,4 +1,5 @@
 """Implementation of methods and classes to wrap the optimization Framework `Optuna`."""
+
 try:
     import optuna
 except ImportError as e:
@@ -10,11 +11,12 @@ import multiprocessing
 import warnings
 from ast import literal_eval
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, Optional, Sequence, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, TypedDict, TypeVar, Union
 
 import numpy as np
 from joblib import Parallel
 from optuna import Study
+from optuna.study import StudyDirection
 from optuna.study.study import ObjectiveFuncType
 from optuna.trial import FrozenTrial, Trial
 from typing_extensions import Self
@@ -49,10 +51,21 @@ def _split_trials(n_trials, n_jobs):
         remaining -= 1
 
 
+class StudyParamsDict(TypedDict, total=False):
+    """Type of the dictionary returned by `get_study_params`."""
+
+    study_name: Optional[str]
+    storage: Union[str, optuna.storages.BaseStorage]
+    sampler: Optional[optuna.samplers.BaseSampler]
+    pruner: Optional[optuna.pruners.BasePruner]
+    direction: Optional[Union[str, StudyDirection]]
+    load_if_exists: bool
+    directions: Optional[Sequence[Union[str, StudyDirection]]]
+
+
 class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     pipeline: PipelineT
-    create_study: Callable[[], Study]
-
+    get_study_params: Callable[[int], StudyParamsDict]
     return_optimized: bool
 
     # Optuna Parameters that are directly forwarded to study.optimize
@@ -62,10 +75,12 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     gc_after_trial: bool
     show_progress_bar: bool
     n_jobs: int
+    random_seed: Optional[int]
 
     eval_str_paras: Sequence[str]
 
     optimized_pipeline_: PipelineT
+    random_seed_: int
     study_: Study
 
     @property
@@ -139,7 +154,10 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         self.dataset = dataset
 
         objective = self._create_objective(self.pipeline, dataset=dataset)
-        self.study_ = self.create_study()
+        self.random_seed_ = self.random_seed if self.random_seed is not None else np.random.randint(0, 100)
+
+        study_params = self.get_study_params(self.random_seed_)
+        self.study_ = optuna.create_study(**study_params)
 
         if not isinstance(self.study_._storage, optuna.storages.InMemoryStorage):
             warnings.warn(
@@ -179,19 +197,27 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
 
             # This solution is based on the solution proposed here:
             # https://github.com/optuna/optuna/issues/2862
-            def _multi_process_call_optimize(n_trials: int):
+            def _multi_process_call_optimize(n_trials: int, seed: int):
+                study_params_per_process = self.get_study_params(seed)
+                if (name := study_params_per_process.get("study_name", None)) is not None:
+                    assert name == self.study_.study_name, (
+                        "Study name must be the same on every call of `self.get_study_params`"
+                    )
                 study = optuna.load_study(
+                    # Name and storage come from the existing study, as things will break, if they are not consistent
+                    # across processes
                     study_name=self.study_.study_name,
                     storage=self.study_._storage,
-                    sampler=self.study_.sampler,
-                    pruner=self.study_.pruner,
+                    # Pruner and sampler come from the params, because they have updated random seeds
+                    sampler=study_params_per_process.get("sampler", None),
+                    pruner=study_params_per_process.get("pruner", None),
                 )
                 self._call_optimize_multi_process(study, objective, n_trials)
 
             parallel = Parallel(self.n_jobs)
             parallel(
-                delayed(_multi_process_call_optimize)(n_trials=n_trials_i)
-                for n_trials_i in _split_trials(self.n_trials, self.n_jobs)
+                delayed(_multi_process_call_optimize)(n_trials=n_trials_i, seed=self.random_seed_ + i)
+                for (i, n_trials_i) in enumerate(_split_trials(self.n_trials, self.n_jobs))
             )
 
         if self.return_optimized:
@@ -295,13 +321,18 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         A tpcp pipeline with some hyper-parameters that should be optimized.
         This can either be a normal pipeline or an optimizable-pipeline.
         This fully depends on your implementation of the `create_objective` method.
-    create_study
-        A callable that returns an optuna study instance to be used for the optimization.
-        It will be called as part of the `optimize` method without parameters.
-        The resulting study object can be accessed via `self.study_` after the optimization is finished.
-        Creating the study is handled via a callable, instead of providing the study object itself, to make it
-        possible to create individual studies, when CustomOptuna optimize is called by an external wrapper
+    get_study_params
+        A callable that returns a dictionary with the parameters that should be used to create the study (i.e. passed
+        to `optuna.create_study`).
+        Creating the study is handled via a callable, instead of providing the parameters or the study object directly,
+        to make it possible to create individual studies, when CustomOptuna optimize is called by an external wrapper
         (i.e. `cross_validate`).
+        Further, the provided fucntion is called with a single parameter `seed` that can be used to create a samplers
+        and pruners with different random seeds.
+        This is important for multi-processing (see more in Notes).
+        Note, that this method should return consistent output when called multiple times with the same seed.
+        Otherwise, unexcepected behaviour can occur, where different processes use different samplers/pruners in a
+        multi-processing setting (`n_jobs > 1`).
     n_trials
         The number of trials.
         If this argument is set to `None`, there is no limitation on the number of trials.
@@ -334,6 +365,10 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         If this is set to -1, all available cores are used.
 
         .. warning:: Read the notes on multiprocessing below before using this feature.
+    random_seed
+        A random seed that is used as base for the seed passed to your implementation `get_study_params`.
+        If None, this is set to a random integer between 0 and 100 (derived using numpy.random.randint).
+        In case of multiprocessing, this seed is used as offset to create different seeds for each process.
     eval_str_paras
         This can be a sequence (tuple/list) of parameter names used by Optuna that should be evaluated using
         `literal_eval` instead of just set as string on the pipeline.
@@ -414,6 +449,9 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     study_
         The study object itself.
         This should usually be identical to `self.study`.
+    random_seed_
+        The actual random seed used for the optimization.
+        This is either the value passed to `random_seed` or a random integer between 0 and 100.
 
     Examples
     --------
@@ -441,11 +479,16 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     The implementation is based on the suggestions made here: https://github.com/optuna/optuna/issues/2862
     However, it depends on internal optuna APIs and might break in future versions.
 
-    To use multiprocessing, the provided `create_study` function must return a study with a persistent backend (
+    To use multiprocessing, the provided `get_study_params` function must return a persistent backend (
     i.e. not the default InMemoryStorage), that can be written to by multiple processes.
     To make sure that your individual runs are independent and you don't leave behind any files, make sure you clean
     up your study after each run. You can use `optuna.delete_study(study_name=opti_instance.study_.study_name,
     storage=opti_instance.study_._storage)` for this.
+
+    Further, if you use samplers, that use a random seed (you likely are), you need to make sure that you pass the
+    `seed` provided to `get_study_params` to the sampler and potentially pruner as well.
+    Otherwise, each sampler/pruner instance might use the same random seed, which will lead to identical trials in
+    each process.
 
     From the implementation perspective, we split the number of trials into `n_jobs` chunks and then spawn one study
     per job.
@@ -474,21 +517,23 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     def __init__(
         self,
         pipeline: PipelineT,
-        create_study: Callable[[], Study],
+        get_study_params: Callable[[int], StudyParamsDict],
         *,
         n_trials: Optional[int] = None,
         timeout: Optional[float] = None,
         callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None,
         gc_after_trial: bool = False,
         n_jobs: int = 1,
+        random_seed: Optional[int] = None,
         eval_str_paras: Sequence[str] = (),
         show_progress_bar: bool = False,
         return_optimized: bool = True,
     ):
         self.pipeline = pipeline
-        self.create_study = create_study
+        self.get_study_params = get_study_params
 
         self.n_trials = n_trials
+        self.random_seed = random_seed
         self.timeout = timeout
         self.callbacks = callbacks
         self.gc_after_trial = gc_after_trial
@@ -507,7 +552,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             """Dataclass version of CustomOptunaOptimize."""
 
             pipeline: PipelineT
-            create_study: Callable[[], Study]
+            get_study_params: Callable[[int], StudyParamsDict]
 
             # Optuna Parameters that are directly forwarded to study.optimize
             n_trials: Optional[int] = None
@@ -517,6 +562,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             show_progress_bar: bool = False
 
             n_jobs: int = 1
+            random_seed: Optional[int] = None
             return_optimized: bool = True
 
             eval_str_paras: Sequence[str] = ()
@@ -539,7 +585,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             """Attrs version of CustomOptunaOptimize."""
 
             pipeline: PipelineT
-            create_study: Callable[[], Study]
+            get_study_params: Callable[[int], StudyParamsDict]
 
             # Optuna Parameters that are directly forwarded to study.optimize
             n_trials: Optional[int] = None
@@ -548,7 +594,8 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             gc_after_trial: bool = False
             show_progress_bar: bool = False
 
-            n_jobs: int = (1,)
+            n_jobs: int = 1
+            random_seed: Optional[int] = None
             return_optimized: bool = True
 
             eval_str_paras: Sequence[str] = ()
@@ -573,13 +620,19 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
     pipeline
         A tpcp pipeline with some hyper-parameters that should be optimized.
         This should be a normal (i.e. non-optimizable pipeline) when using this class.
-    create_study
-        A callable that returns an optuna study instance to be used for the optimization.
-        It will be called as part of the `optimize` method without parameters.
-        The resulting study object can be accessed via `self.study_` after the optimization is finished.
-        Creating the study is handled via a callable, instead of providing the study object itself, to make it
-        possible to create individual studies, when CustomOptuna optimize is called by an external wrapper
+    get_study_params
+        A callable that returns a dictionary with the parameters that should be used to create the study (i.e. passed
+        to `optuna.create_study`).
+        Creating the study is handled via a callable, instead of providing the parameters or the study object directly,
+        to make it possible to create individual studies, when CustomOptuna optimize is called by an external wrapper
         (i.e. `cross_validate`).
+        Further, the provided fucntion is called with a single parameter `seed` that can be used to create a samplers
+        and pruners with different random seeds.
+        This is important for multi-processing (see more in Notes).
+        Note, that this method should return consistent output when called multiple times with the same seed.
+        Otherwise, unexcepected behaviour can occur, where different processes use different samplers/pruners in a
+        multi-processing setting (`n_jobs > 1`).
+
     create_search_space
         A callable that takes a :class:`~optuna.trial.Trial` object as input and calls `suggest_*` methods on it to
         define the search space.
@@ -618,6 +671,10 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
         .. warning:: Read the notes in :class:`~tpcp.optimize.optuna.CustomOptunaOptimize` on multiprocessing below
                      before using this feature.
+    random_seed
+        A random seed that is used as base for the seed passed to your implementation `get_study_params`.
+        If None, this is set to a random integer between 0 and 100 (derived using numpy.random.randint).
+        In case of multiprocessing, this seed is used as offset to create different seeds for each process.
     eval_str_paras
         This can be a sequence (tuple/list) of parameter names used by Optuna that should be evaluated using
         `literal_eval` instead of just set as string on the pipeline.
@@ -690,6 +747,9 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         This should usually be identical to `self.study`.
     multimetric_
         If the scorer returned multiple scores
+    random_seed_
+        The actual random seed used for the optimization.
+        This is either the value passed to `random_seed` or a random integer between 0 and 100.
 
     """
 
@@ -702,7 +762,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
     def __init__(
         self,
         pipeline: PipelineT,
-        create_study: Callable[[], Study],
+        get_study_params: Callable[[int], StudyParamsDict],
         create_search_space: Callable[[Trial], None],
         *,
         scoring: ScorerTypes[PipelineT, DatasetT, T],
@@ -712,6 +772,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None,
         gc_after_trial: bool = False,
         n_jobs: int = 1,
+        random_seed: Optional[int] = None,
         eval_str_paras: Sequence[str] = (),
         show_progress_bar: bool = False,
         return_optimized: bool = True,
@@ -721,12 +782,13 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         self.score_name = score_name
 
         self.pipeline = pipeline
-        self.create_study = create_study
+        self.get_study_params = get_study_params
         self.n_trials = n_trials
         self.timeout = timeout
         self.callbacks = callbacks
         self.gc_after_trial = gc_after_trial
         self.n_jobs = n_jobs
+        self.random_seed = random_seed
         self.eval_str_paras = eval_str_paras
         self.show_progress_bar = show_progress_bar
         self.return_optimized = return_optimized
