@@ -68,10 +68,10 @@ pipe = MyPipeline()
 from optuna import Trial, create_study, samplers
 
 
-def get_study():
+def get_study_params(seed):
     # We use a simple RandomSampler, but every optuna sampler will work
-    sampler = samplers.RandomSampler(seed=42)
-    return create_study(direction="maximize", sampler=sampler)
+    sampler = samplers.RandomSampler(seed=seed)
+    return dict(direction="maximize", sampler=sampler)
 
 
 # %%
@@ -115,7 +115,9 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
 # In this case, we want to maximize the f1 score.
 from tpcp.optimize.optuna import OptunaSearch
 
-opti = OptunaSearch(pipe, get_study, create_search_space, scoring=score, n_trials=10, score_name="f1_score")
+opti = OptunaSearch(
+    pipe, get_study_params, create_search_space, scoring=score, n_trials=10, score_name="f1_score", random_seed=42
+)
 opti = opti.optimize(example_data)
 
 # %%

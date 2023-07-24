@@ -152,8 +152,8 @@ def f1_score(pipeline: MyPipeline, datapoint: ECGExampleData) -> float:
 # %%
 # The Custom Optimizer
 # --------------------
-# Optimizers in `tpcp` are nothing magical – they are simply algorithms that take a pipeline as input parameter and
-# have an action method called `optimize` that takes in a dataset and then optimizes some parameters of the passed
+# Optimizers in `tpcp` are nothing magical – they are simply pipelines that take a different pipeline as input parameter
+# and have an action method called `optimize` that takes in a dataset and then optimizes some parameters of the passed
 # pipeline using this data.
 #
 # The :class:`~tpcp.optimize.optuna.CustomOptunaOptimize` class already implements most of that for us and simply
@@ -249,16 +249,23 @@ class OptunaSearch(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT]):
 # To run the optimization, we need to create a new Optuna study, a custom sampler and the function that defines our
 # search space:
 #
+# Instead of creating the study directly, we create a function that returns the parameters we want to pass to
+# :func:`~optuna.create_study`.
+# This way, the OptunaSearch class can control the study creation and can ensure that we have independent studies
+# for each run.
+# This method gets a random seed as input.
+# We use that to control the random sampler of Optuna.
+#
 # We use a simple in-memory study with the direction "maximize", as we want to optimize for the highest f1-score
 # However, we wrap it by a callable to ensure that we get a new and independent study everytime our Optuna optimizer
 # is called.
-from optuna import create_study, samplers
+from optuna import samplers
 
 
-def get_study():
+def get_study_params(seed):
     # We use a simple RandomSampler, but every optuna sampler will work
-    sampler = samplers.RandomSampler(seed=42)
-    return create_study(direction="maximize", sampler=sampler)
+    sampler = samplers.RandomSampler(seed=seed)
+    return dict(sampler=sampler)
 
 
 # %%
@@ -283,10 +290,11 @@ def create_search_space(trial: Trial):
 # Then we can use the familiar :class:`~tpcp.optimize.Optimize` interface to run everything.
 opti = OptunaSearch(
     pipe,
-    get_study,
+    get_study_params,
     create_search_space=create_search_space,
     score_function=f1_score,
     n_trials=10,
+    random_seed=42,
 )
 
 opti = opti.optimize(example_data)
@@ -426,17 +434,18 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, D
 # %%
 # Running the new Optimizer stays the same (we even reuse the search space).
 # We only need to add an instance of our pruner to the study.
-def get_study() -> Study:
-    sampler = samplers.RandomSampler(seed=42)
-    return create_study(direction="maximize", sampler=sampler, pruner=MinDatapointPerformancePruner(0.3))
+def get_study_params(seed):
+    sampler = samplers.RandomSampler(seed=seed)
+    return dict(direction="maximize", sampler=sampler, pruner=MinDatapointPerformancePruner(0.3))
 
 
 opti_early_stop = OptunaSearchEarlyStopping(
     pipe,
-    get_study,
+    get_study_params,
     create_search_space=create_search_space,
     score_function=f1_score,
     n_trials=10,
+    random_seed=42,
 )
 
 opti_early_stop.optimize(example_data)

@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2023-07-24
+
+### Changed
+
+- **BREAKING CHANGE**: The way how all Optuna based optimizer work has been changed.
+  Instead of passing a function, that returns a study, you now need to pass a function that returns the parameters of a
+  study.
+  Creating the study is now handled by tpcp internally to avoid issues with multiprocessing.
+  This results in two changes.
+  The parameter name for all optuna pipelines has changed from `create_study` to `get_study_params`.
+  Further, the expected call signature changed, as `get_study_params` now gets a seed as argument.
+  This seed should be used to initialize the random number generator of the sampler and pruner of a study to ensure
+  that each process gets a different seed and sampling process.
+  
+  To migrate your code, you need to change the following:
+  
+  OLD:
+
+  ```python
+  def create_study():
+      return optuna.create_study(sampler=RandomSampler(seed=42))
+  
+  OptunaSearch(..., create_study=create_study, ...)
+  ```
+  
+  NEW:
+
+  ```python
+  def get_study_params(seed: int):
+      return dict(sampler=RandomSampler(seed=seed))
+  
+  OptunaSearch(..., get_study_params=get_study_params, random_seed=42, ...)
+  ```
+     
+
 ## [0.19.0] - 2023-07-06
 
 ### Added
