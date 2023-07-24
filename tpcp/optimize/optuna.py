@@ -200,9 +200,9 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
             def _multi_process_call_optimize(n_trials: int, seed: int):
                 study_params_per_process = self.get_study_params(seed)
                 if (name := study_params_per_process.get("study_name", None)) is not None:
-                    assert name == self.study_.study_name, (
-                        "Study name must be the same on every call of `self.get_study_params`"
-                    )
+                    assert (
+                        name == self.study_.study_name
+                    ), "Study name must be the same on every call of `self.get_study_params`"
                 study = optuna.load_study(
                     # Name and storage come from the existing study, as things will break, if they are not consistent
                     # across processes
