@@ -1,10 +1,11 @@
+import tempfile
 from typing import Callable, List, Optional, Sequence, Union
 from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
 from optuna import Study, Trial
-from optuna.samplers import GridSampler, RandomSampler
+from optuna.samplers import GridSampler, RandomSampler, TPESampler
 from optuna.trial import FrozenTrial
 
 from tests.mixins.test_algorithm_mixin import TestAlgorithmMixin
@@ -374,3 +375,31 @@ class TestOptunaSearch:
 
         assert optuna_search.best_params_["para_1"] == "('a', 'b')"
         assert optuna_search.best_params_["para_2"] == ("a", "b")
+
+
+    @pytest.mark.parametrize("ignore_seed", (True, False))
+    def test_multiprocessing_does_not_repeat_trials(self, ignore_seed):
+        # I am not sure if this test here is actually useful... For some reason, it does not seem to replicate the
+        # behaviour I saw on the HPC. I will still keep it, as it tests the functionality of the multiprocessing
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            def get_study_params(seed):
+                seed = None if ignore_seed else seed
+                return dict(
+                    direction="maximize", storage=f"sqlite:///{tmp_dir}/optuna.db", sampler=TPESampler(seed=seed)
+                )
+
+            def search_space(trial):
+                trial.suggest_float("para_1", 0, 10)
+
+            optuna_search = OptunaSearch(
+                DummyOptimizablePipeline(),
+                get_study_params,
+                search_space,
+                scoring=dummy_single_score_func,
+                n_trials=3,
+                n_jobs=2,
+            )
+
+            optuna_search.optimize(DummyDataset())
+
+            assert len({v["para_1"] for v in optuna_search.search_results_["params"]}) == 3

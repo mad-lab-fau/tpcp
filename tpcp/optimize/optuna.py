@@ -214,10 +214,12 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
                 )
                 self._call_optimize_multi_process(study, objective, n_trials)
 
+            # We call the objective function once in the main thread to make sure that the study is created correctly
+            _multi_process_call_optimize(1, self.random_seed_)
             parallel = Parallel(self.n_jobs)
             parallel(
-                delayed(_multi_process_call_optimize)(n_trials=n_trials_i, seed=self.random_seed_ + i)
-                for (i, n_trials_i) in enumerate(_split_trials(self.n_trials, self.n_jobs))
+                delayed(_multi_process_call_optimize)(n_trials=n_trials_i, seed=self.random_seed_ + i + 1)
+                for (i, n_trials_i) in enumerate(_split_trials(self.n_trials - 1, self.n_jobs))
             )
 
         if self.return_optimized:
@@ -492,6 +494,8 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
     From the implementation perspective, we split the number of trials into `n_jobs` chunks and then spawn one study
     per job.
+    However, we first run the first trial in the main process, to make sure that the study is created correctly.
+    Then we split the remaining trials into chunks and spawn a new process for each chunk.
     This study is a copy of the study from the main process and hence, points to the same database.
     Each process will then complete its chunk of trials and then terminate.
     This is a relatively naive implementation, but it avoids the overhead of spawning a new process for each trial.
@@ -802,6 +806,8 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
         scoring = _validate_scorer(self.scoring, self.pipeline)
 
+        # In a multiprocessing case, this function is called once in the main process and then in the worker processes.
+        # The first call in the main process allows us to set the multimetric_ attribute.
         def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
             # First we need to select parameters for the current trial
             if self.create_search_space is None:
