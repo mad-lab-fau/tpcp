@@ -267,7 +267,7 @@ from optuna import samplers
 def get_study_params(seed):
     # We use a simple RandomSampler, but every optuna sampler will work
     sampler = samplers.RandomSampler(seed=seed)
-    return dict(sampler=sampler)
+    return dict(sampler=sampler, direction="maximize")
 
 
 # %%
