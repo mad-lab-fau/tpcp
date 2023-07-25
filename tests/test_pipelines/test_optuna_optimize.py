@@ -27,7 +27,7 @@ class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
     def __init__(
         self,
         pipeline: PipelineT,
-        get_study_params: Callable[[int], StudyParamsDict],
+        get_study_params: Callable[[int, str], StudyParamsDict],
         scoring: Callable,
         create_search_space: Callable,
         *,
@@ -79,7 +79,7 @@ def dummy_search_space(trial: Trial):
     trial.suggest_categorical("para_1", [1])
 
 
-def _get_study_params(seed):
+def _get_study_params(seed, _):
     # We define it globally so that we can pickle it
     return {"sampler": RandomSampler(seed)}
 
@@ -193,15 +193,17 @@ class TestCustomOptunaOptimize:
         def scoring(pipe, _):
             return scores[pipe.para_1]
 
-        storage = f"sqlite:///{tmp_path}/test.db" if n_jobs > 1 else None
-
-        opti = DummyOptunaOptimizer(
-            pipe,
-            lambda _: {
+        def get_study_params(_: int, unique_id: str):
+            storage = f"sqlite:///{tmp_path}/test_{unique_id}.db" if n_jobs > 1 else None
+            return {
                 "sampler": GridSampler({"para_1": list(scores.keys())}),
                 "direction": "maximize",
                 "storage": storage,
-            },
+            }
+
+        opti = DummyOptunaOptimizer(
+            pipe,
+            get_study_params,
             scoring=scoring,
             create_search_space=create_search_space,
             # In case of the multiprocessing backend, we need to set n_trials to a value > len(scores), as we can not
@@ -384,12 +386,12 @@ class TestOptunaSearch:
         # However, we expect this to fail, if we set a fixed seed that is not None.
         with tempfile.TemporaryDirectory() as tmp_dir:
 
-            def get_study_params(seed):
+            def get_study_params(seed, unique_id):
                 seed = (None if ignore_seed else seed) if isinstance(ignore_seed, bool) else ignore_seed
 
                 return {
                     "direction": "maximize",
-                    "storage": f"sqlite:///{tmp_dir}/optuna.db",
+                    "storage": f"sqlite:///{tmp_dir}/optuna_{unique_id}.db",
                     "sampler": TPESampler(seed=seed),
                 }
 
@@ -412,3 +414,38 @@ class TestOptunaSearch:
             else:
                 # This is bad and happens if users set a fixed seed.
                 assert len({v["para_1"] for v in optuna_search.search_results_["params"]}) == 1
+
+    @pytest.mark.parametrize("reuse_storage", (True, False))
+    def test_raises_error_when_reusing_storage(self, reuse_storage):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+
+            def get_study_params(seed, unique_id):
+                if reuse_storage:
+                    storage = f"sqlite:///{tmp_dir}/optuna.db"
+                else:
+                    storage = f"sqlite:///{tmp_dir}/optuna_{unique_id}.db"
+                return {
+                    "direction": "maximize",
+                    "storage": storage,
+                    "sampler": TPESampler(seed=seed),
+                }
+
+            def search_space(trial):
+                trial.suggest_float("para_1", 0, 10)
+
+            optuna_search = OptunaSearch(
+                DummyOptimizablePipeline(),
+                get_study_params,
+                search_space,
+                scoring=dummy_single_score_func,
+                n_trials=3,
+                n_jobs=3,
+            )
+
+            optuna_search.optimize(DummyDataset())
+
+            if reuse_storage:
+                with pytest.raises(RuntimeError):
+                    optuna_search.clone().optimize(DummyDataset())
+            else:
+                optuna_search.clone().optimize(DummyDataset())

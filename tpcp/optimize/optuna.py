@@ -1,4 +1,5 @@
 """Implementation of methods and classes to wrap the optimization Framework `Optuna`."""
+import uuid
 
 try:
     import optuna
@@ -65,7 +66,7 @@ class StudyParamsDict(TypedDict, total=False):
 
 class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     pipeline: PipelineT
-    get_study_params: Callable[[int], StudyParamsDict]
+    get_study_params: Callable[[int, str], StudyParamsDict]
     return_optimized: bool
 
     # Optuna Parameters that are directly forwarded to study.optimize
@@ -81,6 +82,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
 
     optimized_pipeline_: PipelineT
     random_seed_: int
+    unique_id_: str
     study_: Study
 
     @property
@@ -134,7 +136,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         """Best trial in the :class:`~optuna.study.Study`."""
         return self.study_.best_trial
 
-    def optimize(self, dataset: DatasetT, **_: Any) -> Self:
+    def optimize(self, dataset: DatasetT, **_: Any) -> Self:  # noqa: C901
         """Optimize the objective over the dataset and find the best parameter combination.
 
         This method calls `self.create_objective` to obtain the objective function that should be optimized.
@@ -156,8 +158,21 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         objective = self._create_objective(self.pipeline, dataset=dataset)
         self.random_seed_ = self.random_seed if self.random_seed is not None else np.random.randint(0, 100)
 
-        study_params = self.get_study_params(self.random_seed_)
+        self.unique_id_ = str(uuid.uuid4())
+
+        study_params = self.get_study_params(self.random_seed_, self.unique_id_)
         self.study_ = optuna.create_study(**study_params)
+
+        # We check if the storage is empty (i.e. if other studies exist in the storage)
+        # In this case we raise an error, as this means that the optimizations are not independent
+        if len(self.study_._storage.get_all_studies()) > 1:
+            raise RuntimeError(
+                "You are trying to reuse the persistent storage of a previous study. "
+                "This is not supported at the moment and hints towards a common issue, where you accidentally use the "
+                "same storage, because you are using the OptunaSearch in a loop (e.g. in a cross-validation). "
+                "To avoid this issue, use the `unique_id` parameter passed to `get_study_params` to create a unique "
+                "storage location when using persistent storage."
+            )
 
         if not isinstance(self.study_._storage, optuna.storages.InMemoryStorage):
             warnings.warn(
@@ -198,7 +213,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
             # This solution is based on the solution proposed here:
             # https://github.com/optuna/optuna/issues/2862
             def _multi_process_call_optimize(n_trials: int, seed: int):
-                study_params_per_process = self.get_study_params(seed)
+                study_params_per_process = self.get_study_params(seed, self.unique_id_)
                 if (name := study_params_per_process.get("study_name", None)) is not None:
                     assert (
                         name == self.study_.study_name
@@ -455,6 +470,10 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     random_seed_
         The actual random seed used for the optimization.
         This is either the value passed to `random_seed` or a random integer between 0 and 100.
+    unique_id_
+        A unique ID for this optimization run.
+        This should be used to create a unique study storage location when using persistent storage and is passed to
+        `get_study_params`.
 
     Examples
     --------
@@ -522,7 +541,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     def __init__(
         self,
         pipeline: PipelineT,
-        get_study_params: Callable[[int], StudyParamsDict],
+        get_study_params: Callable[[int, str], StudyParamsDict],
         *,
         n_trials: Optional[int] = None,
         timeout: Optional[float] = None,
@@ -557,7 +576,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             """Dataclass version of CustomOptunaOptimize."""
 
             pipeline: PipelineT
-            get_study_params: Callable[[int], StudyParamsDict]
+            get_study_params: Callable[[int, str], StudyParamsDict]
 
             # Optuna Parameters that are directly forwarded to study.optimize
             n_trials: Optional[int] = None
@@ -590,7 +609,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             """Attrs version of CustomOptunaOptimize."""
 
             pipeline: PipelineT
-            get_study_params: Callable[[int], StudyParamsDict]
+            get_study_params: Callable[[int, str], StudyParamsDict]
 
             # Optuna Parameters that are directly forwarded to study.optimize
             n_trials: Optional[int] = None
@@ -755,6 +774,10 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
     random_seed_
         The actual random seed used for the optimization.
         This is either the value passed to `random_seed` or a random integer between 0 and 100.
+    unique_id_
+        A unique ID for this optimization run.
+        This should be used to create a unique study storage location when using persistent storage and is passed to
+        `get_study_params`.
 
     """
 
@@ -767,7 +790,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
     def __init__(
         self,
         pipeline: PipelineT,
-        get_study_params: Callable[[int], StudyParamsDict],
+        get_study_params: Callable[[int, str], StudyParamsDict],
         create_search_space: Callable[[Trial], None],
         *,
         scoring: ScorerTypes[PipelineT, DatasetT, T],

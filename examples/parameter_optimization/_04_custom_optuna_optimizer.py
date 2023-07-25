@@ -263,8 +263,10 @@ class OptunaSearch(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT]):
 # is called.
 from optuna import samplers
 
-
-def get_study_params(seed):
+# We ignore the second argument here, which is the unique optimizer id, as we are using in-memory storage.
+# However, in case of persistent storage, we would need to use this id in the storage path to ensure that we get a
+# unique study for each optimization call.
+def get_study_params(seed, _):
     # We use a simple RandomSampler, but every optuna sampler will work
     sampler = samplers.RandomSampler(seed=seed)
     return dict(sampler=sampler, direction="maximize")
@@ -436,7 +438,7 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, D
 # %%
 # Running the new Optimizer stays the same (we even reuse the search space).
 # We only need to add an instance of our pruner to the study.
-def get_study_params(seed):
+def get_study_params(seed, _):
     sampler = samplers.RandomSampler(seed=seed)
     return dict(direction="maximize", sampler=sampler, pruner=MinDatapointPerformancePruner(0.3))
 
