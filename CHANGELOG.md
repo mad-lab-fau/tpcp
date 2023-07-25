@@ -3,6 +3,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.20.1] - 2023-07-25
+
+### Fixed
+
+- Fixed regression introduced in 0.19.0, which resulted in optimizers not beeing correctly cloned per fold.
+  In result, each CV fold would overwrite the optimizer object of the previous fold.
+  This did not affect the reported results, but the returned optimizer object was not the one that was used to calculate
+  the results.
 
 ## [0.20.0] - 2023-07-24
 
