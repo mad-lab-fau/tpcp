@@ -154,10 +154,6 @@ def cross_validate(
         )
     splits = list(cv_checked.split(dataset, mock_labels, groups=groups))
 
-    # We clone the estimator to make sure that all the folds are
-    # independent, and that it is pickle-able.
-    optimizable = optimizable.clone()
-
     pbar = partial(tqdm, total=len(splits), desc="CV Folds") if progress_bar else _noop
 
     parallel = Parallel(n_jobs=n_jobs, verbose=verbose, pre_dispatch=pre_dispatch, return_as="generator")
@@ -166,7 +162,9 @@ def cross_validate(
             pbar(
                 parallel(
                     delayed(_optimize_and_score)(
-                        optimizable,
+                        # We clone the estimator to make sure that all the folds are
+                        # independent, and that it is pickle-able.
+                        optimizable.clone(),
                         scoring,
                         dataset[train],
                         dataset[test],

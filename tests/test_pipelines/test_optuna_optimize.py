@@ -412,3 +412,33 @@ class TestOptunaSearch:
             else:
                 # This is bad and happens if users set a fixed seed.
                 assert len({v["para_1"] for v in optuna_search.search_results_["params"]}) == 1
+
+    def test_two_studies_independent(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+
+            def get_study_params(seed):
+                storage = f"sqlite:///{tmp_dir}/optuna.db"
+                return {
+                    "direction": "maximize",
+                    "storage": storage,
+                    "sampler": TPESampler(seed=seed),
+                }
+
+            def search_space(trial):
+                trial.suggest_float("para_1", 0, 10)
+
+            optuna_search = OptunaSearch(
+                DummyOptimizablePipeline(),
+                get_study_params,
+                search_space,
+                scoring=dummy_single_score_func,
+                n_trials=3,
+                n_jobs=3,
+            )
+
+            optuna_search.optimize(DummyDataset())
+
+            copied_search = optuna_search.clone()
+            copied_search.optimize(DummyDataset())
+
+            assert optuna_search.best_params_ != copied_search.best_params_

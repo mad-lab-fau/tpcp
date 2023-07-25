@@ -198,7 +198,6 @@ class TestCrossValidate:
 
     @pytest.mark.parametrize("error_fold", (0, 2))
     def test_cross_validate_opti_error(self, error_fold):
-
         with pytest.raises(OptimizationError) as e:
             cross_validate(
                 Optimize(CustomOptimizablePipelineWithOptiError(error_fold=error_fold)),
@@ -252,3 +251,15 @@ class TestCrossValidate:
         else:
             assert "This error occurred in fold 1" in str(e.value)
             assert "test-set" in str(e.value)
+
+    def test_cross_validate_optimizer_are_cloned(self):
+        results = cross_validate(
+            Optimize(DummyOptimizablePipeline()),
+            DummyDataset(),
+            scoring=dummy_single_score_func,
+            return_optimizer=True,
+            cv=5,
+        )
+
+        assert len(results["optimizer"]) == 5
+        assert len({id(o) for o in results["optimizer"]}) == 5
