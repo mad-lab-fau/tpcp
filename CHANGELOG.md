@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2023-07-25
+
+### Changed
+
+- **BREAKING CHANGE**: Fixing the multiprocessing issues for the Optuna wrapper in 0.20.0, has uncovered another issue
+  with the implementation. Namely, that the current implementation would reuse the same storage when called multiple
+  times.
+  This leads to issues when calling the optimization in a loop (e.g. within a cross validation), as the final optimized
+  parameters leak from one iteration to the next.
+  To solve this issue, `get_study_params` now gets a `unique_id` parameter, that should be used to create a unique 
+  storage location for each call.
+  We also throw an error, if the selected storage already contains a study.
+  Below you can find the updated migration guide:
+  
+  OLD (0.19.0)
+  ```python
+  def create_study():
+      return optuna.create_study(sampler=RandomSampler(seed=42), storage="sqlite:///example.db")
+  
+  OptunaSearch(..., create_study=create_study, ...)
+  ```
+  
+  NEW (0.21.0)
+  
+  ```python
+  def get_study_params(seed: int, unique_id: str):
+      return dict(sampler=RandomSampler(seed=seed), storage=f"sqlite:///example_{unique_id}.db")
+  
+  OptunaSearch(..., get_study_params=get_study_params, random_seed=42, ...)
+  ```
+
 ## [0.20.0] - 2023-07-24
 
 ### Changed
