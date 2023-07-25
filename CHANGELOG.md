@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   To solve this issue, `get_study_params` now gets a `unique_id` parameter, that should be used to create a unique 
   storage location for each call.
   We also throw an error, if the selected storage already contains a study.
+  (https://github.com/mad-lab-fau/tpcp/pull/81)
+
   Below you can find the updated migration guide:
   
   OLD (0.19.0)
@@ -34,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   
   OptunaSearch(..., get_study_params=get_study_params, random_seed=42, ...)
   ```
+  
+  Note: If you were using in-memory storage, you don't need to use the `unique_id` parameter.
 
 ## [0.20.0] - 2023-07-24
 
