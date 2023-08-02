@@ -41,8 +41,6 @@ class QRSDetector(Algorithm):
         self.high_pass_filter_cutoff_hz = high_pass_filter_cutoff_hz
 
 
-from dataclasses import dataclass, field
-
 # %%
 # Luckily, Python has a built-in solution for that, called `dataclasses`.
 # With that, we can write the class above much more compact.
@@ -53,6 +51,7 @@ from dataclasses import dataclass, field
 #
 # Note, if you are using Python >=3.10, we highly recommend to use the `kw_only` option for dataclasses,
 # which prevent some of the inheritance issues of dataclasses.
+from dataclasses import dataclass, field
 from typing import ClassVar
 
 
@@ -77,6 +76,7 @@ class QRSDetector(Algorithm):
 # %%
 # We still get all parameters in the init:
 QRSDetector(high_pass_filter_cutoff_hz=4, max_heart_rate_bpm=200, min_r_peak_height_over_baseline=1)
+
 
 # %%
 # Inheritance
@@ -225,7 +225,6 @@ HigherLevelFilter()
 
 @define(kw_only=True, slots=False, repr=False)  # Slots Don't play nice with tpcp!
 class CustomDataset(Dataset.as_attrs()):  # Note the `as_attrs` call here!
-
     custom_param: float  # We don't need a default, as we are using `kw_only` in define
 
     def create_index(self) -> pd.DataFrame:
