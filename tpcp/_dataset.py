@@ -50,7 +50,8 @@ class _Dataset(BaseTpcpObject):
                 f"the `super().__init__` call.\n"
                 f"{cls.__name__} does only implement the following parameters: {params}\n\n"
                 "Add `groupby_cols: Optional[Union[List[str], str]] = None, subset_index: Optional[pd.DataFrame] = "
-                "None` to the end of your `__init__` method and forward them to the `super().__init__` call."
+                "None` to the end of the input arguments in the `__init__` method and forward them to the "
+                "`super().__init__` call."
             )
 
     def _create_check_index(self):
