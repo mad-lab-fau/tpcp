@@ -78,7 +78,7 @@ class DummyGroupedDataset(Dataset):
 
 
 def dummy_single_score_func(pipeline, data_point):
-    return data_point.groups[0]
+    return data_point.groups[0][0]
 
 
 def create_dummy_score_func(name):
@@ -90,13 +90,13 @@ def create_dummy_multi_score_func(names):
 
 
 def dummy_multi_score_func(pipeline, data_point):
-    return {"score_1": data_point.groups[0], "score_2": data_point.groups[0] + 1}
+    return {"score_1": data_point.groups[0][0], "score_2": data_point.groups[0][0] + 1}
 
 
 def dummy_error_score_func(pipeline, data_point):
-    if data_point.groups[0] in [0, 2, 4]:
+    if data_point.groups[0][0] in [0, 2, 4]:
         raise ValueError(f"Dummy Error for {data_point.groups[0]}")
-    return data_point.groups[0]
+    return data_point.groups[0][0]
 
 
 def dummy_error_score_func_multi(pipeline, data_point):

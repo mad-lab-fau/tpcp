@@ -93,10 +93,7 @@ class TestDataset:
             index_level = 1
         assert grouped.grouped_index.index.nlevels == index_level
         assert len(grouped.groups) == length
-        if index_level > 1:
-            assert len(grouped.groups[0]) == index_level
-        else:
-            assert isinstance(grouped.groups[0], (str, int))
+        assert len(grouped.groups[0]) == index_level
 
     def test_groupby_error(self):
         ds = Dataset(subset_index=_create_valid_index())
@@ -590,13 +587,11 @@ class TestDataset:
     def test_group(self, groupby):
         ds = Dataset(subset_index=_create_valid_index(), groupby_cols=groupby)
         group = ds[0].group
-
-        assert group == ds[0].groups[0]
-        if isinstance(groupby, str):
-            assert group == ds.index.iloc[0][groupby]
-        elif groupby is None:
+        assert group == ds.groups[0]
+        if groupby is None:
             assert group == tuple(ds.index.iloc[0])
         else:
+            groupby = groupby if isinstance(groupby, list) else [groupby]
             assert group._fields == tuple(groupby)
             assert group == tuple(ds.index.iloc[0][groupby])
 

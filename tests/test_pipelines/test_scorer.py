@@ -47,7 +47,7 @@ class TestScorer:
         agg, single = scorer(pipe, data)
         assert len(single) == len(data)
         # Our Dummy scorer, returns the groupname of the dataset
-        assert all(np.array(single) == data.groups)
+        assert all(np.array(single) == np.array(data.groups).flatten())
         assert agg == np.mean(data.groups)
 
     def test_score_return_val_multi_score(self):
@@ -60,9 +60,9 @@ class TestScorer:
             assert len(v) == len(data)
             # Our Dummy scorer, returns the groupname of the dataset
             if k == "score_2":
-                assert all(np.array(v) == np.array(data.groups) + 1)
+                assert all(np.array(v) == np.array(data.groups).flatten() + 1)
             else:
-                assert all(np.array(v) == data.groups)
+                assert all(np.array(v) == np.array(data.groups).flatten())
         assert isinstance(agg, dict)
         for k, v in agg.items():
             if k == "score_2":

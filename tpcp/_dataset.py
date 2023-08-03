@@ -85,7 +85,7 @@ class _Dataset(BaseTpcpObject):
         return index_1
 
     @property
-    def groups(self) -> List[Union[str, Tuple[str, ...]]]:
+    def groups(self) -> List[Tuple[str, ...]]:
         """Get all groups based on the set groupby level.
 
         This will either return a list of strings/integers, if there is only a single group level or index column.
@@ -95,12 +95,10 @@ class _Dataset(BaseTpcpObject):
         spaces or starts with a number), the named tuple will not contain the correct column name!
         For more information see the documentation of the `rename` parameter of :func:`collections.namedtuple`.
         """
-        if len(self._get_groupby_columns()) == 1:
-            return self._get_unique_groups().to_list()
-        return list(self._get_unique_groups().to_frame().itertuples(index=False, name=type(self).__name__))
+        return list(self._get_unique_groups().to_frame().itertuples(index=False, name=type(self).__name__ + "Group"))
 
     @property
-    def group(self) -> Union[str, Tuple[str, ...]]:
+    def group(self) -> Tuple[str, ...]:
         """Get the current group.
 
         Note, this attribute can only be used, if there is just a single group.

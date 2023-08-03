@@ -81,7 +81,7 @@ class OptimizableCustomErrorPipeline(OptimizablePipeline):
         self.optimized = optimized
 
     def self_optimize(self, dataset, **kwargs):
-        condition = (self.error_fold not in dataset.groups) and (self.error_para == self.para)
+        condition = ((self.error_fold,) not in dataset.groups) and (self.error_para == self.para)
         if condition:
             raise ValueError("This is an error")
         self.optimized = True
@@ -314,9 +314,9 @@ class TestGridSearch:
 
         def scoring(pipeline, data_point):
             return {
-                "score_1": data_point.groups[0],
-                "score_2": data_point.groups[0] + 1,
-                "custom_agg": Agg(data_point.groups[0]),
+                "score_1": data_point.groups[0][0],
+                "score_2": data_point.groups[0][0] + 1,
+                "custom_agg": Agg(data_point.groups[0][0]),
             }
 
         gs = GridSearch(
@@ -346,7 +346,7 @@ class TestGridSearch:
     def test_custom_error_message(self, error_para):
         def simple_scorer(pipeline, data_point):
             pipeline.run(data_point)
-            return data_point.groups[0]
+            return data_point.groups[0][0]
 
         gs = GridSearch(
             CustomErrorPipeline(error_para=error_para), ParameterGrid({"para": [1, 2]}), scoring=simple_scorer
@@ -622,9 +622,9 @@ class TestGridSearchCV:
 
         def scoring(pipeline, data_point):
             return {
-                "score_1": data_point.groups[0],
-                "score_2": data_point.groups[0] + 1,
-                "custom_agg": Agg(data_point.groups[0]),
+                "score_1": data_point.groups[0][0],
+                "score_2": data_point.groups[0][0] + 1,
+                "custom_agg": Agg(data_point.groups[0][0]),
             }
 
         gs = GridSearchCV(
@@ -658,7 +658,7 @@ class TestGridSearchCV:
     def test_custom_error_message(self, error_para, error_fold):
         def simple_scorer(pipeline, data_point):
             pipeline.run(data_point)
-            return data_point.groups[0]
+            return data_point.groups[0][0]
 
         gs = GridSearchCV(
             OptimizableCustomErrorPipeline(error_para=error_para, error_fold=error_fold),

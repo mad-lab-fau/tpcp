@@ -25,7 +25,7 @@ class CustomOptimizablePipelineWithOptiError(OptimizablePipeline):
         self.optimized = optimized
 
     def self_optimize(self, dataset: Dataset, **kwargs):
-        if self.error_fold not in dataset.groups:
+        if (self.error_fold,) not in dataset.groups:
             raise ValueError("This is an error")
         return self
 
@@ -38,7 +38,7 @@ class CustomOptimizablePipelineWithRunError(OptimizablePipeline):
         self.optimized = optimized
 
     def run(self, dataset: Dataset):
-        condition = self.error_fold == dataset.group
+        condition = (self.error_fold,) == dataset.group
         if condition:
             raise ValueError("This is an error")
         self.optimized = True
@@ -87,7 +87,7 @@ class TestCrossValidate:
 
     def test_single_score(self):
         ds = DummyDataset()
-        # The we use len(ds) splits, effectively a leave one our CV for testing.
+        # Then we use len(ds) splits, effectively a leave one out CV for testing.
         cv = KFold(n_splits=len(ds))
 
         results = cross_validate(
@@ -112,13 +112,13 @@ class TestCrossValidate:
         assert all(len(v) == 1 for v in results_df["test_single_score"])
         # The dummy scorer is returning the dataset group id -> The datapoint id is also the result
         for i, r in results_df.iterrows():
-            all_ids = ds.groups
-            assert r["test_data_labels"] == [i]
-            assert r["test_data_labels"] == r["test_single_score"]
+            all_ids = np.array(ds.groups).flatten()
+            assert r["test_data_labels"] == [(i,)]
+            assert r["test_data_labels"][0][0] == r["test_single_score"][0]
             assert r["test_score"] == i
-            all_ids.remove(i)
-            assert r["train_data_labels"] == all_ids
-            assert all(np.array(r["train_data_labels"]) == np.array(r["train_single_score"]))
+            all_ids = all_ids[all_ids != i]
+            assert all(np.array(r["train_data_labels"]).flatten() == all_ids)
+            assert all(np.array(r["train_data_labels"]).flatten() == np.array(r["train_single_score"]))
             assert r["train_score"] == np.mean(all_ids)
 
     @pytest.mark.parametrize(
