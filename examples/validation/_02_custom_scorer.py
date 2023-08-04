@@ -313,7 +313,7 @@ class GroupWeightedAggregator(Aggregator[float]):
     @classmethod
     def aggregate(cls, /, values: Sequence[float], datapoints: Sequence[ECGExampleData], **_) -> Dict[str, float]:
         print("GroupWeightedAggregator Aggregator called")
-        patient_groups = [d.group.patient_group for d in datapoints]
+        patient_groups = [d.group_label.patient_group for d in datapoints]
         data = pd.DataFrame({"value": values, "patient_groups": patient_groups})
         per_group = data.groupby("patient_groups").mean()["value"]
         return {**per_group.to_dict(), "group_mean": per_group.mean()}

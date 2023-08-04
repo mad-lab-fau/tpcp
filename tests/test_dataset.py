@@ -586,7 +586,7 @@ class TestDataset:
     @pytest.mark.parametrize("groupby", ["patients", "tests", ["patients", "tests"], None])
     def test_group(self, groupby):
         ds = Dataset(subset_index=_create_valid_index(), groupby_cols=groupby)
-        group = ds[0].group
+        group = ds[0].group_label
         assert group == ds.groups[0]
         if groupby is None:
             assert group == tuple(ds.index.iloc[0])
@@ -597,7 +597,7 @@ class TestDataset:
 
     def test_group_with_invalid_col_name(self):
         ds = Dataset(subset_index=_create_valid_index())
-        group = ds[0].group
+        group = ds[0].group_label
 
         # the named tuple will rename columns that are invalid, therefore instead of `extra with spaces`,
         # it should be `_2`
@@ -607,7 +607,7 @@ class TestDataset:
         ds = Dataset(subset_index=_create_valid_index())
 
         with pytest.raises(ValueError, match="only a single group left"):
-            _ = ds.group
+            _ = ds.group_label
 
     def test_doctest(self):
         from tpcp import _dataset
