@@ -1,4 +1,5 @@
 """Base class for all datasets."""
+import warnings
 from typing import Dict, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, cast, overload
 
 import numpy as np
@@ -367,6 +368,13 @@ class _Dataset(BaseTpcpObject):
             )
 
     def create_group_labels(self, label_cols: Union[str, List[str]]) -> List[str]:
+        warnings.warn(
+            "The method `create_string_group_labels` is deprecated and will be removed in a future version. "
+            "Use `create_string_group_labels` instead.", DeprecationWarning
+        )
+        return self.create_string_group_labels(label_cols)
+
+    def create_string_group_labels(self, label_cols: Union[str, List[str]]) -> List[str]:
         """Generate a list of string labels for each group/row in the dataset.
 
         .. note::
@@ -391,7 +399,7 @@ class _Dataset(BaseTpcpObject):
         except KeyError as e:
             if self.groupby_cols is not None:
                 raise KeyError(
-                    "When using `create_group_labels` with a grouped dataset, the selected columns must "
+                    "When using `create_string_group_labels` with a grouped dataset, the selected columns must "
                     f"be a subset of `self.groupby_cols` ({self.groupby_cols}) and not ({label_cols})"
                 ) from e
             raise KeyError(
@@ -563,7 +571,7 @@ class Dataset(_Dataset):
         You usually don't want to use that in combination with `self.groupby`.
 
     >>> # We are using the ungrouped dataset again!
-    >>> group_labels = dataset.create_group_labels(["patient", "test"])
+    >>> group_labels = dataset.create_string_group_labels(["patient", "test"])
     >>> pd.concat([dataset.index, pd.Series(group_labels, name="group_labels")], axis=1)
           patient    test extra             group_labels
     0   patient_1  test_1     1  ('patient_1', 'test_1')

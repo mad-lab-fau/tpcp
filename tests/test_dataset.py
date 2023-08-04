@@ -568,20 +568,20 @@ class TestDataset:
     )
     def test_create_group_labels(self, groupby, groupby_labels, unique):
         ds = Dataset(subset_index=_create_valid_index(), groupby_cols=groupby)
-        labels = ds.create_group_labels(groupby_labels)
+        labels = ds.create_string_group_labels(groupby_labels)
 
         assert len(labels) == len(ds)
         assert len(set(labels)) == unique
 
     def test_create_group_labels_error_groupby(self):
         ds = Dataset(subset_index=_create_valid_index(), groupby_cols="patients")
-        with pytest.raises(KeyError, match="When using `create_group_labels` with a grouped dataset"):
-            ds.create_group_labels("recording")
+        with pytest.raises(KeyError, match="When using `create_string_group_labels` with a grouped dataset"):
+            ds.create_string_group_labels("recording")
 
     def test_create_group_labels_error_not_in_index(self):
         ds = Dataset(subset_index=_create_valid_index())
         with pytest.raises(KeyError, match="The selected label columns"):
-            ds.create_group_labels("something_wrong")
+            ds.create_string_group_labels("something_wrong")
 
     @pytest.mark.parametrize("groupby", ["patients", "tests", ["patients", "tests"], None])
     def test_group(self, groupby):
@@ -640,7 +640,7 @@ class TestGroupLabelsKFold:
         # We sample the index to make sure the split can not be simple be performed by taking the first k
         ds = Dataset(subset_index=index.sample(frac=1))
 
-        group_labels = ds.create_group_labels(["patients", "tests"])
+        group_labels = ds.create_string_group_labels(["patients", "tests"])
 
         kfold = GroupKFold(n_splits=2)
         splits = kfold.split(
