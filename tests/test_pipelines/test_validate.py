@@ -25,7 +25,7 @@ class CustomOptimizablePipelineWithOptiError(OptimizablePipeline):
         self.optimized = optimized
 
     def self_optimize(self, dataset: Dataset, **kwargs):
-        if (self.error_fold,) not in dataset.groups:
+        if (self.error_fold,) not in dataset.group_labels:
             raise ValueError("This is an error")
         return self
 
@@ -112,7 +112,7 @@ class TestCrossValidate:
         assert all(len(v) == 1 for v in results_df["test_single_score"])
         # The dummy scorer is returning the dataset group label -> The datapoint id is also the result
         for i, r in results_df.iterrows():
-            all_ids = np.array(ds.groups).flatten()
+            all_ids = np.array(ds.group_labels).flatten()
             assert r["test_data_labels"] == [(i,)]
             assert r["test_data_labels"][0][0] == r["test_single_score"][0]
             assert r["test_score"] == i
@@ -212,7 +212,7 @@ class TestCrossValidate:
     def test_cross_validate_test_error(self, error_fold):
         def simple_scorer(pipeline, data_point):
             pipeline.run(data_point)
-            return data_point.groups[0]
+            return data_point.group_labels[0]
 
         with pytest.raises(TestError) as e:
             cross_validate(
@@ -233,7 +233,7 @@ class TestCrossValidate:
 
         def simple_scorer(pipeline, data_point):
             pipeline.run(data_point)
-            return data_point.groups[0]
+            return data_point.group_labels[0]
 
         with pytest.raises(TestError) as e:
             cross_validate(

@@ -852,7 +852,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
                 # No need to set average scores, as their is only one score and that is returned by the objective
                 # function and will be included in the results by optuna
                 trial.set_user_attr("__single_scores", {"score": single_scores})
-            trial.set_user_attr("__data_labels", dataset.groups)
+            trial.set_user_attr("__data_labels", dataset.group_labels)
 
             return score
 

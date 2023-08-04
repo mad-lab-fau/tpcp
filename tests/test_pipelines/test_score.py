@@ -12,7 +12,7 @@ class TestScoreMock:
     def create_paras(self):
         dataset = DummyDataset()
         # We mock the scorer and just return the dataset itself and 1 as agg score
-        scorer = Mock(return_value=(1, np.asarray(dataset.groups)))
+        scorer = Mock(return_value=(1, np.asarray(dataset.group_labels)))
         pipe = DummyOptimizablePipeline()
 
         self.dummy_paras = (pipe, dataset, scorer)
