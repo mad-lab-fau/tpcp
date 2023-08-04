@@ -146,7 +146,7 @@ class _Dataset(BaseTpcpObject):
     @property
     def datapoint_labels(self) -> List[Tuple[str, ...]]:
         """Get all datapoint labels of the dataset (i.e. a list of the rows of the index as named tuples)."""
-        return list(self.index.itertuples(index=False, name=type(self).__name__+"DatapointLabel"))
+        return list(self.index.itertuples(index=False, name=type(self).__name__ + "DatapointLabel"))
 
     def __len__(self) -> int:
         """Get the length of the dataset.
