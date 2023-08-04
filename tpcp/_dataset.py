@@ -133,6 +133,21 @@ class _Dataset(BaseTpcpObject):
         )
         return self.group_label
 
+    @property
+    def datapoint_label(self) -> Tuple[str, ...]:
+        """Get the current datapoint label (i.e. the full row of the index as a named tuple).
+
+        Note, this attribute can only be used, if there is just a single row.
+        This will return a named tuple.
+        """
+        self.assert_is_single_datapoint("datapoint_label")
+        return self.datapoint_labels[0]
+
+    @property
+    def datapoint_labels(self) -> List[Tuple[str, ...]]:
+        """Get all datapoint labels of the dataset (i.e. a list of the rows of the index as named tuples)."""
+        return list(self.index.itertuples(index=False, name=type(self).__name__+"DatapointLabel"))
+
     def __len__(self) -> int:
         """Get the length of the dataset.
 
@@ -356,6 +371,30 @@ class _Dataset(BaseTpcpObject):
             raise ValueError(
                 f"The attribute `{property_name}` of dataset {self.__class__.__name__} can only be accessed if there "
                 f"is only a single combination of the columns {groupby_cols} left in a data subset,"
+            )
+
+    def is_single_datapoint(self) -> bool:
+        """Return True if index contains only one row.
+
+        This is independent of the groupby settings.
+        This means it is equivalent to `is_single_group` if no grouping is given.
+        """
+        return self.is_single(None)
+
+    def assert_is_single_datapoint(self, property_name) -> None:
+        """Raise error if index does contain more than one row.
+
+        Parameters
+        ----------
+        property_name
+            Name of the property this check is used in.
+            Used to format the error message.
+
+        """
+        if not self.is_single_datapoint():
+            raise ValueError(
+                f"The attribute `{property_name}` of dataset {self.__class__.__name__} can only be accessed if there "
+                f"is only a single row left in the data subset index."
             )
 
     def assert_is_single_group(self, property_name) -> None:
