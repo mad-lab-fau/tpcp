@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Deprecated
+
+- The `create_group_labels` method of the `Dataset` class is deprecated and will be removed in the next major release.
+  It is replaced by the `create_string_group_labels` method of the `Dataset` class.
+- The properties `group` and `groups` of the `Dataset` class are deprecated and will be removed in the next major
+  release.
+  They are replaced by the `group_label` and `group_labels` properties of the `Dataset` class.
+
+### Changed
+
+- **BREAKING CHANGE**: The `group` property of the `Dataset` class is now called `group_label` and always returns named
+  tuples of strings (even for single groups where it used to return strings!).
+- **BREAKING CHANGE**: The `groups` property of the `Dataset` class is now called `group_labels` and always returns a
+  list of named tuples of strings (even for single groups where it used to return a list of strings!).
+- **BREAKING CHANGE**: The parameter `groups` of the `get_subset` method of the `Dataset` class is now called `group_labels` and always
+  expects a list of named tuples of strings.
+
+
 ## [0.23.0] - 2023-08-30
 
 ## Added
