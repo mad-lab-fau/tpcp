@@ -105,6 +105,15 @@ class _Dataset(BaseTpcpObject):
         )
 
     @property
+    def groups(self) -> List[Tuple[str, ...]]:
+        warnings.warn(
+            "The attribute `groups` is deprecated and will be removed in a future version. "
+            "Use `group_labels` instead.",
+            DeprecationWarning,
+        )
+        return self.group_labels
+
+    @property
     def group_label(self) -> Tuple[str, ...]:
         """Get the current group label.
 
@@ -114,6 +123,15 @@ class _Dataset(BaseTpcpObject):
         """
         self.assert_is_single_group("group")
         return self.group_labels[0]
+
+    @property
+    def group(self) -> Tuple[str, ...]:
+        warnings.warn(
+            "The attribute `group` is deprecated and will be removed in a future version. "
+            "Use `group_label` instead.",
+            DeprecationWarning,
+        )
+        return self.group_label
 
     def __len__(self) -> int:
         """Get the length of the dataset.
@@ -249,7 +267,9 @@ class _Dataset(BaseTpcpObject):
 
             return self.clone().set_params(subset_index=subset_index)
 
-        raise ValueError("At least one of `group_labels`, `selected_keys`, `index`, `bool_map` or kwarg must not be None!")
+        raise ValueError(
+            "At least one of `group_labels`, `selected_keys`, `index`, `bool_map` or kwarg must not be None!"
+        )
 
     def __repr__(self) -> str:
         """Return string representation of the dataset object."""
@@ -370,7 +390,8 @@ class _Dataset(BaseTpcpObject):
     def create_group_labels(self, label_cols: Union[str, List[str]]) -> List[str]:
         warnings.warn(
             "The method `create_string_group_labels` is deprecated and will be removed in a future version. "
-            "Use `create_string_group_labels` instead.", DeprecationWarning
+            "Use `create_string_group_labels` instead.",
+            DeprecationWarning,
         )
         return self.create_string_group_labels(label_cols)
 
