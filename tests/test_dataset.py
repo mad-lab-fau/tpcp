@@ -610,6 +610,18 @@ class TestDataset:
         with pytest.raises(ValueError, match="only a single group left"):
             _ = ds.group_label
 
+    def test_datapoint_label(self):
+        ds = Dataset(subset_index=_create_valid_index())
+        label = ds[0].datapoint_label
+        assert label == ("patient_1", "test_1", "0")
+        label = ds[1].datapoint_label
+        assert label == ("patient_1", "test_1", "1")
+
+    def test_datapoint_label_error(self):
+        ds = Dataset(subset_index=_create_valid_index())
+        with pytest.raises(ValueError, match="only a single row left"):
+            _ = ds.datapoint_label
+
     def test_doctest(self):
         from tpcp import _dataset
 

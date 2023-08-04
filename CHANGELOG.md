@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   release.
   They are replaced by the `group_label` and `group_labels` properties of the `Dataset` class.
 
+### Added
+
+- Added `datapoint_label` and `datapoint_labels` properties to the `Dataset` class.
+  They return the full index of the dataset as a named tuple or list of named tuples regardless of the current grouping.
+
+
 ### Changed
 
 - **BREAKING CHANGE**: The `group` property of the `Dataset` class is now called `group_label` and always returns named
@@ -207,7 +213,7 @@ YANKED RELEASE
 ## Fixed
 - GridSearch and GridSearchCV now correctly handle custom aggregators that return scores with new names.
   (https://github.com/mad-lab-fau/tpcp/pull/58)
-- When using the `create_group_labels` method on dataset with multiple groupby columns, the method returned a list of 
+- When using the `create_string_group_labels` method on dataset with multiple groupby columns, the method returned a list of 
   tuples.
   This caused issues with `GroupKFold`, as the method internally flattens the list of tuples.
   To avoid this, the method now return a list of strings.
