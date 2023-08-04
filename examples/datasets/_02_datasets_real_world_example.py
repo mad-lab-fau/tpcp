@@ -355,7 +355,7 @@ class ECGExampleData(Dataset):
         # Check that there is only a single participant in the dataset
         self.assert_is_single(None, "data")
         # Reconstruct the ecg file path based on the data index
-        p_id = self.group.participant
+        p_id = self.group_label.participant
         file_path = self.data_path / f"{p_id}.pk.gz"
         # We try to use the cache if enabled.
         if self.use_lru_cache:
@@ -369,7 +369,7 @@ class ECGExampleData(Dataset):
         This includes all R-Peaks (PVC or normal)
         """
         self.assert_is_single(None, "r_peaks_")
-        p_id = self.group.participant
+        p_id = self.group_label.participant
         r_peaks = pd.read_csv(self.data_path / f"{p_id}_all.csv", index_col=0)
         r_peaks = r_peaks.rename(columns={"R": "r_peak_position"})
         return r_peaks

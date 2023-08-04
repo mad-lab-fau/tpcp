@@ -105,8 +105,8 @@ class _Dataset(BaseTpcpObject):
         )
 
     @property
-    def group(self) -> Tuple[str, ...]:
-        """Get the current group.
+    def group_label(self) -> Tuple[str, ...]:
+        """Get the current group label.
 
         Note, this attribute can only be used, if there is just a single group.
         This will return a named tuple. The tuple will contain only one entry if there is only a single groupby column

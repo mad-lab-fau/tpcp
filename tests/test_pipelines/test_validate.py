@@ -38,7 +38,7 @@ class CustomOptimizablePipelineWithRunError(OptimizablePipeline):
         self.optimized = optimized
 
     def run(self, dataset: Dataset):
-        condition = (self.error_fold,) == dataset.group
+        condition = (self.error_fold,) == dataset.group_label
         if condition:
             raise ValueError("This is an error")
         self.optimized = True
@@ -110,7 +110,7 @@ class TestCrossValidate:
         assert all(len(v) == len(ds) - 1 for v in results_df["train_single_score"])
         assert all(len(v) == 1 for v in results_df["test_data_labels"])
         assert all(len(v) == 1 for v in results_df["test_single_score"])
-        # The dummy scorer is returning the dataset group id -> The datapoint id is also the result
+        # The dummy scorer is returning the dataset group label -> The datapoint id is also the result
         for i, r in results_df.iterrows():
             all_ids = np.array(ds.groups).flatten()
             assert r["test_data_labels"] == [(i,)]

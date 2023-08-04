@@ -139,7 +139,7 @@ grouped_subset.groups
 #           They can be accessed by name or index:
 #           For example, `grouped_subset.groups[0].participant` and `grouped_subset.groups[0][0]` are equivalent.
 #
-#           Also, `grouped_subset.groups[0]` and `grouped_subset[0].group` are equivalent.
+#           Also, `grouped_subset.groups[0]` and `grouped_subset[0].group_label` are equivalent.
 
 
 # %%
@@ -286,10 +286,10 @@ class CustomDataset(Dataset):
         # Note that we need to make our checks from the least restrictive to the most restrictive (if there is only a
         # single trail, there is only just a single recording).
         if self.is_single(["participant", "recording"]):
-            return "This is the data for participant {} and rec {}".format(*self.group)
+            return "This is the data for participant {} and rec {}".format(*self.group_label)
         # None -> single row
         if self.is_single(None):
-            return "This is the data for participant {}, rec {} and trial {}".format(*self.group)
+            return "This is the data for participant {}, rec {} and trial {}".format(*self.group_label)
         raise ValueError(
             "Data can only be accessed when their is only a single recording of a single participant in the subset"
         )
@@ -303,7 +303,7 @@ class CustomDataset(Dataset):
         # We use assert here, as we don't have multiple options.
         # (We could also used `None` for the `groupby_cols` here)
         self.assert_is_single(["participant", "recording", "trial"], "segmented_stride_list_")
-        return "This is the segmented stride list for participant {}, rec {} and trial {}".format(*self.group)
+        return "This is the segmented stride list for participant {}, rec {} and trial {}".format(*self.group_label)
 
     def create_index(self):
         return index

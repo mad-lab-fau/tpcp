@@ -70,7 +70,7 @@ class ECGExampleData(Dataset):
         This includes all R-Peaks (PVC or normal)
         """
         self.assert_is_single(None, "r_peaks_")
-        p_id = self.group.participant
+        p_id = self.group_label.participant
         r_peaks = pd.read_csv(self.data_path / f"{p_id}_all.csv", index_col=0)
         r_peaks = r_peaks.rename(columns={"R": "r_peak_position"})
         return r_peaks
@@ -82,7 +82,7 @@ class ECGExampleData(Dataset):
         The position is equivalent to a position entry in `self.r_peak_positions_`.
         """
         self.assert_is_single(None, "pvc_positions_")
-        p_id = self.group.participant
+        p_id = self.group_label.participant
         pvc_peaks = pd.read_csv(self.data_path / f"{p_id}_pvc.csv", index_col=0)
         pvc_peaks = pvc_peaks.rename(columns={"PVC": "pvc_position"})
         return pvc_peaks

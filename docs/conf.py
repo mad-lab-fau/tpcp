@@ -47,9 +47,9 @@ def convert_github_links(base_url, text):
     regex = base_url + r"/(pull|issues|commit)/(\w+)"
 
     def substitute(matchobj):
-        if matchobj.group(1) == "commit":
-            return f"[{matchobj.group(2)[:5]}]({matchobj.group(0)})"
-        return f"[#{matchobj.group(2)}]({matchobj.group(0)})"
+        if matchobj.group_label(1) == "commit":
+            return f"[{matchobj.group_label(2)[:5]}]({matchobj.group_label(0)})"
+        return f"[#{matchobj.group_label(2)}]({matchobj.group_label(0)})"
 
     return re.sub(regex, substitute, text)
 
