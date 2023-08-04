@@ -167,7 +167,8 @@ class TestDataset:
     )
     def test_get_subset_groups_valid_input(self, group_labels, what_to_expect):
         pd.testing.assert_frame_equal(
-            left=what_to_expect, right=Dataset(subset_index=_create_valid_index()).get_subset(group_labels=group_labels).index
+            left=what_to_expect,
+            right=Dataset(subset_index=_create_valid_index()).get_subset(group_labels=group_labels).index,
         )
 
     @pytest.mark.parametrize(
