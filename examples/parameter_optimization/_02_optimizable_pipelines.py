@@ -118,7 +118,7 @@ example_data = ECGExampleData(data_path)
 train_set, test_set = train_test_split(example_data, train_size=0.7, random_state=0)
 # We only want a single dataset in the test set
 test_set = test_set[0]
-(train_set.groups, test_set.groups)
+(train_set.group_labels, test_set.group_labels)
 
 # %%
 # The Baseline

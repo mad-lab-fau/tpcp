@@ -92,8 +92,8 @@ class TestDataset:
         else:
             index_level = 1
         assert grouped.grouped_index.index.nlevels == index_level
-        assert len(grouped.groups) == length
-        assert len(grouped.groups[0]) == index_level
+        assert len(grouped.group_labels) == length
+        assert len(grouped.group_labels[0]) == index_level
 
     def test_groupby_error(self):
         ds = Dataset(subset_index=_create_valid_index())
@@ -107,14 +107,14 @@ class TestDataset:
                 None,
                 None,
                 None,
-                "At least one of `groups`, `selected_keys`, `index`, `bool_map` or kwarg must not be None!",
+                "At least one of `group_labels`, `selected_keys`, `index`, `bool_map` or kwarg must not be None!",
                 ValueError,
             ),
             (
                 _create_valid_index(),
                 _create_random_bool_map(12, 432),
                 None,
-                "Only one of `groups`, `selected_keys`, `index`, `bool_map` or kwarg can be set!",
+                "Only one of `group_labels`, `selected_keys`, `index`, `bool_map` or kwarg can be set!",
                 ValueError,
             ),
         ],
@@ -147,7 +147,7 @@ class TestDataset:
         )
 
     @pytest.mark.parametrize(
-        ("groups", "what_to_expect"),
+        ("group_labels", "what_to_expect"),
         [
             (
                 [("patient_1", "test_2", "0")],
@@ -165,13 +165,13 @@ class TestDataset:
             ),
         ],
     )
-    def test_get_subset_groups_valid_input(self, groups, what_to_expect):
+    def test_get_subset_groups_valid_input(self, group_labels, what_to_expect):
         pd.testing.assert_frame_equal(
-            left=what_to_expect, right=Dataset(subset_index=_create_valid_index()).get_subset(groups=groups).index
+            left=what_to_expect, right=Dataset(subset_index=_create_valid_index()).get_subset(group_labels=group_labels).index
         )
 
     @pytest.mark.parametrize(
-        ("groups", "what_to_expect"),
+        ("group_labels", "what_to_expect"),
         [
             (
                 [("patient_1", "test_2")],
@@ -189,12 +189,12 @@ class TestDataset:
             ),
         ],
     )
-    def test_get_subset_groups_valid_input_grouped(self, groups, what_to_expect):
+    def test_get_subset_groups_valid_input_grouped(self, group_labels, what_to_expect):
         pd.testing.assert_frame_equal(
             left=what_to_expect,
             right=Dataset(subset_index=_create_valid_index())
             .groupby(["patients", "tests"])
-            .get_subset(groups=groups)
+            .get_subset(group_labels=group_labels)
             .index,
         )
 
@@ -587,7 +587,7 @@ class TestDataset:
     def test_group(self, groupby):
         ds = Dataset(subset_index=_create_valid_index(), groupby_cols=groupby)
         group = ds[0].group_label
-        assert group == ds.groups[0]
+        assert group == ds.group_labels[0]
         if groupby is None:
             assert group == tuple(ds.index.iloc[0])
         else:

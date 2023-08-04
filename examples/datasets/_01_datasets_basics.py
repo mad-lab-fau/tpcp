@@ -129,27 +129,27 @@ for group in grouped_subset:
 # At any point, you can view all unique groups/rows in the dataset using the `groups` attribute.
 # The order shown here, is the same order used when iterating the dataset.
 # When creating a new subset, the order might change!
-grouped_subset.groups
+grouped_subset.group_labels
 
 # %%
-# .. note:: The `groups` attribute consists of a list of `named tuples
+# .. note:: The `group_labels` attribute consists of a list of `named tuples
 #           <https://docs.python.org/3/library/collections.html#
 #           namedtuple-factory-function-for-tuples-with-named-fields>`_.
 #           The tuple elements are named after the groupby columns and are in the same order as the groupby columns.
 #           They can be accessed by name or index:
-#           For example, `grouped_subset.groups[0].participant` and `grouped_subset.groups[0][0]` are equivalent.
+#           For example, `grouped_subset.group_labels[0].participant` and `grouped_subset.group_labels[0][0]` are equivalent.
 #
-#           Also, `grouped_subset.groups[0]` and `grouped_subset[0].group_label` are equivalent.
+#           Also, `grouped_subset.group_labels[0]` and `grouped_subset[0].group_label` are equivalent.
 
 
 # %%
 # Note that for an "un-grouped" dataset, this corresponds to all rows.
-final_subset.groups
+final_subset.group_labels
 
 # %%
 # In both cases, we can use the group labels (or a subset of them) to index our dataset.
 # This can be in particular helpful, if you want to recreate specific train test splits provided by `cross_validate`.
-final_subset.get_subset(groups=final_subset.groups[:3])
+final_subset.get_subset(group_labels=final_subset.group_labels[:3])
 
 # %%
 # If you want, you can also ungroup a dataset again.

@@ -86,8 +86,8 @@ class _Dataset(BaseTpcpObject):
         return index_1
 
     @property
-    def groups(self) -> List[Tuple[str, ...]]:
-        """Get all groups of the dataset based on the set groupby level.
+    def group_labels(self) -> List[Tuple[str, ...]]:
+        """Get all group labels of the dataset based on the set groupby level.
 
         This will return a list of named tuples.
         The tuples will contain only one entry if there is only one groupby level or index column.
@@ -113,7 +113,7 @@ class _Dataset(BaseTpcpObject):
         or column in the index.
         """
         self.assert_is_single_group("group")
-        return self.groups[0]
+        return self.group_labels[0]
 
     def __len__(self) -> int:
         """Get the length of the dataset.
@@ -121,7 +121,7 @@ class _Dataset(BaseTpcpObject):
         This is equal to the number of rows in the index, if `self.groupby_cols=None`.
         Otherwise, it is equal to the number of unique groups.
         """
-        return len(self.groups)
+        return len(self.group_labels)
 
     @property
     def shape(self) -> Tuple[int]:
@@ -155,7 +155,7 @@ class _Dataset(BaseTpcpObject):
         return self.grouped_index.index.unique()
 
     def __getitem__(self, subscript: Union[int, Sequence[int], np.ndarray, slice]) -> Self:
-        """Return a dataset object containing only the selected row indices of `self.groups`."""
+        """Return a dataset object containing only the selected row indices of `self.group_labels`."""
         multi_index = self._get_unique_groups()[subscript]
         if not isinstance(multi_index, pd.Index):
             multi_index = [multi_index]
@@ -181,7 +181,7 @@ class _Dataset(BaseTpcpObject):
     def get_subset(
         self,
         *,
-        groups: Optional[List[Tuple[str, ...]]] = None,
+        group_labels: Optional[List[Tuple[str, ...]]] = None,
         index: Optional[pd.DataFrame] = None,
         bool_map: Optional[Sequence[bool]] = None,
         **kwargs: Union[List[str], str],
@@ -193,9 +193,9 @@ class _Dataset(BaseTpcpObject):
 
         Parameters
         ----------
-        groups
+        group_labels
             A valid row locator or slice that can be passed to `self.grouped_index.loc[locator, :]`.
-            This basically needs to be a subset of `self.groups`.
+            This basically needs to be a subset of `self.group_labels`.
             Note that this is the only indexer that works on the grouped index.
             All other indexers work on the pure index.
         index
@@ -214,13 +214,13 @@ class _Dataset(BaseTpcpObject):
             New dataset object filtered by specified parameters.
 
         """
-        if [x is None or (isinstance(x, dict) and len(x) == 0) for x in [groups, index, bool_map, kwargs]].count(
+        if [x is None or (isinstance(x, dict) and len(x) == 0) for x in [group_labels, index, bool_map, kwargs]].count(
             False
         ) > 1:
-            raise ValueError("Only one of `groups`, `selected_keys`, `index`, `bool_map` or kwarg can be set!")
+            raise ValueError("Only one of `group_labels`, `selected_keys`, `index`, `bool_map` or kwarg can be set!")
 
-        if groups is not None:
-            return self.clone().set_params(subset_index=self.grouped_index.loc[groups, :].reset_index(drop=True))
+        if group_labels is not None:
+            return self.clone().set_params(subset_index=self.grouped_index.loc[group_labels, :].reset_index(drop=True))
 
         if index is not None:
             if len(index) == 0:
@@ -249,7 +249,7 @@ class _Dataset(BaseTpcpObject):
 
             return self.clone().set_params(subset_index=subset_index)
 
-        raise ValueError("At least one of `groups`, `selected_keys`, `index`, `bool_map` or kwarg must not be None!")
+        raise ValueError("At least one of `group_labels`, `selected_keys`, `index`, `bool_map` or kwarg must not be None!")
 
     def __repr__(self) -> str:
         """Return string representation of the dataset object."""

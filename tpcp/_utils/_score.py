@@ -111,14 +111,14 @@ def _score(
     except Exception as e:  # noqa: BLE001
         raise TestError(
             f"Testing the algorithm on the dataset failed with the error above.\n{error_info or ''}\n\n"
-            f"The test-set is:\n{[d.groups for d in dataset]}"
+            f"The test-set is:\n{[d.group_labels for d in dataset]}"
         ) from e
 
     result: _ScoreResults = {"scores": agg_scores, "single_scores": single_scores}
     if return_times:
         result["score_time"] = score_time
     if return_data_labels:
-        result["data_labels"] = dataset.groups
+        result["data_labels"] = dataset.group_labels
     if return_parameters:
         result["parameters"] = parameters
     return result
@@ -212,7 +212,7 @@ def _optimize_and_score(
             raise TestError(
                 "Running the optimized algorithm on the train-set to calculate the train error failed with the error "
                 f"above.\n{error_info or ''}\n\n"
-                f"The train-set is:\n{[d.groups for d in test_set]}"
+                f"The train-set is:\n{[d.group_labels for d in test_set]}"
             ) from e
         result["train_scores"] = train_agg_scores
         result["train_single_scores"] = train_single_scores
@@ -222,8 +222,8 @@ def _optimize_and_score(
     if return_data_labels:
         # Note we always return the train data attribute as it is interesting information independent of the train
         # score and has 0 runtime impact.
-        result["train_data_labels"] = train_set.groups
-        result["test_data_labels"] = test_set.groups
+        result["train_data_labels"] = train_set.group_labels
+        result["test_data_labels"] = test_set.group_labels
     if return_optimizer:
         # This is the actual trained optimizer. This means that `optimizer.optimized_pipeline_` contains the actual
         # instance of the trained pipeline.

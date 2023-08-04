@@ -33,7 +33,7 @@ class TestScorerCalls:
 
         assert mock_score_func.call_count == len(DummyDataset())
         for call, d in zip(mock_score_func.call_args_list, DummyDataset()):
-            assert call[0][1].groups == d.groups
+            assert call[0][1].group_labels == d.group_labels
             assert isinstance(call[0][0], DummyOptimizablePipeline)
             # Check that the pipeline was cloned before calling
             assert id(pipe) != id(call[0][0])
@@ -47,8 +47,8 @@ class TestScorer:
         agg, single = scorer(pipe, data)
         assert len(single) == len(data)
         # Our Dummy scorer, returns the groupname of the dataset
-        assert all(np.array(single) == np.array(data.groups).flatten())
-        assert agg == np.mean(data.groups)
+        assert all(np.array(single) == np.array(data.group_labels).flatten())
+        assert agg == np.mean(data.group_labels)
 
     def test_score_return_val_multi_score(self):
         scorer = Scorer(dummy_multi_score_func)
@@ -60,15 +60,15 @@ class TestScorer:
             assert len(v) == len(data)
             # Our Dummy scorer, returns the groupname of the dataset
             if k == "score_2":
-                assert all(np.array(v) == np.array(data.groups).flatten() + 1)
+                assert all(np.array(v) == np.array(data.group_labels).flatten() + 1)
             else:
-                assert all(np.array(v) == np.array(data.groups).flatten())
+                assert all(np.array(v) == np.array(data.group_labels).flatten())
         assert isinstance(agg, dict)
         for k, v in agg.items():
             if k == "score_2":
-                assert v == np.mean(data.groups) + 1
+                assert v == np.mean(data.group_labels) + 1
             else:
-                assert v == np.mean(data.groups)
+                assert v == np.mean(data.group_labels)
 
     @pytest.mark.parametrize("bad_scorer", (lambda x, y: "test", lambda x, y: {"val": "test"}))
     def test_bad_scorer(self, bad_scorer):
@@ -100,7 +100,7 @@ class TestScorer:
             assert kwargs.pop("scorer") == scorer
             assert kwargs.pop("scores") == (1,) * (i + 1)
             assert kwargs.pop("pipeline") == pipe
-            assert kwargs.pop("dataset").groups == DummyDataset().groups
+            assert kwargs.pop("dataset").group_labels == DummyDataset().group_labels
             assert kwargs.pop("step") == i
             assert kwargs == {}
 
@@ -295,7 +295,7 @@ class TestCustomAggregator:
 
     def test_score_return_val_multi_score_no_agg(self):
         def multi_score_func(pipeline, data_point):
-            return {"score_1": data_point.groups[0], "no_agg_score": NoAgg(str(data_point.groups))}
+            return {"score_1": data_point.group_labels[0], "no_agg_score": NoAgg(str(data_point.group_labels))}
 
         scorer = Scorer(multi_score_func)
         pipe = DummyOptimizablePipeline()
@@ -306,13 +306,13 @@ class TestCustomAggregator:
             assert len(v) == len(data)
             # Our Dummy scorer, returns the groupname of the dataset as string in the no-agg case
             if k == "no_agg_score":
-                assert all(np.array(v) == [str(d.groups) for d in data])
+                assert all(np.array(v) == [str(d.group_labels) for d in data])
             else:
-                assert all(np.array(v) == data.groups)
+                assert all(np.array(v) == data.group_labels)
         assert isinstance(agg, dict)
         assert "score_1" in agg
         assert "no_agg_score" not in agg
-        assert agg["score_1"] == np.mean(data.groups)
+        assert agg["score_1"] == np.mean(data.group_labels)
 
     class InvalidMultiAgg(Aggregator):
         @classmethod

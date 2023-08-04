@@ -231,7 +231,7 @@ class OptunaSearch(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT]):
             # As a bonus, we use the custom params option of optuna to store the individual scores per datapoint and the
             # respective data labels
             trial.set_user_attr("single_scores", single_scores)
-            trial.set_user_attr("data_labels", dataset.groups)
+            trial.set_user_attr("data_labels", dataset.group_labels)
 
             return average_score
 
@@ -407,10 +407,10 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, D
                     # Apparently, our last value was bad, and we should abort.
                     # However, before we do so, we will save the scores so far as debug information
                     trial.set_user_attr("single_scores", scores)
-                    trial.set_user_attr("data_labels", dataset[: step + 1].groups)
+                    trial.set_user_attr("data_labels", dataset[: step + 1].group_labels)
                     # And, finally, we abort the trial
                     raise TrialPruned(
-                        f"Pruned at datapoint {step} ({dataset[step].groups[0]}) with value " f"{scores[step]}."
+                        f"Pruned at datapoint {step} ({dataset[step].group_labels[0]}) with value " f"{scores[step]}."
                     )
 
             # We wrap the score function with a Scorer object to avoid writing our own for-loop to aggregate the
@@ -426,7 +426,7 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, D
             # As a bonus, we use the custom params option of Optuna to store the individual scores per datapoint and the
             # respective data labels.
             trial.set_user_attr("single_scores", single_scores)
-            trial.set_user_attr("data_labels", dataset.groups)
+            trial.set_user_attr("data_labels", dataset.group_labels)
 
             return average_score
 
