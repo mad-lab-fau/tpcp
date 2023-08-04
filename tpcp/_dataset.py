@@ -86,24 +86,30 @@ class _Dataset(BaseTpcpObject):
 
     @property
     def groups(self) -> List[Tuple[str, ...]]:
-        """Get all groups based on the set groupby level.
+        """Get all groups of the dataset based on the set groupby level.
 
-        This will either return a list of strings/integers, if there is only a single group level or index column.
-        If there are multiple groupy levels/index columns, it will return a list of named tuples.
+        This will return a list of named tuples.
+        The tuples will contain only one entry if there is only one groupby level or index column.
+
+        The elements of the named tuples will have the same names as the groupby columns and will be in the same order.
 
         Note, that if one of the groupby levels/index columns is not a valid Python attribute name (e.g. in contains
         spaces or starts with a number), the named tuple will not contain the correct column name!
         For more information see the documentation of the `rename` parameter of :func:`collections.namedtuple`.
+
+        For some examples and additional explanation see this :ref:`example <custom_dataset_basics>`.
         """
-        return list(self._get_unique_groups().to_frame().itertuples(index=False, name=type(self).__name__ + "Group"))
+        return list(
+            self._get_unique_groups().to_frame().itertuples(index=False, name=type(self).__name__ + "GroupLabel")
+        )
 
     @property
     def group(self) -> Tuple[str, ...]:
         """Get the current group.
 
         Note, this attribute can only be used, if there is just a single group.
-        If there is only a single groupby column or column in the index, this will return a string.
-        Otherwise, this will return a named tuple.
+        This will return a named tuple. The tuple will contain only one entry if there is only a single groupby column
+        or column in the index.
         """
         self.assert_is_single_group("group")
         return self.groups[0]
@@ -174,7 +180,7 @@ class _Dataset(BaseTpcpObject):
     def get_subset(
         self,
         *,
-        groups: Optional[List[Union[str, Tuple[str, ...]]]] = None,
+        groups: Optional[List[Tuple[str, ...]]] = None,
         index: Optional[pd.DataFrame] = None,
         bool_map: Optional[Sequence[bool]] = None,
         **kwargs: Union[List[str], str],
@@ -361,7 +367,7 @@ class _Dataset(BaseTpcpObject):
             )
 
     def create_group_labels(self, label_cols: Union[str, List[str]]) -> List[str]:
-        """Generate a list of labels for each group/row in the dataset.
+        """Generate a list of string labels for each group/row in the dataset.
 
         .. note::
             This has a different use case than the dataset-wide groupby.
@@ -428,24 +434,6 @@ class Dataset(_Dataset):
     subset_index
         For all classes that inherit from this class, subset_index **must** be None by default.
         But the subclasses require a `create_index` method that returns a DataFrame representing the index.
-
-    Attributes
-    ----------
-    index
-        The index of the dataset.
-        This returns either the `subset_index` or the base index returned by `create_index`.
-        Note, that after the first call to index, the index will be cached in `self.subset_index`.
-    grouped_index
-        The index, but all groupby columns are represented as MultiIndex.
-        Note that the order can be different as the order of index.
-    groups
-        Returns all possible combinations based on the specified `groupby` columns.
-        If `groupby` is None, this returns the row indices.
-        These are also the groups/indices used when iterating over the dataset.
-        The groups are sorted by name.
-    shape
-        Represents the number of all groups encapsulated in a tuple.
-        This is only necessary if `sklearn.model_selection.KFold` is used for splitting the dataset.
 
     Examples
     --------

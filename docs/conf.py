@@ -196,14 +196,3 @@ linkcode_resolve = make_linkcode_resolve(
     "tpcp",
     "https://github.com/mad-lab-fau/tpcp/blob/{revision}/{package}/{path}#L{lineno}",
 )
-
-
-def skip_properties(app, what, name, obj, skip, options):
-    """This removes all properties from the documentation as they are expected to be documented in the docstring."""
-    if isinstance(obj, property):
-        return True
-    return None
-
-
-def setup(app):
-    app.connect("autodoc-skip-member", skip_properties)

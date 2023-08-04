@@ -58,7 +58,7 @@ index
 # Now we use this index as the index of our new dataset.
 # To see the dataset in action, we need to create an instance of it.
 # Its string representation will show us the most important information.
-from tpcp._dataset import Dataset
+from tpcp import Dataset
 
 
 class CustomDataset(Dataset):
@@ -109,7 +109,7 @@ for trial in final_subset.iter_level("recording"):
 # %%
 # You can see that we get two subsets, one for each recording label.
 # But what, if we want to iterate over the participants and the recordings together?
-# In these cases, we need to group our dataset first.
+# In this case, we need to group our dataset first.
 # Note that the grouped_subset shows the new groupby columns as the index in the representation and the length of the
 # dataset is reported to be the number of groups.
 grouped_subset = final_subset.groupby(["participant", "recording"])
@@ -130,6 +130,17 @@ for group in grouped_subset:
 # The order shown here, is the same order used when iterating the dataset.
 # When creating a new subset, the order might change!
 grouped_subset.groups
+
+# %%
+# .. note:: The `groups` attribute consists of a list of `named tuples
+#           <https://docs.python.org/3/library/collections.html#
+#           namedtuple-factory-function-for-tuples-with-named-fields>`_.
+#           The tuple elements are named after the groupby columns and are in the same order as the groupby columns.
+#           They can be accessed by name or index:
+#           For example, `grouped_subset.groups[0].participant` and `grouped_subset.groups[0][0]` are equivalent.
+#
+#           Also, `grouped_subset.groups[0]` and `grouped_subset[0].group` are equivalent.
+
 
 # %%
 # Note that for an "un-grouped" dataset, this corresponds to all rows.
@@ -184,11 +195,11 @@ for train, test in cv.split(grouped_subset):
 # %%
 # While this works well, it is not always what we want.
 # Sometimes, we still want to consider each row a single datapoint, but want to prevent that data of e.g. a single
-# participant is partially put into train- and partially into the test-split.
+# participant and recording is partially put into train- and partially into the test-split.
 # For this, we can use `GroupKFold` in combination with `dataset.create_group_labels`.
 #
-# `create_group_labels` generates a unique identifier for each row/group:
-group_labels = final_subset.create_group_labels("participant")
+# `create_group_labels` generates a unique string identifier for each row/group:
+group_labels = final_subset.create_group_labels(["participant", "recording"])
 group_labels
 
 # %%
