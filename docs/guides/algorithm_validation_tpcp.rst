@@ -50,7 +50,23 @@ For a grouped split it might look like this:
 >>>
 >>> splitter = GroupKFold(n_splits=2)
 >>> data = CustomDatasetClass(...)
->>> # You can use `create_group_labels` method to create an array of group labels based on the dataset index
+>>> # You can use `create_string_group_labels` method to create an array of group labels based on the dataset index
+>>> groups = data.create_string_group_labels("patient_groups")
+>>> for train_index, test_index in splitter.split(data, groups=groups):
+...     train_data = data[train_index]
+...     test_data = data[test_index]
+...     # do something with the data
+
+This works well, when you iterate over your folds on your own.
+If you are planning to use
+>>> groups = data.create_string_group_labels("patient_groups")
+>>> for train_index, test_index in splitter.split(data, groups=groups):
+...     train_data = data[train_index]
+...     test_data = data[test_index]
+...     # do something with the data
+
+This works well, when you iterate over your folds on your own.
+If you are planning to use
 >>> groups = data.create_group_labels("patient_groups")
 >>> for train_index, test_index in splitter.split(data, groups=groups):
 ...     train_data = data[train_index]

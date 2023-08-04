@@ -150,7 +150,7 @@ class TestCrossValidate:
     def test_propagate_groups(self, propagate):
         pipeline = DummyOptimizablePipeline()
         dataset = DummyGroupedDataset()
-        groups = dataset.create_group_labels("v1")
+        groups = dataset.create_string_group_labels("v1")
         # With 3 splits, each group get its own split -> so basically only "a", only "b", and only "c"
         cv = GroupKFold(n_splits=3)
 
@@ -172,7 +172,7 @@ class TestCrossValidate:
     def test_propagate_mock_labels(self, propagate):
         pipeline = DummyOptimizablePipeline()
         dataset = DummyGroupedDataset()
-        groups = dataset.create_group_labels("v1")
+        groups = dataset.create_string_group_labels("v1")
         # With 5 folds, we expect exactly on "a", one "b", and one "c" in each fold
         cv = StratifiedKFold(n_splits=5)
 

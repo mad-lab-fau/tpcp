@@ -196,10 +196,10 @@ for train, test in cv.split(grouped_subset):
 # While this works well, it is not always what we want.
 # Sometimes, we still want to consider each row a single datapoint, but want to prevent that data of e.g. a single
 # participant and recording is partially put into train- and partially into the test-split.
-# For this, we can use `GroupKFold` in combination with `dataset.create_group_labels`.
+# For this, we can use `GroupKFold` in combination with `dataset.create_string_group_labels`.
 #
-# `create_group_labels` generates a unique string identifier for each row/group:
-group_labels = final_subset.create_group_labels(["participant", "recording"])
+# `create_string_group_labels` generates a unique string identifier for each row/group:
+group_labels = final_subset.create_string_group_labels(["participant", "recording"])
 group_labels
 
 # %%
@@ -217,7 +217,7 @@ for train, test in cv.split(final_subset, groups=group_labels):
 # But, the columns that should be contained in the label must be a subset of the groupby columns in this case.
 #
 # The number of group labels is 4 in this case, as there are only 4 groups after grouping the datset.
-group_labels = final_subset.groupby(["participant", "recording"]).create_group_labels("participant")
+group_labels = final_subset.groupby(["participant", "recording"]).create_string_group_labels("participant")
 group_labels
 
 # %%
