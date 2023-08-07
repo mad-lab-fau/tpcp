@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Deprecated
 
-- The `create_group_labels` method of the `Dataset` class is deprecated and will be removed in the next major release.
+- The `create_group_labels` method of the `Dataset` class is deprecated and will be removed in a future release.
   It is replaced by the `create_string_group_labels` method of the `Dataset` class.
 - The properties `group` and `groups` of the `Dataset` class are deprecated and will be removed in the next major
   release.
   They are replaced by the `group_label` and `group_labels` properties of the `Dataset` class.
+  This renaming was done to make it more clear that these properties return the labels of the groups and not the 
+  groups themselves.
 
 ### Added
 
@@ -21,12 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **BREAKING CHANGE**: The `group` property of the `Dataset` class is now called `group_label` and always returns named
-  tuples of strings (even for single groups where it used to return strings!).
-- **BREAKING CHANGE**: The `groups` property of the `Dataset` class is now called `group_labels` and always returns a
-  list of named tuples of strings (even for single groups where it used to return a list of strings!).
-- **BREAKING CHANGE**: The parameter `groups` of the `get_subset` method of the `Dataset` class is now called `group_labels` and always
-  expects a list of named tuples of strings.
+- **BREAKING CHANGE**: The `group` property of the `Dataset` class is now called `group_label`.
+- **BREAKING CHANGE**: The `group_label` property now always returns named tuples of strings
+  (even for single groups where it used to return strings!).
+- **BREAKING CHANGE**: The `groups` property of the `Dataset` class is now called `group_labels`.
+- **BREAKING CHANGE**: The `group_labels` property always returns a list of named tuples of strings
+  (even for single groups where it used to return a list of strings!).
+- **BREAKING CHANGE**: The parameter `groups` of the `get_subset` method of the `Dataset` class is now called
+  `group_labels` and always expects a list of named tuples of strings.
 
 
 ## [0.23.0] - 2023-08-30
@@ -213,7 +217,7 @@ YANKED RELEASE
 ## Fixed
 - GridSearch and GridSearchCV now correctly handle custom aggregators that return scores with new names.
   (https://github.com/mad-lab-fau/tpcp/pull/58)
-- When using the `create_string_group_labels` method on dataset with multiple groupby columns, the method returned a list of 
+- When using the `create_group_labels` method on dataset with multiple groupby columns, the method returned a list of 
   tuples.
   This caused issues with `GroupKFold`, as the method internally flattens the list of tuples.
   To avoid this, the method now return a list of strings.
