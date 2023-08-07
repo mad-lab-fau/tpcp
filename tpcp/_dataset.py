@@ -106,6 +106,7 @@ class _Dataset(BaseTpcpObject):
 
     @property
     def groups(self) -> List[Tuple[str, ...]]:
+        """Get the current group labels. Deprecated, use `group_labels` instead."""
         warnings.warn(
             "The attribute `groups` is deprecated and will be removed in a future version. "
             "Use `group_labels` instead.",
@@ -117,15 +118,20 @@ class _Dataset(BaseTpcpObject):
     def group_label(self) -> Tuple[str, ...]:
         """Get the current group label.
 
+        The group is defined by the current groupby settings.
+        If the dataset is not grouped, this is equivalent to `datapoint_label`.
+
         Note, this attribute can only be used, if there is just a single group.
         This will return a named tuple. The tuple will contain only one entry if there is only a single groupby column
         or column in the index.
+        The elements of the named tuple will have the same names as the groupby columns and will be in the same order.
         """
         self.assert_is_single_group("group")
         return self.group_labels[0]
 
     @property
     def group(self) -> Tuple[str, ...]:
+        """Get the current group label. Deprecated, use `group_label` instead."""
         warnings.warn(
             "The attribute `group` is deprecated and will be removed in a future version. "
             "Use `group_label` instead.",
@@ -394,7 +400,8 @@ class _Dataset(BaseTpcpObject):
         if not self.is_single_datapoint():
             raise ValueError(
                 f"The attribute `{property_name}` of dataset {self.__class__.__name__} can only be accessed if there "
-                f"is only a single row left in the data subset index."
+                f"is only a single row (i.e. single datapoint) left in the data subset index independent of the groupby"
+                f"level."
             )
 
     def assert_is_single_group(self, property_name) -> None:
