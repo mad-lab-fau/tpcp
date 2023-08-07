@@ -128,8 +128,8 @@ ECGExampleData(data_path=data_path)
 # Further, loading the data (in this case) only makes sense, when there is just a single participant selected in the
 # dataset.
 #
-# We will implement this logic by using a `property` to implement "load-on-demand" and the `dataset.is_single` method
-# to check that there is really only a single participant selected.
+# We will implement this logic by using a `property` to implement "load-on-demand" and the `dataset.is_single_datapoint`
+# method to check that there is really only a single participant selected.
 
 
 class ECGExampleData(Dataset):
@@ -159,7 +159,7 @@ class ECGExampleData(Dataset):
         You can use the sampling rate (`self.sampling_rate_hz`) to convert it into time
         """
         # Check that there is only a single participant in the dataset
-        if not self.is_single(None):
+        if not self.is_single_datapoint():
             raise ValueError("Data can only be accessed, when there is just a single participant in the dataset.")
         # Reconstruct the ecg file path based on the data index
         p_id = self.index["participant"][0]
@@ -231,7 +231,7 @@ class ECGExampleData(Dataset):
         You can use the sampling rate (`self.sampling_rate_hz`) to convert it into time
         """
         # Check that there is only a single participant in the dataset
-        self.assert_is_single(None, "data")
+        self.assert_is_single_datapoint("data")
         # Reconstruct the ecg file path based on the data index
         p_id = self.index["participant"][0]
         return pd.read_pickle(self.data_path / f"{p_id}.pk.gz")
@@ -242,7 +242,7 @@ class ECGExampleData(Dataset):
 
         This includes all R-Peaks (PVC or normal)
         """
-        self.assert_is_single(None, "r_peaks_")
+        self.assert_is_single_datapoint("r_peaks_")
         p_id = self.index["participant"][0]
         r_peaks = pd.read_csv(self.data_path / f"{p_id}_all.csv", index_col=0)
         r_peaks = r_peaks.rename(columns={"R": "r_peak_position"})
@@ -254,7 +254,7 @@ class ECGExampleData(Dataset):
 
         The position is equivalent to a position entry in `self.r_peak_positions_`.
         """
-        self.assert_is_single(None, "pvc_positions_")
+        self.assert_is_single_datapoint("pvc_positions_")
         p_id = self.index["participant"][0]
         pvc_peaks = pd.read_csv(self.data_path / f"{p_id}_pvc.csv", index_col=0)
         pvc_peaks = pvc_peaks.rename(columns={"PVC": "pvc_position"})
@@ -263,7 +263,7 @@ class ECGExampleData(Dataset):
     @property
     def labeled_r_peaks_(self) -> pd.DataFrame:
         """All r-peak positions with an additional column that labels them as normal or PVC."""
-        self.assert_is_single(None, "labeled_r_peaks_")
+        self.assert_is_single_datapoint("labeled_r_peaks_")
         r_peaks = self.r_peak_positions_
         r_peaks["label"] = "normal"
         r_peaks.loc[r_peaks["r_peak_position"].isin(self.pvc_positions_["pvc_position"]), "label"] = "pvc"
@@ -353,7 +353,7 @@ class ECGExampleData(Dataset):
         You can use the sampling rate (`self.sampling_rate_hz`) to convert it into time
         """
         # Check that there is only a single participant in the dataset
-        self.assert_is_single(None, "data")
+        self.assert_is_single_datapoint("data")
         # Reconstruct the ecg file path based on the data index
         p_id = self.group_label.participant
         file_path = self.data_path / f"{p_id}.pk.gz"
@@ -368,7 +368,7 @@ class ECGExampleData(Dataset):
 
         This includes all R-Peaks (PVC or normal)
         """
-        self.assert_is_single(None, "r_peaks_")
+        self.assert_is_single_datapoint("r_peaks_")
         p_id = self.group_label.participant
         r_peaks = pd.read_csv(self.data_path / f"{p_id}_all.csv", index_col=0)
         r_peaks = r_peaks.rename(columns={"R": "r_peak_position"})
@@ -380,7 +380,7 @@ class ECGExampleData(Dataset):
 
         The position is equivalent to a position entry in `self.r_peak_positions_`.
         """
-        self.assert_is_single(None, "pvc_positions_")
+        self.assert_is_single_datapoint("pvc_positions_")
         p_id = self.index["participant"][0]
         pvc_peaks = pd.read_csv(self.data_path / f"{p_id}_pvc.csv", index_col=0)
         pvc_peaks = pvc_peaks.rename(columns={"PVC": "pvc_position"})
@@ -389,7 +389,7 @@ class ECGExampleData(Dataset):
     @property
     def labeled_r_peaks_(self) -> pd.DataFrame:
         """All r-peak positions with an additional column that labels them as normal or PVC."""
-        self.assert_is_single(None, "labeled_r_peaks_")
+        self.assert_is_single_datapoint("labeled_r_peaks_")
         r_peaks = self.r_peak_positions_
         r_peaks["label"] = "normal"
         r_peaks.loc[r_peaks["r_peak_position"].isin(self.pvc_positions_["pvc_position"]), "label"] = "pvc"
