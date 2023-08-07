@@ -567,25 +567,25 @@ class TestDataset:
             (["patients", "tests"], ["patients"], 3),
         ),
     )
-    def test_create_group_labels(self, groupby, groupby_labels, unique):
+    def test_create_string_group_labels(self, groupby, groupby_labels, unique):
         ds = Dataset(subset_index=_create_valid_index(), groupby_cols=groupby)
         labels = ds.create_string_group_labels(groupby_labels)
 
         assert len(labels) == len(ds)
         assert len(set(labels)) == unique
 
-    def test_create_group_labels_error_groupby(self):
+    def test_create_string_group_labels_error_groupby(self):
         ds = Dataset(subset_index=_create_valid_index(), groupby_cols="patients")
         with pytest.raises(KeyError, match="When using `create_string_group_labels` with a grouped dataset"):
             ds.create_string_group_labels("recording")
 
-    def test_create_group_labels_error_not_in_index(self):
+    def test_create_string_group_labels_error_not_in_index(self):
         ds = Dataset(subset_index=_create_valid_index())
         with pytest.raises(KeyError, match="The selected label columns"):
             ds.create_string_group_labels("something_wrong")
 
     @pytest.mark.parametrize("groupby", ["patients", "tests", ["patients", "tests"], None])
-    def test_group(self, groupby):
+    def test_group_label(self, groupby):
         ds = Dataset(subset_index=_create_valid_index(), groupby_cols=groupby)
         group = ds[0].group_label
         assert group == ds.group_labels[0]
@@ -596,7 +596,7 @@ class TestDataset:
             assert group._fields == tuple(groupby)
             assert group == tuple(ds.index.iloc[0][groupby])
 
-    def test_group_with_invalid_col_name(self):
+    def test_group_label_with_invalid_col_name(self):
         ds = Dataset(subset_index=_create_valid_index())
         group = ds[0].group_label
 
@@ -604,7 +604,7 @@ class TestDataset:
         # it should be `_2`
         assert group._fields == ("patients", "tests", "_2")
 
-    def test_group_only_for_single_group(self):
+    def test_group_label_only_for_single_group(self):
         ds = Dataset(subset_index=_create_valid_index())
 
         with pytest.raises(ValueError, match="only a single group left"):
