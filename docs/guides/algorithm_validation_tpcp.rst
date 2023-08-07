@@ -58,22 +58,6 @@ For a grouped split it might look like this:
 ...     # do something with the data
 
 This works well, when you iterate over your folds on your own.
-If you are planning to use
->>> groups = data.create_string_group_labels("patient_groups")
->>> for train_index, test_index in splitter.split(data, groups=groups):
-...     train_data = data[train_index]
-...     test_data = data[test_index]
-...     # do something with the data
-
-This works well, when you iterate over your folds on your own.
-If you are planning to use
->>> groups = data.create_group_labels("patient_groups")
->>> for train_index, test_index in splitter.split(data, groups=groups):
-...     train_data = data[train_index]
-...     test_data = data[test_index]
-...     # do something with the data
-
-This works well, when you iterate over your folds on your own.
 If you are planning to use :func:`~tpcp.validate.cross_validate` you need to handle these special cases a little
 different.
 More about that in the next section.
