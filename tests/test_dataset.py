@@ -610,6 +610,92 @@ class TestDataset:
         with pytest.raises(ValueError, match="only a single group left"):
             _ = ds.group_label
 
+    @pytest.mark.parametrize(
+        ("groupby_cols", "expected_length", "expected_labels"),
+        (
+            (
+                None,
+                12,
+                [
+                    ("patient_1", "test_1", "0"),
+                    ("patient_1", "test_1", "1"),
+                    ("patient_1", "test_2", "0"),
+                    ("patient_1", "test_2", "1"),
+                    ("patient_2", "test_1", "0"),
+                    ("patient_2", "test_1", "1"),
+                    ("patient_3", "test_1", "0"),
+                    ("patient_3", "test_1", "1"),
+                    ("patient_3", "test_2", "0"),
+                    ("patient_3", "test_2", "1"),
+                    ("patient_3", "test_3", "0"),
+                    ("patient_3", "test_3", "1"),
+                ],
+            ),
+            ("patients", 3, [("patient_1",), ("patient_2",), ("patient_3",)]),
+            ("tests", 3, [("test_1",), ("test_2",), ("test_3",)]),
+            (
+                ["patients", "tests"],
+                6,
+                [
+                    ("patient_1", "test_1"),
+                    ("patient_1", "test_2"),
+                    ("patient_2", "test_1"),
+                    ("patient_3", "test_1"),
+                    ("patient_3", "test_2"),
+                    ("patient_3", "test_3"),
+                ],
+            ),
+            (
+                ["tests", "patients"],
+                6,
+                [
+                    ("test_1", "patient_1"),
+                    ("test_2", "patient_1"),
+                    ("test_1", "patient_2"),
+                    ("test_1", "patient_3"),
+                    ("test_2", "patient_3"),
+                    ("test_3", "patient_3"),
+                ],
+            ),
+        ),
+    )
+    def test_group_labels(self, groupby_cols, expected_length, expected_labels):
+        ds = Dataset(subset_index=_create_valid_index(), groupby_cols=groupby_cols)
+        labels = ds.group_labels
+        assert len(labels) == expected_length
+        assert (np.array(labels) == np.array(expected_labels)).all()
+
+    @pytest.mark.parametrize(
+        "groupby_cols",
+        (
+            None,
+            "patients",
+            "tests",
+            ["patients", "tests"],
+            ["tests", "patients"],
+        ),
+    )
+    def test_datapoint_labels(self, groupby_cols):
+        expected_labels = [
+            ("patient_1", "test_1", "0"),
+            ("patient_1", "test_1", "1"),
+            ("patient_1", "test_2", "0"),
+            ("patient_1", "test_2", "1"),
+            ("patient_2", "test_1", "0"),
+            ("patient_2", "test_1", "1"),
+            ("patient_3", "test_1", "0"),
+            ("patient_3", "test_1", "1"),
+            ("patient_3", "test_2", "0"),
+            ("patient_3", "test_2", "1"),
+            ("patient_3", "test_3", "0"),
+            ("patient_3", "test_3", "1"),
+        ]
+        expected_length = 12
+        ds = Dataset(subset_index=_create_valid_index(), groupby_cols=groupby_cols)
+        labels = ds.datapoint_labels
+        assert len(labels) == expected_length
+        assert (np.array(labels) == np.array(expected_labels)).all()
+
     def test_datapoint_label(self):
         ds = Dataset(subset_index=_create_valid_index())
         label = ds[0].datapoint_label
