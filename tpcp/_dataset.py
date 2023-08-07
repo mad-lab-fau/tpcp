@@ -204,6 +204,8 @@ class _Dataset(BaseTpcpObject):
     def groupby(self, groupby_cols: Optional[Union[List[str], str]]) -> Self:
         """Return a copy of the dataset grouped by the specified columns.
 
+        This does not change the order of the rows of the dataset index.
+
         Each unique group represents a single data point in the resulting dataset.
 
         Parameters
