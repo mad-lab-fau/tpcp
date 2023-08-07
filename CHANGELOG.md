@@ -17,16 +17,16 @@ For all changes in this release see: https://github.com/mad-lab-fau/tpcp/pull/85
   groups themselves.
 - The `create_group_labels` method of the `Dataset` class is deprecated and will be removed in a future release.
   It is replaced by the `create_string_group_labels` method of the `Dataset` class.
-  This renaming was done to avoid confusion with the ne names for `groups` and `group`
+  This renaming was done to avoid confusion with the new names for `groups` and `group`
 
 ### Added
 
 - Added `datapoint_label` and `datapoint_labels` properties to the `Dataset` class.
   They return the full index of the dataset as a named tuple or list of named tuples regardless of the current grouping.
-  They might be helpfull to extract the label information of a datapoint, when `group` requires to handle multiple cases,
+  They might be helpful to extract the label information of a datapoint, when `group` requires to handle multiple cases,
   as your code expects the dataset in different grouped versions.
 - Added `is_single_datapoint` and `assert_is_single_datapoint`. These are basically equivalent to `is_single(None)`
-  and `assert_is_single(None)` and check if there is really only on row left in the index independent from the
+  and `assert_is_single(None)` and check if there is really only on row left in the index independent of the
   grouping level.
 
 ### Changed
