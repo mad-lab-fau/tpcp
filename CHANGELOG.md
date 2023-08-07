@@ -5,28 +5,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+For all changes in this release see: https://github.com/mad-lab-fau/tpcp/pull/85
+
 ### Deprecated
 
-- The `create_group_labels` method of the `Dataset` class is deprecated and will be removed in a future release.
-  It is replaced by the `create_string_group_labels` method of the `Dataset` class.
-- The properties `group` and `groups` of the `Dataset` class are deprecated and will be removed in the next major
+- The properties `group` and `groups` of the `Dataset` class are deprecated and will be removed in a future
   release.
   They are replaced by the `group_label` and `group_labels` properties of the `Dataset` class.
   This renaming was done to make it more clear that these properties return the labels of the groups and not the 
   groups themselves.
+- The `create_group_labels` method of the `Dataset` class is deprecated and will be removed in a future release.
+  It is replaced by the `create_string_group_labels` method of the `Dataset` class.
+  This renaming was done to avoid confusion with the ne names for `groups` and `group`
 
 ### Added
 
 - Added `datapoint_label` and `datapoint_labels` properties to the `Dataset` class.
   They return the full index of the dataset as a named tuple or list of named tuples regardless of the current grouping.
-
+  They might be helpfull to extract the label information of a datapoint, when `group` requires to handle multiple cases,
+  as your code expects the dataset in different grouped versions.
+- Added `is_single_datapoint` and `assert_is_single_datapoint`. These are basically equivalent to `is_single(None)`
+  and `assert_is_single(None)` and check if there is really only on row left in the index independent from the
+  grouping level.
 
 ### Changed
 
-- **BREAKING CHANGE**: The `group` property of the `Dataset` class is now called `group_label`.
+- **BREAKING CHANGE (with Deprecation)**: The `group` property of the `Dataset` class is now called `group_label`.
 - **BREAKING CHANGE**: The `group_label` property now always returns named tuples of strings
   (even for single groups where it used to return strings!).
-- **BREAKING CHANGE**: The `groups` property of the `Dataset` class is now called `group_labels`.
+- **BREAKING CHANGE (with Deprecation)**: The `groups` property of the `Dataset` class is now called `group_labels`.
 - **BREAKING CHANGE**: The `group_labels` property always returns a list of named tuples of strings
   (even for single groups where it used to return a list of strings!).
 - **BREAKING CHANGE**: The parameter `groups` of the `get_subset` method of the `Dataset` class is now called
