@@ -119,14 +119,14 @@ grouped_subset
 # %%
 # If we now iterate the dataset, it will iterate over the unique groups.
 #
-# Grouping also changes the meaning of a "single datapoint".
+# Grouping also changes the meaning of a "single datapoint". # TODO how do we change this explanation?
 # Each group reports a shape of `(1,)` independent of the number of rows in each group.
 for group in grouped_subset:
     print("This group has the shape {}".format(group.shape))
     print(group, end="\n\n")
 
 # %%
-# At any point, you can view all unique groups/rows in the dataset using the `groups` attribute.
+# At any point, you can view all unique groups/rows in the dataset using the `group_labels` attribute.
 # The order shown here, is the same order used when iterating the dataset.
 # When creating a new subset, the order might change!
 grouped_subset.group_labels
@@ -147,7 +147,16 @@ grouped_subset.group_labels
 final_subset.group_labels
 
 # %%
-# In both cases, we can use the group labels (or a subset of them) to index our dataset.
+# If you want to view the full set of labels of a dataset regardless of the grouping,
+# you can use the `datapoint_labels` attribute.
+grouped_subset.datapoint_labels
+
+# %%
+# Note that `datapoint_labels` and `group_labels` are the same for an un-grouped dataset.
+final_subset.datapoint_labels
+
+# %%
+# We can use the group labels (or a subset of them) to index our dataset.
 # This can be in particular helpful, if you want to recreate specific train test splits provided by `cross_validate`.
 final_subset.get_subset(group_labels=final_subset.group_labels[:3])
 
