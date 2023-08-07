@@ -619,7 +619,7 @@ class TestDataset:
 
     def test_datapoint_label_error(self):
         ds = Dataset(subset_index=_create_valid_index())
-        with pytest.raises(ValueError, match="only a single row left"):
+        with pytest.raises(ValueError, match="only a single row"):
             _ = ds.datapoint_label
 
     def test_doctest(self):
