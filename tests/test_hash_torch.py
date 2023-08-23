@@ -24,10 +24,13 @@ def torch_objects(request):
 
 
 def test_hash_model():
-    first = custom_hash(TorchModel())
+    model = TorchModel()
+    first = custom_hash(model)
     second = custom_hash(TorchModel())
+    cloned = custom_hash(clone(model))
 
     assert first == second
+    assert first == cloned
 
     # We also create a negative test, to see that our test dataopbject actually triggers the pytorch problem
     first = joblib.hash(TorchModel())
