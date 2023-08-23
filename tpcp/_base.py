@@ -37,6 +37,11 @@ from typing_extensions import Annotated, Literal, Self, get_args, get_origin
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, PotentialUserErrorWarning, ValidationError
 
+try:
+    import tensorflow as tf
+except ImportError:
+    tf = None
+
 T = TypeVar("T")
 BaseTpcpObjectObjT = TypeVar("BaseTpcpObjectObjT", bound="BaseTpcpObject")
 
@@ -675,7 +680,7 @@ def _is_builtin_class_instance(obj: Any) -> bool:
     return type(obj).__module__ == "builtins"
 
 
-def clone(algorithm: T, *, safe: bool = False) -> T:
+def clone(algorithm: T, *, safe: bool = False) -> T:  # noqa: C901
     """Construct a new algorithm object with the same parameters.
 
     This is a modified version from sklearn and the original was published under a BSD-3 license and the original file
@@ -708,6 +713,20 @@ def clone(algorithm: T, *, safe: bool = False) -> T:
     # XXX: not handling dictionaries
     if isinstance(algorithm, (list, tuple, set, frozenset)):
         return type(algorithm)([clone(a, safe=safe) for a in algorithm])
+
+    # Explicit handling of keras models, because they are not handled correctly by deepcopy
+    if tf and isinstance(algorithm, (tf.keras.Model, tf.estimator.Estimator)):
+        tf.keras.backend.clear_session()
+        if "shared_object_id" in str(algorithm.get_config()):
+            warnings.warn(
+                "You are trying to clone a keras model that contains shared objects. "
+                "This will work, but all shared objects will be converted to independent objects. "
+                "Further, the hash of the returned model will differ."
+            )
+        new_model = tf.keras.models.clone_model(algorithm)
+        new_model.set_weights(algorithm.get_weights())
+        return new_model
+
     # Compared to sklearn, we check specifically for BaseTpcpObject and not just if `get_params` is defined on the
     # object.
     # Due to the way algorithms/pipelines in tpcp work, they need to inherit from BaseTpcpObject.
