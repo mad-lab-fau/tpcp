@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tpcp"
-version = "0.21.0"
+version = "0.22.0"
 description = "Pipeline and Dataset helpers for complex algorithm evaluation."
 authors = [
     "Arne Küderle <arne.kuederle@fau.de>",
