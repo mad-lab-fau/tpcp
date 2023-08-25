@@ -1,8 +1,11 @@
 """A custom hash function implementation that properly supports pytorch."""
+import contextlib
 import io
+import os
 import pickle
 import struct
 import sys
+from pathlib import Path
 
 from joblib.hashing import Hasher, NumpyHasher
 
@@ -103,7 +106,7 @@ class NoMemoizeNumpyHasher(NoMemoizeHasher, NumpyHasher):
     """A joblib numpy hasher with all memoize features disabled."""
 
 
-class TorchHasher(NoMemoizeNumpyHasher):
+class NNHasher(NoMemoizeNumpyHasher):
     """A hasher that can handle torch models.
 
     Under the hood this uses the new implementation of `torch.save` to serialize the model.
@@ -114,16 +117,35 @@ class TorchHasher(NoMemoizeNumpyHasher):
 
     def __init__(self, hash_name="md5", coerce_mmap=False):
         super().__init__(hash_name, coerce_mmap)
-        import torch  # pylint: disable=import-outside-toplevel
+        try:
+            import torch  # pylint: disable=import-outside-toplevel
 
-        self.torch = torch
+            self.torch = torch
+        except ImportError:
+            self.torch = None
+        try:
+            import tensorflow
+
+            self.tensorflow = tensorflow
+        except ImportError:
+            self.tensorflow = None
 
     def save(self, obj):
-        if isinstance(obj, (self.torch.nn.Module, self.torch.Tensor)):
+        if self.torch and isinstance(obj, (self.torch.nn.Module, self.torch.Tensor)):
             b = b""
             buffer = io.BytesIO(b)
             self.torch.save(obj, buffer)
             self._hash.update(b)
+            return
+
+        if self.tensorflow and isinstance(obj, (self.tensorflow.keras.Model,)):
+            from tensorflow.python.keras.utils.generic_utils import SharedObjectSavingScope, serialize_keras_object
+
+            with SharedObjectSavingScope():
+                NumpyHasher.save(
+                    self,
+                    [obj.__class__.__name__, serialize_keras_object(obj), obj.get_weights()],
+                )
             return
         NumpyHasher.save(self, obj)
 
@@ -148,10 +170,13 @@ def custom_hash(obj, hash_name="md5", coerce_mmap=False):
     valid_hash_names = ("md5", "sha1")
     if hash_name not in valid_hash_names:
         raise ValueError(f"Valid options for 'hash_name' are {valid_hash_names}. Got hash_name={hash_name!r} instead.")
-    if "torch" in sys.modules:
-        hasher = TorchHasher(hash_name=hash_name, coerce_mmap=coerce_mmap)
+    if "torch" in sys.modules or "tensorflow" in sys.modules:
+        hasher = NNHasher(hash_name=hash_name, coerce_mmap=coerce_mmap)
     elif "numpy" in sys.modules:
         hasher = NoMemoizeNumpyHasher(hash_name=hash_name, coerce_mmap=coerce_mmap)
     else:
         hasher = NoMemoizeHasher(hash_name=hash_name)
-    return hasher.hash(obj)
+    with Path(os.devnull).open("w") as devnull, contextlib.redirect_stdout(devnull):
+        # Some object decide to print stuff to stdout when pickling.
+        # As we potentially pickle a lot of objects, we don't want to see this.
+        return hasher.hash(obj)
