@@ -2,6 +2,7 @@
 import matplotlib
 import numpy as np
 import pandas as pd
+import pytest
 from numpy.testing import assert_almost_equal, assert_array_equal
 
 matplotlib.use("Agg")
@@ -141,6 +142,8 @@ def test_optimization_info():
 
 
 def test_tensoflow_example():
+    pytest.importorskip("tensorflow")
+
     from examples.integrations._01_tensorflow import cv_results
 
     np.testing.assert_array_almost_equal(cv_results["test_per_sample__accuracy"], [0.847059, 0.808586, 0.830808])
