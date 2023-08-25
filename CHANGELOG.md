@@ -3,6 +3,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.21.0] - 2023-08-25
+
+### Added
+
+- Official support for tensorflow/keras. The custom hash function now manages tensorflow models explicitly.
+  This makes it possible again to use the `make_action_safe` and `make_optimize_safe` decorators with algorithms and 
+  pipelines that have tensorflow/keras models as parameters.
+  (https://github.com/mad-lab-fau/tpcp/pull/87)
+- Added a new example for tensorflow/keras models.
+  (https://github.com/mad-lab-fau/tpcp/pull/87)
+
 ## [0.20.1] - 2023-07-25
 
 ### Fixed

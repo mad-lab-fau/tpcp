@@ -139,6 +139,10 @@ class NNHasher(NoMemoizeNumpyHasher):
             return
 
         if self.tensorflow and isinstance(obj, (self.tensorflow.keras.Model,)):
+            # The normal tensorflow objects don't have a consistent hash.
+            # Therefore, we need to serialize all relevant information.
+            # I hope by using `serialize_keras_object` we get all important parts.
+            # The `SharedObjectSavingScope` is required to make sure that shared objects are properly serialized.
             from tensorflow.python.keras.utils.generic_utils import SharedObjectSavingScope, serialize_keras_object
 
             with SharedObjectSavingScope():
