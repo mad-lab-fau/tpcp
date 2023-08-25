@@ -5,13 +5,16 @@ In basically all cases, you do not need them.
 """
 from __future__ import annotations
 
+import contextlib
 import copy
 import dataclasses
 import inspect
+import os
 import sys
 import warnings
 from collections import defaultdict
 from functools import wraps
+from pathlib import Path
 from types import MethodWrapperType
 from typing import (
     Any,
@@ -680,7 +683,7 @@ def _is_builtin_class_instance(obj: Any) -> bool:
     return type(obj).__module__ == "builtins"
 
 
-def clone(algorithm: T, *, safe: bool = False) -> T:  # noqa: C901
+def clone(algorithm: T, *, safe: bool = False) -> T:
     """Construct a new algorithm object with the same parameters.
 
     This is a modified version from sklearn and the original was published under a BSD-3 license and the original file
@@ -714,19 +717,6 @@ def clone(algorithm: T, *, safe: bool = False) -> T:  # noqa: C901
     if isinstance(algorithm, (list, tuple, set, frozenset)):
         return type(algorithm)([clone(a, safe=safe) for a in algorithm])
 
-    # Explicit handling of keras models, because they are not handled correctly by deepcopy
-    if tf and isinstance(algorithm, (tf.keras.Model, tf.estimator.Estimator)):
-        tf.keras.backend.clear_session()
-        if "shared_object_id" in str(algorithm.get_config()):
-            warnings.warn(
-                "You are trying to clone a keras model that contains shared objects. "
-                "This will work, but all shared objects will be converted to independent objects. "
-                "Further, the hash of the returned model will differ."
-            )
-        new_model = tf.keras.models.clone_model(algorithm)
-        new_model.set_weights(algorithm.get_weights())
-        return new_model
-
     # Compared to sklearn, we check specifically for BaseTpcpObject and not just if `get_params` is defined on the
     # object.
     # Due to the way algorithms/pipelines in tpcp work, they need to inherit from BaseTpcpObject.
@@ -734,7 +724,9 @@ def clone(algorithm: T, *, safe: bool = False) -> T:  # noqa: C901
     # algorithm
     if not isinstance(algorithm, BaseTpcpObject):
         if not safe:
-            return copy.deepcopy(algorithm)
+            # For some reason, some libraries print stuff to stdout when cloning.
+            with Path(os.devnull).open("w") as devnull, contextlib.redirect_stdout(devnull):
+                return copy.deepcopy(algorithm)
         raise TypeError(
             f"Cannot clone object '{repr(algorithm)}' (type {type(algorithm)}): "
             "it does not seem to be a compatible algorithm/pipline class or general `tpcp` object as it does not "
