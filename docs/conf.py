@@ -184,6 +184,7 @@ sphinx_gallery_conf = {
             "../examples/algorithms",
             "../examples/parameter_optimization",
             "../examples/validation",
+            "../examples/integrations",
             "../examples/other_features",
         ]
     ),

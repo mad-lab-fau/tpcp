@@ -1,5 +1,6 @@
 # This is needed to avoid plots to open
 import matplotlib
+import numpy as np
 import pandas as pd
 from numpy.testing import assert_almost_equal, assert_array_equal
 
@@ -137,3 +138,9 @@ def test_optimization_info():
     from examples.other_features._03_optimization_info import optimizer
 
     assert len(optimizer.optimization_info_["all_thresholds"]) == 935
+
+
+def test_tensoflow_example():
+    from examples.integrations._01_tensorflow import cv_results
+
+    np.testing.assert_array_almost_equal(cv_results["test_per_sample__accuracy"], [0.847059, 0.808586, 0.830808])
