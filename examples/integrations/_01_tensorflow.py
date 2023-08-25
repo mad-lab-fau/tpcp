@@ -60,6 +60,7 @@ import tensorflow as tf
 from tpcp import Dataset
 
 tf.keras.utils.set_random_seed(812)
+tf.config.experimental.enable_op_determinism()
 
 
 @lru_cache(maxsize=1)

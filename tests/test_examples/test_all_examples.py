@@ -146,4 +146,4 @@ def test_tensoflow_example():
 
     from examples.integrations._01_tensorflow import cv_results
 
-    np.testing.assert_array_almost_equal(cv_results["test_per_sample__accuracy"], [0.847059, 0.808586, 0.830808])
+    np.testing.assert_array_almost_equal(cv_results["test_per_sample__accuracy"], [0.847059, 0.810101, 0.830808])
