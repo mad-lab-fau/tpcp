@@ -334,19 +334,19 @@ class TestCustomAggregator:
             _ = scorer(pipe, data)
         assert "number" in str(e)
 
-    class TestAgg1(Aggregator):
+    class _TestAgg1(Aggregator):
         @classmethod
         def aggregate(cls, **_):
             return 1
 
-    class TestAgg2(Aggregator):
+    class _TestAgg2(Aggregator):
         @classmethod
         def aggregate(cls, **_):
             return 2
 
     def test_all_aggregators_called_correctly(self):
         def score_func(p, d):
-            return {"agg1": self.TestAgg1(None), "agg2": self.TestAgg2(None), "default_agg": 3, "no_agg": NoAgg(4)}
+            return {"agg1": self._TestAgg1(None), "agg2": self._TestAgg2(None), "default_agg": 3, "no_agg": NoAgg(4)}
 
         scorer = Scorer(score_func)
         pipe = DummyOptimizablePipeline()
