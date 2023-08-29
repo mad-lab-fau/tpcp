@@ -141,9 +141,12 @@ def test_optimization_info():
     assert len(optimizer.optimization_info_["all_thresholds"]) == 935
 
 
-def test_tensoflow_example():
+def test_tensorflow_example():
     pytest.importorskip("tensorflow")
 
     from examples.integrations._01_tensorflow import cv_results
 
-    np.testing.assert_array_almost_equal(cv_results["test_per_sample__accuracy"], [0.847059, 0.810101, 0.830808])
+    # It seems to be impossible to run the tensorflow example in a deterministic way, across different machines and
+    # Python versions.
+    # We therefore just check if the performance is larger 0.8, which is the case for all runs we have seen so far.
+    assert np.all(cv_results["test_per_sample__accuracy"] > 0.8)
