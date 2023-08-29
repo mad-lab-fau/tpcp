@@ -8,7 +8,6 @@ from optuna import Study, Trial
 from optuna.samplers import GridSampler, RandomSampler, TPESampler
 from optuna.trial import FrozenTrial
 
-from tests.mixins.test_algorithm_mixin import TestAlgorithmMixin
 from tests.test_pipelines.conftest import (
     DummyDataset,
     DummyOptimizablePipeline,
@@ -20,6 +19,7 @@ from tpcp import make_optimize_safe
 from tpcp._dataset import DatasetT
 from tpcp._pipeline import OptimizablePipeline, PipelineT
 from tpcp.optimize.optuna import CustomOptunaOptimize, OptunaSearch, StudyParamsDict
+from tpcp.testing import TestAlgorithmMixin
 from tpcp.validate import Scorer
 
 
@@ -86,8 +86,9 @@ def _get_study_params(seed):
 
 class TestMetaFunctionalityOptuna(TestAlgorithmMixin):
     __test__ = True
-    algorithm_class = DummyOptunaOptimizer
-    _ignored_names = ("create_search_space", "scoring", "mock_objective")
+    ALGORITHM_CLASS = DummyOptunaOptimizer
+    ONLY_DEFAULT_PARAMS = False
+    _IGNORED_NAMES = ("create_search_space", "scoring", "mock_objective")
 
     @pytest.fixture()
     def after_action_instance(self) -> DummyOptunaOptimizer:
@@ -254,7 +255,8 @@ class TestCustomOptunaOptimize:
 
 class TestMetaFunctionalityOptunaSearch(TestAlgorithmMixin):
     __test__ = True
-    algorithm_class = OptunaSearch
+    ALGORITHM_CLASS = OptunaSearch
+    ONLY_DEFAULT_PARAMS = False
 
     @pytest.fixture()
     def after_action_instance(self) -> OptunaSearch:
@@ -267,9 +269,6 @@ class TestMetaFunctionalityOptunaSearch(TestAlgorithmMixin):
         )
         gs.optimize(DummyDataset())
         return gs
-
-    def test_empty_init(self):
-        pytest.skip()
 
 
 class TestOptunaSearch:

@@ -8,7 +8,6 @@ import pandas as pd
 import pytest
 from sklearn.model_selection import ParameterGrid, PredefinedSplit
 
-from tests.mixins.test_algorithm_mixin import TestAlgorithmMixin
 from tests.test_pipelines.conftest import (
     DummyDataset,
     DummyOptimizablePipeline,
@@ -27,12 +26,14 @@ from tpcp._optimize import BaseOptimize
 from tpcp._utils._score import _optimize_and_score
 from tpcp.exceptions import OptimizationError, PotentialUserErrorWarning, TestError
 from tpcp.optimize import DummyOptimize, GridSearch, GridSearchCV, Optimize
+from tpcp.testing import TestAlgorithmMixin
 from tpcp.validate import Aggregator, Scorer
 
 
 class TestMetaFunctionalityGridSearch(TestAlgorithmMixin):
     __test__ = True
-    algorithm_class = GridSearch
+    ALGORITHM_CLASS = GridSearch
+    ONLY_DEFAULT_PARAMS = False
 
     @pytest.fixture()
     def after_action_instance(self) -> GridSearch:
@@ -40,13 +41,11 @@ class TestMetaFunctionalityGridSearch(TestAlgorithmMixin):
         gs.optimize(DummyDataset())
         return gs
 
-    def test_empty_init(self):
-        pytest.skip()
-
 
 class TestMetaFunctionalityGridSearchCV(TestAlgorithmMixin):
     __test__ = True
-    algorithm_class = GridSearchCV
+    ALGORITHM_CLASS = GridSearchCV
+    ONLY_DEFAULT_PARAMS = False
 
     @pytest.fixture()
     def after_action_instance(self) -> GridSearchCV:
@@ -94,11 +93,12 @@ class OptimizableCustomErrorPipeline(OptimizablePipeline):
 
 class TestMetaFunctionalityOptimize(TestAlgorithmMixin):
     __test__ = True
-    algorithm_class = Optimize
+    ALGORITHM_CLASS = Optimize
+    ONLY_DEFAULT_PARAMS = False
 
     @pytest.fixture()
     def after_action_instance(self) -> Optimize:
-        gs = self.algorithm_class(DummyOptimizablePipelineWithInfo())
+        gs = self.ALGORITHM_CLASS(DummyOptimizablePipelineWithInfo())
         gs.optimize(DummyDataset())
         return gs
 
@@ -108,11 +108,12 @@ class TestMetaFunctionalityOptimize(TestAlgorithmMixin):
 
 class TestMetaFunctionalityDummyOptimize(TestAlgorithmMixin):
     __test__ = True
-    algorithm_class = DummyOptimize
+    ALGORITHM_CLASS = DummyOptimize
+    ONLY_DEFAULT_PARAMS = False
 
     @pytest.fixture()
     def after_action_instance(self) -> DummyOptimize:
-        gs = self.algorithm_class(DummyPipeline())
+        gs = self.ALGORITHM_CLASS(DummyPipeline())
         gs.optimize(DummyDataset())
         return gs
 
