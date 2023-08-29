@@ -38,6 +38,7 @@ if multiprocessing.parent_process() is None:
         "sense even for larger projects. "
         "This means, the interface for `CustomOptunaOptimize` will likely change in the future.",
         UserWarning,
+        stacklevel=2,
     )
 
 
@@ -169,7 +170,8 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
                 "anymore.\n"
                 "You can use use `optuna.delete_study(study_name=opti_instance.study_.study_name, "
                 "storage=opti_instance.study_._storage)`. "
-                "Note that all result object that depend on the study are not available anymore after deletion."
+                "Note that all result object that depend on the study are not available anymore after deletion.",
+                stacklevel=2,
             )
 
         if self.n_jobs == 1:
@@ -192,7 +194,8 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
                 warnings.warn(
                     "You are using a progress bar with n_jobs > 1. "
                     "This might lead to strange behaviour, as each process will launch its own process bar with "
-                    "n_trials/n_jobs steps."
+                    "n_trials/n_jobs steps.",
+                    stacklevel=2,
                 )
 
             # This solution is based on the solution proposed here:
@@ -836,6 +839,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
                     warnings.warn(
                         "score_name is ignored if scoring returns a single score",
                         UserWarning,
+                        stacklevel=2,
                     )
                 score = average_scores
 

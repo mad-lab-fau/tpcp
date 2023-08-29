@@ -61,7 +61,7 @@ def _create_valid_index(input_dict=None, columns_names=None):
 
 def _create_random_bool_map(n, seed):
     np.random.seed(seed)
-    return list(map(lambda x: x >= 0.5, np.random.rand(n)))
+    return [x >= 0.5 for x in np.random.rand(n)]
 
 
 class TestDataset:
@@ -340,7 +340,7 @@ class TestDataset:
         "groupby_level", (["patients"], ["patients", "tests"], ["patients", "tests", "extra with space"])
     )
     @pytest.mark.parametrize(
-        "index,is_single_level",
+        ("index", "is_single_level"),
         (
             (
                 _create_valid_index(

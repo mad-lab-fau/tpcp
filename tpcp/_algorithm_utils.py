@@ -11,13 +11,14 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Ty
 
 from typing_extensions import Concatenate, ParamSpec
 
+from tpcp import Algorithm
 from tpcp._base import NOTHING, _get_annotated_fields_of_type
 from tpcp._hash import custom_hash
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import PotentialUserErrorWarning
 
 if TYPE_CHECKING:
-    from tpcp import Algorithm, OptimizableAlgorithm, OptimizablePipeline
+    from tpcp import OptimizableAlgorithm, OptimizablePipeline
     from tpcp._algorithm import AlgorithmT
 
     OptimizableT = TypeVar("OptimizableT", OptimizablePipeline, OptimizableAlgorithm)
@@ -140,11 +141,9 @@ def _check_safe_run(algorithm: AlgorithmT, old_method: Callable, *args: Any, **k
     before_paras = algorithm.get_params()
     before_paras_hash = custom_hash(before_paras)
     output: AlgorithmT
-    if hasattr(old_method, "__self__"):
-        # In this case the method is already bound and we do not need to pass the algo as first argument
-        output = old_method(*args, **kwargs)
-    else:
-        output = old_method(algorithm, *args, **kwargs)
+
+    # In this case the method is already bound and we do not need to pass the algo as first argument
+    output = old_method(*args, **kwargs) if hasattr(old_method, "__self__") else old_method(algorithm, *args, **kwargs)
     after_paras = algorithm.get_params()
     after_paras_hash = custom_hash(after_paras)
     if not before_paras_hash == after_paras_hash:
@@ -220,6 +219,7 @@ def make_action_safe(
                 f"`    _action_methods = ({action_method.__name__},)`\n\n"
                 "Or append it to the tuple, if it already exists.",
                 PotentialUserErrorWarning,
+                stacklevel=2,
             )
         return _check_safe_run(self, action_method, *args, **kwargs)
 
@@ -232,11 +232,9 @@ def _get_nested_opti_paras(algorithm: Algorithm, opti_para_names: List[str]) -> 
     optimizable_paras = {}
     other_paras = {}
     for p, v in paras.items():
-        if p in opti_para_names:
-            optimizable_paras[p] = v
-        # For each optimizable parameter, we also add all children, as they are also allowed to change,
-        # if the parent is allowed to.
-        elif any(p.startswith(o + "__") for o in opti_para_names):
+        if p in opti_para_names or any(p.startswith(o + "__") for o in opti_para_names):
+            # For each optimizable parameter, we also add all children, as they are also allowed to change,
+            # if the parent is allowed to.
             optimizable_paras[p] = v
         else:
             other_paras[p] = v
@@ -249,7 +247,7 @@ def _get_nested_opti_paras(algorithm: Algorithm, opti_para_names: List[str]) -> 
     return optimizable_paras, other_paras
 
 
-def _check_safe_optimize(  # noqa: C901
+def _check_safe_optimize(  # noqa: C901, PLR0912
     algorithm: OptimizableT, old_method: Callable, *args: Any, **kwargs: Any
 ) -> OptimizableT:
 
@@ -349,6 +347,7 @@ def _check_safe_optimize(  # noqa: C901
             f"({optimizable_paras}). "
             "This could indicate an implementation error of the `self_optimize` method.",
             PotentialUserErrorWarning,
+            stacklevel=2,
         )
     if other_returns != (NOTHING, NOTHING):
         return optimized_algorithm, other_returns
@@ -402,6 +401,7 @@ def make_optimize_safe(
                 "The `make_optimize_safe` decorator is only meant for the `self_optimize` method, but you applied it "
                 f"to the `{self_optimize_method.__name__}` method.",
                 PotentialUserErrorWarning,
+                stacklevel=2,
             )
         try:
             return _check_safe_optimize(self, self_optimize_method, *args, **kwargs)

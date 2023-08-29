@@ -95,7 +95,7 @@ if os.environ.get("NO_MATHJAX"):
     mathjax_path = ""
 else:
     extensions.append("sphinx.ext.mathjax")
-    mathjax_path = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/" "tex-chtml.js"
+    mathjax_path = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"
 
 autodoc_default_options = {"members": True, "inherited-members": True, "special_members": True}
 # autodoc_typehints = 'description'  # Does not work as expected. Maybe try at future date again
@@ -202,6 +202,7 @@ def skip_properties(app, what, name, obj, skip, options):
     """This removes all properties from the documentation as they are expected to be documented in the docstring."""
     if isinstance(obj, property):
         return True
+    return None
 
 
 def setup(app):

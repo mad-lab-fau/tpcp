@@ -124,7 +124,7 @@ def _score(
     return result
 
 
-def _optimize_and_score(  # noqa: C901
+def _optimize_and_score(
     optimizer: BaseOptimize,
     scorer: Scorer,
     train_set: Dataset,
@@ -229,7 +229,7 @@ def _optimize_and_score(  # noqa: C901
         # instance of the trained pipeline.
         result["optimizer"] = optimizer
     if return_parameters:
-        result["parameters"] = {**hyperparameters, **pure_parameters} or None
+        result["parameters"] = {**hyperparameters, **pure_parameters}
     return result
 
 
