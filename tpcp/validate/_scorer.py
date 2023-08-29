@@ -48,7 +48,7 @@ class ScoreCallback(Protocol[PipelineT, DatasetT, T]):
         *,
         step: int,
         scores: Tuple[ScoreTypeT[T], ...],
-        scorer: "Scorer[PipelineT, DatasetT, T]",
+        scorer: Scorer[PipelineT, DatasetT, T],
         pipeline: PipelineT,
         dataset: DatasetT,
     ) -> None:
@@ -75,7 +75,7 @@ class Aggregator(Generic[T]):
 
     def __repr__(self):
         """Show the representation of the object."""
-        return f"{self.__class__.__name__}({repr(self._value)})"
+        return f"{self.__class__.__name__}({self._value!r})"
 
     def get_value(self) -> T:
         """Return the value wrapped by aggregator."""
@@ -195,7 +195,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         """
         return self._score(pipeline=pipeline, dataset=dataset)
 
-    def _aggregate(  # mccabe: disable=MC0001, pylint: disable=too-many-branches  # noqa: C901
+    def _aggregate(  # noqa: C901, PLR0912
         self,
         scores: Union[Tuple[Type[Aggregator[T]], List[T]], Dict[str, Tuple[Type[Aggregator[T]], List[T]]]],
         datapoints: List[DatasetT],
@@ -258,7 +258,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
                 score = self._score_func(pipeline.clone(), d)
-            except Exception as e:  # noqa: broad-except
+            except Exception as e:  # noqa: BLE001
                 raise ScorerFailedError(
                     f"Scorer raised an exception while scoring data point {i} ({d.group}). "
                     "Tpcp does not support that (compared to sklearn) and you need to handle error cases yourself "
@@ -321,7 +321,7 @@ _non_homogeneous_scoring_error = ValidationError(
 )
 
 
-def _check_and_invert_score_dict(  # noqa: C901
+def _check_and_invert_score_dict(
     #  I don't care that this is to complex, some things need to be complex
     scores: List[ScoreTypeT[T]],
     default_agg: Type[Aggregator],

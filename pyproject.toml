@@ -45,7 +45,7 @@ memory-profiler = "^0.58.0"
 matplotlib = "^3.4.3"
 toml = "^0.10.2"
 Sphinx = "^6.1.3"
-ruff = "^0.0.235"
+ruff = "^0.0.286"
 
 
 [[tool.poetry.source]]
@@ -156,8 +156,6 @@ ignore = [
     "EM101",
     "EM102",
     "EM103",
-    # Multiline docstring summary
-    "D213",
     # Varaibles before return
     "RET504",
     # Abstract raise into inner function
@@ -169,7 +167,11 @@ ignore = [
     # df as varaible name
     "PD901",
     # melt over stack
-    "PD013"
+    "PD013",
+    # Avoid specifying long messages outside the exception class
+    "TRY003",
+    # To many arguments
+    "PLR0913"
 ]
 
 

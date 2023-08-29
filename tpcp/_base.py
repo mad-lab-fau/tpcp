@@ -184,7 +184,7 @@ def _retry_eval_with_missing_locals(
 def _custom_get_type_hints(cls: Type[_BaseTpcpObject]) -> Dict[str, Any]:
     """Extract type hints while avoiding issues with forward references.
 
-    We automatically skip all douple_underscore methods.
+    We automatically skip all douple-underscore methods.
     """
     hints = {}
     for base in reversed(cls.__mro__):
@@ -194,11 +194,11 @@ def _custom_get_type_hints(cls: Type[_BaseTpcpObject]) -> Dict[str, Any]:
             if name.startswith("__"):
                 continue
             if value is None:
-                value = type(None)
+                value = type(None)  # noqa: PLW2901
             elif isinstance(value, str):
                 # NOTE: This does not check if the str is a valid expression.
                 #       This might not be an issue, but could lead to obscure error messages.
-                value = _retry_eval_with_missing_locals(value, base_globals)
+                value = _retry_eval_with_missing_locals(value, base_globals)  # noqa: PLW2901
             hints[name] = value
     return hints
 
@@ -212,7 +212,7 @@ def _extract_annotations(
         origin = get_origin(v)
         if origin is ClassVar:
             # If the parameter is a ClassVar, we go one level deeper and check, if its argument was annotated.
-            v = get_args(v)[0]
+            v = get_args(v)[0]  # noqa: PLW2901
             origin = get_origin(v)
         if origin is Annotated:
             for annot in get_args(v)[1:]:
@@ -265,7 +265,8 @@ def _validate_all_parent_parameters_implemented(cls: Type[_BaseTpcpObject]):
                 f"Missing parameters: {missing_params}\n"
                 "This might not be a problem, but indicates bad design and you might run into actual issues with some "
                 "of the validation magic `tpcp` does in the background. "
-                "We would recommend to implement all parameters of your parents in a subclass."
+                "We would recommend to implement all parameters of your parents in a subclass.",
+                stacklevel=2,
             )
 
 
@@ -495,7 +496,7 @@ def _set_comp_field(instance, field_name, params):
     # We first partition our field names to know to which index they belong
     comp_params: DefaultDict[str, Any] = defaultdict(dict)
     for key, value in params.items():
-        key, delim, sub_key = key.partition("__")
+        key, delim, sub_key = key.partition("__")  # noqa: PLW2901
         if delim:
             comp_params[key][sub_key] = value
         else:
@@ -537,7 +538,7 @@ def _set_params(instance: BaseTpcpObjectObjT, **params: Any) -> BaseTpcpObjectOb
 
     nested_params: DefaultDict[str, Any] = defaultdict(dict)  # grouped by prefix
     for key, value in params.items():
-        key, delim, sub_key = key.partition("__")
+        key, delim, sub_key = key.partition("__")  # noqa: PLW2901
         if key not in valid_params:
             raise ValueError(f"`{key}` is not a valid parameter name for {type(instance).__name__}.")
 
@@ -626,6 +627,7 @@ def _annotations_are_valid(
                     "Annotating a nested parameter (parameter like `nested_object__nest_para` as a simple "
                     "Parameter has no effect and the entire line should be removed.",
                     PotentialUserErrorWarning,
+                    stacklevel=2,
                 )
         elif k not in fields:
             raise ValueError(
@@ -728,7 +730,7 @@ def clone(algorithm: T, *, safe: bool = False) -> T:
             with Path(os.devnull).open("w") as devnull, contextlib.redirect_stdout(devnull):
                 return copy.deepcopy(algorithm)
         raise TypeError(
-            f"Cannot clone object '{repr(algorithm)}' (type {type(algorithm)}): "
+            f"Cannot clone object '{algorithm!r}' (type {type(algorithm)}): "
             "it does not seem to be a compatible algorithm/pipline class or general `tpcp` object as it does not "
             "inherit from `BaseTpcpObject` or `Algorithm` or `Pipeline`."
         )

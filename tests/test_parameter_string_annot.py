@@ -37,9 +37,6 @@ def test_basic_annotation_collection():
 
 
 def test_import_forward():
-    if TYPE_CHECKING:
-        pass
-
     class Test(BaseTpcpObject):
         hyper: HyperPara[int]
         normal: Para[renamed_optimize]
@@ -85,11 +82,11 @@ def test_import_forward_error():
 def test_test_str_based_forward():
     class Test(BaseTpcpObject):
         hyper: HyperPara[int]
-        normal: Para["Dataset"]
+        normal: Para[Dataset]
         custom_annotated: Annotated[HyperPara[int], "custom_metadata"]
         normal_no_annot: int
 
-        def __init__(self, hyper: int, normal: "Dataset", custom_annotated: int, normal_no_annot: int):
+        def __init__(self, hyper: int, normal: Dataset, custom_annotated: int, normal_no_annot: int):
             self.hyper = hyper
             self.normal = normal
             self.custom_annotated = custom_annotated

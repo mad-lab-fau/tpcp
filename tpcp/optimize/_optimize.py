@@ -97,6 +97,7 @@ class DummyOptimize(BaseOptimize[PipelineT, DatasetT]):
                 "`DummyOptimize` does never call this method and skips any optimization steps! "
                 "Use `Optimize` if you actually want to optimize your pipeline.",
                 PotentialUserErrorWarning,
+                stacklevel=2,
             )
         self.optimized_pipeline_ = self.pipeline.clone()
         return self
@@ -830,6 +831,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
                 warnings.warn(
                     f"One or more of the {key_name.split('_')[0]} scores are non-finite: {array_means}",
                     category=UserWarning,
+                    stacklevel=2,
                 )
             # Weighted std is not directly available in numpy
             array_stds = np.sqrt(np.average((array - array_means[:, np.newaxis]) ** 2, axis=1, weights=weights))
@@ -914,7 +916,8 @@ def _validate_return_optimized(return_optimized, multi_metric, results) -> Tuple
             "single score."
             "`return_optimized` is set to True. "
             "The only allowed string value for `return_optimized` in a single metric case is `-score`, "
-            "to invert the metric before score selection."
+            "to invert the metric before score selection.",
+            stacklevel=2,
         )
         return reverse, "score"
     raise ValueError("`return_optimized` must be a bool or explicitly `score` or `-score` in a single metric case.")

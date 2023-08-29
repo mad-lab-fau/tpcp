@@ -94,7 +94,8 @@ def _split_hyper_and_pure_parameters(
         return [(c, None) for c in param_dict]
     split_param_dict = []
     for c in param_dict:
-        c = copy.copy(c)  # Otherwise, we remove elements from the actual parameter list that is passed as input.
+        # We need to copy, otherwise, we remove elements from the actual parameter list that is passed as input.
+        c = copy.copy(c)  # noqa: PLW2901
         tmp = {}
         for k in list(c.keys()):
             if k in pure_parameters:
