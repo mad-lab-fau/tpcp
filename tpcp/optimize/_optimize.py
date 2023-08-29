@@ -775,7 +775,9 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
                 return_optimized, reverse_ranking, results, rank_prefix="rank_test_", score_prefix="mean_test_"
             )
             # We clone twice, in case one of the params was itself an algorithm.
-            best_optimizer = Optimize(self.pipeline.clone().set_params(**self.best_params_).clone())
+            best_optimizer = Optimize(
+                self.pipeline.clone().set_params(**self.best_params_).clone(), safe_optimize=self.safe_optimize
+            )
             final_optimize_start_time = time.time()
             optimize_params_clean = optimize_params or {}
             self.optimized_pipeline_ = best_optimizer.optimize(dataset, **optimize_params_clean).optimized_pipeline_
