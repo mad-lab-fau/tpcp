@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0] - 2023-08-30
+
+## Added
+- We migrated some testing utilities from other libraries to tpcp and exposed some algorithm test helper
+  that previously only existed in the tests folder via the actual tpcp API.
+  This should make testing algorithms and pipelines developed with tpcp easier.
+  These new features are now available in the `tpcp.testing` module.
+  (https://github.com/mad-lab-fau/tpcp/pull/89)
+
 ## [0.22.1] - 2023-08-30
 
 ### Fixed
