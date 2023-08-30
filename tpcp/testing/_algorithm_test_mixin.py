@@ -40,7 +40,6 @@ class TestAlgorithmMixin:
 
     Examples
     --------
-
     >>> class TestMyAlgorithm(TestAlgorithmMixin):
     ...    ALGORITHM_CLASS = MyAlgorithm
     ...    __test__ = True
