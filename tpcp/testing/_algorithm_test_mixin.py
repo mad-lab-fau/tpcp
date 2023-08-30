@@ -38,8 +38,8 @@ class TestAlgorithmMixin:
     In some very specific cases you might want to ignore some parameters in the docstring tests.
     For this, set the _IGNORED_NAMES attribute to a tuple of parameter names that should be ignored.
 
-    Example
-    -------
+    Examples
+    --------
 
     >>> class TestMyAlgorithm(TestAlgorithmMixin):
     ...    ALGORITHM_CLASS = MyAlgorithm
@@ -66,7 +66,7 @@ class TestAlgorithmMixin:
         The returned algorithm instance should have the result attributes and the "other parameters" (i.e. the action
         method inputs) set.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def test_is_algorithm(self):
         """Test that the class is actually an algorithm."""
@@ -203,5 +203,6 @@ class TestAlgorithmMixin:
     def test_passes_safe_action_checks(self, after_action_instance):
         """Test that the algorithm passes the safe action checks."""
         return make_action_safe(get_action_method(after_action_instance))(
-            after_action_instance, **get_action_params(after_action_instance)
+            after_action_instance,
+            **get_action_params(after_action_instance),
         )
