@@ -15,3 +15,4 @@ This is the API Reference for tpcp.
     Parameter Optimization <optimize>
     Validation and Scoring <validate>
     Parallel Helpers <parallel>
+    Testing <testing>

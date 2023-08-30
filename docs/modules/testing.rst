@@ -11,8 +11,8 @@ Classes
 .. currentmodule:: tpcp.testing
 
 .. autosummary::
-   :toctree: generated/testing
-   :template: class.rst
+    :toctree: generated/testing
+    :template: class.rst
 
     TestAlgorithmMixin
     PyTestSnapshotTest
