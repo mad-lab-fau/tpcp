@@ -74,13 +74,13 @@ def get_fashion_mnist_data():
 class FashionMNIST(Dataset):
     def input_as_array(self) -> np.ndarray:
         self.assert_is_single(None, "input_as_array")
-        group_id = int(self.group)
+        group_id = int(self.group_label.group_id)
         images, _ = get_fashion_mnist_data()
         return images[group_id * 60 : (group_id + 1) * 60].reshape((60, 28, 28)) / 255
 
     def labels_as_array(self) -> np.ndarray:
         self.assert_is_single(None, "labels_as_array")
-        group_id = int(self.group)
+        group_id = int(self.group_label.group_id)
         _, labels = get_fashion_mnist_data()
         return np.array(labels[group_id * 60 : (group_id + 1) * 60])
 
