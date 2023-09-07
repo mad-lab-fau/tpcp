@@ -139,16 +139,6 @@ class _Dataset(BaseTpcpObject):
         )
         return self.group_label
 
-    @property
-    def datapoint_label(self) -> Tuple[str, ...]:
-        """Get the current datapoint label (i.e. the full row of the index as a named tuple).
-
-        Note, this attribute can only be used, if there is just a single row.
-        This will return a named tuple.
-        """
-        self.assert_is_single_datapoint("datapoint_label")
-        return self.index_as_tuples()[0]
-
     def index_as_tuples(self) -> List[Tuple[str, ...]]:
         """Get all datapoint labels of the dataset (i.e. a list of the rows of the index as named tuples)."""
         return list(self.index.itertuples(index=False, name=type(self).__name__ + "DatapointLabel"))
