@@ -700,7 +700,7 @@ class TestDataset:
             ["tests", "patients"],
         ),
     )
-    def test_datapoint_labels(self, groupby_cols):
+    def test_index_as_tuples(self, groupby_cols):
         expected_labels = [
             ("patient_1", "test_1", "0"),
             ("patient_1", "test_1", "1"),
@@ -717,7 +717,7 @@ class TestDataset:
         ]
         expected_length = 12
         ds = Dataset(subset_index=_create_valid_index(), groupby_cols=groupby_cols)
-        labels = ds.datapoint_labels
+        labels = ds.index_as_tuples()
         assert len(labels) == expected_length
         assert (np.array(labels) == np.array(expected_labels)).all()
 
