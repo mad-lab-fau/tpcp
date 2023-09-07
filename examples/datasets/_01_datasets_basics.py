@@ -148,12 +148,12 @@ final_subset.group_labels
 
 # %%
 # If you want to view the full set of labels of a dataset regardless of the grouping,
-# you can use the `datapoint_labels` attribute.
-grouped_subset.datapoint_labels
+# you can use the `index_as_tuples` method.
+grouped_subset.index_as_tuples()
 
 # %%
-# Note that `datapoint_labels` and `group_labels` are the same for an un-grouped dataset.
-final_subset.datapoint_labels
+# Note that `index_as_tuples()` and `group_labels` return the same for an un-grouped dataset.
+final_subset.index_as_tuples()
 
 # %%
 # We can use the group labels (or a subset of them) to index our dataset.

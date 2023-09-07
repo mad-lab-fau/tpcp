@@ -147,10 +147,9 @@ class _Dataset(BaseTpcpObject):
         This will return a named tuple.
         """
         self.assert_is_single_datapoint("datapoint_label")
-        return self.datapoint_labels[0]
+        return self.index_as_tuples()[0]
 
-    @property
-    def datapoint_labels(self) -> List[Tuple[str, ...]]:
+    def index_as_tuples(self) -> List[Tuple[str, ...]]:
         """Get all datapoint labels of the dataset (i.e. a list of the rows of the index as named tuples)."""
         return list(self.index.itertuples(index=False, name=type(self).__name__ + "DatapointLabel"))
 
