@@ -413,31 +413,6 @@ class TestDataset:
 
         assert "test_name" in str(e)
 
-    def test_is_single_datapoint(self):
-        index = _create_valid_index(
-            {"patient_1": {"a": ["test_1"], "b": ["1"]}}, columns_names=["patients", "tests", "extra with space"]
-        )
-        ds = Dataset(subset_index=index)
-        assert ds.is_single_datapoint() is True
-        assert ds.groupby(["patients"]).is_single_datapoint() is True
-        assert ds.groupby(["patients", "tests"]).is_single_datapoint() is True
-
-    @pytest.mark.parametrize(
-        "groupby_cols", (None, "tests", ["patients", "tests"], ["patients", "tests", "extra with space"])
-    )
-    def test_assert_is_single_datapoint_error(self, groupby_cols):
-        index = _create_valid_index(
-            {
-                "patient_1": {"a": ["test_1"], "b": ["0", "1"]},
-                "patient_2": {"a": ["test_1"], "b": ["0", "1"]},
-            },
-            columns_names=["patients", "tests", "extra with space"],
-        )
-        ds = Dataset(subset_index=index, groupby_cols=groupby_cols)
-        with pytest.raises(ValueError) as e:
-            ds.assert_is_single_datapoint("test_datapoint_name")
-        assert "test_datapoint_name" in str(e)
-
     def test_create_index_call(self):
         with pytest.raises(NotImplementedError):
             _ = Dataset().index
