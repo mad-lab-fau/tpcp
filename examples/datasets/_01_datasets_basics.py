@@ -119,7 +119,7 @@ grouped_subset
 # %%
 # If we now iterate the dataset, it will iterate over the unique groups.
 #
-# Grouping also changes the meaning of a "single datapoint". # TODO how do we change this explanation?
+# Grouping also changes the meaning of a "single datapoint".
 # Each group reports a shape of `(1,)` independent of the number of rows in each group.
 for group in grouped_subset:
     print("This group has the shape {}".format(group.shape))
