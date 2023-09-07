@@ -21,13 +21,10 @@ For all changes in this release see: https://github.com/mad-lab-fau/tpcp/pull/85
 
 ### Added
 
-- Added `datapoint_label` and `datapoint_labels` properties to the `Dataset` class.
-  They return the full index of the dataset as a named tuple or list of named tuples regardless of the current grouping.
-  They might be helpful to extract the label information of a datapoint, when `group` requires to handle multiple cases,
+- Added `index_as_tuples` method to the `Dataset` class.
+  It returns the full index of the dataset as a list of named tuples regardless of the current grouping.
+  This might be helpful to extract the label information of a datapoint, when `group` requires to handle multiple cases,
   as your code expects the dataset in different grouped versions.
-- Added `is_single_datapoint` and `assert_is_single_datapoint`. These are basically equivalent to `is_single(None)`
-  and `assert_is_single(None)` and check if there is really only on row left in the index independent of the
-  grouping level.
 
 ### Changed
 
