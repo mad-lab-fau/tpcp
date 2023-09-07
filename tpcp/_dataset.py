@@ -111,6 +111,7 @@ class _Dataset(BaseTpcpObject):
             "The attribute `groups` is deprecated and will be removed in a future version. "
             "Use `group_labels` instead.",
             DeprecationWarning,
+            stacklevel=1,
         )
         return self.group_labels
 
@@ -136,6 +137,7 @@ class _Dataset(BaseTpcpObject):
             "The attribute `group` is deprecated and will be removed in a future version. "
             "Use `group_label` instead.",
             DeprecationWarning,
+            stacklevel=1,
         )
         return self.group_label
 
@@ -404,6 +406,7 @@ class _Dataset(BaseTpcpObject):
             "The method `create_string_group_labels` is deprecated and will be removed in a future version. "
             "Use `create_string_group_labels` instead.",
             DeprecationWarning,
+            stacklevel=1,
         )
         return self.create_string_group_labels(label_cols)
 
