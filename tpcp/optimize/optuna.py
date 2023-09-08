@@ -155,7 +155,8 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         self.dataset = dataset
 
         objective = self._create_objective(self.pipeline, dataset=dataset)
-        self.random_seed_ = self.random_seed if self.random_seed is not None else np.random.randint(0, 100)
+        rng = np.random.default_rng()
+        self.random_seed_ = self.random_seed if self.random_seed is not None else rng.integers(0, 100)
 
         study_params = self.get_study_params(self.random_seed_)
         self.study_ = optuna.create_study(**study_params)
@@ -536,7 +537,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         eval_str_paras: Sequence[str] = (),
         show_progress_bar: bool = False,
         return_optimized: bool = True,
-    ):
+    ) -> None:
         self.pipeline = pipeline
         self.get_study_params = get_study_params
 
@@ -784,7 +785,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         eval_str_paras: Sequence[str] = (),
         show_progress_bar: bool = False,
         return_optimized: bool = True,
-    ):
+    ) -> None:
         self.create_search_space = create_search_space
         self.scoring = scoring
         self.score_name = score_name

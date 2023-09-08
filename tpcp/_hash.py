@@ -115,7 +115,7 @@ class NNHasher(NoMemoizeNumpyHasher):
     Note: I never did any performance checks with large models.
     """
 
-    def __init__(self, hash_name="md5", coerce_mmap=False):
+    def __init__(self, hash_name="md5", coerce_mmap=False) -> None:
         super().__init__(hash_name, coerce_mmap)
         try:
             import torch  # pylint: disable=import-outside-toplevel

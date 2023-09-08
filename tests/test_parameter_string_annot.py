@@ -1,6 +1,6 @@
-"""A set of tests for parameters that specifically tests potential issues with different type of type import and uses
-the text-annotations future
-.
+"""A set of tests for parameters that specifically tests potential issues with different type of type import.
+
+Specifically, these tests use the text-annotations future.
 """
 
 from __future__ import annotations
@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from typing_extensions import Annotated
+from typing_extensions import Annotated  # noqa: TCH002
 
 from tpcp import BaseTpcpObject, HyperPara, Para
 from tpcp._parameters import _ParaTypes

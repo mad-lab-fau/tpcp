@@ -630,7 +630,7 @@ class Dataset(_Dataset):
         *,
         groupby_cols: Optional[Union[List[str], str]] = None,
         subset_index: Optional[pd.DataFrame] = None,
-    ):
+    ) -> None:
         self.groupby_cols = groupby_cols
         self.subset_index = subset_index
 

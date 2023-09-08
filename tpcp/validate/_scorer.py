@@ -70,10 +70,10 @@ class Aggregator(Generic[T]):
 
     RETURN_RAW_SCORES: ClassVar[bool] = True
 
-    def __init__(self, _value: T):
+    def __init__(self, _value: T) -> None:
         self._value = _value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Show the representation of the object."""
         return f"{self.__class__.__name__}({self._value!r})"
 
@@ -171,7 +171,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         default_aggregator: Type[Aggregator[T]] = MeanAggregator,
         single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT, T]] = None,
         **kwargs: Any,
-    ):
+    ) -> None:
         self.kwargs = kwargs
         self._score_func = score_func
         self._default_aggregator = default_aggregator

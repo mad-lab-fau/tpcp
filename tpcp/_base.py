@@ -387,7 +387,7 @@ class BaseTpcpObject(_BaseTpcpObject):
         """
         return f"{name}={value!r}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Provide generic representation for the object based on all parameters."""
         class_name = type(self).__name__
         paras = self.get_params(deep=False)
@@ -777,7 +777,7 @@ class CloneFactory(BaseFactory, Generic[T]):
     Under the hood this uses :func:`~tpcp.clone`.
     """
 
-    def __init__(self, default_value: T):
+    def __init__(self, default_value: T) -> None:
         self.default_value = default_value
 
     def get_value(self) -> T:

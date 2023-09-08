@@ -6,7 +6,20 @@ from contextlib import nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
-from typing import Any, ContextManager, Dict, Generic, Iterator, List, Literal, Optional, Tuple, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ContextManager,
+    Dict,
+    Generic,
+    Iterator,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 import numpy as np
 from joblib import Memory, Parallel
@@ -16,7 +29,6 @@ from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
 from tqdm.auto import tqdm
 from typing_extensions import Self
 
-from tpcp import OptimizablePipeline
 from tpcp._algorithm_utils import OPTIMIZE_METHOD_INDICATOR, _check_safe_optimize, _split_returns
 from tpcp._base import NOTHING, _get_annotated_fields_of_type
 from tpcp._dataset import DatasetT
@@ -34,6 +46,9 @@ from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.parallel import delayed
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
+
+if TYPE_CHECKING:
+    from tpcp import OptimizablePipeline
 
 T = TypeVar("T")
 

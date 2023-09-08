@@ -14,14 +14,14 @@ from joblib import Memory
 from typing_extensions import TypedDict
 
 from tpcp._base import clone
-from tpcp._dataset import Dataset
 from tpcp._hash import custom_hash
-from tpcp._pipeline import Pipeline
 from tpcp._utils._general import _get_nested_paras
 from tpcp.exceptions import OptimizationError, TestError
 
 if TYPE_CHECKING:
+    from tpcp._dataset import Dataset
     from tpcp._optimize import BaseOptimize
+    from tpcp._pipeline import Pipeline
     from tpcp.validate import Scorer
 
 _SCORE_TYPE = Union[Dict[str, float], float]  # pylint: disable=invalid-name
