@@ -37,7 +37,6 @@ For all changes in this release see: https://github.com/mad-lab-fau/tpcp/pull/85
 - **BREAKING CHANGE**: The parameter `groups` of the `get_subset` method of the `Dataset` class is now called
   `group_labels` and always expects a list of named tuples of strings.
 
-
 ## [0.23.0] - 2023-08-30
 
 ## Added
