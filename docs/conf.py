@@ -57,6 +57,7 @@ def convert_github_links(base_url, text):
 HERE = Path(__file__).parent
 with (HERE.parent / "README.md").open() as f:
     out = f.read()
+out = out.replace("./docs/_static/logo/tpcp_logo_with_text.png", "./_static/logo/tpcp_logo_with_text.png")
 with (HERE / "README.md").open("w+") as f:
     f.write(out)
 
@@ -127,6 +128,8 @@ add_function_parentheses = False
 #
 # Activate the theme.
 html_theme = "pydata_sphinx_theme"
+html_favicon = "_static/logo/tpcp.ico"
+html_logo = "_static/logo/tpcp_logo.png"
 
 html_theme_options = {
     "github_url": "https://github.com/mad-lab-fau/tpcp",
@@ -144,7 +147,7 @@ html_context = {
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-# html_static_path = ["_static"]
+html_static_path = ["_static"]
 
 # -- Options for extensions --------------------------------------------------
 # Intersphinx

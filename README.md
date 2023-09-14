@@ -1,3 +1,5 @@
+<img src="./docs/_static/logo/tpcp_logo_with_text.png" height="150">
+
 [![PyPI](https://img.shields.io/pypi/v/tpcp)](https://pypi.org/project/tpcp/)
 [![Documentation Status](https://readthedocs.org/projects/tpcp/badge/?version=latest)](https://tpcp.readthedocs.io/en/latest/?badge=latest)
 [![codecov](https://codecov.io/gh/mad-lab-fau/tpcp/branch/main/graph/badge.svg?token=ZNVT5LNYHO)](https://codecov.io/gh/mad-lab-fau/tpcp)
