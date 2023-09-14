@@ -86,11 +86,11 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
 
     @property
     def search_results_(self) -> Dict[str, Sequence[Any]]:
-        """Detailed results of the study.
+        r"""Detailed results of the study.
 
         This basically contains the same information as `self.study_.trials_dataframe()`, with some small modifications:
 
-        - columns starting with "params_" are renamed to "param_"
+        - columns starting with "params\_" are renamed to "param\_"
         - a new column called "params" containing all parameters as dict is added
         - "value" is renamed to score"
         - the score of pruned trials is set to `np.nan`
