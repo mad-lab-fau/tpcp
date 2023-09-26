@@ -20,6 +20,7 @@ from typing import (
 )
 
 import numpy as np
+from joblib import Parallel
 from typing_extensions import Protocol
 
 from tpcp import NOTHING
@@ -27,6 +28,7 @@ from tpcp._base import _Nothing
 from tpcp._dataset import Dataset, DatasetT
 from tpcp._pipeline import Pipeline, PipelineT
 from tpcp.exceptions import ScorerFailedError, ValidationError
+from tpcp.parallel import delayed
 
 T = TypeVar("T")
 AggReturnType = Union[float, Dict[str, float], _Nothing]
@@ -154,6 +156,19 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         >>> def callback(*, step: int, pipeline: Pipeline, **_):
         ...     ...
 
+    n_jobs
+        The number of parallel jobs to run.
+        Each job will run on a single data point.
+        Note, that the single_score_callback will still be called in the main thread, after a job is finished.
+        However, it could be that multiple jobs are finished before the callback is called.
+        The callback is still gurateed to be called in the order of the data points.
+        If None, no parallelization is used.
+    verbose
+        Controls the verbosity of the parallelization.
+        See :class:`joblib.Parallel` for more details.
+    pre_dispatch
+        Controls the number of jobs that get dispatched during parallelization.
+        See :class:`joblib.Parallel` for more details.
     kwargs
         Additional arguments that might be used by the scorer.
         These are ignored for the base scorer.
@@ -163,6 +178,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
     kwargs: Dict[str, Any]
     _score_func: ScoreFunc[PipelineT, DatasetT, T]
     _single_score_func: Optional[ScoreCallback[PipelineT, DatasetT, T]]
+    _parallel_kwargs: Dict[str, Any]
 
     def __init__(
         self,
@@ -170,12 +186,21 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         *,
         default_aggregator: Type[Aggregator[T]] = MeanAggregator,
         single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT, T]] = None,
+        # Multiprocess_kwargs
+        n_jobs: Optional[int] = None,
+        verbose: int = 0,
+        pre_dispatch: Union[str, int] = "2*n_jobs",
         **kwargs: Any,
     ) -> None:
         self.kwargs = kwargs
         self._score_func = score_func
         self._default_aggregator = default_aggregator
         self._single_score_callback = single_score_callback
+        self._parallel_kwargs = {
+            "n_jobs": n_jobs,
+            "verbose": verbose,
+            "pre_dispatch": pre_dispatch,
+        }
 
     # The typing for IndividualScoreType here is not perfect, but not sure how to fix.
     # For the aggregated scores, we can easily parameterize the value based on the generic, but not for the single
@@ -251,10 +276,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         return agg_scores, raw_scores
 
     def _score(self, pipeline: PipelineT, dataset: DatasetT):
-        # `float` because the return value in case of an exception will always be float
-        scores: List[ScoreTypeT[T]] = []
-        datapoints: List[DatasetT] = []
-        for i, d in enumerate(dataset):
+        def per_datapoint(i, d):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
                 score = self._score_func(pipeline.clone(), d)
@@ -267,19 +289,24 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
                     "The original exception was:\n\n"
                     f"{traceback.format_exc()}"
                 ) from e
+            return i, score
 
-            scores.append(score)
-            if self._single_score_callback:
-                self._single_score_callback(
-                    step=i,
-                    scores=tuple(scores),
-                    scorer=self,
-                    pipeline=pipeline,
-                    dataset=dataset,
-                )
-            datapoints.append(d)
+        scores: List[ScoreTypeT[T]] = []
 
-        return self._aggregate(_check_and_invert_score_dict(scores, self._default_aggregator), datapoints)
+        parallel = Parallel(**self._parallel_kwargs, return_as="generator")
+        with parallel:
+            for i, r in parallel(delayed(per_datapoint)(i, d) for i, d in enumerate(dataset)):
+                scores.append(r)
+                if self._single_score_callback:
+                    self._single_score_callback(
+                        step=i,
+                        scores=tuple(scores),
+                        scorer=self,
+                        pipeline=pipeline,
+                        dataset=dataset,
+                    )
+
+        return self._aggregate(_check_and_invert_score_dict(scores, self._default_aggregator), list(dataset))
 
 
 ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]], Scorer[PipelineT, DatasetT, ScoreTypeT[T]], None]
