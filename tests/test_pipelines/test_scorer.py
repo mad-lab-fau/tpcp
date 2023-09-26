@@ -293,11 +293,12 @@ class TestCustomAggregator:
 
         assert "Scorer returned a NoAgg object. " in str(e)
 
-    def test_score_return_val_multi_score_no_agg(self):
+    @pytest.mark.parametrize("n_jobs", (1, 2))
+    def test_score_return_val_multi_score_no_agg(self, n_jobs):
         def multi_score_func(pipeline, data_point):
             return {"score_1": data_point.group_labels[0], "no_agg_score": NoAgg(str(data_point.group_labels))}
 
-        scorer = Scorer(multi_score_func)
+        scorer = Scorer(multi_score_func, n_jobs=n_jobs)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         agg, single = scorer(pipe, data)
@@ -381,3 +382,26 @@ class TestCustomAggregator:
         data = DummyDataset()
         _ = scorer(pipe, data)
         assert mock_method.called_with(values=list(data), datapoints=list(data))
+
+    @pytest.mark.parametrize("n_jobs", (1, 2))
+    def test_single_value_callback_called_correctly(self, n_jobs):
+        """This tests that the callback is called in the main thread and not in the parallel threads."""
+
+        def score_func(x, y):
+            return y.group_label.value
+
+        thread_local_step = []
+        thread_local_scores = []
+
+        def callback(step, scores, **_):
+            thread_local_step.append(step)
+            thread_local_scores.append(scores[-1])
+
+        scorer = Scorer(score_func, n_jobs=n_jobs, single_score_callback=callback)
+        pipe = DummyOptimizablePipeline()
+        data = DummyDataset()
+
+        _ = scorer(pipe, data)
+
+        assert thread_local_step == list(range(len(data)))
+        assert thread_local_scores == [d.group_label.value for d in data]
