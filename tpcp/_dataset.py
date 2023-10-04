@@ -1,5 +1,6 @@
 """Base class for all datasets."""
 import warnings
+from keyword import iskeyword
 from typing import Dict, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, cast, overload
 
 import numpy as np
@@ -64,6 +65,8 @@ class _Dataset(BaseTpcpObject):
         While we can not catch all related issues (i.e. determinism across different machines), this should catch the
         most obvious ones.
 
+        Furthermore, we check if all columns of the index are valid Python attribute names and throw a warning if not.
+
         In case, creating the index twice is too expensive, users can overwrite this method.
         But better to catch errors early.
         """
@@ -81,6 +84,16 @@ class _Dataset(BaseTpcpObject):
                 " - Relying on the ordering of files from the file system\n\n"
                 "For the last to cases we recommend to sort the dataframe you return from `create_index` "
                 "explicitly using `sort_values`."
+            )
+
+        invalid_elements = [s for s in index_1.columns if not s.isidentifier() or iskeyword(s)]
+        if invalid_elements:
+            warnings.warn(
+                f"Some of your index columns are not valid Python attribute names: {invalid_elements}. "
+                f"This will cause issues when using further methods such as `get_subset`, `group_label`, "
+                f"`group_labels`, and `datapoint_label`.",
+                RuntimeWarning,
+                stacklevel=1,
             )
 
         return index_1
