@@ -105,7 +105,6 @@ class TestAlgorithmMixin:
 
         documented_names = {p.name for p in docs["Parameters"]}
         actual_names = set(get_param_names(self.ALGORITHM_CLASS))
-
         actual_names -= set(self._IGNORED_NAMES)
 
         assert documented_names == actual_names
@@ -120,6 +119,7 @@ class TestAlgorithmMixin:
 
         documented_names = {p.name for p in docs["Attributes"]}
         actual_names = set(get_results(after_action_instance).keys())
+        actual_names -= set(self._IGNORED_NAMES)
 
         assert documented_names == actual_names
 
@@ -133,6 +133,7 @@ class TestAlgorithmMixin:
 
         documented_names = {p.name for p in docs["Other Parameters"]}
         actual_names = set(get_action_params(after_action_instance).keys())
+        actual_names -= set(self._IGNORED_NAMES)
 
         assert documented_names == actual_names
 
