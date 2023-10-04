@@ -201,7 +201,9 @@ class TestAlgorithmMixin:
 
     def test_passes_safe_action_checks(self, after_action_instance):
         """Test that the algorithm passes the safe action checks."""
-        return make_action_safe(get_action_method(after_action_instance))(
+        # We just wrap the method and call it.
+        # We don't care about the return value
+        make_action_safe(get_action_method(after_action_instance))(
             after_action_instance,
             **get_action_params(after_action_instance),
         )
