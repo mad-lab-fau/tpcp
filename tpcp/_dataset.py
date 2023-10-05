@@ -66,8 +66,6 @@ class _Dataset(BaseTpcpObject):
         most obvious ones.
 
         Furthermore, we check if all columns of the index are valid Python attribute names and throw a warning if not.
-        A string is a valid Python attribute name, if it only contains alphanumeric letters, or underscores,
-        and does not start with a number. Furthermore, it must not be a built-in Python keyword.
 
         In case, creating the index twice is too expensive, users can overwrite this method.
         But better to catch errors early.
@@ -93,7 +91,10 @@ class _Dataset(BaseTpcpObject):
             warnings.warn(
                 f"Some of your index columns are not valid Python attribute names: {invalid_elements}. "
                 "This will cause issues when using further methods such as `get_subset`, `group_label`, "
-                "`group_labels`, and `datapoint_label`.",
+                "`group_labels`, and `datapoint_label`.\n"
+                "To be a valid Python attribute a string should only consist of alphanumeric letters and underscores. "
+                "Strings starting with a number, containing spaces or special characters are not allowed."
+                "Furthermore, they must not shadow a built-in Python keyword.",
                 RuntimeWarning,
                 stacklevel=1,
             )
