@@ -92,8 +92,8 @@ class _Dataset(BaseTpcpObject):
         if invalid_elements:
             warnings.warn(
                 f"Some of your index columns are not valid Python attribute names: {invalid_elements}. "
-                f"This will cause issues when using further methods such as `get_subset`, `group_label`, "
-                f"`group_labels`, and `datapoint_label`.",
+                "This will cause issues when using further methods such as `get_subset`, `group_label`, "
+                "`group_labels`, and `datapoint_label`.",
                 RuntimeWarning,
                 stacklevel=1,
             )
