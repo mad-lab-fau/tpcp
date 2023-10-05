@@ -545,11 +545,15 @@ class TestDataset:
         with pytest.raises(RuntimeError):
             _ = TestDataset().index
 
-    def test_warning_index_no_valid_attribute(self):
+    @pytest.mark.parametrize(
+        ("column_names"),
+        (["else", "b", "c"], ["a", "has space", "c"], ["a", "b", "has-special-char"], ["a", "b", "1number_first"]),
+    )
+    def test_warning_index_no_valid_attribute(self, column_names):
         class TestDataset(Dataset):
             def create_index(self):
                 # Return index with some invalid column names
-                return pd.DataFrame(np.zeros((10, 3)), columns=["a", "b ", "else"])
+                return pd.DataFrame(np.zeros((10, 3)), columns=column_names)
 
         with pytest.warns(RuntimeWarning):
             _ = TestDataset().index
