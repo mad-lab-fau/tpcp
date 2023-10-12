@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Scorer class now has the ability to score datapoints in parallel.
   This can be enabled by setting the `n_jobs` parameter of the `Scorer` class to something larger than 1.
   (https://github.com/mad-lab-fau/tpcp/pull/95)
+- The `PyTestSnapshotTest` class does now support comparing dataframes with datetime columns.
+  (https://github.com/mad-lab-fau/tpcp/pull/97)
 
 ## [0.24.0] - 2023-09-08
 
