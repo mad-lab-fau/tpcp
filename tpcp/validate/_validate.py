@@ -155,7 +155,7 @@ def cross_validate(
         )
     splits = list(cv_checked.split(dataset, mock_labels, groups=groups))
 
-    pbar = partial(tqdm, total=len(splits), desc="CV Folds") if progress_bar else _noop
+    pbar = partial(tqdm, total=len(splits), desc="CV Folds") if progress_bar else _passthrough
 
     parallel = Parallel(n_jobs=n_jobs, verbose=verbose, pre_dispatch=pre_dispatch, return_as="generator")
     with parallel:

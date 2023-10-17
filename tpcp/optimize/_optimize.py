@@ -37,8 +37,8 @@ from tpcp._parameters import Parameter, _ParaTypes
 from tpcp._pipeline import OptimizablePipelineT, PipelineT
 from tpcp._utils._general import (
     _aggregate_final_results,
-    _noop,
     _normalize_score_results,
+    _passthrough,
     _prefix_para_dict,
     _split_hyper_and_pure_parameters,
 )
@@ -377,7 +377,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         if self.progress_bar:
             pbar = partial(tqdm, total=len(self.parameter_grid), desc="Parameter Combinations")
         else:
-            pbar = _noop
+            pbar = _passthrough
 
         parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch, return_as="generator")
         with parallel:
@@ -738,7 +738,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
             product(enumerate(split_parameters), enumerate(cv_checked.split(dataset, mock_labels, groups=groups)))
         )
 
-        pbar = partial(tqdm, total=len(combinations), desc="Split-Para Combos") if self.progress_bar else _noop
+        pbar = partial(tqdm, total=len(combinations), desc="Split-Para Combos") if self.progress_bar else _passthrough
 
         # To enable the pure parameter performance improvement, we need to create a joblib cache in a temp dir that
         # is deleted after the run.

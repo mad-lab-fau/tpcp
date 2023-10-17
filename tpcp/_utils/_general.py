@@ -8,6 +8,11 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 
+def _passthrough(arg):
+    """Pass through function. Return the input."""
+    return arg
+
+
 def _noop(*_, **__):
     """No operation."""
 
