@@ -4,22 +4,15 @@ r"""
 Validation
 ================
 
-TODO: when to use validation, when cv? what is the difference bw them?
-Whenever using some sort of trainable algorithm it is important to clearly separate the training and the testing data to
-get an unbiased result.
-Usually this is achieved by a train-test split.
-However, if you don't have that much data, there is always a risk that one random train-test split, will provide
-better (or worse) results than another.
-In these cases it is a good idea to use cross-validation.
-In this procedure, you perform multiple train-test splits and average the results over all "folds".
-For more information see our :ref:`evaluation guide <algorithm_evaluation>` and the `sklearn guide on cross
-validation <https://scikit-learn.org/stable/modules/cross_validation.html>`_.
+Whenever using some sort of algorithm that has fixed parameters already, for example from previous work, and you simply
+want to test its performance on your data, you can use validation.
+Note that this is not the correct way to train or evaluate a newly developed algorithm, as parameters are not optimized.
+In this case, you should use :ref:` cross validation <cross_validation>` instead.
 
 In this example, we will learn how to use the :func:`~tpcp.validate.validate` function implemented in
 tcpc.
-For this, we will reuse the pipeline from the example on :ref:` gridsearch <grid_search>` and the data from the example
-on :ref:` optimizable pipelines <optimizable_pipelines`.
-If you want to have more information on how the dataset and pipeline is built, head over to these examples.
+For this, we will reuse the pipeline and data from the example on :ref:` gridsearch <grid_search>`.
+If you want to have more information on how the dataset and pipeline is built, head over to this example.
 Here we will just copy the code over.
 """
 # %%
@@ -89,7 +82,6 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
 # Now we have all the pieces for the final validation.
 # First we need to create instances of our data and pipeline.
 # Finally, we can call `tpcp.validate.validate`.
-from tpcp.optimize import Optimize
 from tpcp.validate import validate
 
 pipe = MyPipeline()
@@ -98,13 +90,12 @@ results = validate(pipe, example_data, scoring=score)
 result_df = pd.DataFrame(results)
 result_df
 
-# TODO: add example on parallelization
-# TODO
+
 # %%
 # Understanding the Results
 # -------------------------
-# The cross validation provides a lot of outputs (some of them can be disabled using the function parameters).
-# To simplify things a little, we will split the output into four parts:
+# The cross validation provides a lot of outputs.
+# To simplify things a little, we will split the output into three parts:
 #
 # The main output are the dataset performance values.
 performance = result_df[["precision", "recall", "f1_score"]]
@@ -112,9 +103,8 @@ performance
 
 # %%
 # If you need more insight into the results, you can inspect the
-# individual score for each data point.
-# In this example this is only a list with a single element per score, as we only had a single datapoint.
-# In a real scenario, this will be a list of all datapoints.
+# individual score for each data point given in a list. In this example, we had 12 data points.
+# Thus, we retrieve have 12 values for each score.
 # Inspecting this list can help to identify potential issues with certain parts of your dataset.
 # To link the performance values to a specific datapoint, you can look at the `data_labels` field.
 single_performance = result_df[["single_precision", "single_recall", "single_f1_score", "data_labels"]]
@@ -128,10 +118,9 @@ timings
 # %%
 # Further Notes
 # -------------
-# We also support grouped cross validation.
-# Check the :ref:`dataset guide <custom_dataset_basics>` on how you can group the data before cross-validation or
-# generate data labels to be used with `GroupedKFold`.
-#
-# `Optimize` is just an example of an optimizer that can be passed to cross validation.
-# You can pass any `tpcp` optimizer like `GridSearch` or `GridSearchCV` or custom optimizer that implement the
-# `tpcp.optimize.BaseOptimize` interface.
+# For large amounts of data, we also support parallel processing of data points. This can be enabled by setting the
+# `n_jobs` parameter in the :func:`~tpcp.validate.validate` to the number of parallel workers you want to use.
+# Furthermore, you can configure the verbosity level and the number of pre-dispatched batches using the `verbose` and
+# `pre_dispatch` parameter, respectively.
+# For more details, check the documentation of the utilized
+# `joblib.Parallel <https://joblib.readthedocs.io/en/latest/generated/joblib.Parallel.html>` class.
