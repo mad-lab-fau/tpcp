@@ -308,6 +308,10 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
 
         return self._aggregate(_check_and_invert_score_dict(scores, self._default_aggregator), list(dataset))
 
+    @property
+    def parallel_kwargs(self):
+        return self._parallel_kwargs
+
 
 ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]], Scorer[PipelineT, DatasetT, ScoreTypeT[T]], None]
 
