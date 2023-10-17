@@ -1,4 +1,5 @@
 """Helper to validate/evaluate pipelines and Optimize."""
+import inspect
 from functools import partial
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 
@@ -235,10 +236,12 @@ def validate(
     scoring = _validate_scorer(scoring, pipeline)
 
     for arg in ["n_jobs", "verbose", "pre_dispatch"]:
-        if scoring.parallel_kwargs[arg] is not None and not locals()[arg] == scoring.parallel_kwargs[arg]:
+        default_value = inspect.signature(Scorer.__init__).parameters[arg].default
+        # verify that parallel processing properties were only set once
+        if scoring.parallel_kwargs[arg] is not default_value and not locals()[arg] == default_value:
             raise ValueError(f"Argument `{arg}` was already set in the scorer. You can only set it once.")
-
-        if locals()[arg] is not None:
+        # set parallel processing properties
+        if locals()[arg] is not default_value:
             scoring.parallel_kwargs[arg] = locals()[arg]
 
     results = _score(
