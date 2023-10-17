@@ -313,6 +313,8 @@ subset.labeled_r_peaks_
 #
 # Below we will demonstrate how to do that using Pythons `lru_cache` for the `data` property and make caching optional
 # using a dataset parameter.
+#
+# To learn more about caching check out our :ref:`dedicated example <caching>`.
 from functools import lru_cache
 
 
