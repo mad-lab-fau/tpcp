@@ -150,3 +150,8 @@ def test_tensorflow_example():
     # Python versions.
     # We therefore just check if the performance is larger 0.8, which is the case for all runs we have seen so far.
     assert np.all(cv_results["test_per_sample__accuracy"] > 0.8)
+
+
+def test_caching_example():
+    # We just import the example to see if it runs without errors
+    import examples.recipies._01_caching  # noqa
