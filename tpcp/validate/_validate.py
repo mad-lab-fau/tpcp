@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 
 from tpcp import Dataset, Pipeline
 from tpcp._optimize import BaseOptimize
-from tpcp._utils._general import _aggregate_final_results, _noop, _normalize_score_results
+from tpcp._utils._general import _aggregate_final_results, _normalize_score_results, _passthrough
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.parallel import delayed
 from tpcp.validate._scorer import Scorer, _validate_scorer
@@ -245,7 +245,13 @@ def validate(
             scoring.parallel_kwargs[arg] = locals()[arg]
 
     results = _score(
-        pipeline.clone(), dataset, scoring, pipeline.get_params(), return_data_labels=True, return_times=True
+        pipeline.clone(),
+        dataset,
+        scoring,
+        pipeline.get_params(),
+        return_data_labels=True,
+        return_times=True,
+        progress_bar=progress_bar,
     )
     results = _aggregate_final_results([results])
 

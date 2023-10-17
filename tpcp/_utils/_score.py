@@ -63,6 +63,7 @@ def _score(
     return_data_labels=False,
     return_times=False,
     error_info: Optional[str] = None,
+    **kwargs,
 ) -> _ScoreResults:
     """Set parameters and return score.
 
@@ -106,7 +107,7 @@ def _score(
 
     try:
         start_time = time.time()
-        agg_scores, single_scores = scorer(pipeline, dataset)
+        agg_scores, single_scores = scorer(pipeline, dataset, **kwargs)
         score_time = time.time() - start_time
     except Exception as e:  # noqa: BLE001
         raise TestError(

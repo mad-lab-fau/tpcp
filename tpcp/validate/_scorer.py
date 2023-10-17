@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import traceback
+from functools import partial
 from typing import (
     Any,
     Callable,
@@ -21,12 +22,14 @@ from typing import (
 
 import numpy as np
 from joblib import Parallel
+from tqdm import tqdm
 from typing_extensions import Protocol
 
 from tpcp import NOTHING
 from tpcp._base import _Nothing
 from tpcp._dataset import Dataset, DatasetT
 from tpcp._pipeline import Pipeline, PipelineT
+from tpcp._utils._general import _passthrough
 from tpcp.exceptions import ScorerFailedError, ValidationError
 from tpcp.parallel import delayed
 
@@ -206,7 +209,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
     # For the aggregated scores, we can easily parameterize the value based on the generic, but not for the single
     # scores
     def __call__(
-        self, pipeline: PipelineT, dataset: DatasetT
+        self, pipeline: PipelineT, dataset: DatasetT, **kwargs
     ) -> Tuple[Union[float, Dict[str, float]], Union[Optional[List[T]], Dict[str, List[T]]]]:
         """Score the pipeline with the provided data.
 
@@ -218,7 +221,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             The scores for each individual data-point
 
         """
-        return self._score(pipeline=pipeline, dataset=dataset)
+        return self._score(pipeline=pipeline, dataset=dataset, **kwargs)
 
     def _aggregate(  # noqa: C901, PLR0912
         self,
@@ -275,7 +278,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             )
         return agg_scores, raw_scores
 
-    def _score(self, pipeline: PipelineT, dataset: DatasetT):
+    def _score(self, pipeline: PipelineT, dataset: DatasetT, **kwargs):
         def per_datapoint(i, d):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
@@ -293,9 +296,11 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
 
         scores: List[ScoreTypeT[T]] = []
 
+        progress_bar = kwargs.pop("progress_bar", False)
+        pbar = partial(tqdm, total=len(dataset), desc="Datapoints") if progress_bar else _passthrough
         parallel = Parallel(**self._parallel_kwargs, return_as="generator")
         with parallel:
-            for i, r in parallel(delayed(per_datapoint)(i, d) for i, d in enumerate(dataset)):
+            for i, r in pbar(parallel(delayed(per_datapoint)(i, d) for i, d in enumerate(dataset))):
                 scores.append(r)
                 if self._single_score_callback:
                     self._single_score_callback(
