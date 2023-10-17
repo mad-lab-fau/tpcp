@@ -7,12 +7,12 @@ from joblib import Parallel
 from sklearn.model_selection import BaseCrossValidator, check_cv
 from tqdm.auto import tqdm
 
-from tpcp import Dataset
+from tpcp import Dataset, Pipeline
 from tpcp._optimize import BaseOptimize
 from tpcp._utils._general import _aggregate_final_results, _noop, _normalize_score_results
-from tpcp._utils._score import _optimize_and_score
+from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.parallel import delayed
-from tpcp.validate._scorer import _validate_scorer
+from tpcp.validate._scorer import Scorer, _validate_scorer
 
 
 def cross_validate(
@@ -187,19 +187,69 @@ def cross_validate(
         )
     assert results is not None  # For the typechecker
     results = _aggregate_final_results(results)
-    score_results = {}
-    # Fix the formatting of all the score results
-    for name in ["test_scores", "test_single_scores", "train_scores", "train_single_scores"]:
-        if name in results:
-            score = results.pop(name)
-            prefix = ""
-            if "_" in name:
-                prefix = name.rsplit("_", 1)[0] + "_"
-            score = _normalize_score_results(score, prefix)
-            # We use a new dict here, as it is unsafe to append a dict you are iterating over
-            score_results.update(score)
 
+    # Fix the formatting of all the score results
+    score_results = _reformat_scores(
+        ["test_scores", "test_single_scores", "train_scores", "train_single_scores"], results
+    )
     results.update(score_results)
+
+    return results
+
+
+def validate(
+    pipeline: Pipeline,
+    dataset: Dataset,
+    *,
+    scoring: Optional[Union[Callable, Scorer]] = None,
+    n_jobs: Optional[int] = None,
+    verbose: int = 0,
+    pre_dispatch: Union[str, int] = "2*n_jobs",
+    progress_bar: bool = True,
+):
+    """Evaluate a pipeline on a dataset without any optimization.
+
+    Parameters
+    ----------
+    pipeline
+        A :class:`~tpcp.Pipeline` to evaluate on the given data.
+    dataset
+        A :class:`~tpcp.Dataset` containing all information.
+    scoring
+        A callable that can score a single data point given a pipeline.
+        This function should return either a single score or a dictionary of scores.
+        If scoring is `None` the default `score` method of the optimizable is used instead.
+    n_jobs
+        Number of jobs to run in parallel.
+        One job is created per datapoint.
+        The default (`None`) means 1 job at the time, hence, no parallel computing.
+    verbose
+        The verbosity level (larger number -> higher verbosity).
+        At the moment this only effects `Parallel`.
+    pre_dispatch
+        The number of jobs that should be pre dispatched.
+        For an explanation see the documentation of :class:`~joblib.Parallel`.
+    progress_bar
+        True/False to enable/disable a `tqdm` progress bar.
+    """
+    scoring = _validate_scorer(scoring, pipeline)
+
+    for arg in ["n_jobs", "verbose", "pre_dispatch"]:
+        if scoring.parallel_kwargs[arg] is not None and not locals()[arg] == scoring.parallel_kwargs[arg]:
+            raise ValueError(f"Argument `{arg}` was already set in the scorer. You can only set it once.")
+
+        if locals()[arg] is not None:
+            scoring.parallel_kwargs[arg] = locals()[arg]
+
+    results = _score(
+        pipeline.clone(), dataset, scoring, pipeline.get_params(), return_data_labels=True, return_times=True
+    )
+    results = _aggregate_final_results([results])
+
+    # Fix the formatting of all the score results
+    score_results = _reformat_scores(["scores", "single_scores"], results)
+    results.update(score_results)
+
     return results
 
 
@@ -209,3 +259,18 @@ def _propagate_values(
     if propagate_values is False or values is None:
         return {}
     return {name: np.array(values)[train_idx]}
+
+
+def _reformat_scores(score_names: List[str], score_results: Dict[str, Any]):
+    # extract subtypes (e.g., precision, recall) of scores from nested score dictionaries
+    reformatted_results = {}
+    for name in score_names:
+        if name in score_results:
+            score = score_results.pop(name)
+            prefix = ""
+            if "_" in name:
+                prefix = name.rsplit("_", 1)[0] + "_"
+            score = _normalize_score_results(score, prefix)
+            # We use a new dict here, as it is unsafe to append a dict you are iterating over
+            reformatted_results.update(score)
+    return reformatted_results
