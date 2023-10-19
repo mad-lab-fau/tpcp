@@ -1,5 +1,4 @@
 """Helper to validate/evaluate pipelines and Optimize."""
-import inspect
 from functools import partial
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 
@@ -9,6 +8,7 @@ from sklearn.model_selection import BaseCrossValidator, check_cv
 from tqdm.auto import tqdm
 
 from tpcp import Dataset, Pipeline
+from tpcp._base import _Default
 from tpcp._optimize import BaseOptimize
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results, _passthrough
 from tpcp._utils._score import _optimize_and_score, _score
@@ -203,10 +203,10 @@ def validate(
     dataset: Dataset,
     *,
     scoring: Optional[Union[Callable, Scorer]] = None,
-    n_jobs: Optional[int] = None,
-    verbose: int = 0,
-    pre_dispatch: Union[str, int] = "2*n_jobs",
-    progress_bar: bool = True,
+    n_jobs: Optional[int] = _Default(None),
+    verbose: int = _Default(0),
+    pre_dispatch: Union[str, int] = _Default("2*n_jobs"),
+    progress_bar: bool = _Default(True),
 ):
     """Evaluate a pipeline on a dataset without any optimization.
 
@@ -233,16 +233,23 @@ def validate(
     progress_bar
         True/False to enable/disable a `tqdm` progress bar.
     """
+    scoring_args = {"n_jobs": n_jobs, "verbose": verbose, "pre_dispatch": pre_dispatch, "progress_bar": progress_bar}
+    # iterate over args that will be passed to Scorer
+    for arg in scoring_args:
+
+        # when a Scorer instance is provided, the respective arguments were already set
+        if isinstance(scoring, Scorer) and not isinstance(scoring_args[arg], _Default):
+            raise ValueError(  # noqa: TRY004
+                f"Argument `{arg}` was already set in the scorer. You can only set it once."
+            )
+
+        # extract the value from _Default instances
+        if isinstance(scoring_args[arg], _Default):
+            scoring_args[arg] = scoring_args[arg].get_value()
+
     scoring = _validate_scorer(scoring, pipeline)
 
-    for arg in ["n_jobs", "verbose", "pre_dispatch"]:
-        default_value = inspect.signature(Scorer.__init__).parameters[arg].default
-        # verify that parallel processing properties were only set once
-        if scoring.parallel_kwargs[arg] is not default_value and not locals()[arg] == default_value:
-            raise ValueError(f"Argument `{arg}` was already set in the scorer. You can only set it once.")
-        # set parallel processing properties
-        if locals()[arg] is not default_value:
-            scoring.parallel_kwargs[arg] = locals()[arg]
+    scoring.set_params(**scoring_args)
 
     results = _score(
         pipeline.clone(),
@@ -251,7 +258,6 @@ def validate(
         pipeline.get_params(),
         return_data_labels=True,
         return_times=True,
-        progress_bar=progress_bar,
     )
     results = _aggregate_final_results([results])
 
