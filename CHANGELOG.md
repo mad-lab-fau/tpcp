@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `validate` function was introduced to enable validation of an algorithm on arbitrary data without parameter 
   optimization.
   (https://github.com/mad-lab-fau/tpcp/pull/99)
+- Fixed the bug that the functions `optimize` and `cross_validate` were crashing when `progress_bar` was deactivated.
 - New example about caching.
   (https://github.com/mad-lab-fau/tpcp/pull/98)
 
