@@ -800,3 +800,21 @@ def cf(default_value: T) -> T:  # pylint: disable=invalid-name
     This is basically an alias for :class:`~tpcp.CloneFactory`
     """
     return CloneFactory(default_value)  # type: ignore  # noqa: PGH003
+
+
+class _Default:
+    """Wrapper for default values.
+
+    This can be used to check if an optional function argument was explicitly provided by the user or not.
+    See :func:`~tpcp.validate.validate` for  a usage example.
+    """
+
+    def __init__(self, value):
+        self.value = value
+
+    def get_value(self):
+        return self.value
+
+    def __repr__(self):
+        """Print the representation of the value."""
+        return self.value
