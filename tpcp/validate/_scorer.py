@@ -26,7 +26,7 @@ from tqdm import tqdm
 from typing_extensions import Protocol
 
 from tpcp import NOTHING
-from tpcp._base import _Nothing
+from tpcp._base import BaseTpcpObject, _Nothing
 from tpcp._dataset import Dataset, DatasetT
 from tpcp._pipeline import Pipeline, PipelineT
 from tpcp._utils._general import _passthrough
@@ -130,7 +130,7 @@ class NoAgg(Aggregator[Any]):
         return NOTHING
 
 
-class Scorer(Generic[PipelineT, DatasetT, T]):
+class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
     """A scorer to score multiple data points of a dataset and average the results.
 
     Parameters
@@ -172,16 +172,18 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
     pre_dispatch
         Controls the number of jobs that get dispatched during parallelization.
         See :class:`joblib.Parallel` for more details.
-    kwargs
-        Additional arguments that might be used by the scorer.
-        These are ignored for the base scorer.
+    progress_bar
+        True/False to enable/disable a `tqdm` progress bar.
 
     """
 
-    kwargs: Dict[str, Any]
-    _score_func: ScoreFunc[PipelineT, DatasetT, T]
-    _single_score_func: Optional[ScoreCallback[PipelineT, DatasetT, T]]
-    _parallel_kwargs: Dict[str, Any]
+    score_func: ScoreFunc[PipelineT, DatasetT, T]
+    default_aggregator: Type[Aggregator[T]]
+    single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT, T]]
+    n_jobs: Optional[int]
+    verbose: int
+    pre_dispatch: Union[str, int]
+    progress_bar: bool
 
     def __init__(
         self,
@@ -193,23 +195,21 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
         n_jobs: Optional[int] = None,
         verbose: int = 0,
         pre_dispatch: Union[str, int] = "2*n_jobs",
-        **kwargs: Any,
+        progress_bar: bool = True,
     ) -> None:
-        self.kwargs = kwargs
-        self._score_func = score_func
-        self._default_aggregator = default_aggregator
-        self._single_score_callback = single_score_callback
-        self._parallel_kwargs = {
-            "n_jobs": n_jobs,
-            "verbose": verbose,
-            "pre_dispatch": pre_dispatch,
-        }
+        self.score_func = score_func
+        self.default_aggregator = default_aggregator
+        self.single_score_callback = single_score_callback
+        self.n_jobs = n_jobs
+        self.verbose = verbose
+        self.pre_dispatch = pre_dispatch
+        self.progress_bar = progress_bar
 
     # The typing for IndividualScoreType here is not perfect, but not sure how to fix.
     # For the aggregated scores, we can easily parameterize the value based on the generic, but not for the single
     # scores
     def __call__(
-        self, pipeline: PipelineT, dataset: DatasetT, **kwargs
+        self, pipeline: PipelineT, dataset: DatasetT
     ) -> Tuple[Union[float, Dict[str, float]], Union[Optional[List[T]], Dict[str, List[T]]]]:
         """Score the pipeline with the provided data.
 
@@ -221,7 +221,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             The scores for each individual data-point
 
         """
-        return self._score(pipeline=pipeline, dataset=dataset, **kwargs)
+        return self._score(pipeline=pipeline, dataset=dataset)
 
     def _aggregate(  # noqa: C901, PLR0912
         self,
@@ -278,11 +278,11 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
             )
         return agg_scores, raw_scores
 
-    def _score(self, pipeline: PipelineT, dataset: DatasetT, **kwargs):
+    def _score(self, pipeline: PipelineT, dataset: DatasetT):
         def per_datapoint(i, d):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
-                score = self._score_func(pipeline.clone(), d)
+                score = self.score_func(pipeline.clone(), d)
             except Exception as e:  # noqa: BLE001
                 raise ScorerFailedError(
                     f"Scorer raised an exception while scoring data point {i} ({d.group_label}). "
@@ -296,14 +296,15 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
 
         scores: List[ScoreTypeT[T]] = []
 
-        progress_bar = kwargs.pop("progress_bar", False)
-        pbar = partial(tqdm, total=len(dataset), desc="Datapoints") if progress_bar else _passthrough
-        parallel = Parallel(**self._parallel_kwargs, return_as="generator")
+        pbar = partial(tqdm, total=len(dataset), desc="Datapoints") if self.progress_bar else _passthrough
+        parallel = Parallel(
+            n_jobs=self.n_jobs, verbose=self.verbose, pre_dispatch=self.pre_dispatch, return_as="generator"
+        )
         with parallel:
             for i, r in pbar(parallel(delayed(per_datapoint)(i, d) for i, d in enumerate(dataset))):
                 scores.append(r)
-                if self._single_score_callback:
-                    self._single_score_callback(
+                if self.single_score_callback:
+                    self.single_score_callback(
                         step=i,
                         scores=tuple(scores),
                         scorer=self,
@@ -311,11 +312,7 @@ class Scorer(Generic[PipelineT, DatasetT, T]):
                         dataset=dataset,
                     )
 
-        return self._aggregate(_check_and_invert_score_dict(scores, self._default_aggregator), list(dataset))
-
-    @property
-    def parallel_kwargs(self):
-        return self._parallel_kwargs
+        return self._aggregate(_check_and_invert_score_dict(scores, self.default_aggregator), list(dataset))
 
 
 ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]], Scorer[PipelineT, DatasetT, ScoreTypeT[T]], None]
