@@ -80,11 +80,6 @@ class TestScorer:
             scorer(pipe, data)
         assert "MeanAggregator can only be used with float values" in str(e.value)
 
-    def test_kwargs_passed(self):
-        kwargs = {"a": 3, "b": "test"}
-        scorer = Scorer(lambda x: x, **kwargs)
-        assert kwargs == scorer.kwargs
-
     def test_callback_called(self):
         mock_score_func = Mock(return_value=1)
         mock_callback = Mock()
@@ -179,7 +174,7 @@ class TestScorerUtils:
         pipe.score = lambda x: x
         out = _validate_scorer(scoring, pipe)
         assert isinstance(out, type(expected))
-        assert out._score_func == expected._score_func
+        assert out.score_func == expected.score_func
 
     def test_score_not_implemented(self):
         with pytest.raises(NotImplementedError):
