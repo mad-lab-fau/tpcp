@@ -35,7 +35,7 @@ jobs:
       if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
       run: poetry install --no-interaction --no-root --all-extras
     - name: Install library
-      run: poetry install --no-interaction
+      run: poetry install --no-interaction --all-extras
     - name: Testing
       run: |
         poetry run poe test
