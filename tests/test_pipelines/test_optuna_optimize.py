@@ -205,7 +205,7 @@ class TestCustomOptunaOptimize:
             },
             scoring=scoring,
             create_search_space=create_search_space,
-            n_trials=3,
+            n_trials=6,
             n_jobs=n_jobs,
             timeout=None,
             return_optimized=True,
