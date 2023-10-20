@@ -242,6 +242,7 @@ def _cached_optimize(
     Changing the pure parameters will not invalidate the cache.
 
     """
+
     # We do not set all paras right away, we first create a cached optimize function that only has the hyper
     # parameters as input.
     # This allows to cache the train results, if the _optimize_and_score is called multiple times with the same hyper

@@ -241,7 +241,6 @@ class TestSafeOptimize:
 
     @pytest.mark.parametrize("klass", (PipelineModifyOtherParas, PipelineModifyOtherParasMutable))
     def test_non_opti_para_changed(self, klass):
-
         with pytest.raises(RuntimeError) as e:
             make_optimize_safe(klass.self_optimize)(klass(), DummyDataset())
 
@@ -265,7 +264,6 @@ class TestSafeOptimize:
             return self
 
     def test_nested_opti_para(self):
-
         with pytest.raises(RuntimeError) as e:
             make_optimize_safe(self.PipelineModifyNestedParas.self_optimize)(
                 self.PipelineModifyNestedParas(), DummyDataset()
@@ -290,7 +288,6 @@ class TestSafeOptimize:
             return self
 
     def test_nested_opti_para_specific(self):
-
         with pytest.raises(RuntimeError) as e:
             make_optimize_safe(self.PipelineModifyNestedParasSpecific.self_optimize)(
                 self.PipelineModifyNestedParasSpecific(), DummyDataset()

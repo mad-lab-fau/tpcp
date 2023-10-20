@@ -53,12 +53,10 @@ def test_hash_tensor():
 
 @pytest.mark.parametrize("c", (list, tuple))
 def test_container_tensor(torch_objects, c):
-
     tmp = c([torch_objects])
     assert custom_hash(tmp) == custom_hash(clone(tmp))
 
 
 def test_dict_tensor(torch_objects):
-
     tmp = {"a": torch_objects}
     assert custom_hash(tmp) == custom_hash(clone(tmp))

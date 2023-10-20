@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `PyTestSnapshotTest` class does now support comparing dataframes with datetime columns.
   (https://github.com/mad-lab-fau/tpcp/pull/97)
 
+### Changed
+
+- In line with numpy and some other packages, we drop Python 3.8 support
+
 ## [0.24.0] - 2023-09-08
 
 For all changes in this release see: https://github.com/mad-lab-fau/tpcp/pull/85

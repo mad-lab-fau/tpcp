@@ -184,6 +184,7 @@ assert partial_median_results_agg["precision"] == np.mean(partial_median_results
 # .. warning:: Note, that you score function must return the same aggregator for a score across all datapoints.
 #              If not, we will raise an error!
 
+
 # %%
 # Multi-Return Aggregator
 # -----------------------
@@ -302,6 +303,7 @@ complicated_single_no_raw.keys()
 # In the following example, we want to calculate the Macro Average over all participant groups (see dataset below).
 # This means, we want to average the parameters first in each group and then average the results.
 example_data
+
 
 # %%
 # For this our aggregator will use the `datapoint` parameter to find out which group the datapoint belongs and then

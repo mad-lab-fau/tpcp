@@ -250,7 +250,6 @@ def _get_nested_opti_paras(algorithm: Algorithm, opti_para_names: List[str]) -> 
 def _check_safe_optimize(  # noqa: C901, PLR0912
     algorithm: OptimizableT, old_method: Callable, *args: Any, **kwargs: Any
 ) -> OptimizableT:
-
     # record the hash of the pipeline to make an educated guess if the optimization works
     opti_para_names = _get_annotated_fields_of_type(algorithm, _ParaTypes.OPTI)
     optimizable_paras, other_paras = _get_nested_opti_paras(algorithm, opti_para_names)

@@ -138,7 +138,7 @@ cd tpcp
 poetry install --all-extras
 ```
 
-Afterwards you can start to develop and change things.
+Afterward, you can start to develop and change things.
 If you want to run tests, format your code, build the docs, ..., you can run one of the following `poethepoet` commands
 
 ```

@@ -160,7 +160,7 @@ gs = gs.optimize(example_data)
 results = gs.gs_results_
 results
 
-#%%
+# %%
 pd.DataFrame(results)
 
 # %%

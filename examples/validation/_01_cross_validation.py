@@ -186,7 +186,7 @@ timings
 optimized_pipeline = result_df["optimizer"][0]
 optimized_pipeline
 
-#%%
+# %%
 optimized_pipeline.optimized_pipeline_.get_params()
 
 # %%
