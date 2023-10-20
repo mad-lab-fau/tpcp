@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 from optuna import Study, Trial
-from optuna.samplers import GridSampler, RandomSampler, TPESampler
+from optuna.samplers import GridSampler, RandomSampler, TPESampler, BruteForceSampler
 from optuna.trial import FrozenTrial
 
 from tests.test_pipelines.conftest import (
@@ -199,16 +199,13 @@ class TestCustomOptunaOptimize:
         opti = DummyOptunaOptimizer(
             pipe,
             lambda _: {
-                "sampler": GridSampler({"para_1": list(scores.keys())}),
+                "sampler": BruteForceSampler(),
                 "direction": "maximize",
                 "storage": storage,
             },
             scoring=scoring,
             create_search_space=create_search_space,
-            # In case of the multiprocessing backend, we need to set n_trials to a value > len(scores), as we can not
-            # guarantee that the different trails will not choose the same parameters due to timing issues.
-            # See docu for `GridSampler` in optuna.
-            n_trials=6,
+            n_trials=3,
             n_jobs=n_jobs,
             timeout=None,
             return_optimized=True,
