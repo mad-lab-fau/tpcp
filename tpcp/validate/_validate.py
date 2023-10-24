@@ -235,17 +235,21 @@ def validate(
     """
     scoring_args = {"n_jobs": n_jobs, "verbose": verbose, "pre_dispatch": pre_dispatch, "progress_bar": progress_bar}
     # iterate over args that will be passed to Scorer
-    for arg in scoring_args:
+    for arg, value in scoring_args.items():
 
         # when a Scorer instance is provided, the respective arguments were already set
-        if isinstance(scoring, Scorer) and not isinstance(scoring_args[arg], _Default):
+        if isinstance(scoring, Scorer) and not isinstance(value, _Default):
             raise ValueError(  # noqa: TRY004
-                f"Argument `{arg}` was already set in the scorer. You can only set it once."
+                "You passed a explicit Scorer object for the scoring parameter. In this case, we expect "
+                f"multiprocessing parameters ({list(scoring_args.keys())}) to be configured directly on the "
+                f"Scorer instance. However, you specified {arg}={value} by passing it directly "
+                "to the validate function. Instead, pass multiprocessing parameters to your Scorer during "
+                "initialization or by using `set_params`."
             )
 
         # extract the value from _Default instances
-        if isinstance(scoring_args[arg], _Default):
-            scoring_args[arg] = scoring_args[arg].get_value()
+        if isinstance(value, _Default):
+            scoring_args[arg] = value.get_value()
 
     scoring = _validate_scorer(scoring, pipeline)
 
