@@ -59,6 +59,7 @@ def test_gridsearchcv():
 
 def test_validation():
     from examples.validation._01_validation import results
+
     assert_almost_equal(results["f1_score"], [0.7089727])
 
 

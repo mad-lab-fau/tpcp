@@ -52,7 +52,7 @@ class TestCrossValidate:
         ds = DummyDataset()
         pipeline = DummyOptimizablePipeline()
 
-        # The we use len(ds) splits, effectively a leave one our CV for testing.
+        # We use len(ds) splits, effectively a leave one out CV for testing.
         cv = KFold(n_splits=len(ds))
         train, test = zip(*cv.split(ds))
         with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=pipeline) as mock:

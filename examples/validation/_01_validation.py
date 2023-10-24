@@ -82,7 +82,7 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
 # ----------------
 # Now we have all the pieces for the final validation.
 # First we need to create instances of our data and pipeline.
-# Finally, we can call :func: `~tpcp.validate.validate`.
+# Finally, we can call :func:`~tpcp.validate.validate`.
 from tpcp.validate import validate
 
 pipe = MyPipeline()
@@ -100,7 +100,7 @@ result_df
 #
 # The main output are the means of the performance values over all datapoints.
 # Note that if you want to use different aggregation methods, you can create and pass a custom scorer to
-# :func: `~tpcp.validate.validate`. See the example on :ref:` custom scorers <custom_scorer>` for further details.
+# :func:`~tpcp.validate.validate`. See the example on :ref:` custom scorers <custom_scorer>` for further details.
 performance = result_df[["precision", "recall", "f1_score"]]
 performance
 
