@@ -12,7 +12,7 @@ In this case, you should use :ref:` cross validation <cross_validation>` instead
 
 In this example, we will learn how to use the :func:`~tpcp.validate.validate` function implemented in
 tcpc.
-For this, we will reuse the pipeline and data from the example on :ref:` gridsearch <grid_search>`.
+For this, we will reuse the pipeline and data from the example on :ref:`gridsearch <grid_search>`.
 If you want to have more information on how the dataset and pipeline is built, head over to this example.
 Here we will just copy the code over.
 """
@@ -100,7 +100,7 @@ result_df
 #
 # The main output are the means of the performance values over all datapoints.
 # Note that if you want to use different aggregation methods, you can create and pass a custom scorer to
-# :func:`~tpcp.validate.validate`. See the example on :ref:` custom scorers <custom_scorer>` for further details.
+# :func:`~tpcp.validate.validate`. See the example on :ref:`custom scorers <custom_scorer>` for further details.
 performance = result_df[["precision", "recall", "f1_score"]]
 performance
 
