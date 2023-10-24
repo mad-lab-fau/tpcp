@@ -359,13 +359,25 @@ class TestGridSearch:
 
 
 class TestGridSearchCV:
-    def test_single_score(self):
+    @pytest.mark.parametrize(
+        "kwargs",
+        (
+            {},
+            {"n_jobs": 5, "verbose": 1, "pre_dispatch": 5, "progress_bar": False},
+            {"n_jobs": 2, "progress_bar": False},
+        ),
+    )
+    def test_single_score(self, kwargs):
         """Test scoring when only a single performance parameter."""
         # Fixed cv iterator
         cv = PredefinedSplit(test_fold=[0, 0, 1, 1, 1])  # Test Fold 0 has len==2 and 1 has len == 3
         ds = DummyDataset()
         gs = GridSearchCV(
-            DummyOptimizablePipeline(), ParameterGrid({"para_1": [1, 2]}), scoring=dummy_single_score_func, cv=cv
+            DummyOptimizablePipeline(),
+            ParameterGrid({"para_1": [1, 2]}),
+            scoring=dummy_single_score_func,
+            cv=cv,
+            **kwargs,
         )
         gs.optimize(ds)
         results = gs.cv_results_
@@ -410,7 +422,15 @@ class TestGridSearchCV:
         assert all(results["rank_test_score"] == 1)
         assert gs.multimetric_ is False
 
-    def test_multi_score(self):
+    @pytest.mark.parametrize(
+        "kwargs",
+        (
+            {},
+            {"n_jobs": 5, "verbose": 1, "pre_dispatch": 5, "progress_bar": False},
+            {"n_jobs": 2, "progress_bar": False},
+        ),
+    )
+    def test_multi_score(self, kwargs):
         """Test scoring when only a multiple performance parameter."""
         # Fixed cv iterator
         cv = PredefinedSplit(test_fold=[0, 0, 1, 1, 1])  # Test Fold 0 has len==2 and 1 has len == 3
@@ -420,6 +440,7 @@ class TestGridSearchCV:
             scoring=dummy_multi_score_func,
             return_optimized=False,
             cv=cv,
+            **kwargs,
         )
         gs.optimize(DummyDataset())
         results = gs.cv_results_
