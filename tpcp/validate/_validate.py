@@ -236,7 +236,6 @@ def validate(
     scoring_args = {"n_jobs": n_jobs, "verbose": verbose, "pre_dispatch": pre_dispatch, "progress_bar": progress_bar}
     # iterate over args that will be passed to Scorer
     for arg, value in scoring_args.items():
-
         # when a Scorer instance is provided, the respective arguments were already set
         if isinstance(scoring, Scorer) and not isinstance(value, _Default):
             raise ValueError(  # noqa: TRY004
