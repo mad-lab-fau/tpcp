@@ -1,7 +1,8 @@
 """
+.. _custom_scorer:
+
 Custom Scorer
 =============
-.. _custom_scorer:
 
 Scorer or scoring functions are used in tpcp whenever we need to rank any form of output.
 For examples, after a GridSearch, we want to know which pipeline is the best.
