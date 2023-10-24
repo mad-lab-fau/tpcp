@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 from optuna import Study, Trial
-from optuna.samplers import GridSampler, RandomSampler, TPESampler, BruteForceSampler
+from optuna.samplers import BruteForceSampler, RandomSampler, TPESampler
 from optuna.trial import FrozenTrial
 
 from tests.test_pipelines.conftest import (
