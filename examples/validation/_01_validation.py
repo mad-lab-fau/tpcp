@@ -1,5 +1,5 @@
 r"""
-.. _validation:
+.. _validation_example:
 
 Validation
 ================
@@ -8,10 +8,9 @@ Whenever using some sort of algorithm that has fixed parameters already, for exa
 want to test its performance on your data, you can use validation.
 Note that this is not the correct approach if you need to optimize parameters, e.g., when training or evaluating
 a newly developed algorithm.
-In this case, you should use :ref:` cross validation <cross_validation>` instead.
+In this case, you should use :ref:`cross validation <cross_validation>` instead.
 
-In this example, we will learn how to use the :func:`~tpcp.validate.validate` function implemented in
-tcpc.
+In this example, we will learn how to use the :func:`~tpcp.validate.validate` function implemented in tpcp.
 For this, we will reuse the pipeline and data from the example on :ref:`gridsearch <grid_search>`.
 If you want to have more information on how the dataset and pipeline is built, head over to this example.
 Here we will just copy the code over.

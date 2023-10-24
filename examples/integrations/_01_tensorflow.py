@@ -219,7 +219,7 @@ accuracy_score(p1.predicted_labels_, FashionMNIST()[11].labels_as_array())
 # If we want to run a cross validation, we need to formalize the scoring into a function.
 # We will calculate two types of accuracy:
 # First, the accuracy per group and second, the accuracy over all images across all groups.
-# For more information about how this works, check the :ref:`custom_scorer` example.
+# For more information about how this works, check the :ref:`Custom Scorer <custom_scorer>` example.
 from typing import Sequence, Dict
 from tpcp.validate import Aggregator
 
