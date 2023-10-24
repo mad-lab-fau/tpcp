@@ -57,6 +57,11 @@ def test_gridsearchcv():
     assert_almost_equal(results["mean_test_f1_score"], [0.8640027, 0.861629, 0.8655343])
 
 
+def test_validation():
+    from examples.validation._01_validation import results
+    assert_almost_equal(results["f1_score"], [0.7089727])
+
+
 def test_cross_validate():
     from examples.validation._02_cross_validation import results
 
