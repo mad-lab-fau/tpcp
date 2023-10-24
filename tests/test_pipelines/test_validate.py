@@ -153,13 +153,26 @@ class TestCrossValidate:
         for expected, actual in zip(test_flat, mock.call_args_list):
             pd.testing.assert_frame_equal(ds[expected].index, actual[0][0].index)
 
-    def test_single_score(self):
+    @pytest.mark.parametrize(
+        "kwargs",
+        (
+            {},
+            {"n_jobs": 5, "verbose": 1, "pre_dispatch": 5, "progress_bar": False},
+            {"n_jobs": 2, "progress_bar": False},
+        ),
+    )
+    def test_single_score(self, kwargs):
         ds = DummyDataset()
         # Then we use len(ds) splits, effectively a leave one out CV for testing.
         cv = KFold(n_splits=len(ds))
 
         results = cross_validate(
-            Optimize(DummyOptimizablePipeline()), ds, scoring=dummy_single_score_func, cv=cv, return_train_score=True
+            Optimize(DummyOptimizablePipeline()),
+            ds,
+            scoring=dummy_single_score_func,
+            cv=cv,
+            return_train_score=True,
+            **kwargs,
         )
         results_df = pd.DataFrame(results)
 
