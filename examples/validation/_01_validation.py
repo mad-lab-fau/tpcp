@@ -6,7 +6,8 @@ Validation
 
 Whenever using some sort of algorithm that has fixed parameters already, for example from previous work, and you simply
 want to test its performance on your data, you can use validation.
-Note that this is not the correct way to train or evaluate a newly developed algorithm, as parameters are not optimized.
+Note that this is not the correct approach if you need to optimize parameters, e.g., when training or evaluating
+a newly developed algorithm.
 In this case, you should use :ref:` cross validation <cross_validation>` instead.
 
 In this example, we will learn how to use the :func:`~tpcp.validate.validate` function implemented in
@@ -81,7 +82,7 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
 # ----------------
 # Now we have all the pieces for the final validation.
 # First we need to create instances of our data and pipeline.
-# Finally, we can call `tpcp.validate.validate`.
+# Finally, we can call :func: `~tpcp.validate.validate`.
 from tpcp.validate import validate
 
 pipe = MyPipeline()
@@ -94,10 +95,12 @@ result_df
 # %%
 # Understanding the Results
 # -------------------------
-# The cross validation provides a lot of outputs.
+# The validation provides a lot of outputs.
 # To simplify things a little, we will split the output into three parts:
 #
-# The main output are the dataset performance values.
+# The main output are the means of the performance values over all datapoints.
+# Note that if you want to use different aggregation methods, you can create and pass a custom scorer to
+# :func: `~tpcp.validate.validate`. See the example on :ref:` custom scorers <custom_scorer>` for further details.
 performance = result_df[["precision", "recall", "f1_score"]]
 performance
 
