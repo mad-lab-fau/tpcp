@@ -44,8 +44,12 @@ In general, we separate two ways of caching:
    This way, the cache can be reused between different runs of the same code or by multiple processes, when using
    multiprocessing.
    This can be slow, if inputs or outputs are large, and you are using a slow storage medium (e.g. a network drive).
-2. Memory Caching: Memory caches store input and outputs of a function in memory. This is usually much faster than disk
-   caching, but the cache is not persistent and will be lost, if the process is terminated.
+   Hence, this is only useful for really expensive computations and not micro-optimizations.
+2. Memory (aka RAM) Caching: Memory caches store input and outputs of a function in RAM.
+   This is usually much faster than disk caching, but the cache is not persistent and will be lost, if the process is
+   terminated.
+   This means, this cache is only usefull, if the same computation result is accessed multiple times within the same
+   process/script.
    Also, your RAM space is usually much more limited than your disk space, so you need to be careful to not cache too
    much data.
 
@@ -179,7 +183,7 @@ cache.clear()
 # Disk based caching makes sense if you want to reuse the cache between runs or across different processes.
 # However, it can be comparatively slow.
 # If you don't want to fill up your disk space and want fast access to a function result at multiple places in your
-# code, memory caching is the way to go.
+# code, memory/RAM caching is the way to go.
 # Python provides a built-in decorator for memory caching, called
 # `lru_cache <https://docs.python.org/3/library/functools.html#functools.lru_cache>`__.
 # The ``lru_cache`` can be configured to store the last ``n`` function calls in memory.
@@ -247,13 +251,13 @@ dataset.get_subset(participant_id=1).data
 # For example, if the cached loading function does not just return one piece of information, but, for example, the
 # sensor data and the reference data, you can cache the loading function and then split the data into two separate
 # properties on your class.
-# As users of your class will usually only access one of the two properties at a time, you avoid loading the data twice.
+# If users need to access both pieces of data, you avoid loading the data-file twice.
 #
 # Still, in many cases it beneficial to allow users to configure the cache size.
 # This allows them to trade-off memory usage and performance.
 # For example, if they test locally, they might want to use a smaller cache size more appropriate for their local
 # machine, but when running on a server with more memory, they might want to increase the cache size to take advantage
-# of the additional memory.
+# of the additional memory and potential performance gains.
 # However, to allow this we need to write some additional tooling.
 #
 # The general problem we need to overcome is that we need to create the cache instance locally within the class, but
