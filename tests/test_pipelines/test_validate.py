@@ -9,12 +9,14 @@ from tests.test_pipelines.conftest import (
     DummyDataset,
     DummyGroupedDataset,
     DummyOptimizablePipeline,
+    DummyPipeline,
     dummy_single_score_func,
 )
 from tpcp import Dataset, OptimizableParameter, OptimizablePipeline
 from tpcp.exceptions import OptimizationError, TestError
 from tpcp.optimize import DummyOptimize, Optimize
-from tpcp.validate import cross_validate
+from tpcp.validate import cross_validate, validate
+from tpcp.validate._scorer import Scorer, _validate_scorer
 
 
 class CustomOptimizablePipelineWithOptiError(OptimizablePipeline):
@@ -43,6 +45,72 @@ class CustomOptimizablePipelineWithRunError(OptimizablePipeline):
             raise ValueError("This is an error")
         self.optimized = True
         return self
+
+
+class TestValidate:
+    @pytest.mark.parametrize(
+        "kwargs",
+        (
+            {},
+            {"n_jobs": 5, "verbose": 1, "pre_dispatch": 5, "progress_bar": False},
+            {"n_jobs": 2, "progress_bar": False},
+        ),
+    )
+    def test_scores(self, kwargs):
+        """Test that the scores are calculated correctly and the result dict has the expected structure."""
+        ds = DummyDataset()
+        pipeline = DummyPipeline()
+        results = validate(pipeline, ds, scoring=dummy_single_score_func, **kwargs)
+
+        results_df = pd.DataFrame(results)
+
+        assert len(results_df) == 1
+        assert set(results.keys()) == {
+            "data_labels",
+            "score",
+            "single_score",
+            "score_time",
+        }
+        result_row = results_df.iloc[0]  # result_df only has one row
+        assert all(len(result_row[key]) == len(ds) for key in ["data_labels", "single_score"])
+        assert all(isinstance(result_row[key], float) for key in ["score", "score_time"])
+
+        # The dummy scorer is returning the dataset group label -> The datapoint id is also the result
+        all_ids = np.array(ds.group_labels).flatten()
+        assert all(np.array(result_row["data_labels"]).flatten() == np.array(result_row["single_score"]))
+        assert result_row["score"] == np.mean(all_ids)
+
+    @pytest.mark.parametrize(
+        "multiprocess_args",
+        ({"n_jobs": 1}, {"verbose": 1}, {"pre_dispatch": 1}, {"progress_bar": False}, {"n_jobs": 1, "verbose": 1}),
+    )
+    def test_arguments_set_twice_error(self, multiprocess_args):
+        """Test that an error is raised when a scorer object is passed for scoring,
+        and multiprocessing args are set simultaneously.
+        """
+        ds = DummyDataset()
+        pipeline = DummyPipeline()
+        scorer = _validate_scorer(dummy_single_score_func, pipeline)
+        with pytest.raises(ValueError):
+            validate(pipeline, ds, scoring=scorer, **multiprocess_args)
+
+    @patch("tpcp.validate._validate._score", autospec=True)
+    @pytest.mark.parametrize(
+        "multiprocess_args",
+        (
+            {"n_jobs": 5},
+            {"n_jobs": None, "pre_dispatch": 5},
+            {"n_jobs": 1, "verbose": 1, "pre_dispatch": 1, "progress_bar": False},
+        ),
+    )
+    def test_multiprocessing_parameters_set_correctly(self, mock_score, multiprocess_args):
+        """Check if multiprocessing arguments are passed to scorer correctly."""
+        validate(DummyPipeline(), DummyDataset(), scoring=dummy_single_score_func, **multiprocess_args)
+        assert mock_score.call_args is not None  # _score function was called
+        assert len(mock_score.call_args.args) >= 3  # _score function has 3 positional args
+        scorer = mock_score.call_args.args[2]
+        assert isinstance(scorer, Scorer)
+        assert all(scorer.get_params()[arg] == val for arg, val in multiprocess_args.items())
 
 
 class TestCrossValidate:
