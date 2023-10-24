@@ -817,4 +817,4 @@ class _Default:
 
     def __repr__(self):
         """Print the representation of the value."""
-        return self.value
+        return repr(self.value)

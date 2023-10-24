@@ -28,3 +28,4 @@ Functions
    :template: function.rst
 
     cross_validate
+    validate
