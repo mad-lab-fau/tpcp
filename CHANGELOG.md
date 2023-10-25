@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.1] - 2023-10-25
+
+### Fixed
+
+- Ignored names in the testing mixin are now correctly ignored both-ways.
+  I.e. it allows to document additional parameters as well, not just leave out parameters.
+
 ## [0.25.0] - 2023-10-24
 
 ### Added
