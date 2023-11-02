@@ -14,5 +14,6 @@ This is the API Reference for tpcp.
     Custom Algorithms and Pipelines <algorithm_and_pipeline>
     Parameter Optimization <optimize>
     Validation and Scoring <validate>
+    Miscellaneous Utils <misc>
     Parallel Helpers <parallel>
     Testing <testing>

@@ -13,10 +13,39 @@ class _NotSet:
         return "_NOT_SET"
 
 
-_NOT_SET = _NotSet()
-
-
 class TypedIterator(Algorithm, Generic[DataclassT, T]):
+    """Helper to iterate over data and collect results.
+
+    Parameters
+    ----------
+    data_type
+        A dataclass that defines the result type you expect from each iteration.
+    aggregations
+        An optional list of aggregations to apply to the results.
+        This has the form ``[(result_name, aggregation_function), ...]``.
+        If a result-name is in the list, the aggregation will be applied to it, when accessing the respective result
+        attribute (i.e. ``{result_name}_``).
+        If no aggregation is defined for a result, a simple list of all results will be returned.
+    NULL_VALUE
+        (Class attribute) The value that is used to initialize the result dataclass and will remain in the results, if
+        no result was for a specific attribute in one or more iterations.
+
+    Attributes
+    ----------
+    inputs_
+        List of all input elements that were iterated over.
+    raw_results_
+        List of all results as dataclass instances.
+        The attribute of the dataclass instance will have the a value of ``_NOT_SET`` if no result was set.
+        To check for this, you can use ``isinstance(val, TypedIterator.NULL_VALUE)``.
+    {result_name}_
+        The aggregated results for the respective result name.
+    done_
+        True, if the iterator is done.
+        If the iterator is not done, but you try to access the results, a warning will be raised.
+
+    """
+
     data_type: Type[DataclassT]
     aggregations: List[Tuple[str, Callable[[List, List], Any]]]
 
@@ -24,7 +53,7 @@ class TypedIterator(Algorithm, Generic[DataclassT, T]):
     done_: bool
     inputs_: List[T]
 
-    NULL_VALUE = _NOT_SET
+    NULL_VALUE = _NotSet()
 
     def __init__(
         self, data_type: Type[DataclassT], aggregations: List[Tuple[str, Callable[[List, List], Any]]] = cf([])
@@ -33,6 +62,21 @@ class TypedIterator(Algorithm, Generic[DataclassT, T]):
         self.aggregations = aggregations
 
     def iterate(self, iterable: Iterable[T]) -> Iterator[Tuple[T, DataclassT]]:
+        """Iterate over the given iterable and yield the input and a new empty result object for each iteration.
+
+        Parameters
+        ----------
+        iterable
+            The iterable to iterate over.
+
+        Yields
+        ------
+        input, result_object
+            The input and a new empty result object.
+            The result object is a dataclass instance of the type defined in ``self.data_type``.
+            All values of the result object are set to ``TypedIterator.NULL_VALUE`` by default.
+
+        """
         if not is_dataclass(self.data_type):
             raise TypeError(f"Expected a dataclass as data_type, got {self.data_type}")
 
