@@ -56,7 +56,7 @@ class ECGExampleData(Dataset):
         # Check that there is only a single participant in the dataset
         self.assert_is_single(None, "data")
         # Reconstruct the ecg file path based on the data index
-        p_id = self.index["participant"][0]
+        p_id = self.group_label.participant
         file_path = self.data_path / f"{p_id}.pk.gz"
         # We try to use the cache if enabled.
         if self.use_lru_cache:
