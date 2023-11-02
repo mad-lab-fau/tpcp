@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.0] - 
+
+### Added
+
+- TypedIterator (https://github.com/mad-lab-fau/tpcp/pull/100): A new helper that makes iterating over things and accumulating results much easier.
+
+### Changed
+
+- Improved typing of "safe" decorators (https://github.com/mad-lab-fau/tpcp/pull/100).
+  This should fix wrong IDE typehints.
+
 ## [0.25.1] - 2023-10-25
 
 ### Fixed
