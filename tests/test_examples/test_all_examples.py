@@ -161,3 +161,11 @@ def test_tensorflow_example():
 def test_caching_example():
     # We just import the example to see if it runs without errors
     import examples.recipies._01_caching  # noqa
+
+
+def test_typed_iterator_example():
+    from examples.recipies._04_typed_iterator import iterator
+
+    assert len(iterator.r_peak_positions_) == 17782
+    assert sum(iterator.n_r_peaks_.values()) == 17782
+    assert len(iterator.raw_results_) == 12
