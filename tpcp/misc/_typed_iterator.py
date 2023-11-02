@@ -62,7 +62,7 @@ class TypedIterator(Algorithm, Generic[DataclassT, T]):
         actual_item = item[:-1]
 
         if actual_item in self._raw_results[0].__dict__:
-            values = [getattr(r, actual_item) for r in self._raw_results]
+            values = [getattr(r, actual_item) for r in self.raw_results_]
             # if an aggregator is defined for the specific item, we apply it
             for name, aggregator in self.aggregations:
                 if name == actual_item:

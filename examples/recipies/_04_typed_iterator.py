@@ -124,7 +124,7 @@ class QRSResultType:
     """The result type of the QRS detection algorithm"""
 
     r_peak_positions: pd.DataFrame
-    number_of_r_peaks: int
+    n_r_peaks: int
 
 
 # %%
@@ -133,11 +133,11 @@ class QRSResultType:
 # argument.
 # We can use this to create a combined dataframe with a proper index.
 #
-# We turn the `number_of_r_peaks` into a dictionary, to make it easier to map the results back to the inputs.
+# We turn the `n_r_peaks` into a dictionary, to make it easier to map the results back to the inputs.
 
 aggregations = [
     ("r_peak_positions", lambda i, r: pd.concat(r, keys=[i.group_label for i in i])),
-    ("number_of_r_peaks", lambda i, r: dict(zip([i.group_label for i in i], r))),
+    ("n_r_peaks", lambda i, r: dict(zip([i.group_label for i in i], r))),
 ]
 
 # %%
@@ -159,7 +159,7 @@ dataset = ECGExampleData(data_path)
 d: ECGExampleData
 for d, r in iterator.iterate(dataset):
     r.r_peak_positions = QRSDetector().detect(d.data["ecg"], sampling_rate_hz=d.sampling_rate_hz).r_peak_positions_
-    r.number_of_r_peaks = len(r.r_peak_positions)
+    r.n_r_peaks = len(r.r_peak_positions)
 
 # %%
 # Finally we can inspect the results stored on the iterator.
@@ -167,8 +167,8 @@ for d, r in iterator.iterate(dataset):
 iterator.r_peak_positions_
 
 # %%
-# The `number_of_r_peaks_` is still a list of values
-iterator.number_of_r_peaks_
+# The `n_r_peaks_` is still a dictionary, as excpected.
+iterator.n_r_peaks_
 
 # %%
 # The raw results are still available a list of dataclass instances.
