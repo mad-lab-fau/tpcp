@@ -9,7 +9,7 @@ from inspect import isclass
 from pickle import PicklingError
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
 
-from typing_extensions import Concatenate, ParamSpec
+from typing_extensions import ParamSpec
 
 from tpcp import Algorithm
 from tpcp._base import NOTHING, _get_annotated_fields_of_type
@@ -28,6 +28,7 @@ OPTIMIZE_METHOD_INDICATOR = "__tpcp_optimize_method"
 
 
 P = ParamSpec("P")
+CallableT = TypeVar("CallableT", bound=Callable)
 
 
 def _split_returns(values):
@@ -173,9 +174,7 @@ def _check_safe_run(algorithm: AlgorithmT, old_method: Callable, *args: Any, **k
     return output
 
 
-def make_action_safe(
-    action_method: Callable[Concatenate[AlgorithmT, P], AlgorithmT]
-) -> Callable[Concatenate[AlgorithmT, P], AlgorithmT]:
+def make_action_safe(action_method: CallableT) -> CallableT:
     """Mark a method as an "action" and apply a set of runtime checks to prevent implementation errors.
 
     This decorator marks a method as action.
@@ -210,7 +209,7 @@ def make_action_safe(
         return action_method
 
     @wraps(action_method)
-    def safe_wrapped(self: AlgorithmT, *args: P.args, **kwargs: P.kwargs) -> AlgorithmT:
+    def safe_wrapped(self: AlgorithmT, *args, **kwargs) -> AlgorithmT:
         if action_method.__name__ not in get_action_methods_names(self):
             warnings.warn(
                 "The `make_action_safe` decorator should only be applied to an action method "
@@ -353,9 +352,7 @@ def _check_safe_optimize(  # noqa: C901, PLR0912
     return optimized_algorithm
 
 
-def make_optimize_safe(
-    self_optimize_method: Callable[Concatenate[OptimizableT, P], OptimizableT]
-) -> Callable[Concatenate[OptimizableT, P], OptimizableT]:
+def make_optimize_safe(self_optimize_method: CallableT) -> CallableT:
     """Apply a set of runtime checks to a custom `self_optimize` method to prevent implementation errors.
 
     The following things are checked:
@@ -394,7 +391,7 @@ def make_optimize_safe(
         return self_optimize_method
 
     @wraps(self_optimize_method)
-    def safe_wrapped(self: OptimizableT, *args: P.args, **kwargs: P.kwargs) -> OptimizableT:
+    def safe_wrapped(self: OptimizableT, *args, **kwargs) -> OptimizableT:
         if self_optimize_method.__name__ not in ("self_optimize", "self_optimize_with_info"):
             warnings.warn(
                 "The `make_optimize_safe` decorator is only meant for the `self_optimize` method, but you applied it "
