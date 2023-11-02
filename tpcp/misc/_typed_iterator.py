@@ -1,8 +1,8 @@
 import warnings
 from dataclasses import fields, is_dataclass
-from typing import Generic, Iterable, Iterator, List, Tuple, Type, TypeVar
+from typing import Any, Callable, Generic, Iterable, Iterator, List, Tuple, Type, TypeVar
 
-from tpcp import Algorithm
+from tpcp import Algorithm, cf
 
 DataclassT = TypeVar("DataclassT")
 T = TypeVar("T")
@@ -17,12 +17,20 @@ _NOT_SET = _NotSet()
 
 
 class TypedIterator(Algorithm, Generic[DataclassT, T]):
+    data_type: Type[DataclassT]
+    aggregations: List[Tuple[str, Callable[[List, List], Any]]]
+
     _raw_results: List[DataclassT]
     done_: bool
     inputs_: List[T]
 
-    def __init__(self, data_type: Type[DataclassT]):
+    NULL_VALUE = _NOT_SET
+
+    def __init__(
+        self, data_type: Type[DataclassT], aggregations: List[Tuple[str, Callable[[List, List], Any]]] = cf([])
+    ):
         self.data_type = data_type
+        self.aggregations = aggregations
 
     def iterate(self, iterable: Iterable[T]) -> Iterator[Tuple[T, DataclassT]]:
         if not is_dataclass(self.data_type):
@@ -39,7 +47,7 @@ class TypedIterator(Algorithm, Generic[DataclassT, T]):
         self.done_ = True
 
     def _get_new_empty_object(self) -> DataclassT:
-        init_dict = {k.name: _NOT_SET for k in fields(self.data_type)}
+        init_dict = {k.name: self.NULL_VALUE for k in fields(self.data_type)}
         return self.data_type(**init_dict)
 
     @property
@@ -54,7 +62,12 @@ class TypedIterator(Algorithm, Generic[DataclassT, T]):
         actual_item = item[:-1]
 
         if actual_item in self._raw_results[0].__dict__:
-            return [getattr(r, actual_item) for r in self._raw_results]
+            values = [getattr(r, actual_item) for r in self._raw_results]
+            # if an aggregator is defined for the specific item, we apply it
+            for name, aggregator in self.aggregations:
+                if name == actual_item:
+                    return aggregator(self.inputs_, values)
+            return values
 
         valid_result_fields = [k.name + "_" for k in fields(self.data_type)]
 
