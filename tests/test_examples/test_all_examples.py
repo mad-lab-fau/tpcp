@@ -98,7 +98,7 @@ def test_optuna_search():
 
 
 def test_dataclasses():
-    from examples.other_features._01_dataclasses import nested_object_is_different
+    from examples.recipies._02_dataclasses import nested_object_is_different
 
     assert nested_object_is_different is True
 
@@ -135,14 +135,14 @@ def test_custom_scorer():
 
 
 def test_composite_objects():
-    from examples.other_features._02_composite_objects import workflow_instance
+    from examples.recipies._03_composite_objects import workflow_instance
 
     assert workflow_instance.get_params()["pipelines__pipe1__param"] == 2
     assert workflow_instance.get_params()["pipelines__pipe2__param2"] == 4
 
 
 def test_optimization_info():
-    from examples.other_features._03_optimization_info import optimizer
+    from examples.recipies._05_optimization_info import optimizer
 
     assert len(optimizer.optimization_info_["all_thresholds"]) == 935
 
