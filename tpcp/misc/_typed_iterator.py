@@ -1,6 +1,6 @@
 import warnings
 from dataclasses import fields, is_dataclass
-from typing import Any, Callable, Generic, Iterable, Iterator, List, Tuple, Type, TypeVar
+from typing import Any, Callable, Generic, Iterable, Iterator, List, Sequence, Tuple, Type, TypeVar
 
 from tpcp import Algorithm, cf
 
@@ -13,7 +13,7 @@ class _NotSet:
         return "_NOT_SET"
 
 
-class TypedIterator(Algorithm, Generic[DataclassT, T]):
+class TypedIterator(Algorithm, Generic[DataclassT]):
     """Helper to iterate over data and collect results.
 
     Parameters
@@ -47,16 +47,16 @@ class TypedIterator(Algorithm, Generic[DataclassT, T]):
     """
 
     data_type: Type[DataclassT]
-    aggregations: List[Tuple[str, Callable[[List, List], Any]]]
+    aggregations: Sequence[Tuple[str, Callable[[List, List], Any]]]
 
     _raw_results: List[DataclassT]
     done_: bool
-    inputs_: List[T]
+    inputs_: List
 
     NULL_VALUE = _NotSet()
 
     def __init__(
-        self, data_type: Type[DataclassT], aggregations: List[Tuple[str, Callable[[List, List], Any]]] = cf([])
+        self, data_type: Type[DataclassT], aggregations: Sequence[Tuple[str, Callable[[List, List], Any]]] = cf([])
     ):
         self.data_type = data_type
         self.aggregations = aggregations
