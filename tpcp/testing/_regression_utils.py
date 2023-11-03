@@ -188,6 +188,6 @@ class PyTestSnapshotTest:
                     diff = "".join(diff)
                     assert value == prev_snapshot, diff
                 else:
-                    raise ValueError(f"The dtype {value_dtype} is not supported for snapshot testing")
+                    raise TypeError(f"The dtype {value_dtype} is not supported for snapshot testing")
 
         self.curr_snapshot_number += 1
