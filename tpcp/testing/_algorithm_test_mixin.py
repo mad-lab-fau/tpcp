@@ -15,7 +15,7 @@ from tpcp import (
     get_results,
     make_action_safe,
 )
-from tpcp._base import BaseTpcpObjectObjT, _BaseTpcpObject
+from tpcp._base import BaseTpcpObjectT, _BaseTpcpObject
 from tpcp._hash import custom_hash
 
 
@@ -58,7 +58,7 @@ class TestAlgorithmMixin:
     _IGNORED_NAMES = ()
 
     @pytest.fixture()
-    def after_action_instance(self, **kwargs) -> BaseTpcpObjectObjT:  # noqa: PT004
+    def after_action_instance(self, **kwargs) -> BaseTpcpObjectT:  # noqa: PT004
         """Return an instance of the algorithm class AFTER the action is performed.
 
         This needs to be implemented by every testclass.

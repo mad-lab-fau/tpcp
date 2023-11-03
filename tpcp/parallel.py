@@ -16,7 +16,8 @@ from typing import Callable, List, Tuple, TypeVar
 import joblib
 
 T = TypeVar("T")
-_PARALLEL_CONTEXT_CALLBACKS: List[Callable[[], Tuple[T, Callable[[T], None]]]] = []
+CalbackReturnType = Tuple[T, Callable[[T], None]]
+_PARALLEL_CONTEXT_CALLBACKS: List[Callable[[], CalbackReturnType]] = []
 
 
 def delayed(func):

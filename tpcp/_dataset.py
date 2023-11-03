@@ -311,9 +311,13 @@ class _Dataset(BaseTpcpObject):
         """Return html representation of the dataset object."""
         repr_index = self.index if self.groupby_cols is None else self.grouped_index
 
+        representation = repr_index._repr_html_()
+
+        # For type checking
+        assert isinstance(representation, str)
+
         df_repr = (
-            repr_index._repr_html_()
-            .replace("<div>", '<div style="margin-top: 0em">')
+            representation.replace("<div>", '<div style="margin-top: 0em">')
             .replace('<table border="1" class="dataframe"', '<table style="margin-left: 3em;"')
             .replace("<th>", '<th style="text-align: center;">')
             .replace("<td>", '<td style="text-align: center; padding-left: 2em; padding-right: 2em;">')

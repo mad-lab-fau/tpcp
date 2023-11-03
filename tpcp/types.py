@@ -5,7 +5,7 @@ Note, this module only imports them, but they are defined close to places where 
 
 
 from tpcp._algorithm import AlgorithmT
-from tpcp._base import BaseTpcpObjectObjT
+from tpcp._base import BaseTpcpObjectT
 from tpcp._dataset import DatasetT
 from tpcp._pipeline import OptimizablePipelineT, PipelineT
 from tpcp.validate._scorer import (
@@ -19,7 +19,7 @@ from tpcp.validate._scorer import (
 )
 
 __all__ = [
-    "BaseTpcpObjectObjT",
+    "BaseTpcpObjectT",
     "PipelineT",
     "OptimizablePipelineT",
     "DatasetT",

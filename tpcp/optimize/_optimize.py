@@ -940,7 +940,7 @@ def _validate_return_optimized(return_optimized, multi_metric, results) -> Tuple
 
 def _extract_return_optimize_info(
     return_optimized: str, reverse, results, rank_prefix: str = "rank_", score_prefix: str = ""
-) -> Tuple[int, Optional[float], Dict[str, Any]]:
+) -> Tuple[int, float, Dict[str, Any]]:
     """Extract the information from `return_optimized` and check if it is valid."""
     if reverse:
         best_index = (results[f"{rank_prefix}{return_optimized}"]).argmax()

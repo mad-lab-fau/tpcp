@@ -30,12 +30,13 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
-from typing_extensions import Annotated, Literal, Self, get_args, get_origin
+from typing_extensions import Annotated, Concatenate, Literal, ParamSpec, Self, get_args, get_origin
 
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import MutableDefaultsError, PotentialUserErrorWarning, ValidationError
@@ -46,7 +47,9 @@ except ImportError:
     tf = None
 
 T = TypeVar("T")
-BaseTpcpObjectObjT = TypeVar("BaseTpcpObjectObjT", bound="BaseTpcpObject")
+P = ParamSpec("P")
+BaseTpcpObjectT = TypeVar("BaseTpcpObjectT", bound="BaseTpcpObject")
+_BaseTpcpObjectT = TypeVar("_BaseTpcpObjectT", bound="_BaseTpcpObject")
 
 
 class _Nothing:
@@ -94,7 +97,9 @@ def _get_init_defaults(cls: Type[_BaseTpcpObject]) -> Dict[str, inspect.Paramete
     return defaults
 
 
-def _replace_defaults_wrapper(cls: Type[_BaseTpcpObject], old_init: Callable) -> Callable:
+def _replace_defaults_wrapper(
+    cls: Type[_BaseTpcpObjectT], old_init: Callable[Concatenate[_BaseTpcpObjectT, P], T]
+) -> Callable[Concatenate[_BaseTpcpObjectT, P], T]:
     """Decorate an init to create new instances of mutable defaults.
 
     This should only be used in combination with `default` and will be applied as part of `__init_subclass`.
@@ -106,7 +111,7 @@ def _replace_defaults_wrapper(cls: Type[_BaseTpcpObject], old_init: Callable) ->
     params = get_param_names(cls)
 
     @wraps(old_init)
-    def new_init(self: BaseTpcpObject, *args: Any, **kwargs: Any) -> None:
+    def new_init(self: _BaseTpcpObjectT, *args: P.args, **kwargs: P.kwargs) -> None:
         # call the old init.
         old_init(self, *args, **kwargs)
 
@@ -120,7 +125,7 @@ def _replace_defaults_wrapper(cls: Type[_BaseTpcpObject], old_init: Callable) ->
     # This is just for introspection, in case we want to know if we have a modified init.
     new_init.__tpcp_wrapped__ = True
 
-    return new_init
+    return cast(Callable[Concatenate[_BaseTpcpObjectT, P], T], new_init)
 
 
 def _retry_eval_with_missing_locals(
@@ -525,7 +530,7 @@ def _set_comp_field(instance, field_name, params):
     setattr(instance, field_name, new_list)
 
 
-def _set_params(instance: BaseTpcpObjectObjT, **params: Any) -> BaseTpcpObjectObjT:
+def _set_params(instance: BaseTpcpObjectT, **params: Any) -> BaseTpcpObjectT:
     """Set the parameters of an instance.
 
     To set parameters of nested objects use `nested_object_name__para_name=`.
@@ -585,7 +590,7 @@ def get_param_names(obj: Union[Type[_BaseTpcpObject], _BaseTpcpObject]) -> List[
 
 
 def _get_annotated_fields_of_type(
-    instance_or_cls: Union[BaseTpcpObject], field_type: Union[_ParaTypes, Iterable[_ParaTypes]]
+    instance_or_cls: BaseTpcpObject, field_type: Union[_ParaTypes, Iterable[_ParaTypes]]
 ) -> List[str]:
     if isinstance(field_type, _ParaTypes):
         field_type = [field_type]

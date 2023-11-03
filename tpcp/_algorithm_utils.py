@@ -7,28 +7,36 @@ import warnings
 from functools import wraps
 from inspect import isclass
 from pickle import PicklingError
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast, overload
 
-from typing_extensions import ParamSpec
+from typing_extensions import Concatenate, ParamSpec
 
 from tpcp import Algorithm
-from tpcp._base import NOTHING, _get_annotated_fields_of_type
+from tpcp._base import NOTHING, BaseTpcpObject, _get_annotated_fields_of_type, _Nothing
 from tpcp._hash import custom_hash
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import PotentialUserErrorWarning
 
-if TYPE_CHECKING:
-    from tpcp import OptimizableAlgorithm, OptimizablePipeline
-    from tpcp._algorithm import AlgorithmT
-
-    OptimizableT = TypeVar("OptimizableT", OptimizablePipeline, OptimizableAlgorithm)
-
 ACTION_METHOD_INDICATOR = "__tpcp_action_method"
 OPTIMIZE_METHOD_INDICATOR = "__tpcp_optimize_method"
 
+if TYPE_CHECKING:
+    from tpcp._algorithm import AlgorithmT
 
+
+T = TypeVar("T")
+K = TypeVar("K")
 P = ParamSpec("P")
-CallableT = TypeVar("CallableT", bound=Callable)
+
+
+@overload
+def _split_returns(values: Tuple[T, K]) -> Tuple[T, K]:
+    ...
+
+
+@overload
+def _split_returns(values: T) -> Tuple[T, Tuple[_Nothing, _Nothing]]:
+    ...
 
 
 def _split_returns(values):
@@ -36,7 +44,6 @@ def _split_returns(values):
         value, other = values
     else:
         value = values
-        # We use this sentinal here, to allow NOTHING to be returned.
         other = (NOTHING, NOTHING)
     return value, other
 
@@ -174,7 +181,7 @@ def _check_safe_run(algorithm: AlgorithmT, old_method: Callable, *args: Any, **k
     return output
 
 
-def make_action_safe(action_method: CallableT) -> CallableT:
+def make_action_safe(action_method: Callable[P, T]) -> Callable[P, T]:
     """Mark a method as an "action" and apply a set of runtime checks to prevent implementation errors.
 
     This decorator marks a method as action.
@@ -209,7 +216,7 @@ def make_action_safe(action_method: CallableT) -> CallableT:
         return action_method
 
     @wraps(action_method)
-    def safe_wrapped(self: AlgorithmT, *args, **kwargs) -> AlgorithmT:
+    def safe_wrapped(self: AlgorithmT, *args: P.args, **kwargs: P.kwargs) -> AlgorithmT:
         if action_method.__name__ not in get_action_methods_names(self):
             warnings.warn(
                 "The `make_action_safe` decorator should only be applied to an action method "
@@ -223,10 +230,12 @@ def make_action_safe(action_method: CallableT) -> CallableT:
         return _check_safe_run(self, action_method, *args, **kwargs)
 
     setattr(safe_wrapped, ACTION_METHOD_INDICATOR, True)
-    return safe_wrapped
+    return cast(Callable[P, T], safe_wrapped)
 
 
-def _get_nested_opti_paras(algorithm: Algorithm, opti_para_names: List[str]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+def _get_nested_opti_paras(
+    algorithm: BaseTpcpObject, opti_para_names: List[str]
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     paras = algorithm.get_params(deep=True)
     optimizable_paras = {}
     other_paras = {}
@@ -247,8 +256,11 @@ def _get_nested_opti_paras(algorithm: Algorithm, opti_para_names: List[str]) -> 
 
 
 def _check_safe_optimize(  # noqa: C901, PLR0912
-    algorithm: OptimizableT, old_method: Callable, *args: Any, **kwargs: Any
-) -> OptimizableT:
+    algorithm: AlgorithmT,
+    old_method: Callable[Concatenate[AlgorithmT, P], Union[AlgorithmT, Tuple[AlgorithmT, T]]],
+    *args: Any,
+    **kwargs: Any,
+) -> Union[AlgorithmT, Tuple[AlgorithmT, T]]:
     # record the hash of the pipeline to make an educated guess if the optimization works
     opti_para_names = _get_annotated_fields_of_type(algorithm, _ParaTypes.OPTI)
     optimizable_paras, other_paras = _get_nested_opti_paras(algorithm, opti_para_names)
@@ -264,7 +276,7 @@ def _check_safe_optimize(  # noqa: C901, PLR0912
     # Otherwise, we can not capture the "before" state correctly, in case some parameters are mutables (container,
     # or custom object instances)
     before_hash_other_individual = {k: custom_hash(v) for k, v in other_paras.items()}
-    optimized_algorithm: OptimizableT
+    optimized_algorithm: AlgorithmT
     if hasattr(old_method, "__self__"):
         # In this case the method is already bound and we do not need to pass the algo as first argument
         optimized_algorithm, other_returns = _split_returns(old_method(*args, **kwargs))
@@ -352,7 +364,7 @@ def _check_safe_optimize(  # noqa: C901, PLR0912
     return optimized_algorithm
 
 
-def make_optimize_safe(self_optimize_method: CallableT) -> CallableT:
+def make_optimize_safe(self_optimize_method: Callable[P, T]) -> Callable[P, T]:
     """Apply a set of runtime checks to a custom `self_optimize` method to prevent implementation errors.
 
     The following things are checked:
@@ -391,7 +403,7 @@ def make_optimize_safe(self_optimize_method: CallableT) -> CallableT:
         return self_optimize_method
 
     @wraps(self_optimize_method)
-    def safe_wrapped(self: OptimizableT, *args, **kwargs) -> OptimizableT:
+    def safe_wrapped(self: Algorithm, *args: P.args, **kwargs: P.kwargs) -> T:
         if self_optimize_method.__name__ not in ("self_optimize", "self_optimize_with_info"):
             warnings.warn(
                 "The `make_optimize_safe` decorator is only meant for the `self_optimize` method, but you applied it "
@@ -412,4 +424,4 @@ def make_optimize_safe(self_optimize_method: CallableT) -> CallableT:
             ) from e
 
     setattr(safe_wrapped, OPTIMIZE_METHOD_INDICATOR, True)
-    return safe_wrapped
+    return cast(Callable[P, T], safe_wrapped)
