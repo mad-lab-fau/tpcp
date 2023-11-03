@@ -176,11 +176,11 @@ class PyTestSnapshotTest:
             except:
                 raise
             else:
-                if value_dtype == pd.DataFrame:
+                if isinstance(value, pd.DataFrame):
                     assert_frame_equal(value, prev_snapshot, **kwargs)
-                elif value_dtype == np.ndarray:
+                elif isinstance(value, np.ndarray):
                     np.testing.assert_array_almost_equal(value, prev_snapshot, **kwargs)
-                elif value_dtype == str:
+                elif isinstance(value, str):
                     # Display the string diff line by line as part of error message using difflib
                     import difflib
 

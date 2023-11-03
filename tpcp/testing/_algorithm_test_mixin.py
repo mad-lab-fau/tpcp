@@ -1,5 +1,6 @@
 """A mixin for all common tests that should be run on all algorithm classes."""
 import inspect
+from typing import Generic
 
 import joblib
 import pytest
@@ -18,7 +19,7 @@ from tpcp._base import BaseTpcpObjectT, _BaseTpcpObject
 from tpcp._hash import custom_hash
 
 
-class TestAlgorithmMixin:
+class TestAlgorithmMixin(Generic[BaseTpcpObjectT]):
     """A mixin for all common tests that should be run on all algorithm classes.
 
     You can use this mixin to test your algorithm class OR Pipeline sub-class (as pipelines are just algorithms).
@@ -47,7 +48,7 @@ class TestAlgorithmMixin:
 
     """
 
-    ALGORITHM_CLASS: type[Algorithm]
+    ALGORITHM_CLASS: type[BaseTpcpObjectT]
     __test__ = False
 
     ONLY_DEFAULT_PARAMS: bool = True
