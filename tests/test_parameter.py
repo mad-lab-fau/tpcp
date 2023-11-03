@@ -1,5 +1,6 @@
+from typing import Annotated
+
 import pytest
-from typing_extensions import Annotated
 
 from tpcp import BaseTpcpObject, HyperPara, Para
 from tpcp._parameters import _ParaTypes

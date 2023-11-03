@@ -111,7 +111,7 @@ from sklearn.model_selection import train_test_split
 try:
     HERE = Path(__file__).parent
 except NameError:
-    HERE = Path(".").resolve()
+    HERE = Path().resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
 

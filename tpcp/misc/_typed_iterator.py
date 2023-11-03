@@ -1,6 +1,7 @@
 import warnings
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import fields, is_dataclass
-from typing import Any, Callable, Generic, Iterable, Iterator, List, Sequence, Tuple, Type, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
 from tpcp import Algorithm, cf
 
@@ -46,22 +47,22 @@ class TypedIterator(Algorithm, Generic[DataclassT]):
 
     """
 
-    data_type: Type[DataclassT]
-    aggregations: Sequence[Tuple[str, Callable[[List, List], Any]]]
+    data_type: type[DataclassT]
+    aggregations: Sequence[tuple[str, Callable[[list, list], Any]]]
 
-    _raw_results: List[DataclassT]
+    _raw_results: list[DataclassT]
     done_: bool
-    inputs_: List
+    inputs_: list
 
     NULL_VALUE = _NotSet()
 
     def __init__(
-        self, data_type: Type[DataclassT], aggregations: Sequence[Tuple[str, Callable[[List, List], Any]]] = cf([])
+        self, data_type: type[DataclassT], aggregations: Sequence[tuple[str, Callable[[list, list], Any]]] = cf([])
     ):
         self.data_type = data_type
         self.aggregations = aggregations
 
-    def iterate(self, iterable: Iterable[T]) -> Iterator[Tuple[T, DataclassT]]:
+    def iterate(self, iterable: Iterable[T]) -> Iterator[tuple[T, DataclassT]]:
         """Iterate over the given iterable and yield the input and a new empty result object for each iteration.
 
         Parameters
@@ -95,7 +96,7 @@ class TypedIterator(Algorithm, Generic[DataclassT]):
         return self.data_type(**init_dict)
 
     @property
-    def raw_results_(self) -> List[DataclassT]:
+    def raw_results_(self) -> list[DataclassT]:
         if not self.done_:
             warnings.warn("The iterator is not done yet. The results might not be complete.", stacklevel=1)
 

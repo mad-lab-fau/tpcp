@@ -25,14 +25,12 @@ Here we will just copy the code over.
 # Dataset
 from pathlib import Path
 
-import numpy as np
-
 from examples.datasets.datasets_final_ecg import ECGExampleData
 
 try:
     HERE = Path(__file__).parent
 except NameError:
-    HERE = Path(".").resolve()
+    HERE = Path().resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
 

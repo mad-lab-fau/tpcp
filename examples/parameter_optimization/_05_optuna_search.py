@@ -32,7 +32,7 @@ from tpcp import Parameter, Pipeline, cf
 try:
     HERE = Path(__file__).parent
 except NameError:
-    HERE = Path(".").resolve()
+    HERE = Path().resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
 
@@ -71,7 +71,7 @@ from optuna import Trial, samplers
 def get_study_params(seed):
     # We use a simple RandomSampler, but every optuna sampler will work
     sampler = samplers.RandomSampler(seed=seed)
-    return dict(direction="maximize", sampler=sampler)
+    return {"direction": "maximize", "sampler": sampler}
 
 
 # %%

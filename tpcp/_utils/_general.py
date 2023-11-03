@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import copy
 import numbers
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import numpy as np
 
@@ -17,7 +17,7 @@ def _noop(*_, **__):
     """No operation."""
 
 
-def _aggregate_final_results(results: List) -> Dict:
+def _aggregate_final_results(results: list) -> dict:
     """Aggregate the list of dict to dict of np ndarray/list.
 
     Modified based on sklearn.model_selection._validation._aggregate_score_dicts
@@ -46,7 +46,7 @@ def _aggregate_final_results(results: List) -> Dict:
     }
 
 
-def _normalize_score_results(scores: List, prefix="", single_score_key="score"):
+def _normalize_score_results(scores: list, prefix="", single_score_key="score"):
     """Create a scoring dictionary based on the type of `scores`."""
     if scores[0] is None:
         # This is the case, when we have a custom aggregator that sets RETURN_RAW_SCORES to False.
@@ -58,7 +58,7 @@ def _normalize_score_results(scores: List, prefix="", single_score_key="score"):
     return {prefix + single_score_key: scores}
 
 
-def _prefix_para_dict(params_dict: Optional[Dict], prefix="pipeline__") -> Optional[Dict]:
+def _prefix_para_dict(params_dict: Optional[dict], prefix="pipeline__") -> Optional[dict]:
     """Add a prefix to all parameter names in the dictionary.
 
     This can be helpful to adjust a parameter grid that was originally created for a pipeline to work on a wrapper like
@@ -69,7 +69,7 @@ def _prefix_para_dict(params_dict: Optional[Dict], prefix="pipeline__") -> Optio
     return {prefix + k: v for k, v in params_dict.items()}
 
 
-def _get_nested_paras(param_dict: Optional[Dict], nested_object_name="pipeline") -> Dict:
+def _get_nested_paras(param_dict: Optional[dict], nested_object_name="pipeline") -> dict:
     """Get the parameters belonging to a nested object and remove the suffix.
 
     If the parameter of a double nested object are required, use `level_1__level_1`.
@@ -80,8 +80,8 @@ def _get_nested_paras(param_dict: Optional[Dict], nested_object_name="pipeline")
 
 
 def _split_hyper_and_pure_parameters(
-    param_dict: List[Dict], pure_parameters: Optional[List[str]]
-) -> List[Tuple[Optional[Dict], Optional[Dict]]]:
+    param_dict: list[dict], pure_parameters: Optional[list[str]]
+) -> list[tuple[Optional[dict], Optional[dict]]]:
     """Split a list of parameters in hyperparameters and pure parameters.
 
     For each dictionary in the list, this separates the pure parameters (names provided in input) from all

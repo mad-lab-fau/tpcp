@@ -1,6 +1,5 @@
 """A mixin for all common tests that should be run on all algorithm classes."""
 import inspect
-from typing import Type
 
 import joblib
 import pytest
@@ -48,7 +47,7 @@ class TestAlgorithmMixin:
 
     """
 
-    ALGORITHM_CLASS: Type[Algorithm]
+    ALGORITHM_CLASS: type[Algorithm]
     __test__ = False
 
     ONLY_DEFAULT_PARAMS: bool = True

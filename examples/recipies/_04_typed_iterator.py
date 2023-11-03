@@ -1,7 +1,7 @@
 """
 
 TypedIterator
-=============
+=============.
 
 This example shows how to use the :class:`~tpcp.misc.TypedIterator` class, which might be helpful, when iterating over
 data and needing to store multiple results for each iteration.
@@ -121,7 +121,7 @@ import pandas as pd
 
 @dataclass
 class QRSResultType:
-    """The result type of the QRS detection algorithm"""
+    """The result type of the QRS detection algorithm."""
 
     r_peak_positions: pd.Series
     n_r_peaks: int
@@ -142,16 +142,17 @@ aggregations = [
 
 # %%
 # Now we can create the iterator and iterate over the dataset.
-from examples.datasets.datasets_final_ecg import ECGExampleData
-from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
 from pathlib import Path
+
+from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
+from examples.datasets.datasets_final_ecg import ECGExampleData
 
 iterator = TypedIterator(QRSResultType, aggregations=aggregations)
 
 try:
     HERE = Path(__file__).parent
 except NameError:
-    HERE = Path(".").resolve()
+    HERE = Path().resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 
 dataset = ECGExampleData(data_path)

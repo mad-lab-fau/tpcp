@@ -17,17 +17,13 @@ from functools import wraps
 from pathlib import Path
 from types import MethodWrapperType
 from typing import (
+    TYPE_CHECKING,
+    Annotated,
     Any,
     Callable,
     ClassVar,
-    DefaultDict,
-    Dict,
     Generic,
-    Iterable,
-    List,
     Optional,
-    Tuple,
-    Type,
     TypeVar,
     Union,
     cast,
@@ -36,15 +32,29 @@ from typing import (
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
-from typing_extensions import Annotated, Concatenate, Literal, ParamSpec, Self, get_args, get_origin
+from typing_extensions import (
+    Concatenate,
+    Literal,
+    ParamSpec,
+    Self,
+    get_args,
+    get_origin,
+)
 
 from tpcp._parameters import _ParaTypes
-from tpcp.exceptions import MutableDefaultsError, PotentialUserErrorWarning, ValidationError
+from tpcp.exceptions import (
+    MutableDefaultsError,
+    PotentialUserErrorWarning,
+    ValidationError,
+)
 
 try:
     import tensorflow as tf
 except ImportError:
     tf = None
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 T = TypeVar("T")
 P = ParamSpec("P")
@@ -83,7 +93,7 @@ Sentinel to indicate the lack of a value when ``None`` is ambiguous.
 """
 
 
-def _get_init_defaults(cls: Type[_BaseTpcpObject]) -> Dict[str, inspect.Parameter]:
+def _get_init_defaults(cls: type[_BaseTpcpObject]) -> dict[str, inspect.Parameter]:
     # fetch the constructor or the original constructor before deprecation wrapping if any
     init = cls.__init__
     if init is object.__init__ or isinstance(init, MethodWrapperType):
@@ -98,7 +108,7 @@ def _get_init_defaults(cls: Type[_BaseTpcpObject]) -> Dict[str, inspect.Paramete
 
 
 def _replace_defaults_wrapper(
-    cls: Type[_BaseTpcpObjectT], old_init: Callable[Concatenate[_BaseTpcpObjectT, P], T]
+    cls: type[_BaseTpcpObjectT], old_init: Callable[Concatenate[_BaseTpcpObjectT, P], T]
 ) -> Callable[Concatenate[_BaseTpcpObjectT, P], T]:
     """Decorate an init to create new instances of mutable defaults.
 
@@ -129,7 +139,9 @@ def _replace_defaults_wrapper(
 
 
 def _retry_eval_with_missing_locals(
-    expression: str, globalns: Optional[Dict[str, Any]] = None, localns: Optional[Dict[str, Any]] = None
+    expression: str,
+    globalns: Optional[dict[str, Any]] = None,
+    localns: Optional[dict[str, Any]] = None,
 ) -> Any:
     globalns = globalns or {}
     localns = localns or {}
@@ -186,7 +198,7 @@ def _retry_eval_with_missing_locals(
     return val
 
 
-def _custom_get_type_hints(cls: Type[_BaseTpcpObject]) -> Dict[str, Any]:
+def _custom_get_type_hints(cls: type[_BaseTpcpObject]) -> dict[str, Any]:
     """Extract type hints while avoiding issues with forward references.
 
     We automatically skip all douple-underscore methods.
@@ -209,8 +221,8 @@ def _custom_get_type_hints(cls: Type[_BaseTpcpObject]) -> Dict[str, Any]:
 
 
 def _extract_annotations(
-    cls: Type[_BaseTpcpObject], init_fields: Dict[str, inspect.Parameter]
-) -> Dict[str, _ParaTypes]:
+    cls: type[_BaseTpcpObject], init_fields: dict[str, inspect.Parameter]
+) -> dict[str, _ParaTypes]:
     cls_annotations = _custom_get_type_hints(cls)
     para_annotations = {}
     for k, v in cls_annotations.items():
@@ -229,7 +241,7 @@ def _extract_annotations(
     return para_annotations
 
 
-def _validate_parameter(cls: Type[_BaseTpcpObject]):
+def _validate_parameter(cls: type[_BaseTpcpObject]):
     # We extract the fields of the init
     fields = _get_init_defaults(cls)
 
@@ -252,7 +264,7 @@ def _validate_parameter(cls: Type[_BaseTpcpObject]):
         )
 
 
-def _validate_all_parent_parameters_implemented(cls: Type[_BaseTpcpObject]):
+def _validate_all_parent_parameters_implemented(cls: type[_BaseTpcpObject]):
     """Validate that a class implements all parameters of its parents.
 
     We don't raise an error in this case, we just warn the user.
@@ -275,12 +287,12 @@ def _validate_all_parent_parameters_implemented(cls: Type[_BaseTpcpObject]):
             )
 
 
-def _get_tpcp_validated(cls_or_instance: Union[Type[_BaseTpcpObject], _BaseTpcpObject]):
+def _get_tpcp_validated(cls_or_instance: Union[type[_BaseTpcpObject], _BaseTpcpObject]):
     cls = cls_or_instance if isinstance(cls_or_instance, type) else type(cls_or_instance)
     return cls.__dict__.get("__tpcp_validated_hidden__", False)
 
 
-def _set_tpcp_validated(cls_or_instance: Union[Type[_BaseTpcpObject], _BaseTpcpObject], value: bool):
+def _set_tpcp_validated(cls_or_instance: Union[type[_BaseTpcpObject], _BaseTpcpObject], value: bool):
     cls = cls_or_instance if isinstance(cls_or_instance, type) else type(cls_or_instance)
     cls.__tpcp_validated_hidden__ = value
 
@@ -288,11 +300,11 @@ def _set_tpcp_validated(cls_or_instance: Union[Type[_BaseTpcpObject], _BaseTpcpO
 class _BaseTpcpObject:
     # These two parameters should be initialized once per class.
     # This means, when we read them, we always check in the dictionary if they are defined.
-    __field_annotations_cache__: Dict[str, _ParaTypes]
+    __field_annotations_cache__: dict[str, _ParaTypes]
     __tpcp_validated_hidden__: bool
 
     @property
-    def __field_annotations__(self) -> Dict[str, _ParaTypes]:
+    def __field_annotations__(self) -> dict[str, _ParaTypes]:
         """Get the field annotations that provide higher level information about the role of a parameter.
 
         We implement that as property to move the extraction of the annotations as far down in the initialization as
@@ -337,9 +349,9 @@ class _BaseTpcpObject:
 class BaseTpcpObject(_BaseTpcpObject):
     """Baseclass for all tpcp objects."""
 
-    _composite_params: ClassVar[Tuple[str, ...]] = ()
+    _composite_params: ClassVar[tuple[str, ...]] = ()
 
-    def get_params(self, deep: bool = True) -> Dict[str, Any]:
+    def get_params(self, deep: bool = True) -> dict[str, Any]:
         """Get parameters for this algorithm.
 
         Parameters
@@ -431,7 +443,7 @@ class BaseTpcpObject(_BaseTpcpObject):
         return clone(value, safe=False)
 
 
-def _get_deep_params(obj, parent_key) -> Dict[str, Any]:
+def _get_deep_params(obj, parent_key) -> dict[str, Any]:
     # This is a little magic, that also gets the parameters of nested sklearn classifiers.
     if hasattr(obj, "get_params"):
         deep_items = obj.get_params(deep=True).items()
@@ -449,7 +461,7 @@ def _assert_is_allowed_composite_value(val, parent_key: str, iteration: int):
         )
 
 
-def _recursive_validate(cls: Type[_BaseTpcpObject]):
+def _recursive_validate(cls: type[_BaseTpcpObject]):
     if not _get_tpcp_validated(cls):
         _validate_parameter(cls)
         _validate_all_parent_parameters_implemented(cls)
@@ -462,7 +474,7 @@ def _recursive_validate(cls: Type[_BaseTpcpObject]):
                 _recursive_validate(base)
 
 
-def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
+def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> dict[str, Any]:
     # At some point, we want to validate that the user defined the class correctly.
     # To allow for all strange modifications of the class, we run the validation, when we actually need the parameters.
     # This usually required a call to `get_params`.
@@ -475,7 +487,7 @@ def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
 
     valid_fields = get_param_names(type(instance))
     comp_fields = getattr(instance, "_composite_params", ())
-    out: Dict[str, Any] = {}
+    out: dict[str, Any] = {}
     for key in valid_fields:
         value = getattr(instance, key)
         if deep:
@@ -499,7 +511,7 @@ def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> Dict[str, Any]:
 
 def _set_comp_field(instance, field_name, params):
     # We first partition our field names to know to which index they belong
-    comp_params: DefaultDict[str, Any] = defaultdict(dict)
+    comp_params: defaultdict[str, Any] = defaultdict(dict)
     for key, value in params.items():
         key, delim, sub_key = key.partition("__")  # noqa: PLW2901
         if delim:
@@ -541,7 +553,7 @@ def _set_params(instance: BaseTpcpObjectT, **params: Any) -> BaseTpcpObjectT:
     valid_params = instance.get_params(deep=True)
     comp_fields = getattr(instance, "_composite_params", ())
 
-    nested_params: DefaultDict[str, Any] = defaultdict(dict)  # grouped by prefix
+    nested_params: defaultdict[str, Any] = defaultdict(dict)  # grouped by prefix
     for key, value in params.items():
         key, delim, sub_key = key.partition("__")  # noqa: PLW2901
         if key not in valid_params:
@@ -561,7 +573,7 @@ def _set_params(instance: BaseTpcpObjectT, **params: Any) -> BaseTpcpObjectT:
     return instance
 
 
-def get_param_names(obj: Union[Type[_BaseTpcpObject], _BaseTpcpObject]) -> List[str]:
+def get_param_names(obj: Union[type[_BaseTpcpObject], _BaseTpcpObject]) -> list[str]:
     """Get parameter names for the object.
 
     The parameters of an algorithm/pipeline are defined based on its `__init__` method.
@@ -591,13 +603,13 @@ def get_param_names(obj: Union[Type[_BaseTpcpObject], _BaseTpcpObject]) -> List[
 
 def _get_annotated_fields_of_type(
     instance_or_cls: BaseTpcpObject, field_type: Union[_ParaTypes, Iterable[_ParaTypes]]
-) -> List[str]:
+) -> list[str]:
     if isinstance(field_type, _ParaTypes):
         field_type = [field_type]
     return [k for k, v in instance_or_cls.__field_annotations__.items() if v in field_type]
 
 
-def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]) -> None:
+def _has_dangerous_mutable_default(fields: dict[str, inspect.Parameter], cls: type[_BaseTpcpObject]) -> None:
     mutable_defaults = []
 
     for name, field in fields.items():
@@ -623,7 +635,9 @@ def _has_dangerous_mutable_default(fields: Dict[str, inspect.Parameter], cls: Ty
 
 
 def _annotations_are_valid(
-    field_annotations: Dict[str, _ParaTypes], fields: Dict[str, inspect.Parameter], cls_name: str
+    field_annotations: dict[str, _ParaTypes],
+    fields: dict[str, inspect.Parameter],
+    cls_name: str,
 ) -> None:
     for k, v in field_annotations.items():
         if "__" in k:
@@ -643,7 +657,7 @@ def _annotations_are_valid(
             )
 
 
-def _has_invalid_name(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpObject]) -> None:
+def _has_invalid_name(fields: dict[str, inspect.Parameter], cls: type[_BaseTpcpObject]) -> None:
     invalid_names = [f for f in fields if "__" in f]
     if len(invalid_names) > 0:
         raise ValidationError(
@@ -672,7 +686,7 @@ def _has_invalid_name(fields: Dict[str, inspect.Parameter], cls: Type[_BaseTpcpO
         )
 
 
-def _get_dangerous_mutable_types() -> Tuple[type, ...]:
+def _get_dangerous_mutable_types() -> tuple[type, ...]:
     # TODO: Update this list or even make it a white list?
     return _BaseTpcpObject, list, dict, np.ndarray, pd.DataFrame, BaseEstimator
 

@@ -8,7 +8,7 @@ The original code is licenced under BSD-3: https://github.com/scikit-learn/sciki
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from joblib import Memory
 from typing_extensions import TypedDict
@@ -24,9 +24,9 @@ if TYPE_CHECKING:
     from tpcp._pipeline import Pipeline
     from tpcp.validate import Scorer
 
-_SCORE_TYPE = Union[Dict[str, float], float]  # pylint: disable=invalid-name
-_AGG_SCORE_TYPE = Union[Dict[str, float], float]  # pylint: disable=invalid-name
-_SINGLE_SCORE_TYPE = Union[Dict[str, List[float]], Optional[List[float]]]  # pylint: disable=invalid-name
+_SCORE_TYPE = Union[dict[str, float], float]  # pylint: disable=invalid-name
+_AGG_SCORE_TYPE = Union[dict[str, float], float]  # pylint: disable=invalid-name
+_SINGLE_SCORE_TYPE = Union[dict[str, list[float]], Optional[list[float]]]  # pylint: disable=invalid-name
 
 
 class _ScoreResults(TypedDict, total=False):
@@ -35,8 +35,8 @@ class _ScoreResults(TypedDict, total=False):
     scores: _AGG_SCORE_TYPE
     single_scores: _SINGLE_SCORE_TYPE
     score_time: float
-    data_labels: List[Union[str, Tuple[str, ...]]]
-    parameters: Optional[Dict[str, Any]]
+    data_labels: list[Union[str, tuple[str, ...]]]
+    parameters: Optional[dict[str, Any]]
 
 
 class _OptimizeScoreResults(TypedDict, total=False):
@@ -48,9 +48,9 @@ class _OptimizeScoreResults(TypedDict, total=False):
     train_single_scores: _SINGLE_SCORE_TYPE
     score_time: float
     optimize_time: float
-    train_data_labels: List[Union[str, Tuple[str, ...]]]
-    test_data_labels: List[Union[str, Tuple[str, ...]]]
-    parameters: Optional[Dict[str, Any]]
+    train_data_labels: list[Union[str, tuple[str, ...]]]
+    test_data_labels: list[Union[str, tuple[str, ...]]]
+    parameters: Optional[dict[str, Any]]
     optimizer: BaseOptimize
 
 
@@ -58,7 +58,7 @@ def _score(
     pipeline: Pipeline,
     dataset: Dataset,
     scorer: Scorer,
-    parameters: Optional[Dict[str, Any]],
+    parameters: Optional[dict[str, Any]],
     return_parameters=False,
     return_data_labels=False,
     return_times=False,
@@ -130,9 +130,9 @@ def _optimize_and_score(
     train_set: Dataset,
     test_set: Dataset,
     *,
-    optimize_params: Optional[Dict] = None,
-    hyperparameters: Optional[Dict] = None,
-    pure_parameters: Optional[Dict] = None,
+    optimize_params: Optional[dict] = None,
+    hyperparameters: Optional[dict] = None,
+    pure_parameters: Optional[dict] = None,
     return_train_score=False,
     return_optimizer=False,
     return_parameters=False,
@@ -172,7 +172,7 @@ def _optimize_and_score(
     hyperparameters = _clone_parameter_dict(hyperparameters)
     pure_parameters = _clone_parameter_dict(pure_parameters)
 
-    optimize_params_clean: Dict = optimize_params or {}
+    optimize_params_clean: dict = optimize_params or {}
 
     try:
         start_time = time.time()
@@ -234,7 +234,7 @@ def _optimize_and_score(
 
 
 def _cached_optimize(
-    optimizer: BaseOptimize, data: Dataset, hyperparameters: Dict, pure_parameters: Dict, memory: Memory, optimize_paras
+    optimizer: BaseOptimize, data: Dataset, hyperparameters: dict, pure_parameters: dict, memory: Memory, optimize_paras
 ):
     """Set parameters and optimize a pipeline and cache the optimization result.
 
@@ -252,7 +252,7 @@ def _cached_optimize(
     # Ideally the `memory` object used here should only be used once.
     # E.g. for a single a GridSearchCV.
     def cachable_optimize(
-        opti: Type[BaseOptimize], hyperparas: Dict[str, Any], data: Dataset, optimize_params: Dict
+        opti: type[BaseOptimize], hyperparas: dict[str, Any], data: Dataset, optimize_params: dict
     ) -> BaseOptimize:
         _ = opti
         return optimizer.set_params(**hyperparas).optimize(data, **optimize_params)
@@ -286,7 +286,7 @@ def _cached_optimize(
     return optimizer
 
 
-def _clone_parameter_dict(param_dict: Optional[Dict]) -> Dict:
+def _clone_parameter_dict(param_dict: Optional[dict]) -> dict:
     cloned_param_dict = {}
     if param_dict is not None:
         for k, v in param_dict.items():

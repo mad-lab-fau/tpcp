@@ -1,4 +1,3 @@
-from typing import Dict
 from unittest import mock
 from unittest.mock import patch
 
@@ -227,7 +226,7 @@ class TestSafeOptimize:
             return self
 
     class PipelineModifyOtherParasMutable(OptimizablePipeline):
-        para: Parameter[Dict]
+        para: Parameter[dict]
         opti_para: OptimizableParameter[int]
 
         def __init__(self, para=cf({}), opti_para: int = 0):

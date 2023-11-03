@@ -29,7 +29,6 @@ but it is relatively simple to implement yourself.
 In the following we will show how all of this works by expanding the QRS detection algorithm implemented in the other
 examples to return additional information from the optimization.
 """
-from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -37,7 +36,6 @@ from sklearn.metrics import roc_curve
 from typing_extensions import Self
 
 from examples.algorithms.algorithms_qrs_detection_final import (
-    OptimizableQrsDetector,
     QRSDetector,
     match_events_with_reference,
 )
@@ -74,8 +72,8 @@ class OptimizableQrsDetectorWithInfo(QRSDetector):
 
     @make_optimize_safe
     def self_optimize_with_info(
-        self, ecg_data: List[pd.Series], r_peaks: List[pd.Series], sampling_rate_hz: float
-    ) -> Tuple[Self, Dict[str, np.ndarray]]:
+        self, ecg_data: list[pd.Series], r_peaks: list[pd.Series], sampling_rate_hz: float
+    ) -> tuple[Self, dict[str, np.ndarray]]:
         all_labels = []
         all_peak_heights = []
         for d, p in zip(ecg_data, r_peaks):
@@ -107,7 +105,7 @@ class OptimizableQrsDetectorWithInfo(QRSDetector):
         additional_info = {"all_youden_index": youden_index, "all_thresholds": thresholds}
         return self, additional_info
 
-    def self_optimize(self, ecg_data: List[pd.Series], r_peaks: List[pd.Series], sampling_rate_hz: float) -> Self:
+    def self_optimize(self, ecg_data: list[pd.Series], r_peaks: list[pd.Series], sampling_rate_hz: float) -> Self:
         return self.self_optimize_with_info(ecg_data=ecg_data, r_peaks=r_peaks, sampling_rate_hz=sampling_rate_hz)[0]
 
 
@@ -161,7 +159,7 @@ from sklearn.model_selection import train_test_split
 try:
     HERE = Path(__file__).parent
 except NameError:
-    HERE = Path(".").resolve()
+    HERE = Path().resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
 

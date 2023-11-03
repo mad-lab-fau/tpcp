@@ -1,5 +1,5 @@
 """Base Classes for custom pipelines."""
-from typing import Any, ClassVar, Dict, Generic, Tuple, TypeVar, Union
+from typing import Any, ClassVar, Generic, TypeVar, Union
 
 from typing_extensions import Self
 
@@ -18,7 +18,7 @@ class Pipeline(Algorithm, Generic[DatasetT]):
     To create your own custom pipeline, subclass this class and implement `run`.
     """
 
-    _action_methods: ClassVar[Tuple[str, str]] = ("safe_run", "run")
+    _action_methods: ClassVar[tuple[str, str]] = ("safe_run", "run")
 
     datapoint: DatasetT
 
@@ -74,7 +74,7 @@ class Pipeline(Algorithm, Generic[DatasetT]):
             return run_method(datapoint)
         return _check_safe_run(self, run_method, datapoint)
 
-    def score(self, datapoint: DatasetT) -> Union[float, Dict[str, float]]:
+    def score(self, datapoint: DatasetT) -> Union[float, dict[str, float]]:
         """Calculate performance of the pipeline on a datapoint with reference information.
 
         This is an optional method and does not need to be implemented in many cases.
@@ -159,7 +159,7 @@ class OptimizablePipeline(Pipeline[DatasetT]):
             raise NotImplementedError() from e
         return out
 
-    def self_optimize_with_info(self, dataset: DatasetT, **kwargs) -> Tuple[Self, Any]:
+    def self_optimize_with_info(self, dataset: DatasetT, **kwargs) -> tuple[Self, Any]:
         """Optimize the input parameters of the pipeline or algorithm using any logic.
 
         This is equivalent to `self_optimize`, but allows you to return additional information as a second return value.

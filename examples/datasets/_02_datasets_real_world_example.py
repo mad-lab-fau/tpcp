@@ -42,14 +42,14 @@ If you just want the final implementation, without all the explanation, check :r
 # Later we need to include the data of all files into the dataset, but to generate out index, it is sufficient to only
 # list one of the datatypes.
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from tpcp import Dataset
 
 try:
     HERE = Path(__file__).parent
 except NameError:
-    HERE = Path(".").resolve()
+    HERE = Path().resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 
 # Note that we sort the files explicitly, as the file order might depend on the operating system.
@@ -90,7 +90,7 @@ class ECGExampleData(Dataset):
         self,
         data_path: Path,
         *,
-        groupby_cols: Optional[Union[List[str], str]] = None,
+        groupby_cols: Optional[Union[list[str], str]] = None,
         subset_index: Optional[pd.DataFrame] = None,
     ):
         self.data_path = data_path
@@ -139,7 +139,7 @@ class ECGExampleData(Dataset):
         self,
         data_path: Path,
         *,
-        groupby_cols: Optional[Union[List[str], str]] = None,
+        groupby_cols: Optional[Union[list[str], str]] = None,
         subset_index: Optional[pd.DataFrame] = None,
     ):
         self.data_path = data_path
@@ -147,7 +147,7 @@ class ECGExampleData(Dataset):
 
     @property
     def sampling_rate_hz(self) -> float:
-        """The sampling rate of the raw ECG recording in Hz"""
+        """The sampling rate of the raw ECG recording in Hz."""
         return 360.0
 
     @property
@@ -211,7 +211,7 @@ class ECGExampleData(Dataset):
         self,
         data_path: Path,
         *,
-        groupby_cols: Optional[Union[List[str], str]] = None,
+        groupby_cols: Optional[Union[list[str], str]] = None,
         subset_index: Optional[pd.DataFrame] = None,
     ):
         self.data_path = data_path
@@ -219,7 +219,7 @@ class ECGExampleData(Dataset):
 
     @property
     def sampling_rate_hz(self) -> float:
-        """The sampling rate of the raw ECG recording in Hz"""
+        """The sampling rate of the raw ECG recording in Hz."""
         return 360.0
 
     @property
@@ -334,7 +334,7 @@ class ECGExampleData(Dataset):
         data_path: Path,
         *,
         use_lru_cache: bool = True,
-        groupby_cols: Optional[Union[List[str], str]] = None,
+        groupby_cols: Optional[Union[list[str], str]] = None,
         subset_index: Optional[pd.DataFrame] = None,
     ):
         self.data_path = data_path
@@ -343,7 +343,7 @@ class ECGExampleData(Dataset):
 
     @property
     def sampling_rate_hz(self) -> float:
-        """The sampling rate of the raw ECG recording in Hz"""
+        """The sampling rate of the raw ECG recording in Hz."""
         return 360.0
 
     @property

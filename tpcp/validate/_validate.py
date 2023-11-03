@@ -1,6 +1,7 @@
 """Helper to validate/evaluate pipelines and Optimize."""
+from collections.abc import Iterator
 from functools import partial
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Callable, Optional, Union
 
 import numpy as np
 from joblib import Parallel
@@ -20,13 +21,13 @@ def cross_validate(
     optimizable: BaseOptimize,
     dataset: Dataset,
     *,
-    groups: Optional[List[Union[str, Tuple[str, ...]]]] = None,
-    mock_labels: Optional[List[Union[str, Tuple[str, ...]]]] = None,
+    groups: Optional[list[Union[str, tuple[str, ...]]]] = None,
+    mock_labels: Optional[list[Union[str, tuple[str, ...]]]] = None,
     scoring: Optional[Callable] = None,
     cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
     n_jobs: Optional[int] = None,
     verbose: int = 0,
-    optimize_params: Optional[Dict[str, Any]] = None,
+    optimize_params: Optional[dict[str, Any]] = None,
     propagate_groups: bool = True,
     propagate_mock_labels: bool = True,
     pre_dispatch: Union[str, int] = "2*n_jobs",
@@ -272,14 +273,14 @@ def validate(
 
 
 def _propagate_values(
-    name: str, propagate_values: bool, values: Optional[List[Union[str, Tuple[str, ...]]]], train_idx: List[int]
+    name: str, propagate_values: bool, values: Optional[list[Union[str, tuple[str, ...]]]], train_idx: list[int]
 ):
     if propagate_values is False or values is None:
         return {}
     return {name: np.array(values)[train_idx]}
 
 
-def _reformat_scores(score_names: List[str], score_results: Dict[str, Any]):
+def _reformat_scores(score_names: list[str], score_results: dict[str, Any]):
     # extract subtypes (e.g., precision, recall) of scores from nested score dictionaries
     reformatted_results = {}
     for name in score_names:

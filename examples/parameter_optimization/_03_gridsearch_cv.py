@@ -33,7 +33,7 @@ from examples.datasets.datasets_final_ecg import ECGExampleData
 try:
     HERE = Path(__file__).parent
 except NameError:
-    HERE = Path(".").resolve()
+    HERE = Path().resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
 
@@ -86,12 +86,11 @@ pipe = MyPipeline()
 # ----------
 # The scorer is identical to the scoring function used in the other examples.
 # The F1-score is still the most important parameter for our comparison.
-from typing import Dict
 
 from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference, precision_recall_f1_score
 
 
-def score(pipeline: MyPipeline, datapoint: ECGExampleData) -> Dict[str, float]:
+def score(pipeline: MyPipeline, datapoint: ECGExampleData) -> dict[str, float]:
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
     # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
     # will clone it again.

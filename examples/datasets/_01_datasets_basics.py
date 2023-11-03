@@ -44,13 +44,13 @@ Datasets work best in combination with `Pipelines` and are further compatible wi
 # Then you can filter the dataset first and load the data once you know which data-points you want to access.
 # We will discuss this later in the example.
 from itertools import product
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import pandas as pd
 
 trials = list(product(("rec_1", "rec_2", "rec_3"), ("trial_1",)))
 trials.append(("rec_3", "trial_2"))
-index = [(p, *t) for p, t in product(("p{}".format(i) for i in range(1, 6)), trials)]
+index = [(p, *t) for p, t in product((f"p{i}" for i in range(1, 6)), trials)]
 index = pd.DataFrame(index, columns=["participant", "recording", "trial"])
 index
 
@@ -96,7 +96,7 @@ final_subset
 # Note, that each row itself is a dataset again, but just with a single entry.
 for row in final_subset:
     print(row)
-    print("This row contains {} data-point".format(len(row)), end="\n\n")
+    print(f"This row contains {len(row)} data-point", end="\n\n")
 
 # %%
 # However, in many cases, we don't want to iterate over all rows, but rather iterate over groups of the datasets (
@@ -113,7 +113,7 @@ for trial in final_subset.iter_level("recording"):
 # Note that the grouped_subset shows the new groupby columns as the index in the representation and the length of the
 # dataset is reported to be the number of groups.
 grouped_subset = final_subset.groupby(["participant", "recording"])
-print("The dataset contains {} groups.".format(len(grouped_subset)))
+print(f"The dataset contains {len(grouped_subset)} groups.")
 grouped_subset
 
 # %%
@@ -122,7 +122,7 @@ grouped_subset
 # Grouping also changes the meaning of a "single datapoint".
 # Each group reports a shape of `(1,)` independent of the number of rows in each group.
 for group in grouped_subset:
-    print("This group has the shape {}".format(group.shape))
+    print(f"This group has the shape {group.shape}")
     print(group, end="\n\n")
 
 # %%
@@ -358,7 +358,7 @@ class CustomDatasetWithConfig(Dataset):
         data_folder: str,
         custom_config_para: bool = False,
         *,
-        groupby_cols: Optional[Union[List[str], str]] = None,
+        groupby_cols: Optional[Union[list[str], str]] = None,
         subset_index: Optional[pd.DataFrame] = None,
     ):
         self.data_folder = data_folder

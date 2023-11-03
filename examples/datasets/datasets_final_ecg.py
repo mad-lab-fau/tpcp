@@ -10,7 +10,7 @@ This file can be used as quick reference or to import the class into other examp
 from functools import lru_cache
 from itertools import cycle
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import pandas as pd
 
@@ -33,7 +33,7 @@ class ECGExampleData(Dataset):
         data_path: Path,
         *,
         use_lru_cache: bool = True,
-        groupby_cols: Optional[Union[List[str], str]] = None,
+        groupby_cols: Optional[Union[list[str], str]] = None,
         subset_index: Optional[pd.DataFrame] = None,
     ):
         self.data_path = data_path
@@ -42,7 +42,7 @@ class ECGExampleData(Dataset):
 
     @property
     def sampling_rate_hz(self) -> float:
-        """The sampling rate of the raw ECG recording in Hz"""
+        """The sampling rate of the raw ECG recording in Hz."""
         return 360.0
 
     @property

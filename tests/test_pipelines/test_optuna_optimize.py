@@ -1,5 +1,6 @@
 import tempfile
-from typing import Callable, List, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Callable, Optional, Union
 from unittest.mock import Mock, patch
 
 import numpy as np
@@ -33,7 +34,7 @@ class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
         *,
         n_trials: Optional[int] = None,
         timeout: Optional[float] = None,
-        callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None,
+        callbacks: Optional[list[Callable[[Study, FrozenTrial], None]]] = None,
         gc_after_trial: bool = False,
         show_progress_bar: bool = False,
         return_optimized: bool = True,

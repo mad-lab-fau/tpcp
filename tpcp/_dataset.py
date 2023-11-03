@@ -1,7 +1,8 @@
 """Base class for all datasets."""
 import warnings
+from collections.abc import Iterator, Sequence
 from keyword import iskeyword
-from typing import Dict, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, cast, overload
+from typing import Optional, TypeVar, Union, cast, overload
 
 import numpy as np
 import pandas as pd
@@ -14,7 +15,7 @@ DatasetT = TypeVar("DatasetT", bound="_Dataset")
 
 
 class _Dataset(BaseTpcpObject):
-    groupby_cols: Optional[Union[List[str], str]]
+    groupby_cols: Optional[Union[list[str], str]]
     subset_index: Optional[pd.DataFrame]
 
     @property
@@ -102,7 +103,7 @@ class _Dataset(BaseTpcpObject):
         return index_1
 
     @property
-    def group_labels(self) -> List[Tuple[str, ...]]:
+    def group_labels(self) -> list[tuple[str, ...]]:
         """Get all group labels of the dataset based on the set groupby level.
 
         This will return a list of named tuples.
@@ -121,7 +122,7 @@ class _Dataset(BaseTpcpObject):
         )
 
     @property
-    def groups(self) -> List[Tuple[str, ...]]:
+    def groups(self) -> list[tuple[str, ...]]:
         """Get the current group labels. Deprecated, use `group_labels` instead."""
         warnings.warn(
             "The attribute `groups` is deprecated and will be removed in a future version. "
@@ -132,7 +133,7 @@ class _Dataset(BaseTpcpObject):
         return self.group_labels
 
     @property
-    def group_label(self) -> Tuple[str, ...]:
+    def group_label(self) -> tuple[str, ...]:
         """Get the current group label.
 
         The group is defined by the current groupby settings.
@@ -147,7 +148,7 @@ class _Dataset(BaseTpcpObject):
         return self.group_labels[0]
 
     @property
-    def group(self) -> Tuple[str, ...]:
+    def group(self) -> tuple[str, ...]:
         """Get the current group label. Deprecated, use `group_label` instead."""
         warnings.warn(
             "The attribute `group` is deprecated and will be removed in a future version. "
@@ -157,7 +158,7 @@ class _Dataset(BaseTpcpObject):
         )
         return self.group_label
 
-    def index_as_tuples(self) -> List[Tuple[str, ...]]:
+    def index_as_tuples(self) -> list[tuple[str, ...]]:
         """Get all datapoint labels of the dataset (i.e. a list of the rows of the index as named tuples)."""
         return list(self.index.itertuples(index=False, name=type(self).__name__ + "DatapointLabel"))
 
@@ -170,7 +171,7 @@ class _Dataset(BaseTpcpObject):
         return len(self.group_labels)
 
     @property
-    def shape(self) -> Tuple[int]:
+    def shape(self) -> tuple[int]:
         """Get the shape of the dataset.
 
         This only reports a single dimension.
@@ -191,7 +192,7 @@ class _Dataset(BaseTpcpObject):
                 f" {self.groupby_cols}"
             ) from e
 
-    def _get_groupby_columns(self) -> List[str]:
+    def _get_groupby_columns(self) -> list[str]:
         """Get the groupby columns."""
         if self.groupby_cols is None:
             return self.index.columns.to_list()
@@ -208,7 +209,7 @@ class _Dataset(BaseTpcpObject):
 
         return self.clone().set_params(subset_index=self.grouped_index.loc[multi_index].reset_index(drop=True))
 
-    def groupby(self, groupby_cols: Optional[Union[List[str], str]]) -> Self:
+    def groupby(self, groupby_cols: Optional[Union[list[str], str]]) -> Self:
         """Return a copy of the dataset grouped by the specified columns.
 
         This does not change the order of the rows of the dataset index.
@@ -229,10 +230,10 @@ class _Dataset(BaseTpcpObject):
     def get_subset(
         self,
         *,
-        group_labels: Optional[List[Tuple[str, ...]]] = None,
+        group_labels: Optional[list[tuple[str, ...]]] = None,
         index: Optional[pd.DataFrame] = None,
         bool_map: Optional[Sequence[bool]] = None,
-        **kwargs: Union[List[str], str],
+        **kwargs: Union[list[str], str],
     ) -> Self:
         """Get a subset of the dataset.
 
@@ -283,7 +284,7 @@ class _Dataset(BaseTpcpObject):
             return self.clone().set_params(subset_index=self.index[bool_map].reset_index(drop=True))
 
         if len(kwargs) > 0:
-            cleaned_kwargs = cast(Dict[str, List[str]], {k: _ensure_is_list(v) for k, v in kwargs.items()})
+            cleaned_kwargs = cast(dict[str, list[str]], {k: _ensure_is_list(v) for k, v in kwargs.items()})
 
             # Check if all values are actually in their respective columns.
             # This is not strictly required, but avoids user error
@@ -351,7 +352,7 @@ class _Dataset(BaseTpcpObject):
 
         return (self.get_subset(**{level: category}) for category in self.index[level].unique())
 
-    def is_single(self, groupby_cols: Optional[Union[str, List[str]]]) -> bool:
+    def is_single(self, groupby_cols: Optional[Union[str, list[str]]]) -> bool:
         """Return True if index contains only one row/group with the given groupby settings.
 
         If `groupby_cols=None` this checks if there is only a single row left.
@@ -369,7 +370,7 @@ class _Dataset(BaseTpcpObject):
         """Return True if index contains only one group."""
         return len(self) == 1
 
-    def assert_is_single(self, groupby_cols: Optional[Union[str, List[str]]], property_name) -> None:
+    def assert_is_single(self, groupby_cols: Optional[Union[str, list[str]]], property_name) -> None:
         """Raise error if index does contain more than one group/row with the given groupby settings.
 
         This should be used when implementing access to data values, which can only be accessed when only a single
@@ -421,7 +422,7 @@ class _Dataset(BaseTpcpObject):
                 f" only a single group left in a data subset. " + group_error_str
             )
 
-    def create_group_labels(self, label_cols: Union[str, List[str]]) -> List[str]:
+    def create_group_labels(self, label_cols: Union[str, list[str]]) -> list[str]:
         warnings.warn(
             "The method `create_string_group_labels` is deprecated and will be removed in a future version. "
             "Use `create_string_group_labels` instead.",
@@ -430,7 +431,7 @@ class _Dataset(BaseTpcpObject):
         )
         return self.create_string_group_labels(label_cols)
 
-    def create_string_group_labels(self, label_cols: Union[str, List[str]]) -> List[str]:
+    def create_string_group_labels(self, label_cols: Union[str, list[str]]) -> list[str]:
         """Generate a list of string labels for each group/row in the dataset.
 
         .. note::
@@ -648,7 +649,7 @@ class Dataset(_Dataset):
     def __init__(
         self,
         *,
-        groupby_cols: Optional[Union[List[str], str]] = None,
+        groupby_cols: Optional[Union[list[str], str]] = None,
         subset_index: Optional[pd.DataFrame] = None,
     ) -> None:
         self.groupby_cols = groupby_cols
@@ -663,7 +664,7 @@ class Dataset(_Dataset):
         class DatasetDc(_Dataset):
             """Dataclass version of Dataset."""
 
-            groupby_cols: Optional[Union[List[str], str]] = None
+            groupby_cols: Optional[Union[list[str], str]] = None
             subset_index: Optional[pd.DataFrame] = None
 
         return DatasetDc
@@ -680,7 +681,7 @@ class Dataset(_Dataset):
         class DatasetAt(_Dataset):
             """Attrs version of Dataset."""
 
-            groupby_cols: Optional[Union[List[str], str]] = None
+            groupby_cols: Optional[Union[list[str], str]] = None
             subset_index: Optional[pd.DataFrame] = None
 
         return DatasetAt
@@ -690,12 +691,12 @@ T = TypeVar("T")
 
 
 @overload
-def _ensure_is_list(x: List[T]) -> List[T]:
+def _ensure_is_list(x: list[T]) -> list[T]:
     ...
 
 
 @overload
-def _ensure_is_list(x: T) -> List[T]:
+def _ensure_is_list(x: T) -> list[T]:
     ...
 
 

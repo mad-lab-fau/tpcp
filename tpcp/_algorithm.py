@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import ClassVar, Tuple, TypeVar, Union
+from typing import ClassVar, TypeVar, Union
 
 from tpcp._base import BaseTpcpObject
 
@@ -31,4 +31,4 @@ class Algorithm(BaseTpcpObject):
 
     """
 
-    _action_methods: ClassVar[Union[Tuple[str, ...], str]]
+    _action_methods: ClassVar[Union[tuple[str, ...], str]]

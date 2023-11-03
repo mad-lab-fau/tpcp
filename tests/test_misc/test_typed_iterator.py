@@ -20,7 +20,7 @@ def test_simple_no_agg():
     check_data = []
     check_results = []
     for i, (d, r) in enumerate(iterator.iterate(data)):
-        assert all([getattr(r, f.name) == iterator.NULL_VALUE for f in fields(rt)])
+        assert all(getattr(r, f.name) == iterator.NULL_VALUE for f in fields(rt))
         assert isinstance(r, rt)
         r.result_1 = i
         r.result_2 = i * 2

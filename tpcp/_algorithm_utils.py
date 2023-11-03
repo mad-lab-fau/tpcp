@@ -7,7 +7,7 @@ import warnings
 from functools import wraps
 from inspect import isclass
 from pickle import PicklingError
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar, Union, cast, overload
 
 from typing_extensions import Concatenate, ParamSpec
 
@@ -30,12 +30,12 @@ P = ParamSpec("P")
 
 
 @overload
-def _split_returns(values: Tuple[T, K]) -> Tuple[T, K]:
+def _split_returns(values: tuple[T, K]) -> tuple[T, K]:
     ...
 
 
 @overload
-def _split_returns(values: T) -> Tuple[T, Tuple[_Nothing, _Nothing]]:
+def _split_returns(values: T) -> tuple[T, tuple[_Nothing, _Nothing]]:
     ...
 
 
@@ -66,7 +66,7 @@ def get_action_method(instance: Algorithm, method_name: Optional[str] = None) ->
     return getattr(instance, method_name)
 
 
-def get_action_methods_names(instance_or_cls: Union[Type[Algorithm], Algorithm]) -> Tuple[str, ...]:
+def get_action_methods_names(instance_or_cls: Union[type[Algorithm], Algorithm]) -> tuple[str, ...]:
     """Get the names of all action methods of a class.
 
     This basically returns `instance_or_cls._action_method`, but ensures that the return type is a tuple.
@@ -76,7 +76,7 @@ def get_action_methods_names(instance_or_cls: Union[Type[Algorithm], Algorithm])
         method_names = (method_names,)
     if not isinstance(method_names, tuple) and len(method_names) == 0:
         if isclass(instance_or_cls):
-            instance_or_cls = cast(Type[Algorithm], instance_or_cls)
+            instance_or_cls = cast(type[Algorithm], instance_or_cls)
             name = instance_or_cls.__name__
         else:
             name = type(instance_or_cls).__name__
@@ -84,7 +84,7 @@ def get_action_methods_names(instance_or_cls: Union[Type[Algorithm], Algorithm])
     return method_names
 
 
-def get_action_params(instance: Algorithm) -> Dict[str, Any]:
+def get_action_params(instance: Algorithm) -> dict[str, Any]:
     """Get all "Action Params" / "Other Parameters" of the Algorithm.
 
     Action params are all parameters passed as input to the action method.
@@ -109,7 +109,7 @@ def get_action_params(instance: Algorithm) -> Dict[str, Any]:
     return attrs
 
 
-def get_results(instance: Algorithm) -> Dict[str, Any]:
+def get_results(instance: Algorithm) -> dict[str, Any]:
     """Get all Results of the Algorithm.
 
     "Results" or "Attributes" are all values considered results of the algorithm.
@@ -234,8 +234,8 @@ def make_action_safe(action_method: Callable[P, T]) -> Callable[P, T]:
 
 
 def _get_nested_opti_paras(
-    algorithm: BaseTpcpObject, opti_para_names: List[str]
-) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    algorithm: BaseTpcpObject, opti_para_names: list[str]
+) -> tuple[dict[str, Any], dict[str, Any]]:
     paras = algorithm.get_params(deep=True)
     optimizable_paras = {}
     other_paras = {}
@@ -257,10 +257,10 @@ def _get_nested_opti_paras(
 
 def _check_safe_optimize(  # noqa: C901, PLR0912
     algorithm: AlgorithmT,
-    old_method: Callable[Concatenate[AlgorithmT, P], Union[AlgorithmT, Tuple[AlgorithmT, T]]],
+    old_method: Callable[Concatenate[AlgorithmT, P], Union[AlgorithmT, tuple[AlgorithmT, T]]],
     *args: Any,
     **kwargs: Any,
-) -> Union[AlgorithmT, Tuple[AlgorithmT, T]]:
+) -> Union[AlgorithmT, tuple[AlgorithmT, T]]:
     # record the hash of the pipeline to make an educated guess if the optimization works
     opti_para_names = _get_annotated_fields_of_type(algorithm, _ParaTypes.OPTI)
     optimizable_paras, other_paras = _get_nested_opti_paras(algorithm, opti_para_names)

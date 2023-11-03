@@ -1,5 +1,4 @@
 from itertools import product
-from typing import Dict
 
 import pandas as pd
 
@@ -55,7 +54,7 @@ class MutableParaPipeline(OptimizablePipeline):
     optimized: OptimizableParameter[bool]
     para_mutable: OptimizableParameter[bool]
 
-    def __init__(self, para_normal=3, para_mutable: Dict = cf(MutableCustomClass()), optimized=False):
+    def __init__(self, para_normal=3, para_mutable: dict = cf(MutableCustomClass()), optimized=False):
         self.para_normal = para_normal
         self.para_mutable = para_mutable
         self.optimized = optimized

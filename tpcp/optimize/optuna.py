@@ -11,7 +11,8 @@ import multiprocessing
 import warnings
 from ast import literal_eval
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, Optional, Sequence, TypedDict, TypeVar, Union
+from collections.abc import Sequence
+from typing import Any, Callable, Optional, TypedDict, TypeVar, Union
 
 import numpy as np
 from joblib import Parallel
@@ -72,7 +73,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     # Optuna Parameters that are directly forwarded to study.optimize
     n_trials: Optional[int]
     timeout: Optional[float]
-    callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]]
+    callbacks: Optional[list[Callable[[Study, FrozenTrial], None]]]
     gc_after_trial: bool
     show_progress_bar: bool
     n_jobs: int
@@ -85,7 +86,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     study_: Study
 
     @property
-    def search_results_(self) -> Dict[str, Sequence[Any]]:
+    def search_results_(self) -> dict[str, Sequence[Any]]:
         r"""Detailed results of the study.
 
         This basically contains the same information as `self.study_.trials_dataframe()`, with some small modifications:
@@ -121,7 +122,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         return base_df.to_dict(orient="list")
 
     @property
-    def best_params_(self) -> Dict[str, Any]:
+    def best_params_(self) -> dict[str, Any]:
         """Parameters of the best trial in the :class:`~optuna.study.Study`."""
         return self.sanitize_params(self.study_.best_params)
 
@@ -266,7 +267,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         """
         raise NotImplementedError()
 
-    def sanitize_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    def sanitize_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Sanatize the parameters of a trial.
 
         This will apply the str evaluation controlled by `self.eval_str_paras` to the parameters.
@@ -530,7 +531,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         *,
         n_trials: Optional[int] = None,
         timeout: Optional[float] = None,
-        callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None,
+        callbacks: Optional[list[Callable[[Study, FrozenTrial], None]]] = None,
         gc_after_trial: bool = False,
         n_jobs: int = 1,
         random_seed: Optional[int] = None,
@@ -566,7 +567,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             # Optuna Parameters that are directly forwarded to study.optimize
             n_trials: Optional[int] = None
             timeout: Optional[float] = None
-            callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None
+            callbacks: Optional[list[Callable[[Study, FrozenTrial], None]]] = None
             gc_after_trial: bool = False
             show_progress_bar: bool = False
 
@@ -599,7 +600,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             # Optuna Parameters that are directly forwarded to study.optimize
             n_trials: Optional[int] = None
             timeout: Optional[float] = None
-            callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None
+            callbacks: Optional[list[Callable[[Study, FrozenTrial], None]]] = None
             gc_after_trial: bool = False
             show_progress_bar: bool = False
 
@@ -778,7 +779,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         score_name: Optional[str] = None,
         n_trials: Optional[int] = None,
         timeout: Optional[float] = None,
-        callbacks: Optional[List[Callable[[Study, FrozenTrial], None]]] = None,
+        callbacks: Optional[list[Callable[[Study, FrozenTrial], None]]] = None,
         gc_after_trial: bool = False,
         n_jobs: int = 1,
         random_seed: Optional[int] = None,
@@ -860,7 +861,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         return objective
 
     @property
-    def search_results_(self) -> Dict[str, Sequence[Any]]:  # noqa: D102
+    def search_results_(self) -> dict[str, Sequence[Any]]:  # noqa: D102
         search_results = super().search_results_
         search_results["data_labels"] = search_results.pop("user_attrs___data_labels")
 
@@ -891,7 +892,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         return pipeline_with_best_params
 
 
-def _invert_list_of_dicts(list_of_dicts: List[Dict[str, Any]]) -> Dict[str, List]:
+def _invert_list_of_dicts(list_of_dicts: list[dict[str, Any]]) -> dict[str, list]:
     inverted = defaultdict(list)
     for d in list_of_dicts:
         for k, v in d.items():

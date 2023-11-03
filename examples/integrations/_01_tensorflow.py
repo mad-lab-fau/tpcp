@@ -136,10 +136,12 @@ dataset[0].labels_as_array().shape
 # We then extract the data from the datapoint and let the model make a prediction.
 # We store the prediction on our output attribute `predictions_`.
 # The trailing underscore is a convention to signify, that this is an "result" attribute.
-from tpcp import OptimizablePipeline, OptiPara, make_optimize_safe, make_action_safe
-from typing import Optional, Tuple
-from typing_extensions import Self
 import warnings
+from typing import Optional
+
+from typing_extensions import Self
+
+from tpcp import OptimizablePipeline, OptiPara, make_action_safe, make_optimize_safe
 
 
 class KerasPipeline(OptimizablePipeline):
@@ -220,7 +222,8 @@ accuracy_score(p1.predicted_labels_, FashionMNIST()[11].labels_as_array())
 # We will calculate two types of accuracy:
 # First, the accuracy per group and second, the accuracy over all images across all groups.
 # For more information about how this works, check the :ref:`Custom Scorer <custom_scorer>` example.
-from typing import Sequence, Dict
+from collections.abc import Sequence
+
 from tpcp.validate import Aggregator
 
 
@@ -228,7 +231,7 @@ class SingleValueAccuracy(Aggregator[np.ndarray]):
     RETURN_RAW_SCORES = False
 
     @classmethod
-    def aggregate(cls, /, values: Sequence[Tuple[np.ndarray, np.ndarray]], **_) -> Dict[str, float]:
+    def aggregate(cls, /, values: Sequence[tuple[np.ndarray, np.ndarray]], **_) -> dict[str, float]:
         return {"accuracy": accuracy_score(np.hstack([v[0] for v in values]), np.hstack([v[1] for v in values]))}
 
 
@@ -250,8 +253,8 @@ def scoring(pipeline, datapoint):
 #           This is because we clone the pipeline before each call to the run method.
 #           This is a good idea to ensure that all pipelines are independent of each other, however, might result in
 #           some performance overhead.
-from tpcp.validate import cross_validate
 from tpcp.optimize import Optimize
+from tpcp.validate import cross_validate
 
 pipeline = KerasPipeline(n_train_epochs=10)
 cv_results = cross_validate(Optimize(pipeline), FashionMNIST()[:100], scoring=scoring, cv=3)

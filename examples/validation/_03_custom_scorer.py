@@ -24,7 +24,7 @@ In the following, we will demonstrate solutions for two typical usecases:
    (Note, which of the two cases you want will depend on your usecase and the data distributions per datapoint)
 
 """
-from itertools import groupby
+from collections.abc import Sequence
 from pathlib import Path
 
 # %%
@@ -32,8 +32,6 @@ from pathlib import Path
 # -----
 # We will simply reuse the pipline from the general QRS detection example.
 # For all of our custom scorer, we will use this pipeline and apply it to all datapoints of the ECG example dataset.
-from typing import Dict, Sequence
-
 import pandas as pd
 
 from examples.algorithms.algorithms_qrs_detection_final import (
@@ -47,7 +45,7 @@ from tpcp import Parameter, Pipeline, cf
 try:
     HERE = Path(__file__).parent
 except NameError:
-    HERE = Path(".").resolve()
+    HERE = Path().resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
 
@@ -210,7 +208,7 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
 
 class MeanAndStdAggregator(Aggregator[float]):
     @classmethod
-    def aggregate(cls, /, values: Sequence[float], **_) -> Dict[str, float]:
+    def aggregate(cls, /, values: Sequence[float], **_) -> dict[str, float]:
         print("MeanAndStdAggregator Aggreagtor called")
         try:
             return {"mean": float(np.mean(values)), "std": float(np.std(values))}
@@ -243,7 +241,7 @@ multi_agg_agg
 
 class SingleValuePrecisionRecallF1(Aggregator[np.ndarray]):
     @classmethod
-    def aggregate(cls, /, values: Sequence[np.ndarray], **_) -> Dict[str, float]:
+    def aggregate(cls, /, values: Sequence[np.ndarray], **_) -> dict[str, float]:
         print("SingleValuePrecisionRecallF1 Aggregator called")
         precision, recall, f1_score = precision_recall_f1_score(np.vstack(values))
         return {"precision": precision, "recall": recall, "f1_score": f1_score}
@@ -314,7 +312,7 @@ example_data
 #
 class GroupWeightedAggregator(Aggregator[float]):
     @classmethod
-    def aggregate(cls, /, values: Sequence[float], datapoints: Sequence[ECGExampleData], **_) -> Dict[str, float]:
+    def aggregate(cls, /, values: Sequence[float], datapoints: Sequence[ECGExampleData], **_) -> dict[str, float]:
         print("GroupWeightedAggregator Aggregator called")
         patient_groups = [d.group_label.patient_group for d in datapoints]
         data = pd.DataFrame({"value": values, "patient_groups": patient_groups})

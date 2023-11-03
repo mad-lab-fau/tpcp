@@ -72,8 +72,9 @@ own project-specific optimizers.
 #           generics.
 #           You should read that as "Some subclass of :class:`~tpcp.Pipeline`, but we don't know which yet".
 #
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Callable, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Optional, Union
 
 import pandas as pd
 
@@ -84,7 +85,7 @@ from tpcp import Parameter, Pipeline, cf
 try:
     HERE = Path(__file__).parent
 except NameError:
-    HERE = Path(".").resolve()
+    HERE = Path().resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 
 # The dataset
@@ -267,7 +268,7 @@ from optuna import samplers
 def get_study_params(seed):
     # We use a simple RandomSampler, but every optuna sampler will work
     sampler = samplers.RandomSampler(seed=seed)
-    return dict(sampler=sampler, direction="maximize")
+    return {"sampler": sampler, "direction": "maximize"}
 
 
 # %%
@@ -399,7 +400,7 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, D
             # the literal eval transform, if specified in the params.
             pipeline = pipeline.set_params(**self.sanitize_params(trial.params))
 
-            def single_score_callback(*, step: int, dataset: DatasetT, scores: Tuple[float, ...], **_: Any):
+            def single_score_callback(*, step: int, dataset: DatasetT, scores: tuple[float, ...], **_: Any):
                 # We need to report the new score value.
                 # This will call the pruner internally and then tell us if we should stop
                 trial.report(float(scores[step]), step)
@@ -438,7 +439,7 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, D
 # We only need to add an instance of our pruner to the study.
 def get_study_params(seed):
     sampler = samplers.RandomSampler(seed=seed)
-    return dict(direction="maximize", sampler=sampler, pruner=MinDatapointPerformancePruner(0.3))
+    return {"direction": "maximize", "sampler": sampler, "pruner": MinDatapointPerformancePruner(0.3)}
 
 
 opti_early_stop = OptunaSearchEarlyStopping(

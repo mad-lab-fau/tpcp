@@ -151,7 +151,7 @@ dataset.get_subset(participant_id=1).data
 # Note, that we clean the cache before and after in this example, to make sure that we don't get a cache hit from a
 # previous run.
 # Usually, you would not do this, as you want to reuse the cache between runs.
-HERE = Path(".")
+HERE = Path()
 
 cache = Memory(HERE / ".cache")
 cache.clear()

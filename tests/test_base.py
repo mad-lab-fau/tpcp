@@ -2,7 +2,7 @@
 import dataclasses
 from collections import namedtuple
 from inspect import Parameter, signature
-from typing import Any, ClassVar, Dict, Tuple
+from typing import Any, ClassVar
 from unittest.mock import patch
 
 import joblib
@@ -78,13 +78,13 @@ def create_test_class(
         },
     ]
 )
-def example_test_class_initialised(request) -> Tuple[Algorithm, Dict[str, Any]]:
+def example_test_class_initialised(request) -> tuple[Algorithm, dict[str, Any]]:
     test_instance = create_test_class(**request.param)
     return test_instance, request.param
 
 
 @pytest.fixture()
-def example_test_class_after_action(example_test_class_initialised) -> Tuple[Algorithm, Dict[str, Any]]:
+def example_test_class_after_action(example_test_class_initialised) -> tuple[Algorithm, dict[str, Any]]:
     test_instance, params = example_test_class_initialised
     action_params = {
         **params["attributes"],

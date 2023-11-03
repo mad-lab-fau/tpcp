@@ -1,5 +1,5 @@
+from collections.abc import Sequence
 from itertools import cycle
-from typing import Dict, Sequence
 from unittest import mock
 from unittest.mock import Mock
 
@@ -192,7 +192,7 @@ class TestScorerUtils:
 class TestCustomAggregator:
     class MultiAgg(Aggregator):
         @classmethod
-        def aggregate(cls, /, values: Sequence[float], **_) -> Dict[str, float]:
+        def aggregate(cls, /, values: Sequence[float], **_) -> dict[str, float]:
             return {"mean": float(np.mean(values)), "std": float(np.std(values))}
 
     @pytest.mark.parametrize(

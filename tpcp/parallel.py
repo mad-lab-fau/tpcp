@@ -11,13 +11,13 @@ The same way, by default tpcp will not forward sklearn global configs through tp
 However, you can likely configure the callbacks in tpcp to make that work.
 """
 import functools
-from typing import Callable, List, Tuple, TypeVar
+from typing import Callable, TypeVar
 
 import joblib
 
 T = TypeVar("T")
-CalbackReturnType = Tuple[T, Callable[[T], None]]
-_PARALLEL_CONTEXT_CALLBACKS: List[Callable[[], CalbackReturnType]] = []
+CalbackReturnType = tuple[T, Callable[[T], None]]
+_PARALLEL_CONTEXT_CALLBACKS: list[Callable[[], CalbackReturnType]] = []
 
 
 def delayed(func):
@@ -84,7 +84,7 @@ def delayed(func):
     return joblib.delayed(inner)
 
 
-def register_global_parallel_callback(callback: Callable[[], Tuple[T, Callable[[T], None]]]):
+def register_global_parallel_callback(callback: Callable[[], tuple[T, Callable[[T], None]]]):
     """Register a callback to transfer information to parallel workers.
 
     This callback should be used together with :func:`~tpcp.parallel.delayed` in a joblib parallel context.

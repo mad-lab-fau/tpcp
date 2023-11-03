@@ -2,21 +2,17 @@
 import time
 import warnings
 from collections import defaultdict
-from contextlib import nullcontext
+from collections.abc import Iterator
+from contextlib import AbstractContextManager, nullcontext
 from functools import partial
 from itertools import product
 from tempfile import TemporaryDirectory
 from typing import (
     TYPE_CHECKING,
     Any,
-    ContextManager,
-    Dict,
     Generic,
-    Iterator,
-    List,
     Literal,
     Optional,
-    Tuple,
     TypeVar,
     Union,
 )
@@ -29,7 +25,11 @@ from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
 from tqdm.auto import tqdm
 from typing_extensions import Self
 
-from tpcp._algorithm_utils import OPTIMIZE_METHOD_INDICATOR, _check_safe_optimize, _split_returns
+from tpcp._algorithm_utils import (
+    OPTIMIZE_METHOD_INDICATOR,
+    _check_safe_optimize,
+    _split_returns,
+)
 from tpcp._base import NOTHING, _get_annotated_fields_of_type
 from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
@@ -168,7 +168,11 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
     optimization_info_: Any
 
     def __init__(
-        self, pipeline: OptimizablePipelineT, *, safe_optimize: bool = True, optimize_with_info: bool = True
+        self,
+        pipeline: OptimizablePipelineT,
+        *,
+        safe_optimize: bool = True,
+        optimize_with_info: bool = True,
     ) -> None:
         self.pipeline = pipeline
         self.safe_optimize = safe_optimize
@@ -327,8 +331,8 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
     pre_dispatch: Union[int, str]
     progress_bar: bool
 
-    gs_results_: Dict[str, Any]
-    best_params_: Dict[str, Any]
+    gs_results_: dict[str, Any]
+    best_params_: dict[str, Any]
     best_index_: int
     best_score_: float
     multimetric_: bool
@@ -414,8 +418,16 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
             self.return_optimized, self.multimetric_, first_test_score
         )
         if return_optimized:
-            self.best_index_, self.best_score_, self.best_params_ = _extract_return_optimize_info(
-                return_optimized, reverse_ranking, results, rank_prefix="rank_", score_prefix=""
+            (
+                self.best_index_,
+                self.best_score_,
+                self.best_params_,
+            ) = _extract_return_optimize_info(
+                return_optimized,
+                reverse_ranking,
+                results,
+                rank_prefix="rank_",
+                score_prefix="",
             )
             # We clone twice, in case one of the params was itself an algorithm.
             self.optimized_pipeline_ = self.pipeline.clone().set_params(**self.best_params_).clone()
@@ -474,7 +486,10 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         return results
 
 
-class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[OptimizablePipelineT, DatasetT, T]):
+class GridSearchCV(
+    BaseOptimize[OptimizablePipelineT, DatasetT],
+    Generic[OptimizablePipelineT, DatasetT, T],
+):
     """Exhaustive (hyper)parameter search using a cross validation based score to optimize pipeline parameters.
 
     This class follows as much as possible the interface of :func:`~sklearn.model_selection.GridSearchCV`.
@@ -636,7 +651,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
     scoring: ScorerTypes[OptimizablePipelineT, DatasetT, T]
     return_optimized: Union[bool, str]
     cv: Optional[Union[int, BaseCrossValidator, Iterator]]
-    pure_parameters: Union[bool, List[str]]
+    pure_parameters: Union[bool, list[str]]
     return_train_score: bool
     verbose: int
     n_jobs: Optional[int]
@@ -645,11 +660,11 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
     safe_optimize: bool
     optimize_with_info: bool
 
-    groups: Optional[List[Union[str, Tuple[str, ...]]]]
-    mock_labels: Optional[List[Union[str, Tuple[str, ...]]]]
+    groups: Optional[list[Union[str, tuple[str, ...]]]]
+    mock_labels: Optional[list[Union[str, tuple[str, ...]]]]
 
-    cv_results_: Dict[str, Any]
-    best_params_: Dict[str, Any]
+    cv_results_: dict[str, Any]
+    best_params_: dict[str, Any]
     best_index_: int
     best_score_: float
     multimetric_: bool
@@ -663,7 +678,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         scoring: ScorerTypes[OptimizablePipelineT, DatasetT, T] = None,
         return_optimized: Union[bool, str] = True,
         cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
-        pure_parameters: Union[bool, List[str]] = False,
+        pure_parameters: Union[bool, list[str]] = False,
         return_train_score: bool = False,
         verbose: int = 0,
         n_jobs: Optional[int] = None,
@@ -713,13 +728,15 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         # We need to wrap our pipeline for a consistent interface.
         # In the future we might be able to allow objects with optimizer Interface as input directly.
         optimizer = Optimize(
-            self.pipeline, safe_optimize=self.safe_optimize, optimize_with_info=self.optimize_with_info
+            self.pipeline,
+            safe_optimize=self.safe_optimize,
+            optimize_with_info=self.optimize_with_info,
         )
 
         # For each para combi, we separate the pure parameters (parameters that do not affect the optimization) and
         # the hyperparameters.
         # This allows for massive caching optimizations in the `_optimize_and_score`.
-        pure_parameters: Optional[List[str]]
+        pure_parameters: Optional[list[str]]
         if self.pure_parameters is False:
             pure_parameters = None
         elif self.pure_parameters is True:
@@ -735,7 +752,10 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         split_parameters = _split_hyper_and_pure_parameters(parameters, pure_parameters)
         parameter_prefix = "pipeline__"
         combinations = list(
-            product(enumerate(split_parameters), enumerate(cv_checked.split(dataset, mock_labels, groups=groups)))
+            product(
+                enumerate(split_parameters),
+                enumerate(cv_checked.split(dataset, mock_labels, groups=groups)),
+            )
         )
 
         pbar = partial(tqdm, total=len(combinations), desc="Split-Para Combos") if self.progress_bar else _passthrough
@@ -745,12 +765,16 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         # We only allow a temporary cache here, because the method that is cached internally is generic and the cache
         # might not be correctly invalidated, if GridSearchCv is called with a different pipeline or when the
         # pipeline itself is modified.
-        tmp_dir_context: Union[ContextManager[None], TemporaryDirectory] = nullcontext()
+        tmp_dir_context: Union[AbstractContextManager[None], TemporaryDirectory] = nullcontext()
         if pure_parameters:
             tmp_dir_context = TemporaryDirectory("joblib_tpcp_cache")
         with tmp_dir_context as cachedir:
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None
-            parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch, return_as="generator")
+            parallel = Parallel(
+                n_jobs=self.n_jobs,
+                pre_dispatch=self.pre_dispatch,
+                return_as="generator",
+            )
             # We use a similar structure to sklearn's GridSearchCV here (see GridSearch for more info).
             with parallel:
                 # Evaluate each parameter combination
@@ -773,7 +797,10 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
                                 error_info=f"This error occurred in fold {split_idx} with parameters candidate "
                                 f"{cand_idx}.",
                             )
-                            for (cand_idx, (hyper_paras, pure_paras)), (split_idx, (train, test)) in combinations
+                            for (cand_idx, (hyper_paras, pure_paras)), (
+                                split_idx,
+                                (train, test),
+                            ) in combinations
                         )
                     )
                 )
@@ -787,12 +814,21 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
             self.return_optimized, self.multimetric_, first_test_score
         )
         if return_optimized:
-            self.best_index_, self.best_score_, self.best_params_ = _extract_return_optimize_info(
-                return_optimized, reverse_ranking, results, rank_prefix="rank_test_", score_prefix="mean_test_"
+            (
+                self.best_index_,
+                self.best_score_,
+                self.best_params_,
+            ) = _extract_return_optimize_info(
+                return_optimized,
+                reverse_ranking,
+                results,
+                rank_prefix="rank_test_",
+                score_prefix="mean_test_",
             )
             # We clone twice, in case one of the params was itself an algorithm.
             best_optimizer = Optimize(
-                self.pipeline.clone().set_params(**self.best_params_).clone(), safe_optimize=self.safe_optimize
+                self.pipeline.clone().set_params(**self.best_params_).clone(),
+                safe_optimize=self.safe_optimize,
             )
             final_optimize_start_time = time.time()
             optimize_params_clean = optimize_params or {}
@@ -862,7 +898,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         # Use one MaskedArray and mask all the places where the param is not
         # applicable for that candidate. Use defaultdict as each candidate may
         # not contain all the params
-        param_results: Dict = defaultdict(
+        param_results: dict = defaultdict(
             partial(
                 MaskedArray,
                 np.empty(
@@ -888,7 +924,13 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
 
         for scorer_name in test_scores_dict:
             # Computed the (weighted) mean and std for test scores alone
-            _store(f"test_{scorer_name}", test_scores_dict[scorer_name], splits=True, rank=True, weights=None)
+            _store(
+                f"test_{scorer_name}",
+                test_scores_dict[scorer_name],
+                splits=True,
+                rank=True,
+                weights=None,
+            )
         for scorer_name in test_single_scores_dict:
             # Because of custom aggregators, it can be that single scores dicts have different keys than the aggregated
             # scores.
@@ -905,7 +947,7 @@ class GridSearchCV(BaseOptimize[OptimizablePipelineT, DatasetT], Generic[Optimiz
         return results
 
 
-def _validate_return_optimized(return_optimized, multi_metric, results) -> Tuple[bool, Union[str, Literal[False]]]:
+def _validate_return_optimized(return_optimized, multi_metric, results) -> tuple[bool, Union[str, Literal[False]]]:
     """Check if `return_optimize` fits to the multimetric output of the scorer."""
     if return_optimized is False:
         return False, False
@@ -939,8 +981,12 @@ def _validate_return_optimized(return_optimized, multi_metric, results) -> Tuple
 
 
 def _extract_return_optimize_info(
-    return_optimized: str, reverse, results, rank_prefix: str = "rank_", score_prefix: str = ""
-) -> Tuple[int, float, Dict[str, Any]]:
+    return_optimized: str,
+    reverse,
+    results,
+    rank_prefix: str = "rank_",
+    score_prefix: str = "",
+) -> tuple[int, float, dict[str, Any]]:
     """Extract the information from `return_optimized` and check if it is valid."""
     if reverse:
         best_index = (results[f"{rank_prefix}{return_optimized}"]).argmax()

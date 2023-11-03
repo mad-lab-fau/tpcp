@@ -52,7 +52,6 @@ Ok that is still a bunch of code... But let's focus on the aspects that are impo
    checks to ensure our implementation follows the tpcp spec.
 
 """
-from typing import List
 
 import numpy as np
 import pandas as pd
@@ -132,7 +131,7 @@ from examples.datasets.datasets_final_ecg import ECGExampleData
 try:
     HERE = Path(__file__).parent
 except NameError:
-    HERE = Path(".").resolve()
+    HERE = Path().resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
 ecg_data = example_data[0].data["ecg"]
@@ -220,7 +219,7 @@ class OptimizableQrsDetector(QRSDetector):
         )
 
     @make_optimize_safe
-    def self_optimize(self, ecg_data: List[pd.Series], r_peaks: List[pd.Series], sampling_rate_hz: float):
+    def self_optimize(self, ecg_data: list[pd.Series], r_peaks: list[pd.Series], sampling_rate_hz: float):
         all_labels = []
         all_peak_heights = []
         for d, p in zip(ecg_data, r_peaks):

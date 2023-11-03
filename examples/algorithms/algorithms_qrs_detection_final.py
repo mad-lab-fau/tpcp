@@ -8,12 +8,12 @@ These are the QRS detection algorithms, that we developed step by step :ref:`cus
 This file can be used as quick reference or to import the class into other examples without side effects.
 """
 
-from typing import List, Tuple, Union
+from typing import Union
 
 import numpy as np
 import pandas as pd
 from scipy import signal
-from scipy.spatial import KDTree, cKDTree, minkowski_distance
+from scipy.spatial import KDTree, minkowski_distance
 from sklearn.metrics import roc_curve
 
 from tpcp import Algorithm, HyperParameter, OptimizableParameter, Parameter, make_action_safe, make_optimize_safe
@@ -185,7 +185,7 @@ class OptimizableQrsDetector(QRSDetector):
         )
 
     @make_optimize_safe
-    def self_optimize(self, ecg_data: List[pd.Series], r_peaks: List[pd.Series], sampling_rate_hz: float):
+    def self_optimize(self, ecg_data: list[pd.Series], r_peaks: list[pd.Series], sampling_rate_hz: float):
         all_labels = []
         all_peak_heights = []
         for d, p in zip(ecg_data, r_peaks):

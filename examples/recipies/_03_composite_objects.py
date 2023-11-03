@@ -17,9 +17,9 @@ attribute:
 """
 import dataclasses
 import traceback
-from typing import List, Optional, Tuple
+from typing import Optional
 
-from tpcp import CloneFactory, Pipeline
+from tpcp import Pipeline
 from tpcp.exceptions import ValidationError
 
 
@@ -27,7 +27,7 @@ from tpcp.exceptions import ValidationError
 class Workflow(Pipeline):
     _composite_params = ("pipelines",)
 
-    pipelines: Optional[List[Tuple[str, Pipeline]]] = None
+    pipelines: Optional[list[tuple[str, Pipeline]]] = None
 
     def __init__(self, pipelines=None):
         self.pipelines = pipelines
@@ -45,7 +45,7 @@ instance.pipelines  # Our default value of None
 instance.pipelines = "something invalid"
 try:
     print(instance.get_params())
-except ValidationError as e:
+except ValidationError:
     traceback.print_exc()
 
 

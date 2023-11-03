@@ -1,5 +1,5 @@
 line-length = 120
-target-version = "py38"
+target-version = "py39"
 
 select = [
     # pyflakes
@@ -93,7 +93,9 @@ ignore = [
     # No Any annotations
     "ANN401",
     # To many arguments
-    "PLR0913"
+    "PLR0913",
+    # Ignore because of formatting
+    "ISC001",
 ]
 
 
@@ -103,7 +105,6 @@ exclude = [
     "doc/temp/*.py",
     ".eggs/*.py",
     "example_data",
-    "examples"
 ]
 
 
