@@ -53,7 +53,7 @@ print(result_3)
 #
 # The basic idea of `TypedIterator` is to provide a way to specify all configuration (i.e. what results to expect and
 # how to aggregate them) in one place at the beginning.
-# It further simplifies hoe eto store results, by inverting the data structure.
+# It further simplifies how to store results, by inverting the data structure.
 # Instead of worrying about one data structure for each result, you only need to worry about one data structure for each
 # iteration.
 # Using dataclasses, these objects are also typed, preventing typos and providing IDE support.
@@ -76,7 +76,7 @@ class ResultType:
 #    If we don't want to aggregate a result, we simply don't add it to the list.
 #    We provide some more explanation on aggregations below, just accept this for now.
 aggregations = [
-    ("result_1", lambda _, r: sum(r)),
+    ("result_1", lambda _, results: sum(results)),
 ]
 
 # %%
@@ -123,7 +123,7 @@ import pandas as pd
 class QRSResultType:
     """The result type of the QRS detection algorithm"""
 
-    r_peak_positions: pd.DataFrame
+    r_peak_positions: pd.Series
     n_r_peaks: int
 
 
@@ -136,8 +136,8 @@ class QRSResultType:
 # We turn the `n_r_peaks` into a dictionary, to make it easier to map the results back to the inputs.
 
 aggregations = [
-    ("r_peak_positions", lambda i, r: pd.concat(r, keys=[i.group_label for i in i])),
-    ("n_r_peaks", lambda i, r: dict(zip([i.group_label for i in i], r))),
+    ("r_peak_positions", lambda datapoints, results: pd.concat(results, keys=[d.group_label for d in datapoints])),
+    ("n_r_peaks", lambda datapoints, results: dict(zip([d.group_label for d in datapoints], results))),
 ]
 
 # %%
@@ -156,7 +156,6 @@ data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 
 dataset = ECGExampleData(data_path)
 
-d: ECGExampleData
 for d, r in iterator.iterate(dataset):
     r.r_peak_positions = QRSDetector().detect(d.data["ecg"], sampling_rate_hz=d.sampling_rate_hz).r_peak_positions_
     r.n_r_peaks = len(r.r_peak_positions)
