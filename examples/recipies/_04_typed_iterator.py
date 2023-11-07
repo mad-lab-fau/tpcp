@@ -1,7 +1,8 @@
 """
+.. _typed_iterator:
 
 TypedIterator
-=============.
+=============
 
 This example shows how to use the :class:`~tpcp.misc.TypedIterator` class, which might be helpful, when iterating over
 data and needing to store multiple results for each iteration.
