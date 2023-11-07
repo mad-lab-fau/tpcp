@@ -14,8 +14,17 @@ class _NotSet:
         return "_NOT_SET"
 
 
-class TypedIterator(Algorithm, Generic[DataclassT]):
-    """Helper to iterate over data and collect results.
+class BaseTypedIterator(Algorithm, Generic[DataclassT]):
+    """A Base class to implement custom typed iterators.
+
+    This class is missing the ``iterate`` method, which needs to be implemented by the child class.
+    It has a `_iterate` method though that does most of the heavy lifting.
+    The actual iterate method should handle turning the inputs into an iterable and then call `_iterate`.
+
+    :class:`TypedIterator` provides a "dummy" implementation that expects any type of iterator for the iterate method.
+    Custom base classes could provide more elaborate preprocessing of the inputs before iteration.
+    For example, cutting sections out of a dataframe based on a list of start and end indices, and then iterating over
+    the cut sections.
 
     Parameters
     ----------
@@ -62,7 +71,7 @@ class TypedIterator(Algorithm, Generic[DataclassT]):
         self.data_type = data_type
         self.aggregations = aggregations
 
-    def iterate(self, iterable: Iterable[T]) -> Iterator[tuple[T, DataclassT]]:
+    def _iterate(self, iterable: Iterable[T]) -> Iterator[tuple[T, DataclassT]]:
         """Iterate over the given iterable and yield the input and a new empty result object for each iteration.
 
         Parameters
@@ -122,3 +131,64 @@ class TypedIterator(Algorithm, Generic[DataclassT]):
             f"Valid result attributes are: {valid_result_fields}. "
             "Note the trailing underscore!"
         )
+
+
+class TypedIterator(BaseTypedIterator, Generic[DataclassT]):
+    """Helper to iterate over data and collect results.
+
+    Parameters
+    ----------
+    data_type
+        A dataclass that defines the result type you expect from each iteration.
+    aggregations
+        An optional list of aggregations to apply to the results.
+        This has the form ``[(result_name, aggregation_function), ...]``.
+        If a result-name is in the list, the aggregation will be applied to it, when accessing the respective result
+        attribute (i.e. ``{result_name}_``).
+        If no aggregation is defined for a result, a simple list of all results will be returned.
+    NULL_VALUE
+        (Class attribute) The value that is used to initialize the result dataclass and will remain in the results, if
+        no result was for a specific attribute in one or more iterations.
+
+    Attributes
+    ----------
+    inputs_
+        List of all input elements that were iterated over.
+    raw_results_
+        List of all results as dataclass instances.
+        The attribute of the dataclass instance will have the value of ``_NOT_SET`` if no result was set.
+        To check for this, you can use ``isinstance(val, TypedIterator.NULL_VALUE)``.
+    {result_name}_
+        The aggregated results for the respective result name.
+    done_
+        True, if the iterator is done.
+        If the iterator is not done, but you try to access the results, a warning will be raised.
+
+    """
+
+    data_type: type[DataclassT]
+    aggregations: Sequence[tuple[str, Callable[[list, list], Any]]]
+
+    _raw_results: list[DataclassT]
+    done_: bool
+    inputs_: list
+
+    NULL_VALUE = _NotSet()
+
+    def iterate(self, iterable: Iterable[T]) -> Iterator[tuple[T, DataclassT]]:
+        """Iterate over the given iterable and yield the input and a new empty result object for each iteration.
+
+        Parameters
+        ----------
+        iterable
+            The iterable to iterate over.
+
+        Yields
+        ------
+        input, result_object
+            The input and a new empty result object.
+            The result object is a dataclass instance of the type defined in ``self.data_type``.
+            All values of the result object are set to ``TypedIterator.NULL_VALUE`` by default.
+
+        """
+        yield from self._iterate(iterable)

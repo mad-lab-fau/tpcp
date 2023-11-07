@@ -137,8 +137,14 @@ class QRSResultType:
 # We turn the `n_r_peaks` into a dictionary, to make it easier to map the results back to the inputs.
 
 aggregations = [
-    ("r_peak_positions", lambda datapoints, results: pd.concat(results, keys=[d.group_label for d in datapoints])),
-    ("n_r_peaks", lambda datapoints, results: dict(zip([d.group_label for d in datapoints], results))),
+    (
+        "r_peak_positions",
+        lambda datapoints, results: pd.concat(results, keys=[d.group_label for d in datapoints]),
+    ),
+    (
+        "n_r_peaks",
+        lambda datapoints, results: dict(zip([d.group_label for d in datapoints], results)),
+    ),
 ]
 
 # %%
@@ -178,3 +184,47 @@ iterator.raw_results_
 # %%
 # And the inputs are stored as well.
 iterator.inputs_
+
+# %%
+# Custom Iterators
+# ----------------
+# When passing an iterable directly is not really convenient, you can also create a custom iterator class.
+# This class can reimplement ``iterate`` with custom logic.
+# For example, you could provide a custom iterator that takes a data and a sections parameter and then loops over the
+# sections of the data.
+#
+# For this we need to create a custom subclass inheriting from ``BaseTypedIterator``.
+from collections.abc import Iterator
+
+from tpcp.misc import BaseTypedIterator
+
+
+class SectionIterator(BaseTypedIterator[QRSResultType]):
+    def iterate(self, data: pd.DataFrame, sections: pd.DataFrame) -> Iterator[tuple[pd.DataFrame, QRSResultType]]:
+        # We turn the sections into a generator of dataframes
+        iterable = (data.iloc[s.start : s.end] for s in sections.itertuples(index=False))
+        # We use the `_iterate` method to do the heavy lifting
+        yield from self._iterate(iterable)
+
+
+# %%
+# We create some dummy data and sections to test the iterator.
+dummy_data = pd.DataFrame({"data": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]})
+dummy_sections = pd.DataFrame({"start": [0, 5], "end": [5, 10]})
+
+
+# %%
+# Now we can use the iterator to iterate over the data.
+# We skip any form of aggregation here, as it is not really relevant for this example, but it would work the same way
+# as before.
+@dataclass
+class SimpleResultType:
+    n_samples: int
+
+
+iterator = SectionIterator(SimpleResultType)
+
+for d, r in iterator.iterate(dummy_data, dummy_sections):
+    r.n_samples = len(d)
+
+iterator.raw_results_

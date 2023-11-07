@@ -14,5 +14,6 @@ Classes
     :toctree: generated/misc
     :template: classes.rst
 
+    BaseTypedIterator
     TypedIterator
 
