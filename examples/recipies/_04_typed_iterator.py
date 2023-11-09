@@ -106,7 +106,7 @@ iterator.raw_results_
 # %%
 # While this version of the code required a couple more lines, it is much easier to understand and reason about.
 # It clearly separates the configuration from the actual code and the core pipeline code is much cleaner.
-
+#
 # A real-world example
 # --------------------
 # Below we apply this pattern to a pipeline that iterates over an actual dataset.
