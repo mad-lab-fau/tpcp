@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.0] - 2023-11-09
+
+### Added
+
+- The TypedIterator (introduced in 0.26.0) now hase a base class (BaseTypedIterator), that can be used to implement 
+  custom iterators that can get custom inputs to the `iterate` method, that are then further processed before the actual
+  iteration.
+
 ## [0.26.2] - 2023-11-05
 
 ## Fixed
