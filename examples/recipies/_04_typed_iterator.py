@@ -173,7 +173,7 @@ for d, r in iterator.iterate(dataset):
 # Note, that `r_peak_positions_` is a single dataframe now and not a list of dataframes.
 iterator.r_peak_positions_
 
-# %%
+# %%k
 # The `n_r_peaks_` is still a dictionary, as excpected.
 iterator.n_r_peaks_
 
@@ -202,9 +202,9 @@ from tpcp.misc import BaseTypedIterator
 class SectionIterator(BaseTypedIterator[QRSResultType]):
     def iterate(self, data: pd.DataFrame, sections: pd.DataFrame) -> Iterator[tuple[pd.DataFrame, QRSResultType]]:
         # We turn the sections into a generator of dataframes
-        iterable = (data.iloc[s.start : s.end] for s in sections.itertuples(index=False))
+        data_iterable = (data.iloc[s.start : s.end] for s in sections.itertuples(index=False))
         # We use the `_iterate` method to do the heavy lifting
-        yield from self._iterate(iterable)
+        yield from self._iterate(data_iterable)
 
 
 # %%
@@ -222,9 +222,19 @@ class SimpleResultType:
     n_samples: int
 
 
-iterator = SectionIterator(SimpleResultType)
+custom_iterator = SectionIterator(SimpleResultType)
 
-for d, r in iterator.iterate(dummy_data, dummy_sections):
+for d, r in custom_iterator.iterate(dummy_data, dummy_sections):
+    print(d)
     r.n_samples = len(d)
 
-iterator.raw_results_
+# %%
+# We can see that the iterator iterated over the two sections of the data.
+# And the raw results contain two instances of the result dataclass.
+custom_iterator.raw_results_
+
+# %%
+custom_iterator.n_samples_
+
+# %%
+custom_iterator.inputs_
