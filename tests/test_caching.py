@@ -124,6 +124,6 @@ class TestGlobalDiskCache:
         assert example.result_1_ == 5
         assert not hasattr(example, "result_2_")
 
-    def test_erro_on_classes_with_multiple_action_methods(self):
+    def test_error_on_classes_with_multiple_action_methods(self):
         with pytest.raises(NotImplementedError):
             self.cache_method()(ExampleClassMultiAction)
