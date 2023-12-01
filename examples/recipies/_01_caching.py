@@ -29,6 +29,8 @@ Before we start, some general information you need to be aware of:
 2. Caching class methods directly is discouraged, as they get the entire class instance as input.
    As instance parameters might change often and independent of the actual required inputs of the function, this can
    lead to a lot of unnecessary cache invalidations/cache misses.
+   The only exception to this are our custom class decorators, which are designed to work with tpcp action methods
+   specifically.
 3. You should only ever cache functions that are deterministic, i.e. always return the same output for the same input.
 4. You should only ever cache pure functions, i.e. functions that do not have any side-effects (modify global state,
    write to files, etc.).
@@ -48,7 +50,7 @@ In general, we separate two ways of caching:
 2. Memory (aka RAM) Caching: Memory caches store input and outputs of a function in RAM.
    This is usually much faster than disk caching, but the cache is not persistent and will be lost, if the process is
    terminated.
-   This means, this cache is only usefull, if the same computation result is accessed multiple times within the same
+   This means, this cache is only useful, if the same computation result is accessed multiple times within the same
    process/script.
    Also, your RAM space is usually much more limited than your disk space, so you need to be careful to not cache too
    much data.
@@ -58,7 +60,7 @@ Disk Caching
 
 The easiest way to perform disk-caching in Python is to use the `joblib <https://joblib.readthedocs.io/en/latest/>`__
 library.
-We highly recommend to read through their documentation, as it provides a genral useful information on that topic.
+We highly recommend to read through their documentation, as it provides a general useful information on that topic.
 Below, are just the most important points:
 
 1. Joblib uses Pickle to serialize the inputs and outputs of a function.
@@ -77,8 +79,16 @@ Below, are just the most important points:
 
 All caching in joblib is done via the :class:`~joblib.Memory` decorator.
 This decorator takes a `location` argument, which defines where the cache should be stored.
-To make this location parameter accessible to the user of your tpcp object, we recommend to add a `memory` parameter
-to your `init` method, that can take a joblib memory instance.
+
+Within custom objects
+~~~~~~~~~~~~~~~~~~~~~
+In many cases, in particular in Datasets, you that you are developing yourself, there is a specific substep of the
+processing that is slow and you want to cache.
+For example, loading a large file from disk and performing some pre-processing on it.
+For efficient cashing, you want to wrap this slow function into the :class:`~joblib.Memory` decorator and then call
+the cached version of the function every time you need the data.
+To make the location parameter of the Memory object accessible to the user of your tpcp object, we recommend to add
+a `memory` parameter to your `init` method, that can take a joblib memory instance.
 
 Below, you can see an example Dataset that uses this pattern.
 Note, that we factored out the processing that we want to cache into a global pure function and then cache this function
@@ -151,7 +161,10 @@ dataset.get_subset(participant_id=1).data
 # Note, that we clean the cache before and after in this example, to make sure that we don't get a cache hit from a
 # previous run.
 # Usually, you would not do this, as you want to reuse the cache between runs.
-HERE = Path()
+try:
+    HERE = Path(__file__).parent
+except NameError:
+    HERE = Path().resolve()
 
 cache = Memory(HERE / ".cache")
 cache.clear()
@@ -178,8 +191,77 @@ cache.clear()
 #    To avoid this, avoid caching multiple steps of your pre-processing/loading individually and validate if the
 #    performance gain is worth the disk space.
 #
-# Memory Caching
-# --------------
+# Within existing objects or full action cashing
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# The method above could be considered "precision caching".
+# We only cache the part of the processing that is slow and leave the rest of the processing as is.
+# This is more flexible and usually the preferred approach.
+#
+# However, this assumes that we have full control over the code and can easily factor out the slow part.
+# It also assumes that we have control over the instance creation of the object.
+# In particular if you have an algorithm that is used multiple times in your pipeline, or even deeply nested within
+# other algorithms, integrating caching can be difficult.
+# Also, you might not want to explicitly implement caching for all algorithms in existence, just on the off chance that
+# someone might need it.
+#
+# One alternative, is to replace a class method globally with a cached version.
+# As mentioned above, this can be notoriously difficult, as you need to deal with the ever-changing mutable nature
+# of class instances.
+# However, in the world of tpcp-algorithms, thinks are significantly simpler than in the general case.
+# This is because we know that the functionality of an algorithm is purely defined by its parameters.
+# And we know, that the only side-effect an action method of an algorithm is allowed to have, is to write results to
+# the `self` object.
+# With this knowledge, we can implement a caching decorator that works for all action methods for all tpcp algorithms.
+#
+# It either can be applied as decorator to the class definition or called once with the class as an argument during
+# runtime.
+# The latter allows you to apply the caching to classes that you don't have control over.
+#
+# .. warning:: Depending on when and how you apply the decorator, it might not be correctly reapplied in the context
+#    of multiprocessing.
+#    Make sure to double-check that everything works as expected.
+#    If not, you might be able to use :func:`~tpcp.parallel.register_global_parallel_callback` to fix the issue.
+#    (at least in the context of joblib based multiprocessing).
+#
+# Below we demonstrate how to apply the decorator to a class after the fact.
+from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
+from tpcp.caching import global_disk_cache, remove_any_cache
+
+memory = Memory(HERE / ".cache", verbose=10)
+global_disk_cache(memory)(QRSDetector)
+
+# %%
+# Now, if we call the QRS detector, we see that the cache is in the debug output.
+# We load the example dataset here to demonstrate this.
+from examples.datasets.datasets_final_ecg import ECGExampleData
+example_data = ECGExampleData(HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data")
+ecg_data = example_data[0].data["ecg"]
+
+# %%
+# As expected, we see that the algorithm was actually called twice (one for each config) and once from cache, even
+# though, we created a completely new instance of the algorithm.
+algo = QRSDetector()
+algo = algo.detect(ecg_data, example_data.sampling_rate_hz)
+
+algo2 = QRSDetector(max_heart_rate_bpm=180)
+algo2 = algo2.detect(ecg_data, example_data.sampling_rate_hz)
+
+# This one gets the result from cache
+algo3 = QRSDetector()
+algo3 = algo3.detect(ecg_data, example_data.sampling_rate_hz)
+
+# %%
+# This would allow us to globally patch the algorithm, without having to change any code in the algorithm itself.
+# Read the documentation of the :func:`~tpcp.caching.global_disk_cache` for more information on how to configure the
+# cache and some caveats of this approach.
+#
+# In this example, we remove the caching again, to not interfere with the rest of the example.
+remove_any_cache(QRSDetector)
+memory.clear()
+
+# %%
+# RAM Caching
+# -----------
 # Disk based caching makes sense if you want to reuse the cache between runs or across different processes.
 # However, it can be comparatively slow.
 # If you don't want to fill up your disk space and want fast access to a function result at multiple places in your
@@ -379,3 +461,41 @@ dataset.clone().get_subset(participant_id=1).data
 # approach to cache it.
 # Or when performing a GridSearch, where only some parts of calculations are influenced by the changing parameters,
 # caching could result in large performance increases.
+#
+# Within existing objects or full action cashing
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Like with disk caching, we can also apply the memory caching to existing classes.
+# The same caveats apply here, but using global RAM caching might even be more elegant to cache away repeated parts of
+# your pipeline.
+# For example, a filter that will be applied as a sub-step in multiple algorithms, could be cached globally.
+#
+# Below, we just repeat the example from above, but with RAM caching.
+# Note that we set the size of the cache to 2, as we run the method below with two different configurations.
+from tpcp.caching import global_ram_cache
+
+global_ram_cache(2)(QRSDetector)
+
+# %%
+# Now, if we call the QRS detector, we see that the cache is working by inspecting the cache object.
+algo = QRSDetector()
+algo = algo.detect(ecg_data, example_data.sampling_rate_hz)
+
+algo2 = QRSDetector(max_heart_rate_bpm=180)
+algo2 = algo2.detect(ecg_data, example_data.sampling_rate_hz)
+
+# This one gets the result from cache
+algo3 = QRSDetector()
+algo3 = algo3.detect(ecg_data, example_data.sampling_rate_hz)
+
+# %%
+# Now we can inspect the cache statistics.
+from tpcp.caching import get_ram_cache_obj
+
+cache_obj = get_ram_cache_obj(QRSDetector)
+cache_obj.cache_info()
+
+# %%
+# Have a look at the documentation of :func:`~tpcp.caching.global_ram_cache` for more information.
+#
+# Again, we remove the caching again, to not interfere with the rest of the example.
+remove_any_cache(QRSDetector)
