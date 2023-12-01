@@ -1,9 +1,8 @@
 """Helper for caching related tasks."""
-import multiprocessing
-import warnings
-
 import binascii
 import functools
+import multiprocessing
+import warnings
 from collections.abc import Sequence
 from typing import Generic, Optional, TypeVar
 
@@ -261,6 +260,7 @@ def remove_ram_cache(algorithm_object: type[Algorithm]):
 def remove_any_cache(algorithm_object: type[Algorithm]):
     """Remove any cache from an algorithm class."""
     return remove_disk_cache(remove_ram_cache(algorithm_object))
+
 
 def get_ram_cache_obj(algorithm_object: type[Algorithm]):
     """Get the RAM cache object from an algorithm class."""
