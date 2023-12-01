@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Helper to perform global caching of algorithm actions.
+  This can be helpful to cache results of algorithms that are deeply nested within other methods or algorithms that are
+  called multiple times withing the same pipeline.
+  (https://github.com/mad-lab-fau/tpcp/pull/103)
+
 ## [0.27.0] - 2023-11-09
 
 ### Added
