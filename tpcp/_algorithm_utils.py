@@ -48,7 +48,7 @@ def _split_returns(values):
     return value, other
 
 
-def get_action_method(instance: Algorithm, method_name: Optional[str] = None) -> Callable:
+def get_action_method(instance: Union[type[Algorithm], Algorithm], method_name: Optional[str] = None) -> Callable:
     """Get the action method for an Algorithm.
 
     If method_name is None, the primary action method is returned (the one listed first in `Algorithm._action_methods`).
