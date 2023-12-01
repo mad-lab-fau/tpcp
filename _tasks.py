@@ -1,4 +1,3 @@
-import platform
 import re
 import shutil
 import subprocess

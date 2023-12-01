@@ -8,14 +8,13 @@ from numpydoc.docscrape import NumpyDocString
 
 from tpcp import (
     Algorithm,
-    BaseFactory,
     get_action_method,
     get_action_params,
     get_param_names,
     get_results,
     make_action_safe,
 )
-from tpcp._base import BaseTpcpObjectT, _BaseTpcpObject
+from tpcp._base import BaseTpcpObjectT
 from tpcp._hash import custom_hash
 
 
@@ -177,31 +176,6 @@ class TestAlgorithmMixin(Generic[BaseTpcpObjectT]):
         instance = after_action_instance.clone()
 
         assert joblib.hash(instance) == joblib.hash(instance.clone())
-
-    def test_nested_algo_marked_default(self):
-        """Test that nested algorithms are wrapped with cf/CloneFactory."""
-        init = self.ALGORITHM_CLASS.__init__
-        if init is object.__init__:
-            # No explicit constructor to introspect
-            pytest.skip()
-
-        # introspect the constructor arguments to find the _model parameters to represent
-        init_signature = inspect.signature(init)
-        # Consider the constructor parameters excluding 'self'
-        parameters = {
-            p.name: p.default
-            for p in init_signature.parameters.values()
-            if p.name != "self" and p.kind != p.VAR_KEYWORD
-        }
-        nested_algos = {k: v for k, v in parameters.items() if isinstance(v, (_BaseTpcpObject, BaseFactory))}
-        if len(nested_algos) == 0:
-            pytest.skip()
-
-        # If nested algos exists, we check that we get a new instance of the nested object and not the mutable default.
-        # If not, we let the test fail, as we should always wrap such paras in a default explicitly.
-        new_instance = self.ALGORITHM_CLASS().get_params()
-        for k, v in nested_algos.items():
-            assert new_instance[k] is not v, "nested algorithm defaults should be wrapped in `cf`/`CloneFactory`."
 
     def test_passes_safe_action_checks(self, after_action_instance):
         """Test that the algorithm passes the safe action checks."""

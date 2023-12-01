@@ -234,6 +234,7 @@ global_disk_cache(memory)(QRSDetector)
 # Now, if we call the QRS detector, we see that the cache is in the debug output.
 # We load the example dataset here to demonstrate this.
 from examples.datasets.datasets_final_ecg import ECGExampleData
+
 example_data = ECGExampleData(HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data")
 ecg_data = example_data[0].data["ecg"]
 
