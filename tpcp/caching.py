@@ -26,15 +26,15 @@ def global_disk_cache(memory: Memory = Memory(None), *, cache_only: Optional[Seq
 
         @functools.wraps(action_method)
         def wrapped(self, *args_outer, **kwargs_outer):
-            params = self.get_params()
-
             if getattr(self, instance_level_cache_key, None) is None:
-                # our cached function gets the args, the kwargs and the params as input
-                # We now that for a "proper" algorithm, the params are the only thing that can change the results.
-                # Having them as input will invalidate the cache, if the params change.
-                def cachable_inner(__params, __cache_only, *args, **kwargs):
+                # our cached function gets the args, the kwargs and "fake self" as input.
+                # Fake self is a clean clone of the algorithm instance.
+                # It basically only encodes the parameters and the "name" of the algorithm.
+                def cachable_inner(__fake_self, __cache_only, *args, **kwargs):
                     after_action_instance: Algorithm = action_method(self, *args, **kwargs)
                     # We return the results instead of the instance, as the results can be easily pickled.
+                    if __cache_only is None:
+                        return get_results(after_action_instance)
                     return {k: v for k, v in get_results(after_action_instance).items() if k in __cache_only}
 
 
@@ -42,7 +42,7 @@ def global_disk_cache(memory: Memory = Memory(None), *, cache_only: Optional[Seq
                 setattr(self, instance_level_cache_key, cached_inner)
 
             cached_inner = getattr(self, instance_level_cache_key)
-            results = cached_inner(params, cache_only, *args_outer, **kwargs_outer)
+            results = cached_inner(self.clone(), cache_only, *args_outer, **kwargs_outer)
 
             # manually "glue" the results back to the instance
             for result_name, result in results.items():
