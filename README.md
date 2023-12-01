@@ -143,12 +143,15 @@ If you want to run tests, format your code, build the docs, ..., you can run one
 
 ```
 CONFIGURED TASKS
-  format         
-  lint           Lint all files with Prospector.
-  check          Check all potential format and linting issues.
-  test           Run Pytest with coverage.
-  docs           Build the html docs using Sphinx.
-  bump_version   
+  format            
+  format_unsafe     
+  lint              Lint all files with ruff.
+  ci_check          Check all potential format and linting issues.
+  test              Run Pytest with coverage.
+  docs              Build the html docs using Sphinx.
+  docs_clean        Remove all old build files and build a clean version of the docs.
+  docs_preview      Preview the built html docs.
+  version   
 ```
 
 by calling
