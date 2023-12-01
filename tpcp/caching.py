@@ -1,4 +1,6 @@
 """Helper for caching related tasks."""
+import multiprocessing
+import warnings
 
 import binascii
 import functools
@@ -9,6 +11,15 @@ from joblib import Memory
 
 from tpcp import Algorithm, get_action_methods_names, get_results, make_action_safe
 from tpcp._hash import custom_hash
+
+if multiprocessing.parent_process() is None:
+    # We want to avoid spamming the user with warnings if they are running multiple processes
+    warnings.warn(
+        "Global caching is a little tricky to get right and our implementation is not yet battle-tested. "
+        "Please double check that the results are correct and report any issues you find.",
+        UserWarning,
+        stacklevel=2,
+    )
 
 _instance_level_disk_cache_key = "__tpcp_disk_cached_action_method"
 _class_level_lru_cache_key = "__tpcp_lru_cached_action_method"
@@ -251,6 +262,10 @@ def remove_any_cache(algorithm_object: type[Algorithm]):
     """Remove any cache from an algorithm class."""
     return remove_disk_cache(remove_ram_cache(algorithm_object))
 
+def get_ram_cache_obj(algorithm_object: type[Algorithm]):
+    """Get the RAM cache object from an algorithm class."""
+    return getattr(algorithm_object, _class_level_lru_cache_key, None)["cached_func"]
+
 
 __all__ = [
     "global_disk_cache",
@@ -259,4 +274,5 @@ __all__ = [
     "remove_disk_cache",
     "remove_ram_cache",
     "remove_any_cache",
+    "get_ram_cache_obj",
 ]
