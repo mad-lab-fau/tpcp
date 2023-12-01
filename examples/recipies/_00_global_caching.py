@@ -1,10 +1,7 @@
-from joblib import Memory
-
-from tpcp.caching import global_disk_cache
 from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
+from tpcp.caching import _class_level_lru_cache_key, global_ram_cache
 
-
-global_disk_cache(Memory("./.cache", verbose=10))(QRSDetector)
+global_ram_cache(1)(QRSDetector)
 
 # %%
 
@@ -30,4 +27,8 @@ algorithm = algorithm.detect(ecg_data, example_data.sampling_rate_hz)
 algorithm = QRSDetector()
 algorithm = algorithm.detect(ecg_data, example_data.sampling_rate_hz)
 
+algorithm = QRSDetector()
+algorithm = algorithm.detect(ecg_data, example_data.sampling_rate_hz)
 
+
+print(getattr(QRSDetector, _class_level_lru_cache_key)["cached_func"].cache_info())
