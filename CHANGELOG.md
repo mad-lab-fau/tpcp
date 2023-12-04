@@ -28,13 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.26.2] - 2023-11-05
 
-## Fixed
+### Fixed
 
 - Now actually fixed the pytest registration of the testing modules.
 
 ## [0.26.1] - 2023-11-05
 
-## Fixed
+### Fixed
 
 - The testing modules are now registered as pytest files, which should result in verbose assert statements, making 
   debugging easier.
@@ -114,7 +114,7 @@ For all changes in this release see: https://github.com/mad-lab-fau/tpcp/pull/85
 
 ## [0.23.0] - 2023-08-30
 
-## Added
+### Added
 - We migrated some testing utilities from other libraries to tpcp and exposed some algorithm test helper
   that previously only existed in the tests folder via the actual tpcp API.
   This should make testing algorithms and pipelines developed with tpcp easier.
@@ -288,12 +288,12 @@ YANKED RELEASE
 
 ## [0.14.0] - 2023-02-01
 
-## Added
+### Added
 - Custom Aggregators can now use the `RETURN_RAW_SCORES` class variable to specify, if their raw input scores should be 
   returned.
   (https://github.com/mad-lab-fau/tpcp/pull/58)
 
-## Fixed
+### Fixed
 - GridSearch and GridSearchCV now correctly handle custom aggregators that return scores with new names.
   (https://github.com/mad-lab-fau/tpcp/pull/58)
 - When using the `create_group_labels` method on dataset with multiple groupby columns, the method returned a list of 
