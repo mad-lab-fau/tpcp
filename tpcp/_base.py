@@ -734,7 +734,8 @@ def clone(algorithm: T, *, safe: bool = False) -> T:
     # Handle named tuple
     if isinstance(algorithm, tuple) and hasattr(algorithm, "_asdict") and hasattr(algorithm, "_fields"):
         return type(algorithm)(*(clone(a, safe=safe) for a in algorithm))
-    # XXX: not handling dictionaries
+    if isinstance(algorithm, dict):
+        return {k: clone(v, safe=safe) for k, v in algorithm.items()}
     if isinstance(algorithm, (list, tuple, set, frozenset)):
         return type(algorithm)([clone(a, safe=safe) for a in algorithm])
 

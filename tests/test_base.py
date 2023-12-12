@@ -270,6 +270,23 @@ def test_clone_namedtuple(mutable):
     assert namedtuple_instance.b == cloned_named_tuble.b
 
 
+def test_recursive_clone_dict():
+    """Test that objects with dicts are cloned correctly.
+
+    We expect a deepcopy of the dict and all its elements
+    """
+    # create a new dict
+    dict_instance = {"a": {"a": "a"}, "b": {"b": "b"}}
+
+    # We expect that the cloned dict has the same content as the original, but the memory address is different
+    cloned_dict = clone(dict_instance)
+    assert dict_instance is not cloned_dict
+    assert dict_instance["a"] is not cloned_dict["a"]
+    assert dict_instance["b"] is not cloned_dict["b"]
+    assert dict_instance["a"] == cloned_dict["a"]
+    assert dict_instance["b"] == cloned_dict["b"]
+
+
 def test_mutable_default_nested_objects_error():
     nested_instance = create_test_class("nested", params={"nested1": "n1", "nested2": "n2"})
 

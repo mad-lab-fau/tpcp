@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This can be helpful to cache results of algorithms that are deeply nested within other methods or algorithms that are
   called multiple times withing the same pipeline.
   (https://github.com/mad-lab-fau/tpcp/pull/103)
+- Clone now supports recursive cloning of dicts.
+  This allows the theoretical use of dictionaries as parameters.
 
 ### Removed
 
