@@ -40,10 +40,10 @@ class TestAlgorithmMixin(Generic[BaseTpcpObjectT]):
     Examples
     --------
     >>> class TestMyAlgorithm(TestAlgorithmMixin):
-    ...    ALGORITHM_CLASS = MyAlgorithm
-    ...    __test__ = True
+    ...     ALGORITHM_CLASS = MyAlgorithm
+    ...     __test__ = True
     ...
-    ...    ONLY_DEFAULT_PARAMS = False
+    ...     ONLY_DEFAULT_PARAMS = False
 
     """
 

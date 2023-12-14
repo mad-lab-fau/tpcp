@@ -30,6 +30,7 @@ class PyTestSnapshotTest:
             with PyTestSnapshotTest(request) as snapshot_test:
                 yield snapshot_test
 
+
         def pytest_addoption(parser):
             group = parser.getgroup("snapshottest")
             group.addoption(
@@ -37,7 +38,7 @@ class PyTestSnapshotTest:
                 action="store_true",
                 default=False,
                 dest="snapshot_update",
-                help="Update the snapshots."
+                help="Update the snapshots.",
             )
 
     This will register the snapshot fixture that you can use in your tests.

@@ -203,7 +203,6 @@ def make_action_safe(action_method: Callable[P, T]) -> Callable[P, T]:
     --------
     >>> from tpcp import Algorithm, make_action_safe
     >>> class MyAlgorithm(Algorithm):
-    ...
     ...     @make_action_safe
     ...     def detect(self, data, sampling_rate_hz):
     ...         ...

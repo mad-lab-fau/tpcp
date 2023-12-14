@@ -140,13 +140,7 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
         It should have the following call signature:
 
         >>> def callback(
-        ...     *,
-        ...     step: int,
-        ...     scores: Tuple[_SCORE_TYPE, ...],
-        ...     scorer: "Scorer",
-        ...     pipeline: Pipeline,
-        ...     dataset: Dataset,
-        ...     **_
+        ...     *, step: int, scores: Tuple[_SCORE_TYPE, ...], scorer: "Scorer", pipeline: Pipeline, dataset: Dataset, **_
         ... ) -> None:
         ...     ...
 
