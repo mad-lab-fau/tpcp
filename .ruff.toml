@@ -96,6 +96,8 @@ ignore = [
     "PLR0913",
     # Ignore because of formatting
     "ISC001",
+    # Ignore line length warnings. The formatter knows better.
+    "E501",
 ]
 
 
