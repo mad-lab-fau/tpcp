@@ -655,9 +655,12 @@ class Dataset(_Dataset):
         self.groupby_cols = groupby_cols
         self.subset_index = subset_index
 
-    @staticmethod
-    def as_dataclass():
+    @classmethod
+    def as_dataclass(cls):
         """Return a version of the Dataset class that can be subclassed using dataclasses."""
+        # You are only allowed to call this method on the base class not the subclass!
+        assert cls is Dataset, "You can only call `as_dataclass` on the base class `Dataset`!"
+
         import dataclasses  # pylint: disable=import-outside-toplevel
 
         @dataclasses.dataclass(eq=False, repr=False, order=False)
@@ -669,12 +672,14 @@ class Dataset(_Dataset):
 
         return DatasetDc
 
-    @staticmethod
-    def as_attrs():
+    @classmethod
+    def as_attrs(cls):
         """Return a version of the Dataset class that can be subclassed using `attrs` defined classes.
 
         Note, this requires `attrs` to be installed!
         """
+        assert cls is Dataset, "You can only call `as_attrs` on the base class `Dataset`!"
+
         from attrs import define  # pylint: disable=import-outside-toplevel
 
         @define(eq=False, repr=False, order=False, kw_only=True, slots=False)
