@@ -14,6 +14,7 @@ Functions
     :toctree: generated/caching
     :template: function.rst
 
+    staggered_cache
     global_disk_cache
     global_ram_cache
     remove_disk_cache
