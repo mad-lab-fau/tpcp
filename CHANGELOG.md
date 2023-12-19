@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The minimal version of pandas was reduced to 1.3. It still seems to work with that minimal version and this avoids 
+  version conflicts with other packages.
+
 ### Added
 
 - Helper to perform global caching of algorithm actions.
