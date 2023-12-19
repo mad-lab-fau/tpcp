@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.29.0] - 2023-12-19
+
+### Added
+
+- Added a new `hybrid_cache` that allows to cache in RAM and Disk at the same time.
+
 ## [0.28.0] - 2023-12-19
 
 ### Changed
