@@ -4,9 +4,10 @@ from typing import Callable
 
 import joblib
 import pytest
+from joblib import Memory
 
 from tpcp import Algorithm
-from tpcp.caching import global_disk_cache, global_ram_cache, remove_any_cache
+from tpcp.caching import global_disk_cache, global_ram_cache, remove_any_cache, staggered_cache
 
 
 class CacheWarning(UserWarning):
@@ -29,6 +30,12 @@ class ExampleClass(Algorithm):
         return self
 
 
+def example_func(a, b):
+    warnings.warn("This function was called without caching.", CacheWarning)
+
+    return a + b
+
+
 class ExampleClassMultiAction(Algorithm):
     _action_methods = ["action", "action_2"]
 
@@ -44,6 +51,19 @@ def joblib_cache():
     memory = joblib.Memory(location=".cache", verbose=0)
     yield memory
     memory.clear()
+
+
+@pytest.fixture()
+def joblib_cache_verbose():
+    memory = joblib.Memory(location=".cache", verbose=10)
+    yield memory
+    memory.clear()
+
+
+@pytest.fixture()
+def stagger_cache_clear():
+    yield None
+    staggered_cache.__cache_registry__.clear()
 
 
 class TestGlobalDiskCache:
@@ -127,3 +147,114 @@ class TestGlobalDiskCache:
     def test_error_on_classes_with_multiple_action_methods(self):
         with pytest.raises(NotImplementedError):
             self.cache_method()(ExampleClassMultiAction)
+
+
+class TestStaggerdCache:
+    def test_staggered_cache_all_disabled(self):
+        cached_func = staggered_cache(joblib.Memory(None), False)(example_func)
+
+        with pytest.warns(CacheWarning):
+            r = cached_func(1, 2)
+
+        assert r == 3
+
+    def test_staggered_cache_returns_from_registry(self, stagger_cache_clear):
+        cached_func_1 = staggered_cache(joblib.Memory(None), False)(example_func)
+        cached_func_2 = staggered_cache(joblib.Memory(None), False)(example_func)
+
+        assert cached_func_1 is cached_func_2
+
+    def test_joblib_only(self, joblib_cache, stagger_cache_clear):
+        cached_func = staggered_cache(joblib_cache, False)(example_func)
+
+        with pytest.warns(CacheWarning):
+            r = cached_func(1, 2)
+
+        assert r == 3
+
+        with pytest.warns(None) as w:
+            r = cached_func(1, 2)
+
+        assert r == 3
+        assert not w
+
+    def test_lru_only(self, stagger_cache_clear):
+        cached_func = staggered_cache(Memory(None), 2)(example_func)
+
+        with pytest.warns(CacheWarning):
+            r = cached_func(1, 2)
+
+        assert r == 3
+
+        with pytest.warns(None) as w:
+            r = cached_func(1, 2)
+
+        assert r == 3
+        assert not w
+
+    def test_staggered_cache(self, joblib_cache_verbose, stagger_cache_clear, capfd):
+        cached_func = staggered_cache(joblib_cache_verbose, 2)(example_func)
+
+        with pytest.warns(CacheWarning):
+            r = cached_func(1, 2)
+
+        out = capfd.readouterr()
+        clean_out = out.out.replace("\n", "")
+        # This should have triggered the joblib cache
+        assert "[Memory] Calling tests.test_caching.example_func" in clean_out
+
+        assert r == 3
+
+        with pytest.warns(None) as w:
+            r = cached_func(1, 2)
+
+        # This should not hit the joblib cache, as the lru cache should have been used
+        out = capfd.readouterr()
+        clean_out = out.out.replace("\n", "")
+
+        assert clean_out == ""
+
+        assert r == 3
+        assert not w
+
+    def test_joblib_cache_survives_clear(self, joblib_cache_verbose, stagger_cache_clear, capfd):
+        cached_func = staggered_cache(joblib_cache_verbose, 2)(example_func)
+
+        with pytest.warns(CacheWarning):
+            r = cached_func(1, 2)
+
+        out = capfd.readouterr()
+        clean_out = out.out.replace("\n", "")
+        # This should have triggered the joblib cache
+        assert "[Memory] Calling tests.test_caching.example_func" in clean_out
+
+        assert r == 3
+
+        staggered_cache.__cache_registry__.clear()
+
+        cached_func_new = staggered_cache(joblib_cache_verbose, 2)(example_func)
+
+        with pytest.warns(None) as w:
+            r = cached_func_new(1, 2)
+
+        # This time this should hit the joblib cache, as the lru cache should have been cleared
+        out = capfd.readouterr()
+        clean_out = out.out.replace("\n", "")
+
+        assert "Loading example_func from" in clean_out
+
+        assert r == 3
+        assert not w
+
+        # And now the lru cache should be used again
+        with pytest.warns(None) as w:
+            r = cached_func_new(1, 2)
+
+        # This time this should hit the joblib cache, as the lru cache should have been cleared
+        out = capfd.readouterr()
+        clean_out = out.out.replace("\n", "")
+
+        assert clean_out == ""
+
+        assert r == 3
+        assert not w

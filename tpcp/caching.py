@@ -332,7 +332,10 @@ def staggered_cache(
             return _GLOBAL_CACHE_REGISTRY[cache_key]
 
         if lru_cache_maxsize is False:
-            final_cached = joblib_memory.cache(function)
+
+            @functools.wraps(function)
+            def final_wrapped(*args, **kwargs):
+                return joblib_memory.cache(function)(*args, **kwargs)
         else:
 
             def inner_cached(*hash_safe_args, **hash_safe_kwargs):
@@ -342,11 +345,11 @@ def staggered_cache(
 
             final_cached = functools.lru_cache(lru_cache_maxsize)(inner_cached)
 
-        @functools.wraps(function)
-        def final_wrapped(*args, **kwargs):
-            hash_safe_args = tuple(UniversalHashableWrapper(arg) for arg in args)
-            hash_safe_kwargs = {k: UniversalHashableWrapper(v) for k, v in kwargs.items()}
-            return final_cached(*hash_safe_args, **hash_safe_kwargs)
+            @functools.wraps(function)
+            def final_wrapped(*args, **kwargs):
+                hash_safe_args = tuple(UniversalHashableWrapper(arg) for arg in args)
+                hash_safe_kwargs = {k: UniversalHashableWrapper(v) for k, v in kwargs.items()}
+                return final_cached(*hash_safe_args, **hash_safe_kwargs)
 
         _GLOBAL_CACHE_REGISTRY[cache_key] = final_wrapped
 
@@ -366,4 +369,5 @@ __all__ = [
     "remove_ram_cache",
     "remove_any_cache",
     "get_ram_cache_obj",
+    "staggered_cache",
 ]
