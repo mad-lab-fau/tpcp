@@ -16,5 +16,5 @@ This is the API Reference for tpcp.
     Validation and Scoring <validate>
     Miscellaneous Utils <misc>
     Parallel Helpers <parallel>
-    caching <caching>
+    Caching <caching>
     Testing <testing>
