@@ -4,7 +4,7 @@ import functools
 import multiprocessing
 import warnings
 from collections.abc import Sequence
-from typing import Generic, Optional, TypeVar
+from typing import Callable, Generic, Optional, TypeVar, Union
 
 from joblib import Memory
 
@@ -124,7 +124,7 @@ def global_disk_cache(memory: Memory = Memory(None), *, cache_only: Optional[Seq
                 # Fake self is a clean clone of the algorithm instance.
                 # It basically only encodes the parameters and the "name" of the algorithm.
                 def cachable_inner(__fake_self, __cache_only, *args, **kwargs):
-                    after_action_instance: Algorithm = make_action_safe(action_method)(__fake_self, *args, **kwargs)
+                    after_action_instance: Algorithm = action_method(__fake_self, *args, **kwargs)
                     # We return the results instead of the instance, as the results can be easily pickled.
                     if __cache_only is None:
                         return get_results(after_action_instance)
@@ -265,6 +265,97 @@ def remove_any_cache(algorithm_object: type[Algorithm]):
 def get_ram_cache_obj(algorithm_object: type[Algorithm]):
     """Get the RAM cache object from an algorithm class."""
     return getattr(algorithm_object, _class_level_lru_cache_key, None)["cached_func"]
+
+
+_GLOBAL_CACHE_REGISTRY: dict[tuple[str, str], Callable] = {}
+
+
+def staggered_cache(
+    joblib_memory: Memory = Memory(None),
+    lru_cache_maxsize: Union[Optional[int], bool] = None,
+):
+    """Cache a function using joblib memory and a lru cache at the same time.
+
+    This function attempts to be the best of both worlds and uses joblib.Memory to cache function calls between runs
+    and a lru_cache to cache function calls during a run.
+
+    When the cached function is called, the lookup will work as follows:
+
+    1. Is the function result in the lrucache? If yes, return it.
+    2. Is the function result in the joblib memory? If yes, return it and cache it in the lru cache.
+    3. Call the function and cache it in the joblib memory and the lru cache. Return the result.
+
+    It further solves one of the issues that you might run into with ``lru_cache``, that it is difficult to create a
+    wrapped function during runtime, as calling ``lru_cache`` directly will create a new cache for each call.
+    We work around this by using a global cache that stores the wrapped functions.
+    The cache key is a tuple of the function name and a hash of the function, the joblib memory and the lru_cache paras.
+    This means, if you create a new cache with different cache parameters, you will get a new cache, but if you call
+    ``staggered_cache`` with the same parameters, you will get the same object back.
+
+    You can access this global cache via the ``__cache_registry__`` attribute of this function
+    (``staggered_cache.__cache_registry__``).
+
+    Parameters
+    ----------
+    joblib_memory
+        The joblib memory object that is used to cache the results.
+        ``Memory(None)`` is equivalent to no caching.
+    lru_cache_maxsize
+        The maximum number of entries in the cache.
+        If None, the cache will grow without limit.
+        If False, no lru_cache is used.
+
+    Returns
+    -------
+    caching_decorator
+        A decorator that can be used to cache a function with the given parameters.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from tpcp.caching import staggered_cache
+    >>> from joblib import Memory
+    >>>
+    >>> @staggered_cache(Memory(".cache"), lru_cache_maxsize=1)
+    ... def add(a: pd.DataFrame, b: pd.DataFrame):
+    ...     return a + b
+    >>> df1 = pd.DataFrame({"a": [1, 2, 3]})
+    >>> df2 = pd.DataFrame({"a": [4, 5, 6]})
+    >>> add(df1, df2)
+
+    """
+
+    def inner(function: Callable):
+        paras_hash = custom_hash((function, joblib_memory, lru_cache_maxsize))
+        cache_key = (function.__name__, paras_hash)
+        if cache_key in _GLOBAL_CACHE_REGISTRY:
+            return _GLOBAL_CACHE_REGISTRY[cache_key]
+
+        if lru_cache_maxsize is False:
+            final_cached = joblib_memory.cache(function)
+        else:
+
+            def inner_cached(*hash_safe_args, **hash_safe_kwargs):
+                args = tuple(arg.obj for arg in hash_safe_args)
+                kwargs = {k: v.obj for k, v in hash_safe_kwargs.items()}
+                return joblib_memory.cache(function)(*args, **kwargs)
+
+            final_cached = functools.lru_cache(lru_cache_maxsize)(inner_cached)
+
+        @functools.wraps(function)
+        def final_wrapped(*args, **kwargs):
+            hash_safe_args = tuple(UniversalHashableWrapper(arg) for arg in args)
+            hash_safe_kwargs = {k: UniversalHashableWrapper(v) for k, v in kwargs.items()}
+            return final_cached(*hash_safe_args, **hash_safe_kwargs)
+
+        _GLOBAL_CACHE_REGISTRY[cache_key] = final_wrapped
+
+        return final_wrapped
+
+    return inner
+
+
+staggered_cache.__cache_registry__ = _GLOBAL_CACHE_REGISTRY
 
 
 __all__ = [
