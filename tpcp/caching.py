@@ -272,7 +272,7 @@ _GLOBAL_CACHE_REGISTRY: dict[tuple[str, str], Callable] = {}
 
 def staggered_cache(
     joblib_memory: Memory = Memory(None),
-    lru_cache_maxsize: Union[Optional[int], bool] = None,
+    lru_cache_maxsize: Union[Optional[int], bool] = False,
 ):
     """Cache a function using joblib memory and a lru cache at the same time.
 
@@ -326,7 +326,7 @@ def staggered_cache(
     """
 
     def inner(function: Callable):
-        paras_hash = custom_hash((function, joblib_memory, lru_cache_maxsize))
+        paras_hash = custom_hash((function.__name__, id(function), joblib_memory, lru_cache_maxsize))
         cache_key = (function.__name__, paras_hash)
         if cache_key in _GLOBAL_CACHE_REGISTRY:
             return _GLOBAL_CACHE_REGISTRY[cache_key]

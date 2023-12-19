@@ -94,7 +94,6 @@ Below, you can see an example Dataset that uses this pattern.
 Note, that we factored out the processing that we want to cache into a global pure function and then cache this function
 every time we call the data attribute.
 """
-import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -341,44 +340,26 @@ dataset.get_subset(participant_id=1).data
 # For example, if they test locally, they might want to use a smaller cache size more appropriate for their local
 # machine, but when running on a server with more memory, they might want to increase the cache size to take advantage
 # of the additional memory and potential performance gains.
-# However, to allow this we need to write some additional tooling.
+# However, this can be tricky, as you need to keep a global reference to the cache instance and hence, can not easily
+# create it within the class.
 #
 # The general problem we need to overcome is that we need to create the cache instance locally within the class, but
 # need to make sure it is somehow persisted between different instances of the class or when the class instance is
 # cloned.
-# To do this, we can use a class attribute to store the cache instance.
-
-
-def get_func_from_class_cache(cls, cache_key, maxsize, func):
-    """Set the cache for a class.
-
-    Parameters
-    ----------
-    cls
-        The class to set the cache for.
-    cache_key
-        The key to use for the cache.
-    maxsize
-        The maximum size of the cache.
-    func
-        The function to cache.
-
-    """
-    class_cache = getattr(cls, "__CACHE", None)
-    if not class_cache:
-        class_cache = {}
-        setattr(cls, "__CACHE", class_cache)
-    if cached_func := class_cache.get(cache_key, None):
-        if cached_func.cache_info().maxsize != maxsize:
-            warnings.warn(
-                f"There already exists a cached function for {cache_key}, but with a different `maxsize` parameter. "
-                "We will ignore the new maxsize parameter and reuse the old cache"
-            )
-        return cached_func
-    if maxsize == 0:
-        return func
-    class_cache[cache_key] = lru_cache(maxsize=maxsize)(func)
-    return class_cache[cache_key]
+#
+# In the past we recommended to use a class variable to store the cache instance.
+# However, since then we added :func:`~tpcp.caching.staggered_cache`, which main purpose will be explained in the next
+# section, but can already be used here to create a global cache instance.
+# In the background it stores each cached function in a global registry and retrieves the cache instance from there,
+# in case you wrap the function with the same parameters again.
+#
+# .. warning:: There is no magic implemented that clears this cache registry. This means you might store multiple caches
+#    of functions that are not relevant anymore.
+#    We explain in the next section, how you could handle this manually.
+#
+# For now, we will use staggered cache similar to how we use joblib Memory.
+# We "re-wrap" the function we want to cache write before usage.
+from tpcp.caching import staggered_cache
 
 
 def _get_data(participant_id: int):
@@ -404,9 +385,7 @@ class ConfigurableMemoryCachedDataset(Dataset):
         super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
 
     def _cached_get_data(self, participant_id: int):
-        return get_func_from_class_cache(
-            self.__class__, cache_key="get_data", maxsize=self.lru_cache_size, func=_get_data
-        )(participant_id)
+        return staggered_cache(lru_cache_maxsize=self.lru_cache_size)(_get_data)(participant_id)
 
     @property
     def data(self):
@@ -423,8 +402,10 @@ class ConfigurableMemoryCachedDataset(Dataset):
 dataset = ConfigurableMemoryCachedDataset()
 dataset.get_subset(participant_id=1).data
 dataset.get_subset(participant_id=1).data
-# We reset the class cache
-ConfigurableMemoryCachedDataset.__CACHE = {}
+
+# %%
+# We reset the cache
+staggered_cache.__cache_registry__.clear()
 
 # %%
 # When we configure the cache size to 1, we see the print statement only once, unless we change the input.
@@ -438,7 +419,9 @@ dataset.get_subset(participant_id=2).data
 # And if we switch back to the previous input, we see that the func is run again.
 dataset.get_subset(participant_id=1).data
 
-ConfigurableMemoryCachedDataset.__CACHE = {}
+# %%
+# We reset the cache
+staggered_cache.__cache_registry__.clear()
 
 # %%
 # If we configure the cache size to larger values, we see that the print statement is only executed once per input.
@@ -455,8 +438,10 @@ dataset.get_subset(participant_id=1).data
 dataset.clone().get_subset(participant_id=1).data
 
 # %%
-# If you want to use this approach in your own code, you can copy the helper function from above.
-#
+# Finally we clean the cache again, to not interfere with the rest of the example.
+staggered_cache.__cache_registry__.clear()
+
+# %%
 # This approach might also make sense for computations.
 # In particular, when you have cases, where multiple algorithms might use the same pre-processing, you could use this
 # approach to cache it.
@@ -500,3 +485,51 @@ cache_obj.cache_info()
 #
 # Again, we remove the caching again, to not interfere with the rest of the example.
 remove_any_cache(QRSDetector)
+
+# %%
+# Hybrid Caching
+# --------------
+# Now that you have seen Disk and RAM caching, you might have noticed that both have their advantages and disadvantages.
+# So, why not combine them?
+# Basically, storing the results on disk and in RAM at the same time.
+# Whenever, the fast RAM cache is available, we use it, but if the cache is not available, we fall back to the disk
+# cache.
+#
+# This is exactly what we implemented in :func:`~tpcp.caching.staggered_cache`.
+# It is a decorator that takes a function and wraps it in a RAM cache and a disk cache.
+#
+# Below we define a simple function and wrap it with the staggered cache.
+# Then we call it 3 times with different arguments.
+from tpcp.caching import staggered_cache
+
+
+@staggered_cache(Memory(".cache", verbose=10), lru_cache_maxsize=2)
+def simple_func(a, b):
+    print("This function was called without caching.")
+    return a + b
+
+
+simple_func(1, 2)
+simple_func(2, 3)
+simple_func(3, 4)
+
+# %%
+# Now the cache should contain all the results.
+# However, as the lru cache has a size of two, it should only have the last two results, but the first one should be
+# disk-cached.
+# We can verify this, as we don't see any debug output when we rerun with these arguments, but when we
+# call the function with the first argument again, we see the joblib-disk cache debug output.
+# In all cases, we don't see the print statement from within the function indicating that the function was cached
+# correctly.
+#
+# Calling again with the second and third argument:
+simple_func(3, 4)
+simple_func(2, 3)
+# %%
+# Now print output as expected
+#
+# If we call it with the first argument, we see the joblib-memory debug output, indicating that we hit the disk cache.
+simple_func(1, 2)
+# %%
+# However, if we do that again now, the result should be stored in the lrucache again and we don't see any debug output.
+simple_func(1, 2)
