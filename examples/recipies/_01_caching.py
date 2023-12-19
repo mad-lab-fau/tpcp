@@ -535,4 +535,3 @@ simple_func(1, 2)
 # %%
 # However, if we do that again now, the result should be stored in the lrucache again and we don't see any debug output.
 simple_func(1, 2)
-

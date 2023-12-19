@@ -7,7 +7,7 @@ import pytest
 from joblib import Memory
 
 from tpcp import Algorithm
-from tpcp.caching import global_disk_cache, global_ram_cache, remove_any_cache, hybrid_cache
+from tpcp.caching import global_disk_cache, global_ram_cache, hybrid_cache, remove_any_cache
 
 
 class CacheWarning(UserWarning):
