@@ -348,7 +348,7 @@ dataset.get_subset(participant_id=1).data
 # cloned.
 #
 # In the past we recommended to use a class variable to store the cache instance.
-# However, since then we added :func:`~tpcp.caching.staggered_cache`, which main purpose will be explained in the next
+# However, since then we added :func:`~tpcp.caching.hybrid_cache`, which main purpose will be explained in the next
 # section, but can already be used here to create a global cache instance.
 # In the background it stores each cached function in a global registry and retrieves the cache instance from there,
 # in case you wrap the function with the same parameters again.
@@ -359,7 +359,7 @@ dataset.get_subset(participant_id=1).data
 #
 # For now, we will use staggered cache similar to how we use joblib Memory.
 # We "re-wrap" the function we want to cache write before usage.
-from tpcp.caching import staggered_cache
+from tpcp.caching import hybrid_cache
 
 
 def _get_data(participant_id: int):
@@ -385,7 +385,7 @@ class ConfigurableMemoryCachedDataset(Dataset):
         super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
 
     def _cached_get_data(self, participant_id: int):
-        return staggered_cache(lru_cache_maxsize=self.lru_cache_size)(_get_data)(participant_id)
+        return hybrid_cache(lru_cache_maxsize=self.lru_cache_size)(_get_data)(participant_id)
 
     @property
     def data(self):
@@ -405,7 +405,7 @@ dataset.get_subset(participant_id=1).data
 
 # %%
 # We reset the cache
-staggered_cache.__cache_registry__.clear()
+hybrid_cache.__cache_registry__.clear()
 
 # %%
 # When we configure the cache size to 1, we see the print statement only once, unless we change the input.
@@ -421,7 +421,7 @@ dataset.get_subset(participant_id=1).data
 
 # %%
 # We reset the cache
-staggered_cache.__cache_registry__.clear()
+hybrid_cache.__cache_registry__.clear()
 
 # %%
 # If we configure the cache size to larger values, we see that the print statement is only executed once per input.
@@ -439,7 +439,7 @@ dataset.clone().get_subset(participant_id=1).data
 
 # %%
 # Finally we clean the cache again, to not interfere with the rest of the example.
-staggered_cache.__cache_registry__.clear()
+hybrid_cache.__cache_registry__.clear()
 
 # %%
 # This approach might also make sense for computations.
@@ -495,15 +495,15 @@ remove_any_cache(QRSDetector)
 # Whenever, the fast RAM cache is available, we use it, but if the cache is not available, we fall back to the disk
 # cache.
 #
-# This is exactly what we implemented in :func:`~tpcp.caching.staggered_cache`.
+# This is exactly what we implemented in :func:`~tpcp.caching.hybrid_cache`.
 # It is a decorator that takes a function and wraps it in a RAM cache and a disk cache.
 #
 # Below we define a simple function and wrap it with the staggered cache.
 # Then we call it 3 times with different arguments.
-from tpcp.caching import staggered_cache
+from tpcp.caching import hybrid_cache
 
 
-@staggered_cache(Memory(".cache", verbose=10), lru_cache_maxsize=2)
+@hybrid_cache(Memory(".cache", verbose=10), lru_cache_maxsize=2)
 def simple_func(a, b):
     print("This function was called without caching.")
     return a + b
@@ -525,11 +525,14 @@ simple_func(3, 4)
 # Calling again with the second and third argument:
 simple_func(3, 4)
 simple_func(2, 3)
+
 # %%
 # Now print output as expected
 #
 # If we call it with the first argument, we see the joblib-memory debug output, indicating that we hit the disk cache.
 simple_func(1, 2)
+
 # %%
 # However, if we do that again now, the result should be stored in the lrucache again and we don't see any debug output.
 simple_func(1, 2)
+

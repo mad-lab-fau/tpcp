@@ -7,7 +7,7 @@ import pytest
 from joblib import Memory
 
 from tpcp import Algorithm
-from tpcp.caching import global_disk_cache, global_ram_cache, remove_any_cache, staggered_cache
+from tpcp.caching import global_disk_cache, global_ram_cache, remove_any_cache, hybrid_cache
 
 
 class CacheWarning(UserWarning):
@@ -61,9 +61,9 @@ def joblib_cache_verbose():
 
 
 @pytest.fixture()
-def stagger_cache_clear():
+def hybrid_cache_clear():
     yield None
-    staggered_cache.__cache_registry__.clear()
+    hybrid_cache.__cache_registry__.clear()
 
 
 class TestGlobalDiskCache:
@@ -149,23 +149,23 @@ class TestGlobalDiskCache:
             self.cache_method()(ExampleClassMultiAction)
 
 
-class TestStaggerdCache:
+class TestHybridCache:
     def test_staggered_cache_all_disabled(self):
-        cached_func = staggered_cache(joblib.Memory(None), False)(example_func)
+        cached_func = hybrid_cache(joblib.Memory(None), False)(example_func)
 
         with pytest.warns(CacheWarning):
             r = cached_func(1, 2)
 
         assert r == 3
 
-    def test_staggered_cache_returns_from_registry(self, stagger_cache_clear):
-        cached_func_1 = staggered_cache(joblib.Memory(None), False)(example_func)
-        cached_func_2 = staggered_cache(joblib.Memory(None), False)(example_func)
+    def test_staggered_cache_returns_from_registry(self, hybrid_cache_clear):
+        cached_func_1 = hybrid_cache(joblib.Memory(None), False)(example_func)
+        cached_func_2 = hybrid_cache(joblib.Memory(None), False)(example_func)
 
         assert cached_func_1 is cached_func_2
 
-    def test_joblib_only(self, joblib_cache, stagger_cache_clear):
-        cached_func = staggered_cache(joblib_cache, False)(example_func)
+    def test_joblib_only(self, joblib_cache, hybrid_cache_clear):
+        cached_func = hybrid_cache(joblib_cache, False)(example_func)
 
         with pytest.warns(CacheWarning):
             r = cached_func(1, 2)
@@ -178,8 +178,8 @@ class TestStaggerdCache:
         assert r == 3
         assert not w
 
-    def test_lru_only(self, stagger_cache_clear):
-        cached_func = staggered_cache(Memory(None), 2)(example_func)
+    def test_lru_only(self, hybrid_cache_clear):
+        cached_func = hybrid_cache(Memory(None), 2)(example_func)
 
         with pytest.warns(CacheWarning):
             r = cached_func(1, 2)
@@ -192,8 +192,8 @@ class TestStaggerdCache:
         assert r == 3
         assert not w
 
-    def test_staggered_cache(self, joblib_cache_verbose, stagger_cache_clear, capfd):
-        cached_func = staggered_cache(joblib_cache_verbose, 2)(example_func)
+    def test_staggered_cache(self, joblib_cache_verbose, hybrid_cache_clear, capfd):
+        cached_func = hybrid_cache(joblib_cache_verbose, 2)(example_func)
 
         with pytest.warns(CacheWarning):
             r = cached_func(1, 2)
@@ -217,8 +217,8 @@ class TestStaggerdCache:
         assert r == 3
         assert not w
 
-    def test_joblib_cache_survives_clear(self, joblib_cache_verbose, stagger_cache_clear, capfd):
-        cached_func = staggered_cache(joblib_cache_verbose, 2)(example_func)
+    def test_joblib_cache_survives_clear(self, joblib_cache_verbose, hybrid_cache_clear, capfd):
+        cached_func = hybrid_cache(joblib_cache_verbose, 2)(example_func)
 
         with pytest.warns(CacheWarning):
             r = cached_func(1, 2)
@@ -230,9 +230,9 @@ class TestStaggerdCache:
 
         assert r == 3
 
-        staggered_cache.__cache_registry__.clear()
+        hybrid_cache.__cache_registry__.clear()
 
-        cached_func_new = staggered_cache(joblib_cache_verbose, 2)(example_func)
+        cached_func_new = hybrid_cache(joblib_cache_verbose, 2)(example_func)
 
         with pytest.warns(None) as w:
             r = cached_func_new(1, 2)

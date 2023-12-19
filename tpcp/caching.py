@@ -270,7 +270,7 @@ def get_ram_cache_obj(algorithm_object: type[Algorithm]):
 _GLOBAL_CACHE_REGISTRY: dict[tuple[str, str], Callable] = {}
 
 
-def staggered_cache(
+def hybrid_cache(
     joblib_memory: Memory = Memory(None),
     lru_cache_maxsize: Union[Optional[int], bool] = False,
 ):
@@ -313,10 +313,10 @@ def staggered_cache(
     Examples
     --------
     >>> import pandas as pd
-    >>> from tpcp.caching import staggered_cache
+    >>> from tpcp.caching import hybrid_cache
     >>> from joblib import Memory
     >>>
-    >>> @staggered_cache(Memory(".cache"), lru_cache_maxsize=1)
+    >>> @hybrid_cache(Memory(".cache"), lru_cache_maxsize=1)
     ... def add(a: pd.DataFrame, b: pd.DataFrame):
     ...     return a + b
     >>> df1 = pd.DataFrame({"a": [1, 2, 3]})
@@ -358,7 +358,7 @@ def staggered_cache(
     return inner
 
 
-staggered_cache.__cache_registry__ = _GLOBAL_CACHE_REGISTRY
+hybrid_cache.__cache_registry__ = _GLOBAL_CACHE_REGISTRY
 
 
 __all__ = [
@@ -369,5 +369,5 @@ __all__ = [
     "remove_ram_cache",
     "remove_any_cache",
     "get_ram_cache_obj",
-    "staggered_cache",
+    "hybrid_cache",
 ]
