@@ -1,56 +1,88 @@
 """Some utility functions for classes."""
 import functools
 import inspect
-from typing import Callable
+from typing import Any, Callable, Generic, Optional, TypeVar, Unpack
+
+from typing_extensions import Concatenate, ParamSpec, Self
+
+P = ParamSpec("P")
+T = TypeVar("T")
+R = TypeVar("R")
 
 
-class classproperty:  # noqa: N801
-    """Convert a class method into a class property.
+class classproperty(Generic[P, T, R]):  # noqa: N801
+    """
+    A decorator that converts a class method into a class property.
 
-    Decorator that converts a method with a single cls argument into a property
-    that can be accessed directly from the class.
+    This decorator allows a class method, which takes the class as its only argument,
+    to be accessed directly from the class as a property. This can be useful when
+    you want to compute a value that is associated with the class, but not with
+    any specific instance of the class.
 
-    Taken from django: https://docs.djangoproject.com/en/5.0/ref/utils/#django.utils.functional.classproperty
-    Original version published under the BSD license.
+    This implementation is taken from Django and slightly modified:
+    https://docs.djangoproject.com/en/5.0/ref/utils/#django.utils.functional.classproperty
+    The original version in Django is published under the BSD license.
+
+    Example
+    -------
+    >>> class MyClass:
+    ...     @classproperty
+    ...     def name(cls) -> str:
+    ...         return cls.__name__
+    >>> print(MyClass.name)
+    'MyClass'
+
     """
 
-    def __init__(self, method=None):
+    def __init__(self, method: Optional[Callable[Concatenate[type[T], P], R]] = None):
         self.fget = method
 
-    def __get__(self, instance, cls=None):
+    def __get__(self, instance: Optional[T], cls: Optional[type[T]] = None) -> R:
         """Return the class property value."""
         return self.fget(cls)
 
-    def getter(self, method):
+    def getter(self, method: Callable[Concatenate[type[T], P], R]) -> Self:
         """Override the decorated method."""
         self.fget = method
         return self
 
 
-def set_defaults(**defaults):  # noqa: C901
-    """Set the default values of a function.
+def set_defaults(**defaults: Unpack[dict[str, Any]]) -> Callable[[Concatenate[Callable[P, R]]], Callable[P, R]]:  # noqa: C901
+    """Set the default values of a function's parameters.
 
-    This will return a wrapped version of the function, that has the default values set.
-    This might be useful, if you want to set default values programmatically (i.e. load them from a file).
+    This decorator returns a wrapped version of the function, with the specified default values set.
+    This can be useful when you want to set default values programmatically, such as loading them from a file.
 
-    This decorator also works on class methods, and might be used to set default values of class-init parameters.
+    This decorator also works on class methods, and can be used to set default values of class initialization parameters.
+
+    Note that the new default values must be a subset of the function's parameters.
+    Also, you cannot set default values for parameters that already have a default value.
+    Doing so will raise a ValueError.
 
     Parameters
     ----------
     **defaults
         The new default values for the function's parameters.
-        Note, that this must be a subset of the function's parameters.
-        Further, you can not set default values for parameters that already have a default value.
-        This will raise a ValueError.
 
     Returns
     -------
     decorator
         A decorator that can be applied to a function to modify its default values.
 
+    Example
+    -------
+    >>> @set_defaults(a=10, b=20)
+    ... def add(a, b):
+    ...     return a + b
+    >>> print(add())
+    30
+    >>> print(add(5))
+    25
+    >>> print(add(5, 5))
+    10
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         sig = inspect.signature(func)
 
         new_paras = [
