@@ -1,9 +1,9 @@
 """Some utility functions for classes."""
 import functools
 import inspect
-from typing import Any, Callable, Generic, Optional, TypeVar, Unpack
+from typing import Any, Callable, Generic, Optional, TypeVar
 
-from typing_extensions import Concatenate, ParamSpec, Self
+from typing_extensions import Concatenate, ParamSpec, Self, Unpack
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -47,7 +47,7 @@ class classproperty(Generic[P, T, R]):  # noqa: N801
         return self
 
 
-def set_defaults(**defaults: Unpack[dict[str, Any]]) -> Callable[[Concatenate[Callable[P, R]]], Callable[P, R]]:  # noqa: C901
+def set_defaults(**defaults: Unpack[dict[str, Any]]) -> Callable[[Callable[P, R]], Callable[P, R]]:  # noqa: C901
     """Set the default values of a function's parameters.
 
     This decorator returns a wrapped version of the function, with the specified default values set.
