@@ -40,11 +40,11 @@ jobs:
       run: |
         poetry run poe test
     - name: Linting
-      if: ${{ matrix.python-version == '3.11' }}
+      if: ${{ matrix.python-version == '3.9' }}
       run: |
         poetry run poe ci_check
     - name: "Upload coverage to Codecov"
-      if: ${{ matrix.python-version == '3.11' }}
+      if: ${{ matrix.python-version == '3.9' }}
       uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
