@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.0] - 2024-01-23
+
+### Added
+
+- Added a new `classproperty` that allows to define class level properties equivalent to `@property` for instances.
+- Added a new `set_defaults` decorator that allows to modify the default values or a function or class init.
+
 ## [0.29.0] - 2023-12-19
 
 ### Added
