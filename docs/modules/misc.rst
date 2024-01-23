@@ -17,3 +17,13 @@ Classes
     BaseTypedIterator
     TypedIterator
 
+
+Functions
+---------
+.. autosummary::
+    :toctree: generated/misc
+    :template: function.rst
+
+    classproperty
+    set_defaults
+
