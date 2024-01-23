@@ -28,7 +28,7 @@ class NoMemoizeHasher(Hasher):
         # For now, we accept the recursion issue, as I think this might happen less often by accident.
         return
 
-    def hash(self, obj, return_digest=True):  # noqa: A003
+    def hash(self, obj, return_digest=True):
         """Get hash while handling some edgecases.
 
         Namely, this implementation fixes the following issues:
