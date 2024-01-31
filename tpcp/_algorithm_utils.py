@@ -215,7 +215,8 @@ def make_action_safe(action_method: Callable[P, T]) -> Callable[P, T]:
         return action_method
 
     @wraps(action_method)
-    def safe_wrapped(self: AlgorithmT, *args: P.args, **kwargs: P.kwargs) -> AlgorithmT:
+    def safe_wrapped(*args: P.args, **kwargs: P.kwargs) -> AlgorithmT:
+        self: AlgorithmT = args[0]
         if action_method.__name__ not in get_action_methods_names(self):
             warnings.warn(
                 "The `make_action_safe` decorator should only be applied to an action method "
@@ -226,7 +227,7 @@ def make_action_safe(action_method: Callable[P, T]) -> Callable[P, T]:
                 PotentialUserErrorWarning,
                 stacklevel=2,
             )
-        return _check_safe_run(self, action_method, *args, **kwargs)
+        return _check_safe_run(self, action_method, *args[1:], **kwargs)
 
     setattr(safe_wrapped, ACTION_METHOD_INDICATOR, True)
     return cast(Callable[P, T], safe_wrapped)

@@ -82,9 +82,11 @@ aggregations = [
 
 # %%
 # 3. We create a new instance of `TypedIterator` with the result type and the aggregations.
+# We use the "square bracket" typing syntax to bind the output datatype.
+# This way, our IDE is able to autocomplete the attributes of the result type.
 from tpcp.misc import TypedIterator
 
-iterator = TypedIterator(ResultType, aggregations=aggregations)
+iterator = TypedIterator[ResultType](ResultType, aggregations=aggregations)
 
 # %%
 # Now we can iterate over our data and get a result object for each iteration, that we can then fill with the results.
@@ -94,7 +96,20 @@ for d, r in iterator.iterate(data):
     r.result_3 = r.result_2 - 4
 
 # %%
-# The aggregated results are now available as attributes of the iterator.
+# You can access the data in two different ways.
+#
+# 1. Using the ``results_`` attribute, which is an instance of ``ResultType`. Just note that the typing of the
+#    attributes is incorrect.
+iterator.results_
+
+# %%
+# However, the big advantage of this approach is that your IDE should be able to autocomplete the attributes.
+iterator.results_.result_1
+
+# %%
+# 2. Alternative you can access the results as dynamically assignes attributes of the iterator.
+#    Note, that you need to add a trailing underscore to the attribute name.
+#    As we are following the typically tpcp convention of using trailing underscores for result attributes.
 print(iterator.result_1_)
 print(iterator.result_2_)
 print(iterator.result_3_)
@@ -154,7 +169,7 @@ from pathlib import Path
 from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
 from examples.datasets.datasets_final_ecg import ECGExampleData
 
-iterator = TypedIterator(QRSResultType, aggregations=aggregations)
+iterator = TypedIterator[QRSResultType](QRSResultType, aggregations=aggregations)
 
 try:
     HERE = Path(__file__).parent
@@ -170,10 +185,13 @@ for d, r in iterator.iterate(dataset):
 
 # %%
 # Finally we can inspect the results stored on the iterator.
+iterator.results_
+
+# %%
 # Note, that `r_peak_positions_` is a single dataframe now and not a list of dataframes.
 iterator.r_peak_positions_
 
-# %%k
+# %%
 # The `n_r_peaks_` is still a dictionary, as excpected.
 iterator.n_r_peaks_
 
@@ -195,12 +213,15 @@ iterator.inputs_
 #
 # For this we need to create a custom subclass inheriting from ``BaseTypedIterator``.
 from collections.abc import Iterator
+from typing import Generic, TypeVar
 
 from tpcp.misc import BaseTypedIterator
 
+CustomTypeT = TypeVar("CustomTypeT")
 
-class SectionIterator(BaseTypedIterator[QRSResultType]):
-    def iterate(self, data: pd.DataFrame, sections: pd.DataFrame) -> Iterator[tuple[pd.DataFrame, QRSResultType]]:
+
+class SectionIterator(BaseTypedIterator[CustomTypeT], Generic[CustomTypeT]):
+    def iterate(self, data: pd.DataFrame, sections: pd.DataFrame) -> Iterator[tuple[pd.DataFrame, CustomTypeT]]:
         # We turn the sections into a generator of dataframes
         data_iterable = (data.iloc[s.start : s.end] for s in sections.itertuples(index=False))
         # We use the `_iterate` method to do the heavy lifting
@@ -222,7 +243,7 @@ class SimpleResultType:
     n_samples: int
 
 
-custom_iterator = SectionIterator(SimpleResultType)
+custom_iterator = SectionIterator[SimpleResultType](SimpleResultType)
 
 for d, r in custom_iterator.iterate(dummy_data, dummy_sections):
     print(d)
@@ -232,6 +253,9 @@ for d, r in custom_iterator.iterate(dummy_data, dummy_sections):
 # We can see that the iterator iterated over the two sections of the data.
 # And the raw results contain two instances of the result dataclass.
 custom_iterator.raw_results_
+
+# %%
+custom_iterator.results_
 
 # %%
 custom_iterator.n_samples_

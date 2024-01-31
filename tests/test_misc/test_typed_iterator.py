@@ -38,7 +38,9 @@ def test_simple_no_agg():
 def test_simple_with_agg():
     rt = make_dataclass("ResultType", ["result_1", "result_2", "result_3"])
 
-    iterator = TypedIterator(rt, aggregations=[("result_1", lambda i, r: sum(i)), ("result_2", lambda i, r: sum(r))])
+    iterator = TypedIterator[rt](
+        rt, aggregations=[("result_1", lambda i, r: sum(i)), ("result_2", lambda i, r: sum(r))]
+    )
 
     data = [1, 2, 3]
     for i, r in iterator.iterate(data):
@@ -46,8 +48,12 @@ def test_simple_with_agg():
         r.result_2 = i * 2
         r.result_3 = i * 3
 
-    assert iterator.result_1_ == 6
-    assert iterator.result_2_ == 12
+    result_obj = iterator.results_
+
+    assert isinstance(result_obj, rt)
+    assert iterator.result_1_ == result_obj.result_1 == 6
+    assert iterator.result_2_ == result_obj.result_2 == 12
+    assert iterator.result_3_ == result_obj.result_3 == [3, 6, 9]
 
 
 def test_warning_incomplete_iterate():
@@ -82,3 +88,14 @@ def test_invalid_attr_error():
 
     assert "invalid_attr_" in str(e.value)
     assert str([f"{f}_" for f in field_names]) in str(e.value)
+
+
+def test_not_allowed_attr_error():
+    field_names = ["results"]
+
+    rt = make_dataclass("ResultType", field_names)
+    iterator = TypedIterator(rt)
+    data = [1, 2, 3]
+
+    with pytest.raises(ValueError):
+        [next(iterator.iterate(data)) for _ in range(3)]

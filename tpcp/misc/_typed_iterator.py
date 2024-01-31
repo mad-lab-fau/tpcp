@@ -48,6 +48,10 @@ class BaseTypedIterator(Algorithm, Generic[DataclassT]):
         List of all results as dataclass instances.
         The attribute of the dataclass instance will have the a value of ``_NOT_SET`` if no result was set.
         To check for this, you can use ``isinstance(val, TypedIterator.NULL_VALUE)``.
+    results_
+        An instance of the result object with either the "inverted" results (i.e. a list of all results) per attribute
+        or the aggregated results (depending on the aggregation function).
+        Note, that the typing of the attributes of the result object will not be correct.
     {result_name}_
         The aggregated results for the respective result name.
     done_
@@ -90,6 +94,15 @@ class BaseTypedIterator(Algorithm, Generic[DataclassT]):
         if not is_dataclass(self.data_type):
             raise TypeError(f"Expected a dataclass as data_type, got {self.data_type}")
 
+        result_field_names = {f.name for f in fields(self.data_type)}
+        not_allowed_fields = {"results", "raw_results", "done", "inputs"}
+        if not_allowed_fields.intersection(result_field_names):
+            raise ValueError(
+                f"The result dataclass cannot have a field called {not_allowed_fields}. "
+                "These fields are used by the TypedIterator to store the results. "
+                "Having these fields in the result object will result in naming conflicts."
+            )
+
         self._raw_results = []
         self.inputs_ = []
         self.done_ = False
@@ -111,17 +124,31 @@ class BaseTypedIterator(Algorithm, Generic[DataclassT]):
 
         return self._raw_results
 
+    def _agg_result(self, name):
+        values = [getattr(r, name) for r in self.raw_results_]
+        # if an aggregator is defined for the specific item, we apply it
+        aggregations = dict(self.aggregations)
+        if name in aggregations:
+            return aggregations[name](self.inputs_, values)
+        return values
+
+    @property
+    def results_(self) -> DataclassT:
+        """The aggregated results.
+
+        Note, that this returns an instance of the result object, even-though the datatypes of the attributes might be
+        different depending on the aggregation function.
+        We still decided it makes sense to return an instance of the result object, as it will allow to autocomplete
+        the attributes, even-though the associated times might not be correct.
+        """
+        return self.data_type(**{k.name: self._agg_result(k.name) for k in fields(self.data_type)})
+
     def __getattr__(self, item):
         # We assume a correct result name ends with an underscore
         actual_item = item[:-1]
 
         if actual_item in self._raw_results[0].__dict__:
-            values = [getattr(r, actual_item) for r in self.raw_results_]
-            # if an aggregator is defined for the specific item, we apply it
-            for name, aggregator in self.aggregations:
-                if name == actual_item:
-                    return aggregator(self.inputs_, values)
-            return values
+            return self._agg_result(actual_item)
 
         valid_result_fields = [k.name + "_" for k in fields(self.data_type)]
 
@@ -133,7 +160,7 @@ class BaseTypedIterator(Algorithm, Generic[DataclassT]):
         )
 
 
-class TypedIterator(BaseTypedIterator, Generic[DataclassT]):
+class TypedIterator(BaseTypedIterator[DataclassT], Generic[DataclassT]):
     """Helper to iterate over data and collect results.
 
     Parameters
@@ -165,15 +192,6 @@ class TypedIterator(BaseTypedIterator, Generic[DataclassT]):
         If the iterator is not done, but you try to access the results, a warning will be raised.
 
     """
-
-    data_type: type[DataclassT]
-    aggregations: Sequence[tuple[str, Callable[[list, list], Any]]]
-
-    _raw_results: list[DataclassT]
-    done_: bool
-    inputs_: list
-
-    NULL_VALUE = _NotSet()
 
     def iterate(self, iterable: Iterable[T]) -> Iterator[tuple[T, DataclassT]]:
         """Iterate over the given iterable and yield the input and a new empty result object for each iteration.
