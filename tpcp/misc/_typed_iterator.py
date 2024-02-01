@@ -64,6 +64,7 @@ class BaseTypedIterator(Algorithm, Generic[DataclassT]):
     aggregations: Sequence[tuple[str, Callable[[list, list], Any]]]
 
     _raw_results: list[DataclassT]
+    _result_fields: set[str]
     done_: bool
     inputs_: list
 
@@ -103,6 +104,8 @@ class BaseTypedIterator(Algorithm, Generic[DataclassT]):
                 "Having these fields in the result object will result in naming conflicts."
             )
 
+        self._result_fields = result_field_names
+
         self._raw_results = []
         self.inputs_ = []
         self.done_ = False
@@ -128,7 +131,7 @@ class BaseTypedIterator(Algorithm, Generic[DataclassT]):
         values = [getattr(r, name) for r in self.raw_results_]
         # if an aggregator is defined for the specific item, we apply it
         aggregations = dict(self.aggregations)
-        if name in aggregations and all(v != self.NULL_VALUE for v in values):
+        if name in aggregations and all(v is not self.NULL_VALUE for v in values):
             return aggregations[name](self.inputs_, values)
         return values
 
@@ -145,17 +148,15 @@ class BaseTypedIterator(Algorithm, Generic[DataclassT]):
 
     def __getattr__(self, item):
         # We assume a correct result name ends with an underscore
-        actual_item = item[:-1]
-
-        if actual_item in self._raw_results[0].__dict__:
+        if (actual_item := item[:-1]) in self._result_fields:
             return self._agg_result(actual_item)
 
-        valid_result_fields = [k.name + "_" for k in fields(self.data_type)]
+        result_field_names = [f + "_" for f in self._result_fields]
 
         raise AttributeError(
             f"Attribute {item} is not a valid attribute for {self.__class__.__name__} nor a dynamically generated "
             "result attribute of the result dataclass. "
-            f"Valid result attributes are: {valid_result_fields}. "
+            f"Valid result attributes are: {result_field_names}. "
             "Note the trailing underscore!"
         )
 

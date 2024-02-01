@@ -87,7 +87,8 @@ def test_invalid_attr_error():
         iterator.invalid_attr_
 
     assert "invalid_attr_" in str(e.value)
-    assert str([f"{f}_" for f in field_names]) in str(e.value)
+    for f in field_names:
+        assert f"{f}_" in str(e.value)
 
 
 def test_not_allowed_attr_error():
@@ -99,6 +100,7 @@ def test_not_allowed_attr_error():
 
     with pytest.raises(ValueError):
         [next(iterator.iterate(data)) for _ in range(3)]
+
 
 def test_agg_with_empty():
     rt = make_dataclass("ResultType", ["result_1", "result_2", "result_3"])
