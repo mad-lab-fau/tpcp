@@ -99,3 +99,23 @@ def test_not_allowed_attr_error():
 
     with pytest.raises(ValueError):
         [next(iterator.iterate(data)) for _ in range(3)]
+
+def test_agg_with_empty():
+    rt = make_dataclass("ResultType", ["result_1", "result_2", "result_3"])
+
+    iterator = TypedIterator[rt](
+        rt, aggregations=[("result_1", lambda i, r: sum(i)), ("result_2", lambda i, r: sum(r))]
+    )
+
+    data = [1, 2, 3]
+    for i, r in iterator.iterate(data):
+        r.result_1 = i - 1
+        # We Don't set result 2 -> it will remain an empty value and should skip agg
+        r.result_3 = i * 3
+
+    result_obj = iterator.results_
+
+    assert isinstance(result_obj, rt)
+    assert iterator.result_1_ == result_obj.result_1 == 6
+    assert iterator.result_2_ == [iterator.NULL_VALUE, iterator.NULL_VALUE, iterator.NULL_VALUE]
+    assert iterator.result_3_ == result_obj.result_3 == [3, 6, 9]

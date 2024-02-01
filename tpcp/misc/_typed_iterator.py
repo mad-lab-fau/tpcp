@@ -128,7 +128,7 @@ class BaseTypedIterator(Algorithm, Generic[DataclassT]):
         values = [getattr(r, name) for r in self.raw_results_]
         # if an aggregator is defined for the specific item, we apply it
         aggregations = dict(self.aggregations)
-        if name in aggregations:
+        if name in aggregations and all(v != self.NULL_VALUE for v in values):
             return aggregations[name](self.inputs_, values)
         return values
 
