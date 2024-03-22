@@ -75,6 +75,7 @@ Other projects using Datasets:
 - [gaitmap-datasets](https://github.com/mad-lab-fau/gaitmap-datasets)
 - [cold-face-test-analysis](https://github.com/mad-lab-fau/cft-analysis/tree/main/cft_analysis/datasets)
 - [carwatch-analysis](https://github.com/mad-lab-fau/carwatch-analysis/tree/main/carwatch_analysis/datasets)
+- [mobgap](https://github.com/mobilise-d/mobgap)
 
 ### Parameter Optimization and Cross Validation
 
@@ -92,6 +93,12 @@ Learn more:
 [Custom Algorithms](https://tpcp.readthedocs.io/en/latest/auto_examples/index.html#algorithms), 
 [Parameter Optimization](https://tpcp.readthedocs.io/en/latest/auto_examples/index.html#parameter-optimization), 
 [Cross Validation](https://tpcp.readthedocs.io/en/latest/auto_examples/index.html#validation)
+
+Other projects using tpcp features:
+- [gaitmap](https://github.com/mad-lab-fau/gaitmap) - uses tpcp as basis for custom class based algorithms
+- [gaitmap-bench](https://github.com/mad-lab-fau/gaitmap-bench) - uses all tpcp features (from pipelines to optuna integration) for standardized evaluation of algorithms
+- [eargait](https://github.com/mad-lab-fau/eargait) - uses tpcp as basis for custom class based algorithms
+- [mobgap](https://github.com/mobilise-d/mobgap) - uses tpcp as basis for custom class based algorithms and to implement reproducible evaluation tools
 
 ## Citation
 
