@@ -40,6 +40,14 @@ class PyTestSnapshotTest:
                 dest="snapshot_update",
                 help="Update the snapshots.",
             )
+            group.addoption(
+                "--snapshot-only-check",
+                action="store_true",
+                default=False,
+                dest="snapshot_only_check",
+                help="Update the snapshots.",
+            )
+
 
     This will register the snapshot fixture that you can use in your tests.
     Further, it will register the `--snapshot-update` commandline flag, which you can use to update the snapshots.
@@ -72,6 +80,10 @@ class PyTestSnapshotTest:
     @property
     def _update(self):
         return self.request.config.option.snapshot_update
+
+    @property
+    def _only_check(self):
+        return self.request.config.option.snapshot_only_check
 
     @property
     def _module(self):
@@ -172,7 +184,13 @@ class PyTestSnapshotTest:
             value_dtype = type(value)
             try:
                 prev_snapshot = self._retrieve(value_dtype)
-            except SnapshotNotFoundError:
+            except SnapshotNotFoundError as e:
+                if self._only_check:
+                    raise SnapshotNotFoundError(
+                        "No corresponding snapshot file could be found. "
+                        "Run pytest without the--snapshot-only-check flag to create a new "
+                        "snapshot and store it in git"
+                    ) from e
                 self._store(value)  # first time this test has been seen
             except:
                 raise
