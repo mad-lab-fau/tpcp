@@ -21,36 +21,11 @@ class PyTestSnapshotTest:
 
     This supports standard datatypes and scientific datatypes like numpy arrays and pandas DataFrames.
 
-    To use this in your tests, add the following lines to your conftest.py:
-
-    .. code-block:: python
-
-        @pytest.fixture()
-        def snapshot(request):
-            with PyTestSnapshotTest(request) as snapshot_test:
-                yield snapshot_test
-
-
-        def pytest_addoption(parser):
-            group = parser.getgroup("snapshottest")
-            group.addoption(
-                "--snapshot-update",
-                action="store_true",
-                default=False,
-                dest="snapshot_update",
-                help="Update the snapshots.",
-            )
-            group.addoption(
-                "--snapshot-only-check",
-                action="store_true",
-                default=False,
-                dest="snapshot_only_check",
-                help="Update the snapshots.",
-            )
-
-
-    This will register the snapshot fixture that you can use in your tests.
+    This plugin will be automatically registered when you install tpcp.
+    It adds the `snapshot` fixture to your tests.
     Further, it will register the `--snapshot-update` commandline flag, which you can use to update the snapshots.
+    You can also run pytest with the `--snapshot-only-check` flag to fail if a snapshot file is not found.
+    Without that flag, missing snapshots will be automatically created.
 
     To use the fixture in your tests, simply add it as a parameter to your test function:
 
@@ -210,3 +185,27 @@ class PyTestSnapshotTest:
                     raise TypeError(f"The dtype {value_dtype} is not supported for snapshot testing")
 
         self.curr_snapshot_number += 1
+
+
+@pytest.fixture()
+def snapshot(request):
+    with PyTestSnapshotTest(request) as snapshot_test:
+        yield snapshot_test
+
+
+def pytest_addoption(parser):
+    group = parser.getgroup("tpcp_snapshots")
+    group.addoption(
+        "--snapshot-update",
+        action="store_true",
+        default=False,
+        dest="snapshot_update",
+        help="Update the snapshots.",
+    )
+    group.addoption(
+        "--snapshot-only-check",
+        action="store_true",
+        default=False,
+        dest="snapshot_only_check",
+        help="Run as normal, but fail if a snapshot file is not found. This is usefull for CI runs.",
+    )

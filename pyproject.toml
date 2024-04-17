@@ -12,6 +12,9 @@ readme = "README.md"
 homepage = "https://github.com/mad-lab-fau/tpcp"
 repository = "https://github.com/mad-lab-fau/tpcp"
 
+[tool.poetry.plugins."pytest11"]
+tpcp_snapshots = "tpcp.testing._regression_utils"
+
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
 joblib = ">=1.3"
