@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.32.0] - 2024-04-17
+
+- The snapshot plugin now supports a new command line argument `--snapshot-only-check` that will fail the test if no
+  snapshot file is found. This is usefull for CI/CD pipelines, where you want to ensure that all snapshots are up to 
+  date.
+- The snapshot plugin is now installed automatically when you install tpcp. There is no need to set it up in the conftest
+  file anymore.
+
 ## [0.31.2] - 2024-02-01
 
 ### Fixed
