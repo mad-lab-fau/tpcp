@@ -3,6 +3,7 @@
 This is inspired by github.com/syrusakbary/snapshottest.
 Note that it can not be used in combination with this module!
 """
+import json
 import re
 from pathlib import Path
 from typing import Optional, Union
@@ -96,7 +97,24 @@ class PyTestSnapshotTest:
     def _store(self, value):
         self._snapshot_folder.mkdir(parents=True, exist_ok=True)
         if isinstance(value, pd.DataFrame):
-            value.to_json(self._file_name_json, indent=4, orient="table", date_unit="ns")
+            # non-unique indices are not stored as index in the snapshot
+            if not value.index.is_unique:
+                raise ValueError(
+                    "Input DataFrame has non-unique index. This is currently not supported for snapshot testing."
+                    "Consider calling `reset_index()` before passing data to `assert_match`."
+                )
+            # "index" is not accepted as index or column name
+            if "index" in value.columns or "index" in value.index.names:
+                raise ValueError(
+                    "Input DataFrame has a column named 'index'. This is currently not supported for snapshot testing."
+                    "Consider renaming this column before passing data to `assert_match`."
+                )
+            # prevent dtype assertion errors
+            self._check_for_non_default_dtypes(value)
+            # convert datetime columns to a format that can be written and read back from json without errors
+            value = self._sanitize_datetime_entries(value)
+
+            value.to_json(self._file_name_json, indent=4, orient="table", date_unit="ns", index=True)
         elif isinstance(value, np.ndarray):
             np.savetxt(self._file_name_csv, value, delimiter=",")
         elif isinstance(value, str):
@@ -172,6 +190,8 @@ class PyTestSnapshotTest:
                 raise
             else:
                 if isinstance(value, pd.DataFrame):
+                    # convert datetime columns to match with the stored format
+                    value = self._sanitize_datetime_entries(value)
                     assert_frame_equal(value, prev_snapshot, **kwargs)
                 elif isinstance(value, np.ndarray):
                     np.testing.assert_array_almost_equal(value, prev_snapshot, **kwargs)
@@ -186,6 +206,43 @@ class PyTestSnapshotTest:
                     raise TypeError(f"The dtype {value_dtype} is not supported for snapshot testing")
 
         self.curr_snapshot_number += 1
+
+    @staticmethod
+    def _check_for_non_default_dtypes(df: pd.DataFrame):
+        df.select_dtypes(include=[float]).columns.equals(df.select_dtypes(include=["float32"]).columns)
+        float_cols = df.select_dtypes(include=[float]).columns
+        default_float_cols = df.select_dtypes(include=["float64"]).columns
+        if not float_cols.equals(default_float_cols):
+            raise ValueError(
+                f"DataFrame contains non-default float dtypes: {df[float_cols].dtypes}, which are not supported for snapshot testing. Consider converting them to 'float64' or to use the flag `check_dtype=False`."
+            )
+        int_cols = df.select_dtypes(include=[int]).columns
+        default_int_cols = df.select_dtypes(include=["int64"]).columns
+        if not int_cols.equals(default_int_cols):
+            raise ValueError(
+                f"DataFrame contains non-default int dtypes: {df[int_cols].dtypes}, which are not supported for snapshot testing. Consider converting them to 'int64' or to use the flag `check_dtype=False`."
+            )
+
+    @staticmethod
+    def _sanitize_datetime_entries(df: pd.DataFrame) -> pd.DataFrame:
+        sanitized_df = df.copy()
+        datetime_types = ["datetime", "datetime64", "datetime64[ns]", "datetimetz"]
+        # check columns
+        datetime_cols = sanitized_df.select_dtypes(include=datetime_types).columns
+        # remove timezone information to prevent this read-write issue:
+        # https://github.com/pandas-dev/pandas/issues/53473
+        sanitized_df.loc[:, datetime_cols] = sanitized_df.loc[:, datetime_cols].apply(lambda x: x.dt.tz_localize(None))
+        # check index
+        for level in range(sanitized_df.index.nlevels):
+            if sanitized_df.index.get_level_values(level).inferred_type in datetime_types:
+                # check if index is a multiindex
+                if sanitized_df.index.nlevels > 1:
+                    sanitized_df.index.set_levels(
+                        sanitized_df.index.get_level_values(level).tz_localize(None), level=level, inplace=True
+                    )
+                else:
+                    sanitized_df.index = sanitized_df.index.tz_localize(None)
+        return sanitized_df
 
 
 @pytest.fixture()
