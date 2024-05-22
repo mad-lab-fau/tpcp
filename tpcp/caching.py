@@ -11,14 +11,16 @@ from joblib import Memory
 from tpcp import Algorithm, get_action_methods_names, get_results, make_action_safe
 from tpcp._hash import custom_hash
 
-if multiprocessing.parent_process() is None:
-    # We want to avoid spamming the user with warnings if they are running multiple processes
-    warnings.warn(
-        "Global caching is a little tricky to get right and our implementation is not yet battle-tested. "
-        "Please double check that the results are correct and report any issues you find.",
-        UserWarning,
-        stacklevel=2,
-    )
+
+def _global_cache_warning():
+    if multiprocessing.parent_process() is None:
+        # We want to avoid spamming the user with warnings if they are running multiple processes
+        warnings.warn(
+            "Global caching is a little tricky to get right and our implementation is not yet battle-tested. "
+            "Please double check that the results are correct and report any issues you find.",
+            UserWarning,
+            stacklevel=2,
+        )
 
 _instance_level_disk_cache_key = "__tpcp_disk_cached_action_method"
 _class_level_lru_cache_key = "__tpcp_lru_cached_action_method"
@@ -108,7 +110,7 @@ def global_disk_cache(memory: Memory = Memory(None), *, cache_only: Optional[Seq
     tpcp.caching.global_ram_cache
         Same as this function, but uses an LRU cache in RAM instead of a disk cache.
     """
-
+    _global_cache_warning()
     def inner(algorithm_object: type[Algorithm]):
         # This only return the first action method, but this is fine for now
         # This method is "unbound", as we are working on the class, not an instance
@@ -190,6 +192,7 @@ def global_ram_cache(max_n: Optional[int] = None, *, cache_only: Optional[Sequen
         Same as this function, but uses a disk cache instead of an LRU cache in RAM.
 
     """
+    _global_cache_warning()
     if cache_only is not None:
         cache_only = tuple(cache_only)
 
@@ -324,6 +327,7 @@ def hybrid_cache(
     >>> add(df1, df2)
 
     """
+    _global_cache_warning()
 
     def inner(function: Callable):
         paras_hash = custom_hash((function.__name__, id(function), joblib_memory, lru_cache_maxsize))
