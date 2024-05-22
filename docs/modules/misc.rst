@@ -24,6 +24,7 @@ Functions
     :toctree: generated/misc
     :template: function.rst
 
+    custom_hash
     classproperty
     set_defaults
 
