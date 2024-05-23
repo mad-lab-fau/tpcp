@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import pytest
 from numpy.testing import assert_almost_equal, assert_array_equal
-from pandas.testing import assert_frame_equal
 
 matplotlib.use("Agg")
 
@@ -165,12 +164,11 @@ def test_caching_example():
 
 
 def test_typed_iterator_example():
-    from examples.recipies._04_typed_iterator import custom_iterator, iterator
+    from examples.recipies._04_typed_iterator import custom_iterator, qrs_iterator
 
-    assert len(iterator.r_peak_positions_) == 17782
-    assert sum(iterator.n_r_peaks_.values()) == 17782
-    assert len(iterator.raw_results_) == 12
+    assert len(qrs_iterator.results_.r_peak_positions) == 17782
+    assert sum(qrs_iterator.results_.n_r_peaks.values()) == 17782
+    assert len(qrs_iterator.raw_results_) == 12
 
-    assert len(custom_iterator.n_samples_) == 2
+    assert len(custom_iterator.results_.n_samples) == 2
     assert len(custom_iterator.raw_results_) == 2
-    assert_frame_equal(custom_iterator.inputs_[0], pd.DataFrame({"data": [1, 2, 3, 4, 5]}))

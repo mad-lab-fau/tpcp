@@ -48,6 +48,7 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
         An optional list of aggregations to apply to the results.
         This has the form ``[(result_name, aggregation_function), ...]``.
         Each aggregation function gets ``raw_results_`` provided as input and can return an arbitrary object.
+        Note, that the aggregation function needs to handle the case where no result was set for a specific attribute.
         If a result-name is in the list, the aggregation will be applied to it, when accessing the ``results_``
         (i.e. ``results_.{result_name}``).
         If no aggregation is defined for a result, a simple list of all results will be returned.
@@ -114,6 +115,7 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
     _result_fields: set[str]
     # We use this as cache
     _results: DataclassT
+    _additional_results: dict[str, Any]
 
     done_: dict[str, bool]
 
@@ -165,18 +167,9 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
             # Reset all caches
             if hasattr(self, "_results"):
                 del self._results
+            if hasattr(self, "_add"):
+                del self._additional_results
             self.done_ = {}
-
-            result_field_names = {f.name for f in fields(self.data_type)}
-            not_allowed_fields = {"results", "raw_results", "done", "inputs"}
-            if not_allowed_fields.intersection(result_field_names):
-                raise ValueError(
-                    f"The result dataclass cannot have a field called {not_allowed_fields}. "
-                    "These fields are used by the TypedIterator to store the results. "
-                    "Having these fields in the result object will result in naming conflicts."
-                )
-
-            self._result_fields = result_field_names
             self._raw_results = []
 
         self.done_[iteration_name] = False
@@ -223,14 +216,15 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
                 values = self._get_default_agg(name)(raw_results)
             agg_results[name] = values
         # If there are further aggregations, we apply them as well
-        additional_aggregations = {name: agg(raw_results) for name, agg in aggregations.items() if name not in agg_results}
+        additional_aggregations = {
+            name: agg(raw_results) for name, agg in aggregations.items() if name not in agg_results
+        }
         return agg_results, additional_aggregations
-
 
     def _cache_agg(self) -> None:
         agg_results, additional_aggregations = self._agg_result(self.raw_results_)
         self._results = self.data_type(**agg_results)
-        self._additional_aggregations = additional_aggregations
+        self._additional_results = additional_aggregations
 
     @property
     def results_(self) -> DataclassT:
@@ -244,11 +238,12 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
         if not hasattr(self, "_results"):
             self._cache_agg()
         return self._results
+
     @property
     def additional_results_(self) -> dict[str, Any]:
         if not hasattr(self, "_additional_results"):
             self._cache_agg()
-        return self._additional_aggregations
+        return self._additional_results
 
     @classmethod
     def filter_iterator_results(

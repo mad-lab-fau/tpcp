@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ``custom_hash`` the internally used hashing method based on pickle is now part of the public API via ``tpcp.misc``.
 
+### Changed
+
+- Relative large rework of the TypedIterator. We recommend to reread the example.
+
 ## [0.32.0] - 2024-04-17
 
 - The snapshot plugin now supports a new command line argument `--snapshot-only-check` that will fail the test if no

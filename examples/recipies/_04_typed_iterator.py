@@ -167,7 +167,7 @@ dataset = ECGExampleData(data_path)
 # Note that we can type these functions using the `TypedIteratorResultTuple` type.
 # Like the iterator itself, this type is generic and allows you to specify the input and output types.
 # So in our case, the input is `ECGExampleData` and the output is `QRSResultType`.
-from typing_extensions import TypeAlias, reveal_type
+from typing_extensions import TypeAlias
 
 from tpcp.misc import TypedIteratorResultTuple
 
