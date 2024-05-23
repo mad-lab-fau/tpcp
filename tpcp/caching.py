@@ -22,6 +22,7 @@ def _global_cache_warning():
             stacklevel=2,
         )
 
+
 _instance_level_disk_cache_key = "__tpcp_disk_cached_action_method"
 _class_level_lru_cache_key = "__tpcp_lru_cached_action_method"
 
@@ -111,6 +112,7 @@ def global_disk_cache(memory: Memory = Memory(None), *, cache_only: Optional[Seq
         Same as this function, but uses an LRU cache in RAM instead of a disk cache.
     """
     _global_cache_warning()
+
     def inner(algorithm_object: type[Algorithm]):
         # This only return the first action method, but this is fine for now
         # This method is "unbound", as we are working on the class, not an instance
