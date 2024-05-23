@@ -4,11 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.33.0] - 2024-05-23
 
 ### Added
 
 - ``custom_hash`` the internally used hashing method based on pickle is now part of the public API via ``tpcp.misc``.
+- ``DummyOptimize`` allows to ignore the warning that it usually throws.
 
 ### Changed
 
