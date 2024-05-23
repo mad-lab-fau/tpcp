@@ -20,6 +20,7 @@ At the end you might apply further operations to the results, e.g. aggregations.
 
 Below is a simple example of this pattern:
 """
+
 data = [1, 2, 3, 4, 5]
 
 result_1 = []
@@ -76,17 +77,25 @@ class ResultType:
 # 2. We define the aggregations we want to apply to the results.
 #    If we don't want to aggregate a result, we simply don't add it to the list.
 #    We provide some more explanation on aggregations below, just accept this for now.
+from tpcp.misc import TypedIteratorResultTuple
+
+
+def sum_agg(results: list[TypedIteratorResultTuple[int, ResultType]]):
+    return sum(r.result.result_1 for r in results)
+
+
 aggregations = [
-    ("result_1", lambda _, results: sum(results)),
+    ("result_1", sum_agg),
 ]
 
 # %%
 # 3. We create a new instance of `TypedIterator` with the result type and the aggregations.
-# We use the "square bracket" typing syntax to bind the output datatype.
+# We use the "square bracket" typing syntax to bind the output datatype and the input datatype we are planning to
+# iterate over.
 # This way, our IDE is able to autocomplete the attributes of the result type.
 from tpcp.misc import TypedIterator
 
-iterator = TypedIterator[ResultType](ResultType, aggregations=aggregations)
+iterator = TypedIterator[int, ResultType](ResultType, aggregations=aggregations)
 
 # %%
 # Now we can iterate over our data and get a result object for each iteration, that we can then fill with the results.
@@ -96,26 +105,16 @@ for d, r in iterator.iterate(data):
     r.result_3 = r.result_2 - 4
 
 # %%
-# You can access the data in two different ways.
-#
-# 1. Using the ``results_`` attribute, which is an instance of ``ResultType`. Just note that the typing of the
-#    attributes is incorrect.
+# You can access the data using the ``results_`` attribute.
 iterator.results_
 
 # %%
-# However, the big advantage of this approach is that your IDE should be able to autocomplete the attributes.
+# Your IDE should be able to autocomplete the attributes.
 iterator.results_.result_1
 
 # %%
-# 2. Alternative you can access the results as dynamically assignes attributes of the iterator.
-#    Note, that you need to add a trailing underscore to the attribute name.
-#    As we are following the typically tpcp convention of using trailing underscores for result attributes.
-print(iterator.result_1_)
-print(iterator.result_2_)
-print(iterator.result_3_)
-
-# %%
-# The raw results are available as a list of dataclass instances.
+# The raw results are available as a list of Result tuples.
+# They allow us to access the results in the order they were created, and contain further metadata like the input data.
 iterator.raw_results_
 
 # %%
@@ -144,32 +143,10 @@ class QRSResultType:
 
 
 # %%
-# For the aggregations, we want to concatenate the r-peak positions.
-# The aggregation function gets the list of inputs as the first argument and the list of results as the second
-# argument.
-# We can use this to create a combined dataframe with a proper index.
-#
-# We turn the `n_r_peaks` into a dictionary, to make it easier to map the results back to the inputs.
-
-aggregations = [
-    (
-        "r_peak_positions",
-        lambda datapoints, results: pd.concat(results, keys=[d.group_label for d in datapoints]),
-    ),
-    (
-        "n_r_peaks",
-        lambda datapoints, results: dict(zip([d.group_label for d in datapoints], results)),
-    ),
-]
-
-# %%
-# Now we can create the iterator and iterate over the dataset.
+# Our input data is going to be a dataset object of the ECGExampleData type.
 from pathlib import Path
 
-from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
 from examples.datasets.datasets_final_ecg import ECGExampleData
-
-iterator = TypedIterator[QRSResultType](QRSResultType, aggregations=aggregations)
 
 try:
     HERE = Path(__file__).parent
@@ -179,29 +156,66 @@ data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 
 dataset = ECGExampleData(data_path)
 
-for d, r in iterator.iterate(dataset):
+# %%
+# For the aggregations, we want to concatenate the r-peak positions.
+# The aggregation function gets all raw results as input.
+# So it can access all inputs, all results, and all metadata.
+# This means you can define any aggregation you want.
+# In this case, we want to concatenate the r-peak positions into a single dataframe.
+# And we turn the `n_r_peaks` into a dictionary, to make it easier to map the results back to the inputs.
+#
+# Note that we can type these functions using the `TypedIteratorResultTuple` type.
+# Like the iterator itself, this type is generic and allows you to specify the input and output types.
+# So in our case, the input is `ECGExampleData` and the output is `QRSResultType`.
+from typing_extensions import TypeAlias, reveal_type
+
+from tpcp.misc import TypedIteratorResultTuple
+
+result_tup: TypeAlias = TypedIteratorResultTuple[ECGExampleData, QRSResultType]
+
+
+def concat_r_peak_positions(results: list[result_tup]):
+    return pd.concat({r.input.group_label: r.result.r_peak_positions for r in results})
+
+
+def aggregate_n_r_peaks(results: list[result_tup]):
+    return {r.input.group_label: r.result.n_r_peaks for r in results}
+
+
+aggregations = [
+    ("r_peak_positions", concat_r_peak_positions),
+    ("n_r_peaks", aggregate_n_r_peaks),
+]
+
+# %%
+# Now we can create the iterator and iterate over the dataset.
+# The iterator takes the same type parameters as our result-tuple.
+#
+# We can then iterate over the dataset and apply the QRS detection algorithm.
+from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
+
+qrs_iterator = TypedIterator[ECGExampleData, QRSResultType](QRSResultType, aggregations=aggregations)
+
+for d, r in qrs_iterator.iterate(dataset):
     r.r_peak_positions = QRSDetector().detect(d.data["ecg"], sampling_rate_hz=d.sampling_rate_hz).r_peak_positions_
     r.n_r_peaks = len(r.r_peak_positions)
 
 # %%
 # Finally we can inspect the results stored on the iterator.
-iterator.results_
+qrs_iterator.results_
 
 # %%
 # Note, that `r_peak_positions_` is a single dataframe now and not a list of dataframes.
-iterator.r_peak_positions_
+qrs_iterator.results_.r_peak_positions
 
 # %%
-# The `n_r_peaks_` is still a dictionary, as excpected.
-iterator.n_r_peaks_
+# The `n_r_peaks_` is still a dictionary, as expected.
+qrs_iterator.results_.n_r_peaks
 
 # %%
-# The raw results are still available a list of dataclass instances.
-iterator.raw_results_
+# The raw results are still available.
+qrs_iterator.raw_results_
 
-# %%
-# And the inputs are stored as well.
-iterator.inputs_
 
 # %%
 # Custom Iterators
@@ -220,7 +234,7 @@ from tpcp.misc import BaseTypedIterator
 CustomTypeT = TypeVar("CustomTypeT")
 
 
-class SectionIterator(BaseTypedIterator[CustomTypeT], Generic[CustomTypeT]):
+class SectionIterator(BaseTypedIterator[pd.DataFrame, CustomTypeT], Generic[CustomTypeT]):
     def iterate(self, data: pd.DataFrame, sections: pd.DataFrame) -> Iterator[tuple[pd.DataFrame, CustomTypeT]]:
         # We turn the sections into a generator of dataframes
         data_iterable = (data.iloc[s.start : s.end] for s in sections.itertuples(index=False))
@@ -258,7 +272,29 @@ custom_iterator.raw_results_
 custom_iterator.results_
 
 # %%
-custom_iterator.n_samples_
+custom_iterator.results_.n_samples
 
 # %%
-custom_iterator.inputs_
+# Advanced Usacases
+# -----------------
+# For a really advanced use cases, check out `mobgap GsIterator
+# <https://mobgap.readthedocs.io/en/latest/modules/generated/pipeline/mobgap.pipeline.GsIterator.html>`_.
+# This makes use of sub-iterations to allow to iterate and aggregate subregions of the data dynamically.
+#
+# Additional Aggregators
+# ++++++++++++++++++++++
+# We allow to pass additional aggregators to the iterator that have names that are not part of the result type.
+# This allows to perform additional aggregations.
+# They work as before, but the aggregation results are not available on the result object, but rather as raw dictionary
+# via the ``additional_results_`` attribute.
+# We show that below with the section iterator we defined above.
+aggregations = [("sum_n_samples", lambda results: sum(r.result.n_samples for r in results))]
+
+custom_iterator = SectionIterator[SimpleResultType](SimpleResultType, aggregations=aggregations)
+
+for d, r in custom_iterator.iterate(dummy_data, dummy_sections):
+    r.n_samples = len(d)
+
+custom_iterator.results_
+# %%
+custom_iterator.additional_results_
