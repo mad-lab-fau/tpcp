@@ -808,6 +808,12 @@ class TestDummyOptimize:
 
         assert len(w.list) == 0
 
+    def test_warning_suppression(self):
+        with pytest.warns(None) as w:
+            DummyOptimize(DummyOptimizablePipeline(), ignore_potential_user_error_warning=True).optimize(dataset=None)
+
+        assert len(w.list) == 0
+
 
 class TestOptimizeBase:
     optimizer: BaseOptimize

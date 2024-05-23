@@ -66,6 +66,10 @@ class DummyOptimize(BaseOptimize[PipelineT, DatasetT]):
     pipeline
         The pipeline to wrap.
         It will not be optimized in any way, but simply copied to `self.optimized_pipeline_` if `optimize` is called.
+    ignore_potential_user_error_warning
+        If True, the warning about using a pipeline that implements `self_optimize` with `DummyOptimize` will be
+        ignored.
+        Only use this, if you are sure about what you are doing.
 
     Other Parameters
     ----------------
@@ -82,11 +86,13 @@ class DummyOptimize(BaseOptimize[PipelineT, DatasetT]):
     """
 
     pipeline: Parameter[PipelineT]
+    ignore_potential_user_error_warning: Parameter[bool]
 
     optimized_pipeline_: PipelineT
 
-    def __init__(self, pipeline: PipelineT) -> None:
+    def __init__(self, pipeline: PipelineT, *, ignore_potential_user_error_warning: bool = False) -> None:
         self.pipeline = pipeline
+        self.ignore_potential_user_error_warning = ignore_potential_user_error_warning
 
     def optimize(self, dataset: DatasetT, **optimize_params: Any) -> Self:  # noqa: ARG002
         """Run the "dummy" optimization.
@@ -105,14 +111,16 @@ class DummyOptimize(BaseOptimize[PipelineT, DatasetT]):
 
         """
         self.dataset = dataset
-        if hasattr(self.pipeline, "self_optimize"):
+        if not self.ignore_potential_user_error_warning and hasattr(self.pipeline, "self_optimize"):
             warnings.warn(
                 "You are using `DummyOptimize` with a pipeline that implements `self_optimize` and, hence, indicates "
                 "that the pipeline can be optimized. "
                 "`DummyOptimize` does never call this method and skips any optimization steps! "
-                "Use `Optimize` if you actually want to optimize your pipeline.",
+                "Use `Optimize` if you actually want to optimize your pipeline.\n\n "
+                "If you are sure that you want to use `DummyOptimize` with this pipeline, set "
+                "``ignore_potential_user_error_warning=True`` to hide this warning in the future.",
                 PotentialUserErrorWarning,
-                stacklevel=2,
+                stacklevel=1,
             )
         self.optimized_pipeline_ = self.pipeline.clone()
         return self
