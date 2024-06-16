@@ -10,7 +10,7 @@ This file can be used as quick reference or to import the class into other examp
 from functools import lru_cache
 from itertools import cycle
 from pathlib import Path
-from typing import Optional, Union
+from typing import Literal, NamedTuple, Optional, Union
 
 import pandas as pd
 
@@ -24,7 +24,12 @@ def load_pandas_pickle_file(file_path):
 cached_load_pandas_pickle_file = lru_cache(10)(load_pandas_pickle_file)
 
 
-class ECGExampleData(Dataset):
+class ECGExampleDataGroupLabel(NamedTuple):
+    patient_group: Literal["group_1", "group_2", "group_3"]
+    participant: str
+
+
+class ECGExampleData(Dataset[ECGExampleDataGroupLabel]):
     data_path: Path
     use_lru_cache: bool
 
