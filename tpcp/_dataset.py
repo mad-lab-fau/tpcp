@@ -87,13 +87,16 @@ class _Dataset(BaseTpcpObject):
                 "explicitly using `sort_values`."
             )
 
-        invalid_elements = [s for s in index_1.columns if not s.isidentifier() or iskeyword(s)]
+        invalid_elements = [
+            s for s in index_1.columns if not isinstance(s, str) or not s.isidentifier() or iskeyword(s)
+        ]
         if invalid_elements:
             warnings.warn(
                 f"Some of your index columns are not valid Python attribute names: {invalid_elements}. "
                 "This will cause issues when using further methods such as `get_subset`, `group_label`, "
                 "`group_labels`, and `datapoint_label`.\n"
-                "To be a valid Python attribute a string should only consist of alphanumeric letters and underscores. "
+                "To be a valid Python attribute, you index column labels need to be a string that only consist of "
+                "alphanumeric letters and underscores. "
                 "Strings starting with a number, containing spaces or special characters are not allowed."
                 "Furthermore, they must not shadow a built-in Python keyword.",
                 RuntimeWarning,
@@ -137,7 +140,6 @@ class _Dataset(BaseTpcpObject):
         """Get the current group label.
 
         The group is defined by the current groupby settings.
-        If the dataset is not grouped, this is equivalent to `datapoint_label`.
 
         Note, this attribute can only be used, if there is just a single group.
         This will return a named tuple. The tuple will contain only one entry if there is only a single groupby column
