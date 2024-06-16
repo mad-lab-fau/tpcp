@@ -2,7 +2,7 @@
 import warnings
 from collections.abc import Iterator, Sequence
 from keyword import iskeyword
-from typing import Optional, TypeVar, Union, cast, overload
+from typing import Generic, Optional, TypeVar, Union, cast, get_args, overload
 
 import numpy as np
 import pandas as pd
@@ -13,8 +13,10 @@ from tpcp.exceptions import ValidationError
 
 DatasetT = TypeVar("DatasetT", bound="_Dataset")
 
+GroupLabelT = TypeVar("GroupLabelT", bound=tuple[str, ...])
 
-class _Dataset(BaseTpcpObject):
+
+class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
     groupby_cols: Optional[Union[list[str], str]]
     subset_index: Optional[pd.DataFrame]
 
@@ -103,10 +105,21 @@ class _Dataset(BaseTpcpObject):
                 stacklevel=1,
             )
 
+        # Get the generic type of the dataset
+        group_label_type = get_args(type(self).__orig_bases__[0])[0]
+        # If group label type is a named tuple, we check that the keys are the same as the index columns
+        if (label_fiels := getattr(group_label_type, "_fields", None)) and label_fiels != (
+            index_cols := tuple(index_1.columns)
+        ):
+            raise ValueError(
+                f"The columns of the index ({index_cols}) must match the fields (in order!) of the group label "
+                f"named tuple ({label_fiels}) provided as Generic to the dataclass."
+            )
+
         return index_1
 
     @property
-    def group_labels(self) -> list[tuple[str, ...]]:
+    def group_labels(self) -> list[GroupLabelT]:
         """Get all group labels of the dataset based on the set groupby level.
 
         This will return a list of named tuples.
@@ -120,12 +133,15 @@ class _Dataset(BaseTpcpObject):
 
         For some examples and additional explanation see this :ref:`example <custom_dataset_basics>`.
         """
-        return list(
-            self._get_unique_groups().to_frame().itertuples(index=False, name=type(self).__name__ + "GroupLabel")
-        )
+        if getattr(group_label_type := get_args(type(self).__orig_bases__[0])[0], "_fields", None):
+            nd_tuple_name = group_label_type.__name__
+        else:
+            nd_tuple_name = type(self).__name__ + "GroupLabel"
+
+        return list(self._get_unique_groups().to_frame().itertuples(index=False, name=nd_tuple_name))
 
     @property
-    def groups(self) -> list[tuple[str, ...]]:
+    def groups(self) -> list[GroupLabelT]:
         """Get the current group labels. Deprecated, use `group_labels` instead."""
         warnings.warn(
             "The attribute `groups` is deprecated and will be removed in a future version. "
@@ -136,7 +152,7 @@ class _Dataset(BaseTpcpObject):
         return self.group_labels
 
     @property
-    def group_label(self) -> tuple[str, ...]:
+    def group_label(self) -> GroupLabelT:
         """Get the current group label.
 
         The group is defined by the current groupby settings.
@@ -150,7 +166,7 @@ class _Dataset(BaseTpcpObject):
         return self.group_labels[0]
 
     @property
-    def group(self) -> tuple[str, ...]:
+    def group(self) -> GroupLabelT:
         """Get the current group label. Deprecated, use `group_label` instead."""
         warnings.warn(
             "The attribute `group` is deprecated and will be removed in a future version. "
@@ -160,9 +176,12 @@ class _Dataset(BaseTpcpObject):
         )
         return self.group_label
 
-    def index_as_tuples(self) -> list[tuple[str, ...]]:
+    def index_as_tuples(self) -> list[GroupLabelT]:
         """Get all datapoint labels of the dataset (i.e. a list of the rows of the index as named tuples)."""
-        return list(self.index.itertuples(index=False, name=type(self).__name__ + "DatapointLabel"))
+        if getattr(group_label_type := get_args(type(self).__orig_bases__[0])[0], "_fields", None):
+            # If a generic is provided, we actually convert the named tuples.
+            return [group_label_type(*row) for row in self.index.itertuples(index=False)]
+        return list(self.index.itertuples(index=False, name=type(self).__name__ + "GroupLabel"))
 
     def __len__(self) -> int:
         """Get the length of the dataset.
@@ -485,7 +504,7 @@ class _Dataset(BaseTpcpObject):
         raise NotImplementedError()
 
 
-class Dataset(_Dataset):
+class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
     """Baseclass for tpcp Dataset objects.
 
     This class provides fundamental functionality like iteration, getting subsets, and compatibility with `sklearn`'s
@@ -666,7 +685,7 @@ class Dataset(_Dataset):
         import dataclasses  # pylint: disable=import-outside-toplevel
 
         @dataclasses.dataclass(eq=False, repr=False, order=False)
-        class DatasetDc(_Dataset):
+        class DatasetDc(_Dataset[GroupLabelT], Generic[GroupLabelT]):
             """Dataclass version of Dataset."""
 
             groupby_cols: Optional[Union[list[str], str]] = None
@@ -685,7 +704,7 @@ class Dataset(_Dataset):
         from attrs import define  # pylint: disable=import-outside-toplevel
 
         @define(eq=False, repr=False, order=False, kw_only=True, slots=False)
-        class DatasetAt(_Dataset):
+        class DatasetAt(_Dataset[GroupLabelT], Generic[GroupLabelT]):
             """Attrs version of Dataset."""
 
             groupby_cols: Optional[Union[list[str], str]] = None

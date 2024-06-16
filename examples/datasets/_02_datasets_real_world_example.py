@@ -42,7 +42,7 @@ If you just want the final implementation, without all the explanation, check :r
 # Later we need to include the data of all files into the dataset, but to generate out index, it is sufficient to only
 # list one of the datatypes.
 from pathlib import Path
-from typing import Optional, Union
+from typing import Literal, NamedTuple, Optional, Union
 
 from tpcp import Dataset
 
@@ -295,6 +295,121 @@ subset.labeled_r_peaks_
 # complexity of data loading.
 # This can prevent accidental errors and just a much faster and better workflow in case new people want to work with
 # a dataset.
+#
+# Advanced Concepts - Typing Group Labels
+# ---------------------------------------
+# In the example above, your IDE will assume that the grouplabel you get from the dataset is a simple tuple of strings.
+
+group_label = dataset[0].group_label
+group_label
+
+# %%
+# However, in reality, it is a NamedTuple with derived by pandas based on the columns of your index.
+# That allows named access to the group label.
+group_label.participant
+
+
+# %%
+# This named access can not be automatically inferred by the IDE or type checker, because the named tuple is created
+# during runtime.
+# This makes it slightly annoying to work with the group label.
+#
+# We can partially work around this, by defining the group label type explicitly and provide it as generic parameter
+# to the dataclass.
+#
+# .. warning :: The typing trick below is a little bit of a hack and the grouplabel is not actually an instance of the
+#               provided NamedTuple.
+#               It is a NamedTuple that has the same (or a subset of the) attributes as the provided NamedTuple.
+#               So you shouldn't use runtime checks against the named tuple that you provided.
+class ECGExampleDataGroupLabel(NamedTuple):
+    patient_group: Literal["group_1", "group_2", "group_3"]
+    participant: str
+
+
+class ECGExampleData(Dataset[ECGExampleDataGroupLabel]):
+    data_path: Path
+
+    def __init__(
+        self,
+        data_path: Path,
+        *,
+        groupby_cols: Optional[Union[list[str], str]] = None,
+        subset_index: Optional[pd.DataFrame] = None,
+    ):
+        self.data_path = data_path
+        super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
+
+    @property
+    def sampling_rate_hz(self) -> float:
+        """The sampling rate of the raw ECG recording in Hz."""
+        return 360.0
+
+    @property
+    def data(self) -> pd.DataFrame:
+        """The raw ECG data of a participant's recording.
+
+        The dataframe contains a single column called "ecg".
+        The index values are just samples.
+        You can use the sampling rate (`self.sampling_rate_hz`) to convert it into time
+        """
+        # Check that there is only a single participant in the dataset
+        self.assert_is_single(None, "data")
+        # Reconstruct the ecg file path based on the data index
+        p_id = self.index["participant"][0]
+        return pd.read_pickle(self.data_path / f"{p_id}.pk.gz")
+
+    @property
+    def r_peak_positions_(self) -> pd.DataFrame:
+        """The sample positions of all R-peaks in the ECG data.
+
+        This includes all R-Peaks (PVC or normal)
+        """
+        self.assert_is_single(None, "r_peaks_")
+        p_id = self.index["participant"][0]
+        r_peaks = pd.read_csv(self.data_path / f"{p_id}_all.csv", index_col=0)
+        r_peaks = r_peaks.rename(columns={"R": "r_peak_position"})
+        return r_peaks
+
+    @property
+    def pvc_positions_(self) -> pd.DataFrame:
+        """The positions of R-peaks belonging to abnormal PVC peaks in the data stream.
+
+        The position is equivalent to a position entry in `self.r_peak_positions_`.
+        """
+        self.assert_is_single(None, "pvc_positions_")
+        p_id = self.index["participant"][0]
+        pvc_peaks = pd.read_csv(self.data_path / f"{p_id}_pvc.csv", index_col=0)
+        pvc_peaks = pvc_peaks.rename(columns={"PVC": "pvc_position"})
+        return pvc_peaks
+
+    @property
+    def labeled_r_peaks_(self) -> pd.DataFrame:
+        """All r-peak positions with an additional column that labels them as normal or PVC."""
+        self.assert_is_single(None, "labeled_r_peaks_")
+        r_peaks = self.r_peak_positions_
+        r_peaks["label"] = "normal"
+        r_peaks.loc[r_peaks["r_peak_position"].isin(self.pvc_positions_["pvc_position"]), "label"] = "pvc"
+        return r_peaks
+
+    def create_index(self) -> pd.DataFrame:
+        participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
+        patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
+        df = pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        # Some additional checks to avoid common issues
+        if len(df) == 0:
+            raise ValueError(
+                "The dataset is empty. Are you sure you selected the correct folder? Current folder is: "
+                f"{self.data_path}"
+            )
+        return df
+
+
+# %%
+# Now doing the same as above, will get auto-completion for the group label keys.
+dataset = ECGExampleData(data_path=data_path)
+subset = dataset[0]
+# "participant" should be suggested by your IDE
+subset.group_label.participant
 
 # %%
 # Advanced Concepts - Caching
@@ -325,7 +440,7 @@ def load_pandas_pickle_file(file_path):
 cached_load_pandas_pickle_file = lru_cache(10)(load_pandas_pickle_file)
 
 
-class ECGExampleData(Dataset):
+class ECGExampleData(Dataset[ECGExampleDataGroupLabel]):
     data_path: Path
     use_lru_cache: bool
 
