@@ -108,12 +108,12 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
         # Get the generic type of the dataset
         group_label_type = get_args(type(self).__orig_bases__[0])[0]
         # If group label type is a named tuple, we check that the keys are the same as the index columns
-        if (label_fiels := getattr(group_label_type, "_fields", None)) and label_fiels != (
+        if (label_fields := getattr(group_label_type, "_fields", None)) and label_fields != (
             index_cols := tuple(index_1.columns)
         ):
             raise ValueError(
                 f"The columns of the index ({index_cols}) must match the fields (in order!) of the group label "
-                f"named tuple ({label_fiels}) provided as Generic to the dataclass."
+                f"named tuple ({label_fields}) provided as Generic to the dataclass."
             )
 
         return index_1
