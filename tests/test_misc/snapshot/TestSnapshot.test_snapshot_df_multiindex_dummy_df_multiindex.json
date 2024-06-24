@@ -1,0 +1,35 @@
+{
+    "schema":{
+        "fields":[
+            {
+                "name":"index_level_a",
+                "type":"string"
+            },
+            {
+                "name":"index_level_b",
+                "type":"string"
+            },
+            {
+                "name":"example_col",
+                "type":"integer"
+            }
+        ],
+        "primaryKey":[
+            "index_level_a",
+            "index_level_b"
+        ],
+        "pandas_version":"1.4.0"
+    },
+    "data":[
+        {
+            "index_level_a":1,
+            "index_level_b":2,
+            "example_col":1
+        },
+        {
+            "index_level_a":"a",
+            "index_level_b":"b",
+            "example_col":2
+        }
+    ]
+}
