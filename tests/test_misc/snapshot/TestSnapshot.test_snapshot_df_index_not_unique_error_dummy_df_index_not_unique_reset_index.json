@@ -1,0 +1,34 @@
+{
+    "schema":{
+        "fields":[
+            {
+                "name":"index",
+                "type":"integer"
+            },
+            {
+                "name":"dummy_index",
+                "type":"integer"
+            },
+            {
+                "name":"column",
+                "type":"integer"
+            }
+        ],
+        "primaryKey":[
+            "index"
+        ],
+        "pandas_version":"1.4.0"
+    },
+    "data":[
+        {
+            "index":0,
+            "dummy_index":1,
+            "column":2
+        },
+        {
+            "index":1,
+            "dummy_index":1,
+            "column":2
+        }
+    ]
+}
