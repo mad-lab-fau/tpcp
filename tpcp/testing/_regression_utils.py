@@ -3,7 +3,6 @@
 This is inspired by github.com/syrusakbary/snapshottest.
 Note that it can not be used in combination with this module!
 """
-import json
 import re
 from pathlib import Path
 from typing import Optional, Union
