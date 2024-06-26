@@ -19,11 +19,18 @@ def snapshot(request):
 
 
 def pytest_addoption(parser):
-    group = parser.getgroup("snapshottest")
+    group = parser.getgroup("tpcp_snapshots")
     group.addoption(
         "--snapshot-update",
         action="store_true",
         default=False,
         dest="snapshot_update",
         help="Update the snapshots.",
+    )
+    group.addoption(
+        "--snapshot-only-check",
+        action="store_true",
+        default=False,
+        dest="snapshot_only_check",
+        help="Run as normal, but fail if a snapshot file is not found. This is usefull for CI runs.",
     )
