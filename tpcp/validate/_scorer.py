@@ -17,7 +17,7 @@ from typing import (
 
 import numpy as np
 from joblib import Parallel
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from typing_extensions import Protocol
 
 from tpcp import NOTHING
