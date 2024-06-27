@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.34.0] - 
+
+### Added
+
+- Dataset classes are now generic and allow you to provide the group-label tuple as generic. This allows for better type 
+  checking and IDE support. (https://github.com/mad-lab-fau/tpcp/pull/113)
+
 ## [0.33.1] - 2024-06-14
 
 - Only warning about global caching once.
@@ -22,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.32.0] - 2024-04-17
 
 - The snapshot plugin now supports a new command line argument `--snapshot-only-check` that will fail the test if no
-  snapshot file is found. This is usefull for CI/CD pipelines, where you want to ensure that all snapshots are up to 
+  snapshot file is found. This is useful for CI/CD pipelines, where you want to ensure that all snapshots are up to 
   date.
 - The snapshot plugin is now installed automatically when you install tpcp. There is no need to set it up in the conftest
   file anymore.

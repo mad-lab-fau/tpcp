@@ -299,12 +299,13 @@ subset.labeled_r_peaks_
 # Advanced Concepts - Typing Group Labels
 # ---------------------------------------
 # In the example above, your IDE will assume that the grouplabel you get from the dataset is a simple tuple of strings.
+# Try it out by running this example and attempt to auto-complete the group label keys.
 
 group_label = dataset[0].group_label
 group_label
 
 # %%
-# However, in reality, it is a NamedTuple with derived by pandas based on the columns of your index.
+# However, in reality, it is a NamedTuple which is derived by pandas based on the columns of your index.
 # That allows named access to the group label.
 group_label.participant
 

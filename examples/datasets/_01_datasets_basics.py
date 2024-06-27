@@ -239,7 +239,7 @@ group_labels
 # data access.
 # It comes down to documentation to ensure that users access the data in the correct way.
 #
-# In general we try to follow a couple of conventions to give datasets a consistent feel:
+# In general, we try to follow a couple of conventions to give datasets a consistent feel:
 #
 # - Data access should be provided via `@property` decorator on the dataset objects, loading the data on demand.
 # - The names of these properties should follow some the naming scheme (e.g. `data` for the core sensor data)
