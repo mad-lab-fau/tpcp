@@ -4,12 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.34.0] - 
+## [0.34.0] - 2024-06-28
 
 ### Added
 
 - Dataset classes are now generic and allow you to provide the group-label tuple as generic. This allows for better type 
   checking and IDE support. (https://github.com/mad-lab-fau/tpcp/pull/113)
+
+### Changed/Fixed
+
+- The snapshot utilities are much more robust now and rais appropriate errors when the stored dataframes have 
+  unsupported properties. (https://github.com/mad-lab-fau/tpcp/pull/112)
 
 ## [0.33.1] - 2024-06-14
 
