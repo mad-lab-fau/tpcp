@@ -225,9 +225,9 @@ for train, test in cv.split(final_subset, groups=group_labels):
 # Instead of doing this manually, we also provide a custom splitter that does this for you.
 # It allows us to directly put the dataset into the `split` method of `cross_validate` and use higher level semantics
 # to specify the grouping and stratification.
-from tpcp.validate import TpcpSplitter
+from tpcp.validate import DatasetSplitter
 
-cv = TpcpSplitter(GroupKFold(n_splits=2), groupby=["participant", "recording"])
+cv = DatasetSplitter(GroupKFold(n_splits=2), groupby=["participant", "recording"])
 
 for train, test in cv.split(final_subset):
     # We only print the train set here

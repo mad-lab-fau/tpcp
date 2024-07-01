@@ -15,7 +15,7 @@ from tests.test_pipelines.conftest import (
 from tpcp import Dataset, OptimizableParameter, OptimizablePipeline
 from tpcp.exceptions import OptimizationError, TestError
 from tpcp.optimize import DummyOptimize, Optimize
-from tpcp.validate import TpcpSplitter, cross_validate, validate
+from tpcp.validate import DatasetSplitter, cross_validate, validate
 from tpcp.validate._scorer import Scorer, _validate_scorer
 
 
@@ -299,7 +299,7 @@ class TestCrossValidate:
 class TestTpcpSplitter:
     def test_normal_k_fold(self):
         ds = DummyGroupedDataset()
-        splitter = TpcpSplitter(base_splitter=KFold(n_splits=5))
+        splitter = DatasetSplitter(base_splitter=KFold(n_splits=5))
         # This should be identical to just calling the splitter directly
         splits_expected = list(KFold(n_splits=5).split(ds))
 
@@ -311,7 +311,7 @@ class TestTpcpSplitter:
 
     def test_normal_k_fold_with_groupby_ignored(self):
         ds = DummyGroupedDataset()
-        splitter = TpcpSplitter(base_splitter=KFold(n_splits=5), groupby="v1")
+        splitter = DatasetSplitter(base_splitter=KFold(n_splits=5), groupby="v1")
         # This should be identical to just calling the splitter directly
         splits_expected = list(KFold(n_splits=5).split(ds))
 
@@ -323,7 +323,7 @@ class TestTpcpSplitter:
 
     def test_normal_group_k_fold(self):
         ds = DummyGroupedDataset()
-        splitter = TpcpSplitter(base_splitter=GroupKFold(n_splits=3), groupby="v1")
+        splitter = DatasetSplitter(base_splitter=GroupKFold(n_splits=3), groupby="v1")
         # This should be identical to just calling the splitter directly
         splits_expected = list(GroupKFold(n_splits=3).split(ds, groups=ds.create_string_group_labels("v1")))
 
@@ -335,7 +335,7 @@ class TestTpcpSplitter:
 
     def test_normal_stratified_k_fold(self):
         ds = DummyGroupedDataset()
-        splitter = TpcpSplitter(base_splitter=StratifiedKFold(n_splits=3), stratify="v1")
+        splitter = DatasetSplitter(base_splitter=StratifiedKFold(n_splits=3), stratify="v1")
         # This should be identical to just calling the splitter directly
         splits_expected = list(StratifiedKFold(n_splits=3).split(ds, y=ds.create_string_group_labels("v1")))
 
