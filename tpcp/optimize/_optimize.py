@@ -21,7 +21,7 @@ import numpy as np
 from joblib import Memory, Parallel
 from numpy.ma import MaskedArray
 from scipy.stats import rankdata
-from sklearn.model_selection import BaseCrossValidator, ParameterGrid, check_cv
+from sklearn.model_selection import BaseCrossValidator, ParameterGrid
 from tqdm.auto import tqdm
 from typing_extensions import Self
 
@@ -45,6 +45,7 @@ from tpcp._utils._general import (
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.parallel import delayed
+from tpcp.validate import TpcpSplitter
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
 
 if TYPE_CHECKING:
@@ -533,10 +534,12 @@ class GridSearchCV(
         with a minus sign, e.g. `-rmse`.
         In case of a single score, use `-score` to select the value with the lowest score.
     cv
-        An integer specifying the number of folds in a K-Fold cross validation or a valid cross validation helper.
-        The default (`None`) will result in a 5-fold cross validation.
-        For further inputs check the `sklearn`
-        `documentation <https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html>`_.
+        The cross-validation strategy to use.
+        For simple use-cases the same input as for the sklearn cross-validation function are supported.
+        For further inputs check the `sklearn` `documentation
+        <https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_validate.html>`_.
+
+        For more complex usecases like grouping or stratification, the :class:`~tpcp.TpcpSplitter` can be used.
     pure_parameters
         .. warning::
             Do not use this option unless you fully understand it!
@@ -584,10 +587,6 @@ class GridSearchCV(
     ----------------
     dataset
         The dataset instance passed to the optimize method
-    groups
-        The groups passed to the optimize method
-    mock_labels
-        The mock labels passed to the optimize method
 
     Attributes
     ----------
@@ -658,7 +657,7 @@ class GridSearchCV(
     parameter_grid: ParameterGrid
     scoring: ScorerTypes[OptimizablePipelineT, DatasetT, T]
     return_optimized: Union[bool, str]
-    cv: Optional[Union[int, BaseCrossValidator, Iterator]]
+    cv: Optional[Union[TpcpSplitter, int, BaseCrossValidator, Iterator]]
     pure_parameters: Union[bool, list[str]]
     return_train_score: bool
     verbose: int
@@ -667,9 +666,6 @@ class GridSearchCV(
     progress_bar: bool
     safe_optimize: bool
     optimize_with_info: bool
-
-    groups: Optional[list[Union[str, tuple[str, ...]]]]
-    mock_labels: Optional[list[Union[str, tuple[str, ...]]]]
 
     cv_results_: dict[str, Any]
     best_params_: dict[str, Any]
@@ -709,29 +705,21 @@ class GridSearchCV(
         self.safe_optimize = safe_optimize
         self.optimize_with_info = optimize_with_info
 
-    def optimize(self, dataset: DatasetT, *, groups=None, mock_labels=None, **optimize_params) -> Self:
+    def optimize(self, dataset: DatasetT, **optimize_params) -> Self:
         """Run the GridSearchCV on the given dataset.
 
         Parameters
         ----------
         dataset
             The dataset to optimize on.
-        groups
-            An optional set of group labels that are passed to the cross-validation helper.
-        mock_labels
-            An optional set of mocked labels that are passed to the cross-validation helper as the `y` parameter.
-            This can be helpful in combination with the `Stratified*Fold` cross-validation helpers, that use the `y`
-            parameter to stratify the folds.
-
         """
         self.dataset = dataset
-        self.groups = groups
-        self.mock_labels = mock_labels
 
         scoring = _validate_scorer(self.scoring, self.pipeline)
 
-        cv_checked: BaseCrossValidator = check_cv(self.cv, None, classifier=True)
-        n_splits = cv_checked.get_n_splits(dataset, mock_labels, groups=groups)
+        cv = self.cv if isinstance(self.cv, TpcpSplitter) else TpcpSplitter(self.cv)
+
+        n_splits = cv.get_n_splits(dataset)
 
         # We need to wrap our pipeline for a consistent interface.
         # In the future we might be able to allow objects with optimizer Interface as input directly.
@@ -762,7 +750,7 @@ class GridSearchCV(
         combinations = list(
             product(
                 enumerate(split_parameters),
-                enumerate(cv_checked.split(dataset, mock_labels, groups=groups)),
+                enumerate(cv.split(dataset)),
             )
         )
 
