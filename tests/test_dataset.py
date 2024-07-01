@@ -756,3 +756,40 @@ class TestGroupLabelsKFold:
             # With the grouping we should have two splits that should always be uniform in their group.
             assert ds[train].is_single(["patients", "tests"])
             assert ds[test].is_single(["patients", "tests"])
+
+
+class DummyExampleDataset(Dataset):
+    def create_index(self) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "A": [1, 2, 3],
+                "B": [4, 5, 6],
+            }
+        )
+
+
+class TestIdentifyUnchanged:
+    def test_unchanged_label_survives_clone(self):
+        ds = DummyExampleDataset()
+
+        assert ds.index_is_unchanged is True
+
+        ds_clone = ds.clone()
+
+        assert ds_clone.index_is_unchanged is True
+
+    def test_label_survives_grouping(self):
+        ds = DummyExampleDataset()
+
+        assert ds.index_is_unchanged is True
+
+        assert ds.groupby("A").index_is_unchanged is True
+
+    def test_label_detects_subset(self):
+        ds = DummyExampleDataset()
+
+        assert ds.index_is_unchanged is True
+
+        assert ds[0].index_is_unchanged is False
+        assert ds.get_subset(A=1).index_is_unchanged is False
+        assert ds.get_subset(index=ds.index.iloc[:-1]).index_is_unchanged is False
