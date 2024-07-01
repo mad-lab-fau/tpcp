@@ -5,7 +5,7 @@ from typing import Any, Callable, Optional, Union
 
 import numpy as np
 from joblib import Parallel
-from sklearn.model_selection import BaseCrossValidator, check_cv
+from sklearn.model_selection import BaseCrossValidator
 from tqdm.auto import tqdm
 
 from tpcp import Dataset, Pipeline
@@ -14,6 +14,7 @@ from tpcp._optimize import BaseOptimize
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results, _passthrough
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.parallel import delayed
+from tpcp.validate._cross_val_helper import TpcpSplitter
 from tpcp.validate._scorer import Scorer, _validate_scorer
 
 
@@ -21,15 +22,11 @@ def cross_validate(
     optimizable: BaseOptimize,
     dataset: Dataset,
     *,
-    groups: Optional[list[Union[str, tuple[str, ...]]]] = None,
-    mock_labels: Optional[list[Union[str, tuple[str, ...]]]] = None,
     scoring: Optional[Callable] = None,
-    cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
+    cv: Optional[Union[TpcpSplitter, int, BaseCrossValidator, Iterator]] = None,
     n_jobs: Optional[int] = None,
     verbose: int = 0,
     optimize_params: Optional[dict[str, Any]] = None,
-    propagate_groups: bool = True,
-    propagate_mock_labels: bool = True,
     pre_dispatch: Union[str, int] = "2*n_jobs",
     return_train_score: bool = False,
     return_optimizer: bool = False,
@@ -47,34 +44,17 @@ def cross_validate(
         :class:`~tpcp.Pipeline` wrapped in an `Optimize` object (:class:`~tpcp.OptimizablePipeline`).
     dataset
         A :class:`~tpcp.Dataset` containing all information.
-    groups
-        Group labels for samples used by the cross validation helper, in case a grouped CV is used (e.g.
-        :class:`~sklearn.model_selection.GroupKFold`).
-        Check the documentation of the :class:`~tpcp.Dataset` class and the respective example for
-        information on how to generate group labels for tpcp datasets.
-
-        The groups will be passed to the optimizers `optimize` method under the same name, if `propagate_groups` is
-        True.
-    mock_labels
-        The value of `mock_labels` is passed as the `y` parameter to the cross-validation helper's `split` method.
-        This can be helpful, if you want to use stratified cross validation.
-        Usually, the stratified CV classes use `y` (i.e. the label) to stratify the data.
-        However, in tpcp, we don't have a dedicated `y` as data and labels are both stored in a single datastructure.
-        If you want to stratify the data (e.g. based on patient cohorts), you can create your own list of labels/groups
-        that should be used for stratification and pass it to `mock_labels` instead.
-
-        The labels will be passed to the optimizers `optimize` method under the same name, if
-        `propagate_mock_labels` is True (similar to how groups are handled).
     scoring
         A callable that can score a single data point given a pipeline.
         This function should return either a single score or a dictionary of scores.
         If scoring is `None` the default `score` method of the optimizable is used instead.
     cv
-        An integer specifying the number of folds in a K-Fold cross validation or a valid cross validation helper.
-        The default (`None`) will result in a 5-fold cross validation.
-        For further inputs check the `sklearn`
-        `documentation
+        The cross-validation strategy to use.
+        For simple use-cases the same input as for the sklearn cross-validation function are supported.
+        For further inputs check the `sklearn` `documentation
         <https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_validate.html>`_.
+
+        For more complex usecases like grouping or stratification, the :class:`~tpcp.TpcpSplitter` can be used.
     n_jobs
         Number of jobs to run in parallel.
         One job is created per CV fold.
@@ -84,16 +64,6 @@ def cross_validate(
         At the moment this only effects `Parallel`.
     optimize_params
         Additional parameter that are forwarded to the `optimize` method.
-    propagate_groups
-        In case your optimizable is a cross validation based optimize (e.g. :class:`~tpcp.optimize.GridSearchCv`) and
-        you are using a grouped cross validation, you probably want to use the same grouped CV for the outer and the
-        inner cross validation.
-        If `propagate_groups` is True, the group labels belonging to the training of each fold are passed to the
-        `optimize` method of the optimizable.
-        This only has an effect if `groups` are specified.
-    propagate_mock_labels
-        For the same reason as `propagate_groups`, you might also want to forward the value provided for
-        `mock_labels` to the optimization workflow.
     pre_dispatch
         The number of jobs that should be pre dispatched.
         For an explanation see the documentation of :class:`~joblib.Parallel`.
@@ -143,18 +113,11 @@ def cross_validate(
             instance.
 
     """
-    cv_checked: BaseCrossValidator = check_cv(cv, None, classifier=True)
-
     scoring = _validate_scorer(scoring, optimizable.pipeline)
 
-    optimize_params = optimize_params or {}
-    if propagate_groups is True and "groups" in optimize_params:
-        raise ValueError(
-            "You can not use `propagate_groups` and specify `groups` in `optimize_params`. "
-            "The latter would overwrite the prior. "
-            "Most likely you only want to use `propagate_groups`."
-        )
-    splits = list(cv_checked.split(dataset, mock_labels, groups=groups))
+    cv = cv if isinstance(cv, TpcpSplitter) else TpcpSplitter(base_splitter=cv)
+
+    splits = list(cv.split(dataset))
 
     pbar = partial(tqdm, total=len(splits), desc="CV Folds") if progress_bar else _passthrough
 
@@ -170,11 +133,7 @@ def cross_validate(
                         scoring,
                         dataset[train],
                         dataset[test],
-                        optimize_params={
-                            **_propagate_values("groups", propagate_groups, groups, train),
-                            **_propagate_values("mock_labels", propagate_mock_labels, mock_labels, train),
-                            **optimize_params,
-                        },
+                        optimize_params=optimize_params,
                         hyperparameters=None,
                         pure_parameters=None,
                         return_train_score=return_train_score,
