@@ -126,9 +126,9 @@ result_df["test_data_labels"].explode()
 # the column(s) to stratify by.
 from sklearn.model_selection import StratifiedKFold
 
-from tpcp.validate import TpcpSplitter
+from tpcp.validate import DatasetSplitter
 
-cv = TpcpSplitter(base_splitter=StratifiedKFold(n_splits=2), stratify="patient_group")
+cv = DatasetSplitter(base_splitter=StratifiedKFold(n_splits=2), stratify="patient_group")
 
 results = cross_validate(optimizable_pipe, data_imbalanced, scoring=score, cv=cv)
 result_df_stratified = pd.DataFrame(results)
@@ -151,7 +151,7 @@ result_df_stratified["test_data_labels"].explode()
 # Note, that we use the "non-subsampled" example data here.
 from sklearn.model_selection import GroupKFold
 
-cv = TpcpSplitter(base_splitter=GroupKFold(n_splits=2), groupby="patient_group")
+cv = DatasetSplitter(base_splitter=GroupKFold(n_splits=2), groupby="patient_group")
 
 results = cross_validate(optimizable_pipe, example_data, scoring=score, cv=cv)
 result_df_grouped = pd.DataFrame(results)

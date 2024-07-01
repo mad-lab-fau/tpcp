@@ -45,7 +45,7 @@ from tpcp._utils._general import (
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.parallel import delayed
-from tpcp.validate import TpcpSplitter
+from tpcp.validate import DatasetSplitter
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
 
 if TYPE_CHECKING:
@@ -657,7 +657,7 @@ class GridSearchCV(
     parameter_grid: ParameterGrid
     scoring: ScorerTypes[OptimizablePipelineT, DatasetT, T]
     return_optimized: Union[bool, str]
-    cv: Optional[Union[TpcpSplitter, int, BaseCrossValidator, Iterator]]
+    cv: Optional[Union[DatasetSplitter, int, BaseCrossValidator, Iterator]]
     pure_parameters: Union[bool, list[str]]
     return_train_score: bool
     verbose: int
@@ -717,7 +717,7 @@ class GridSearchCV(
 
         scoring = _validate_scorer(self.scoring, self.pipeline)
 
-        cv = self.cv if isinstance(self.cv, TpcpSplitter) else TpcpSplitter(self.cv)
+        cv = self.cv if isinstance(self.cv, DatasetSplitter) else DatasetSplitter(self.cv)
 
         n_splits = cv.get_n_splits(dataset)
 
