@@ -6,7 +6,7 @@ from sklearn.model_selection import BaseCrossValidator, check_cv
 from tpcp import BaseTpcpObject, Dataset
 
 
-class TpcpSplitter(BaseTpcpObject):
+class DatasetSplitter(BaseTpcpObject):
     """Wrapper around sklearn cross-validation splitters to support grouping and stratification with tpcp-Datasets.
 
     This wrapper can be used instead of a sklearn-style splitter with all methods that support a ``cv`` parameter.

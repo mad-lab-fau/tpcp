@@ -14,7 +14,7 @@ Classes
    :toctree: generated/validate
    :template: class_with_private.rst
 
-    TpcpSplitter
+    DatasetSplitter
     Scorer
     Aggregator
     MeanAggregator

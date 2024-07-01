@@ -4,11 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - [unreleased]
+
+### BREAKING CHANGE
+
+- Instead of the (annoying) `mock_label` and `group_label` arguments, all functions that take a cv-splitter as input,
+  can now take an instance of the new `DatasetSplitter` class, which elegantly handles grouping and stratification and
+  also removes the need of forwarding the `mock_label` and `group_label` arguments to the underlying optimizer.
+  The use of the `mock_label` and `group_label` arguments has been removed without depreciation.
+  (https://github.com/mad-lab-fau/tpcp/pull/114)
+
 ## [0.34.1] - 2024-07-02
 
 ### Fixed
 - The torch hasher was not working at all. This is hopefully fixed now.
 - The tensorflow clone method did not work. Switched to specialized implementation that hopefully works.
+
 
 ## [0.34.0] - 2024-06-28
 

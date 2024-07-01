@@ -14,7 +14,7 @@ from tpcp._optimize import BaseOptimize
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results, _passthrough
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.parallel import delayed
-from tpcp.validate._cross_val_helper import TpcpSplitter
+from tpcp.validate._cross_val_helper import DatasetSplitter
 from tpcp.validate._scorer import Scorer, _validate_scorer
 
 
@@ -23,7 +23,7 @@ def cross_validate(
     dataset: Dataset,
     *,
     scoring: Optional[Callable] = None,
-    cv: Optional[Union[TpcpSplitter, int, BaseCrossValidator, Iterator]] = None,
+    cv: Optional[Union[DatasetSplitter, int, BaseCrossValidator, Iterator]] = None,
     n_jobs: Optional[int] = None,
     verbose: int = 0,
     optimize_params: Optional[dict[str, Any]] = None,
@@ -115,7 +115,7 @@ def cross_validate(
     """
     scoring = _validate_scorer(scoring, optimizable.pipeline)
 
-    cv = cv if isinstance(cv, TpcpSplitter) else TpcpSplitter(base_splitter=cv)
+    cv = cv if isinstance(cv, DatasetSplitter) else DatasetSplitter(base_splitter=cv)
 
     splits = list(cv.split(dataset))
 
