@@ -9,6 +9,7 @@ import pandas as pd
 from typing_extensions import Self
 
 from tpcp._base import BaseTpcpObject, _recursive_validate, get_param_names
+from tpcp._hash import custom_hash
 from tpcp.exceptions import ValidationError
 
 DatasetT = TypeVar("DatasetT", bound="_Dataset")
@@ -58,6 +59,23 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
                 "None` to the end of the input arguments in the `__init__` method and forward them to the "
                 "`super().__init__` call."
             )
+
+    @property
+    def index_is_unchanged(self) -> bool:
+        """Returns True if the index is the same as the one created by `create_index`.
+
+        This can be used to check, if the index represents a subset or the actual full index.
+        Note, that this is independent of the `groupby_cols` setting.
+
+
+        .. note:: Under the hood this uses the attrs functionality of pandas to store a hash of the original index on
+                  the dataframe.
+                  If the index is modified or a new index is created, this property does either not exist anymore or the
+                  content is modified.
+        """
+        copy_index = self.index.copy()
+        original_index_hash = copy_index.attrs.pop("__tpcp__index_is_unchanged")
+        return custom_hash(copy_index) == original_index_hash
 
     def _create_check_index(self):
         """Check the index creation.
@@ -115,6 +133,9 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
                 f"The columns of the index ({index_cols}) must match the fields (in order!) of the group label "
                 f"named tuple ({label_fields}) provided as Generic to the dataclass."
             )
+
+        # Attach a attribute to indicate that this is the original index.
+        index_1.attrs = {**index_1.attrs, "__tpcp__index_is_unchanged": custom_hash(index_1)}
 
         return index_1
 
