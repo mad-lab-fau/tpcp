@@ -15,7 +15,7 @@ from tests.test_pipelines.conftest import (
 from tpcp import Dataset, OptimizableParameter, OptimizablePipeline
 from tpcp.exceptions import OptimizationError, TestError
 from tpcp.optimize import DummyOptimize, Optimize
-from tpcp.validate import cross_validate, validate
+from tpcp.validate import TpcpSplitter, cross_validate, validate
 from tpcp.validate._scorer import Scorer, _validate_scorer
 
 
@@ -227,56 +227,6 @@ class TestCrossValidate:
         for o in optimizers:
             assert o is not optimizer
 
-    @pytest.mark.parametrize("propagate", (True, False))
-    def test_propagate_groups(self, propagate):
-        pipeline = DummyOptimizablePipeline()
-        dataset = DummyGroupedDataset()
-        groups = dataset.create_string_group_labels("v1")
-        # With 3 splits, each group get its own split -> so basically only "a", only "b", and only "c"
-        cv = GroupKFold(n_splits=3)
-
-        dummy_results = Optimize(pipeline).optimize(dataset)
-        with patch.object(Optimize, "optimize", return_value=dummy_results) as mock:
-            cross_validate(
-                Optimize(pipeline), dataset, cv=cv, scoring=lambda x, y: 1, groups=groups, propagate_groups=propagate
-            )
-
-        assert mock.call_count == 3
-        for call, label in zip(mock.call_args_list, "cba"):
-            train_labels = "abc".replace(label, "")
-            if propagate:
-                assert set(np.unique(call[1]["groups"])) == set(train_labels)
-            else:
-                assert "groups" not in call[1]
-
-    @pytest.mark.parametrize("propagate", (True, False))
-    def test_propagate_mock_labels(self, propagate):
-        pipeline = DummyOptimizablePipeline()
-        dataset = DummyGroupedDataset()
-        groups = dataset.create_string_group_labels("v1")
-        # With 5 folds, we expect exactly on "a", one "b", and one "c" in each fold
-        cv = StratifiedKFold(n_splits=5)
-
-        dummy_results = Optimize(pipeline).optimize(dataset)
-        with patch.object(Optimize, "optimize", return_value=dummy_results) as mock:
-            cross_validate(
-                Optimize(pipeline),
-                dataset,
-                cv=cv,
-                scoring=lambda x, y: 1,
-                mock_labels=groups,
-                propagate_mock_labels=propagate,
-                propagate_groups=False,
-            )
-
-        assert mock.call_count == 5
-        for call in mock.call_args_list:
-            if propagate:
-                assert len(np.unique(call[1]["mock_labels"])) == 3
-                assert set(np.unique(call[1]["mock_labels"])) == set("abc")
-            else:
-                assert "mock_labels" not in call[1]
-
     @pytest.mark.parametrize("error_fold", (0, 2))
     def test_cross_validate_opti_error(self, error_fold):
         with pytest.raises(OptimizationError) as e:
@@ -344,3 +294,53 @@ class TestCrossValidate:
 
         assert len(results["optimizer"]) == 5
         assert len({id(o) for o in results["optimizer"]}) == 5
+
+
+class TestTpcpSplitter:
+    def test_normal_k_fold(self):
+        ds = DummyGroupedDataset()
+        splitter = TpcpSplitter(base_splitter=KFold(n_splits=5))
+        # This should be identical to just calling the splitter directly
+        splits_expected = list(KFold(n_splits=5).split(ds))
+
+        splits = list(splitter.split(ds))
+
+        for (train_expected, test_expected), (train, test) in zip(splits_expected, splits):
+            assert train_expected.tolist() == train.tolist()
+            assert test_expected.tolist() == test.tolist()
+
+    def test_normal_k_fold_with_groupby_ignored(self):
+        ds = DummyGroupedDataset()
+        splitter = TpcpSplitter(base_splitter=KFold(n_splits=5), groupby="v1")
+        # This should be identical to just calling the splitter directly
+        splits_expected = list(KFold(n_splits=5).split(ds))
+
+        splits = list(splitter.split(ds))
+
+        for (train_expected, test_expected), (train, test) in zip(splits_expected, splits):
+            assert train_expected.tolist() == train.tolist()
+            assert test_expected.tolist() == test.tolist()
+
+    def test_normal_group_k_fold(self):
+        ds = DummyGroupedDataset()
+        splitter = TpcpSplitter(base_splitter=GroupKFold(n_splits=3), groupby="v1")
+        # This should be identical to just calling the splitter directly
+        splits_expected = list(GroupKFold(n_splits=3).split(ds, groups=ds.create_string_group_labels("v1")))
+
+        splits = list(splitter.split(ds))
+
+        for (train_expected, test_expected), (train, test) in zip(splits_expected, splits):
+            assert train_expected.tolist() == train.tolist()
+            assert test_expected.tolist() == test.tolist()
+
+    def test_normal_stratified_k_fold(self):
+        ds = DummyGroupedDataset()
+        splitter = TpcpSplitter(base_splitter=StratifiedKFold(n_splits=3), stratify="v1")
+        # This should be identical to just calling the splitter directly
+        splits_expected = list(StratifiedKFold(n_splits=3).split(ds, y=ds.create_string_group_labels("v1")))
+
+        splits = list(splitter.split(ds))
+
+        for (train_expected, test_expected), (train, test) in zip(splits_expected, splits):
+            assert train_expected.tolist() == train.tolist()
+            assert test_expected.tolist() == test.tolist()

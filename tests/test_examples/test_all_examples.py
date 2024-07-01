@@ -69,6 +69,17 @@ def test_cross_validate():
     assert_almost_equal(results["test_f1_score"], [0.9770585, 0.7108303, 0.9250665])
 
 
+def test_advanced_cross_validate(snapshot):
+    from examples.validation._04_advanced_cross_validation import result_df_grouped, result_df_stratified
+
+    snapshot.assert_match(
+        result_df_grouped["test_data_labels"].explode().explode().to_frame().rename_axis("fold_id").reset_index()
+    )
+    snapshot.assert_match(
+        result_df_stratified["test_data_labels"].explode().explode().to_frame().rename_axis("fold_id").reset_index()
+    )
+
+
 def test_optuna():
     from examples.parameter_optimization._04_custom_optuna_optimizer import opti, opti_early_stop
 
