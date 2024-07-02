@@ -54,7 +54,7 @@ def test_gridsearchcv():
     from examples.parameter_optimization._03_gridsearch_cv import r_peaks, results
 
     assert_array_equal(r_peaks[:3], [77, 370, 663])
-    assert_almost_equal(results["mean_test_f1_score"], [0.8640027, 0.861629, 0.8655343])
+    assert_almost_equal(results["mean__test__f1_score"], [0.8640027, 0.861629, 0.8655343])
 
 
 def test_validation():
@@ -66,17 +66,17 @@ def test_validation():
 def test_cross_validate():
     from examples.validation._02_cross_validation import results
 
-    assert_almost_equal(results["test_f1_score"], [0.9770585, 0.7108303, 0.9250665])
+    assert_almost_equal(results["test__f1_score"], [0.9770585, 0.7108303, 0.9250665])
 
 
 def test_advanced_cross_validate(snapshot):
     from examples.validation._04_advanced_cross_validation import result_df_grouped, result_df_stratified
 
     snapshot.assert_match(
-        result_df_grouped["test_data_labels"].explode().explode().to_frame().rename_axis("fold_id").reset_index()
+        result_df_grouped["test__data_labels"].explode().explode().to_frame().rename_axis("fold_id").reset_index()
     )
     snapshot.assert_match(
-        result_df_stratified["test_data_labels"].explode().explode().to_frame().rename_axis("fold_id").reset_index()
+        result_df_stratified["test__data_labels"].explode().explode().to_frame().rename_axis("fold_id").reset_index()
     )
 
 

@@ -455,15 +455,20 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
 
         results = {}
 
-        scores_dict = _normalize_score_results(out["scores"]) or {}
-        single_scores_dict = _normalize_score_results(out["single__scores"]) or {}
+        scores_dict = (
+            _normalize_score_results(
+                out["scores"],
+            )
+            or {}
+        )
+        single_scores_dict = _prefix_para_dict(_normalize_score_results(out["single__scores"]) or {}, "single__")
         for c, v in scores_dict.items():
             results[c] = v
             results[f"rank__{c}"] = np.asarray(rankdata(-v, method="min"), dtype=np.int32)
         for c, _v in single_scores_dict.items():
             # Because of custom aggregators, it can be that single scores dicts have different keys than the aggregated
             # scores.
-            results[f"single_{c}"] = single_scores_dict[c]
+            results[c] = single_scores_dict[c]
 
         results["data_labels"] = out["data_labels"]
         results["score_time"] = out["score_time"]
@@ -486,7 +491,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
                 # An all masked empty array gets created for the key
                 # `"param_%s" % name` at the first occurrence of `name`.
                 # Setting the value at an index also unmasks that index
-                param_results[f"param_{name}"][cand_idx] = value
+                param_results[f"param__{name}"][cand_idx] = value
 
         results.update(param_results)
         # Store a list of param dicts at the key 'params'
@@ -813,8 +818,8 @@ class GridSearchCV(
                 return_optimized,
                 reverse_ranking,
                 results,
-                rank_prefix="test__rank__",
-                score_prefix="test__mean__",
+                rank_prefix="rank__test__",
+                score_prefix="mean__test__",
             )
             # We clone twice, in case one of the params was itself an algorithm.
             best_optimizer = Optimize(
@@ -868,13 +873,6 @@ class GridSearchCV(
 
         def _store(key_name: str, array, weights=None, splits=False, rank=False):
             """Store numeric scores/times to the cv_results_."""
-            if "__" in key_name:
-                prefix, param = key_name.split("__", 1)
-                assert prefix in ("train", "test")
-                prefix = f"{prefix}__"
-            else:
-                prefix = ""
-                param = key_name
             # When iterated first by splits, then by parameters
             # We want `array` to have `n_candidates` rows and `n_splits` cols.
             array = np.array(array, dtype=np.float64).reshape(n_candidates, n_splits)
@@ -884,9 +882,9 @@ class GridSearchCV(
                     # Uses closure to alter the results
                     results[f"split{split_idx}__{key_name}"] = array[:, split_idx]
             array_means = np.average(array, axis=1, weights=weights)
-            results[f"{prefix}mean__{param}"] = array_means
+            results[f"mean__{key_name}"] = array_means
 
-            if prefix and np.any(~np.isfinite(array_means)):
+            if key_name.startswith(("train__", "__test")) and np.any(~np.isfinite(array_means)):
                 warnings.warn(
                     f"One or more of the {key_name.split('__')[0]} scores are non-finite: {array_means}",
                     category=UserWarning,
@@ -894,11 +892,11 @@ class GridSearchCV(
                 )
             # Weighted std is not directly available in numpy
             array_stds = np.sqrt(np.average((array - array_means[:, np.newaxis]) ** 2, axis=1, weights=weights))
-            results[f"{prefix}std__{param}"] = array_stds
+            results[f"std__{key_name}"] = array_stds
 
             if rank:
                 rank = np.asarray(rankdata(-array_means, method="min"), dtype=np.int32)
-                results[f"{prefix}rank__{param}"] = rank
+                results[f"rank__{key_name}"] = rank
 
         _store("optimize_time", out["optimize_time"])
         _store("score_time", out["score_time"])
@@ -928,9 +926,10 @@ class GridSearchCV(
         # Store a list of param dicts at the key 'params'
         results["params"] = candidate_params
 
-        test_scores_dict = _normalize_score_results(out["test__scores"]) or {}
-        test_single_scores_dict = _normalize_score_results(out["test__single__scores"]) or {}
-
+        test_scores_dict = _normalize_score_results(out["test__scores"], "score") or {}
+        test_single_scores_dict = _prefix_para_dict(
+            _normalize_score_results(out["test__single__scores"]) or {}, "single__"
+        )
         for scorer_name in test_scores_dict:
             # Computed the (weighted) mean and std for test scores alone
             _store(
@@ -947,7 +946,9 @@ class GridSearchCV(
 
         if self.return_train_score:
             train_scores_dict = _normalize_score_results(out["train__scores"])
-            train_single_scores_dict = _normalize_score_results(out["train__single__scores"])
+            train_single_scores_dict = _prefix_para_dict(
+                _normalize_score_results(out["train__single__scores"]) or {}, "single__"
+            )
             for scorer_name in train_scores_dict:
                 _store(f"train__{scorer_name}", train_scores_dict[scorer_name], splits=True)
             for scorer_name in train_single_scores_dict:

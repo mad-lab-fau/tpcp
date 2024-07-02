@@ -15,7 +15,7 @@ from typing_extensions import TypedDict
 
 from tpcp._base import clone
 from tpcp._hash import custom_hash
-from tpcp._utils._general import _get_nested_paras, _prefix_para_dict
+from tpcp._utils._general import _get_nested_paras
 from tpcp.exceptions import OptimizationError, TestError
 
 if TYPE_CHECKING:
@@ -116,7 +116,7 @@ def _score(
 
     result: _ScoreResults = {
         "scores": agg_scores,
-        "single__scores": _prefix_para_dict(single_scores, "single__"),
+        "single__scores": single_scores,
     }
     if return_times:
         result["score_time"] = score_time
@@ -209,7 +209,7 @@ def _optimize_and_score(
 
     result: _OptimizeScoreResults = {
         "test__scores": agg_scores,
-        "test__single__scores": _prefix_para_dict(single_scores, "single__"),
+        "test__single__scores": single_scores,
     }
     if return_train_score:
         try:
@@ -221,7 +221,7 @@ def _optimize_and_score(
                 f"The train-set is:\n{[d.group_labels for d in test_set]}"
             ) from e
         result["train__scores"] = train_agg_scores
-        result["train__single__scores"] = _prefix_para_dict(train_single_scores, "single__")
+        result["train__single__scores"] = train_single_scores
     if return_times:
         result["score_time"] = score_time
         result["optimize_time"] = optimize_time
