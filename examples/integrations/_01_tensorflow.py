@@ -171,7 +171,8 @@ class KerasPipeline(OptimizablePipeline):
 
         self._model = tf.keras.Sequential(
             [
-                tf.keras.layers.Flatten(input_shape=(28, 28)),
+                tf.keras.layers.Input((28, 28)),
+                tf.keras.layers.Flatten(),
                 tf.keras.layers.Dense(self.n_dense_layer_nodes, activation="relu"),
                 tf.keras.layers.Dense(10),
             ]

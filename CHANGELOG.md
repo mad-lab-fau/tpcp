@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.34.1] - 2024-07-02
+
+### Fixed
+- The torch hasher was not working at all. This is hopefully fixed now.
+- The tensorflow clone method did not work. Switched to specialized implementation that hopefully works.
+
 ## [0.34.0] - 2024-06-28
 
 ### Added

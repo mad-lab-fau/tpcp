@@ -6,13 +6,15 @@ import joblib
 from torch import nn
 
 from tpcp import clone
-from tpcp._hash import custom_hash
+from tpcp.misc import custom_hash
 
 
 class TorchModel(nn.Module):
-    def __init__(self):
+    def __init__(self, n_features=1024):
         super().__init__()
-        self.readout = nn.Linear(1024, 1)
+        torch.manual_seed(42)
+        self.readout = nn.Linear(n_features, 1)
+        torch.nn.init.uniform_(self.readout.weight, -1, 1)
 
     def forward(self, x):
         return self.readout(x)
@@ -32,11 +34,14 @@ def test_hash_model():
     assert first == second
     assert first == cloned
 
-    # We also create a negative test, to see that our test dataopbject actually triggers the pytorch problem
+    # We also create a negative test, to see that our test data object actually triggers the pytorch problem
     first = joblib.hash(TorchModel())
     second = joblib.hash(TorchModel())
 
     assert first != second
+
+    # And we test that two different models are not equal
+    assert custom_hash(TorchModel(n_features=1024)) != custom_hash(TorchModel(n_features=1025))
 
 
 def test_hash_tensor():
@@ -49,6 +54,9 @@ def test_hash_tensor():
 
     assert first == second
     assert first == cloned
+
+    # And the negative test
+    assert custom_hash(torch.tensor([0, 1, 3])) != custom_hash(torch.tensor([0, 1, 2]))
 
 
 @pytest.mark.parametrize("c", (list, tuple))

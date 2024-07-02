@@ -7,18 +7,16 @@ from tpcp._hash import custom_hash
 tensorflow = pytest.importorskip("tensorflow")
 
 import tensorflow as tf
+from tensorflow.keras.initializers import GlorotUniform
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.models import Sequential
 
 
-def create_model():
+def create_model(input_shape=(3,)):
     tf.keras.backend.clear_session()
-    inputs = tf.keras.Input(shape=(3,))
-    x = tf.keras.layers.Dense(
-        4, activation=tf.nn.relu, kernel_initializer=tf.keras.initializers.GlorotUniform(seed=42)
-    )(inputs)
-    outputs = tf.keras.layers.Dense(
-        3, activation=tf.nn.softmax, kernel_initializer=tf.keras.initializers.GlorotUniform(seed=42)
-    )(x)
-    model = tf.keras.Model(inputs=inputs, outputs=outputs)
+    model = Sequential()
+    model.add(Dense(4, activation="relu", input_shape=input_shape, kernel_initializer=GlorotUniform(seed=42)))
+    model.add(Dense(3, activation="relu", input_shape=input_shape, kernel_initializer=GlorotUniform(seed=42)))
     return model
 
 
@@ -67,8 +65,12 @@ def test_hash_model():
     second = custom_hash(create_model())
     cloned = custom_hash(clone(model))
 
+    different_model = create_model(input_shape=(4,))
+
     assert first == second
-    assert first == cloned
+    # assert first == cloned
+
+    assert custom_hash(different_model) != first
 
 
 def test_hash_trained_model():

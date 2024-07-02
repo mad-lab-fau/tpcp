@@ -9,6 +9,7 @@ import contextlib
 import copy
 import dataclasses
 import inspect
+import io
 import os
 import sys
 import warnings
@@ -52,6 +53,11 @@ try:
     import tensorflow as tf
 except ImportError:
     tf = None
+
+try:
+    import torch
+except ImportError:
+    torch = None
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -704,7 +710,7 @@ def _is_builtin_class_instance(obj: Any) -> bool:
     return type(obj).__module__ == "builtins"
 
 
-def clone(algorithm: T, *, safe: bool = False) -> T:
+def clone(algorithm: T, *, safe: bool = False) -> T:  # noqa: C901, PLR0911
     """Construct a new algorithm object with the same parameters.
 
     This is a modified version from sklearn and the original was published under a BSD-3 license and the original file
@@ -745,15 +751,28 @@ def clone(algorithm: T, *, safe: bool = False) -> T:
     # Therefore, we check explicitly for that, as we do not want to accidentally treat a sklearn algo (or similar) as
     # algorithm
     if not isinstance(algorithm, BaseTpcpObject):
-        if not safe:
-            # For some reason, some libraries print stuff to stdout when cloning.
-            with Path(os.devnull).open("w") as devnull, contextlib.redirect_stdout(devnull):
-                return copy.deepcopy(algorithm)
-        raise TypeError(
-            f"Cannot clone object '{algorithm!r}' (type {type(algorithm)}): "
-            "it does not seem to be a compatible algorithm/pipline class or general `tpcp` object as it does not "
-            "inherit from `BaseTpcpObject` or `Algorithm` or `Pipeline`."
-        )
+        if safe:
+            raise TypeError(
+                f"Cannot clone object '{algorithm!r}' (type {type(algorithm)}): "
+                "it does not seem to be a compatible algorithm/pipline class or general `tpcp` object as it does not "
+                "inherit from `BaseTpcpObject` or `Algorithm` or `Pipeline`."
+            )
+        # We have one special case for torch here, as apparently torch objects can not be deepcopied.
+        # https://github.com/pytorch/tutorials/issues/2177
+        if torch is not None and isinstance(algorithm, torch.nn.Module):
+            buffer = io.BytesIO()
+            torch.save(algorithm, buffer)
+            buffer.seek(0)
+            model = torch.load(buffer)
+            buffer.close()
+            return model
+        if tf is not None and isinstance(algorithm, tf.keras.Model):
+            model_copy = tf.keras.models.clone_model(algorithm)
+            model_copy.set_weights(algorithm.get_weights())
+            return model_copy
+        # For some reason, some libraries print stuff to stdout when cloning.
+        with Path(os.devnull).open("w") as devnull, contextlib.redirect_stdout(devnull):
+            return copy.deepcopy(algorithm)
 
     klass = algorithm.__class__
     new_object_params = algorithm.get_params(deep=False)

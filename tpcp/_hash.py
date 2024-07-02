@@ -1,6 +1,5 @@
 """A custom hash function implementation that properly supports pytorch."""
 import contextlib
-import io
 import os
 import pickle
 import struct
@@ -130,14 +129,21 @@ class NNHasher(NoMemoizeNumpyHasher):
         except ImportError:
             self.tensorflow = None
 
-    def save(self, obj):
-        if self.torch and isinstance(obj, (self.torch.nn.Module, self.torch.Tensor)):
-            b = b""
-            buffer = io.BytesIO(b)
-            self.torch.save(obj, buffer)
-            self._hash.update(b)
-            return
+    def _convert_tensors_to_numpy(self, obj):
+        # Recursively convert torch tensors in obj to numpy arrays
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                obj[key] = self._convert_tensors_to_numpy(value)
+        if isinstance(obj, self.torch.nn.Module):
+            state_dict = obj.state_dict()
+            obj = {key: self._convert_tensors_to_numpy(value) for key, value in state_dict.items()}
+            return obj
+        if isinstance(obj, self.torch.Tensor):
+            obj_as_numpy = obj.cpu().detach().numpy()
+            return obj_as_numpy
+        return obj
 
+    def save(self, obj):
         if self.tensorflow and isinstance(obj, (self.tensorflow.keras.Model,)):
             # The normal tensorflow objects don't have a consistent hash.
             # Therefore, we need to serialize all relevant information.
@@ -151,6 +157,10 @@ class NNHasher(NoMemoizeNumpyHasher):
                     [obj.__class__.__name__, serialize_keras_object(obj), obj.get_weights()],
                 )
             return
+
+        if self.torch and isinstance(obj, (self.torch.nn.Module, self.torch.Tensor)):
+            obj = self._convert_tensors_to_numpy(obj)
+
         NumpyHasher.save(self, obj)
 
 
