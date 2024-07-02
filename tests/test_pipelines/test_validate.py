@@ -67,18 +67,18 @@ class TestValidate:
         assert len(results_df) == 1
         assert set(results.keys()) == {
             "data_labels",
-            "score",
+            "agg__score",
             "single__score",
-            "score_time",
+            "debug__score_time",
         }
         result_row = results_df.iloc[0]  # result_df only has one row
         assert all(len(result_row[key]) == len(ds) for key in ["data_labels", "single__score"])
-        assert all(isinstance(result_row[key], float) for key in ["score", "score_time"])
+        assert all(isinstance(result_row[key], float) for key in ["agg__score", "debug__score_time"])
 
         # The dummy scorer is returning the dataset group label -> The datapoint id is also the result
         all_ids = np.array(ds.group_labels).flatten()
         assert all(np.array(result_row["data_labels"]).flatten() == np.array(result_row["single__score"]))
-        assert result_row["score"] == np.mean(all_ids)
+        assert result_row["agg__score"] == np.mean(all_ids)
 
     @pytest.mark.parametrize(
         "multiprocess_args",
@@ -180,12 +180,12 @@ class TestCrossValidate:
         assert set(results.keys()) == {
             "train__data_labels",
             "test__data_labels",
-            "test__score",
+            "test__agg__score",
             "test__single__score",
-            "train__score",
+            "train__agg__score",
             "train__single__score",
-            "score_time",
-            "optimize_time",
+            "debug__score_time",
+            "debug__optimize_time",
         }
         assert all(len(v) == len(ds) - 1 for v in results_df["train__data_labels"])
         assert all(len(v) == len(ds) - 1 for v in results_df["train__single__score"])
@@ -196,17 +196,17 @@ class TestCrossValidate:
             all_ids = np.array(ds.group_labels).flatten()
             assert r["test__data_labels"] == [(i,)]
             assert r["test__data_labels"][0][0] == r["test__single__score"][0]
-            assert r["test__score"] == i
+            assert r["test__agg__score"] == i
             all_ids = all_ids[all_ids != i]
             assert all(np.array(r["train__data_labels"]).flatten() == all_ids)
             assert all(np.array(r["train__data_labels"]).flatten() == np.array(r["train__single__score"]))
-            assert r["train__score"] == np.mean(all_ids)
+            assert r["train__agg__score"] == np.mean(all_ids)
 
     @pytest.mark.parametrize(
         ("kwargs", "expected"),
         (
             ({"return_optimizer": True}, ("optimizer",)),
-            ({"return_train_score": True}, ("train__score", "train__single__score")),
+            ({"return_train_score": True}, ("train__agg__score", "train__single__score")),
         ),
     )
     def test_return_elements(self, kwargs, expected):

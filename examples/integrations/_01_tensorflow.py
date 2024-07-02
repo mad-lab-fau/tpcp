@@ -162,8 +162,8 @@ class KerasPipeline(OptimizablePipeline):
 
     @make_optimize_safe
     def self_optimize(self, dataset, **_) -> Self:
-        data = np.vstack([d.input_as_array() for d in dataset])
-        labels = np.hstack([d.labels_as_array() for d in dataset])
+        data = tf.convert_to_tensor(np.vstack([d.input_as_array() for d in dataset]))
+        labels = tf.convert_to_tensor(np.hstack([d.labels_as_array() for d in dataset]))
 
         print(data.shape)
         if self._model is not None:
@@ -192,7 +192,7 @@ class KerasPipeline(OptimizablePipeline):
     def run(self, datapoint) -> Self:
         if self._model is None:
             raise RuntimeError("Model not trained yet!")
-        data = datapoint.input_as_array()
+        data = tf.convert_to_tensor(datapoint.input_as_array())
 
         self.predictions_ = self._model.predict(data)
         return self
@@ -265,5 +265,9 @@ cv_results = cross_validate(Optimize(pipeline), FashionMNIST()[:100], scoring=sc
 cv_results["test__single__accuracy"]
 
 # %%
+# Average first per group and then over all groups:
+cv_results["test__agg__accuracy"]
+
+# %%
 # And the overall accuracy as the average over all samples of all groups within a fold:
-cv_results["test__per_sample__accuracy"]
+cv_results["test__agg__per_sample__accuracy"]

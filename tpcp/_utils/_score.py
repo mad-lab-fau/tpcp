@@ -34,7 +34,7 @@ class _ScoreResults(TypedDict, total=False):
 
     scores: _AGG_SCORE_TYPE
     single__scores: _SINGLE_SCORE_TYPE
-    score_time: float
+    debug__score_time: float
     data_labels: list[Union[str, tuple[str, ...]]]
     parameters: Optional[dict[str, Any]]
 
@@ -46,8 +46,8 @@ class _OptimizeScoreResults(TypedDict, total=False):
     test__single__scores: _SINGLE_SCORE_TYPE
     train__scores: _AGG_SCORE_TYPE
     train__single__scores: _SINGLE_SCORE_TYPE
-    score_time: float
-    optimize_time: float
+    debug__score_time: float
+    debug__optimize_time: float
     train__data_labels: list[Union[str, tuple[str, ...]]]
     test__data_labels: list[Union[str, tuple[str, ...]]]
     parameters: Optional[dict[str, Any]]
@@ -119,7 +119,7 @@ def _score(
         "single__scores": single_scores,
     }
     if return_times:
-        result["score_time"] = score_time
+        result["debug__score_time"] = score_time
     if return_data_labels:
         result["data_labels"] = dataset.group_labels
     if return_parameters:
@@ -223,8 +223,8 @@ def _optimize_and_score(
         result["train__scores"] = train_agg_scores
         result["train__single__scores"] = train_single_scores
     if return_times:
-        result["score_time"] = score_time
-        result["optimize_time"] = optimize_time
+        result["debug__score_time"] = score_time
+        result["debug__optimize_time"] = optimize_time
     if return_data_labels:
         # Note we always return the train data attribute as it is interesting information independent of the train
         # score and has 0 runtime impact.

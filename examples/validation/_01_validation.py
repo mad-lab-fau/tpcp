@@ -96,23 +96,35 @@ result_df
 # To simplify things a little, we will split the output into three parts:
 #
 # The main output are the means of the performance values over all datapoints.
+# They are all prefixed with `agg__` to make it easy to filter them out within the results.
 # Note that if you want to use different aggregation methods, you can create and pass a custom scorer to
 # :func:`~tpcp.validate.validate`. See the example on :ref:`custom scorers <custom_scorer>` for further details.
-performance = result_df[["precision", "recall", "f1_score"]]
+performance = result_df.filter(like="agg__")
 performance
 
 # %%
 # If you need more insight into the results, you can inspect the
 # individual score for each data point given in a list. In this example, we had 12 data points.
 # Thus, we retrieve have 12 values for each score.
+# These values are all prefixed with `single__`.
 # Inspecting this list can help to identify potential issues with certain parts of your dataset.
 # To link the performance values to a specific datapoint, you can look at the `data_labels` field.
-single_performance = result_df[["single__precision", "single__recall", "single__f1_score", "data_labels"]]
+single_performance = result_df.filter(like="single__")
 single_performance
 
 # %%
+# It is often quite handy to explode this dataframe and combine it with the data labels.
+# This way, you can easily identify the datapoints that are causing issues.
+exploded_results = (
+    single_performance.explode(single_performance.columns.to_list())
+    .rename_axis("fold")
+    .set_index(result_df["data_labels"].explode(), append=True)
+)
+exploded_results
+
+# %%
 # The final level of debug information is provided via the timings.
-timings = result_df[["score_time"]]
+timings = result_df.filter(like="debug__")
 timings
 
 # %%

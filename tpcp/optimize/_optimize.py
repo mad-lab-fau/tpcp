@@ -427,6 +427,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
             self.return_optimized, self.multimetric_, first_test_score
         )
         if return_optimized:
+            assert isinstance(return_optimized, str)
             (
                 self.best_index_,
                 self.best_score_,
@@ -435,8 +436,8 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
                 return_optimized,
                 reverse_ranking,
                 results,
-                rank_prefix="rank__",
-                score_prefix="",
+                rank_prefix="rank__agg__",
+                score_prefix="agg__",
             )
             # We clone twice, in case one of the params was itself an algorithm.
             self.optimized_pipeline_ = self.pipeline.clone().set_params(**self.best_params_).clone()
@@ -455,12 +456,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
 
         results = {}
 
-        scores_dict = (
-            _normalize_score_results(
-                out["scores"],
-            )
-            or {}
-        )
+        scores_dict = _prefix_para_dict(_normalize_score_results(out["scores"]) or {}, "agg__")
         single_scores_dict = _prefix_para_dict(_normalize_score_results(out["single__scores"]) or {}, "single__")
         for c, v in scores_dict.items():
             results[c] = v
@@ -471,7 +467,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
             results[c] = single_scores_dict[c]
 
         results["data_labels"] = out["data_labels"]
-        results["score_time"] = out["score_time"]
+        results["debug__score_time"] = out["debug__score_time"]
 
         # Use one MaskedArray and mask all the places where the param is not
         # applicable for that candidate. Use defaultdict as each candidate may
@@ -818,8 +814,8 @@ class GridSearchCV(
                 return_optimized,
                 reverse_ranking,
                 results,
-                rank_prefix="rank__test__",
-                score_prefix="mean__test__",
+                rank_prefix="rank__test__agg__",
+                score_prefix="mean__test__agg__",
             )
             # We clone twice, in case one of the params was itself an algorithm.
             best_optimizer = Optimize(
@@ -898,8 +894,8 @@ class GridSearchCV(
                 rank = np.asarray(rankdata(-array_means, method="min"), dtype=np.int32)
                 results[f"rank__{key_name}"] = rank
 
-        _store("optimize_time", out["optimize_time"])
-        _store("score_time", out["score_time"])
+        _store("debug__optimize_time", out["debug__optimize_time"])
+        _store("debug__score_time", out["debug__score_time"])
         _store_non_numeric("test__data_labels", out["test__data_labels"])
         _store_non_numeric("train__data_labels", out["train__data_labels"])
         # Use one MaskedArray and mask all the places where the param is not
@@ -926,7 +922,7 @@ class GridSearchCV(
         # Store a list of param dicts at the key 'params'
         results["params"] = candidate_params
 
-        test_scores_dict = _normalize_score_results(out["test__scores"], "score") or {}
+        test_scores_dict = _prefix_para_dict(_normalize_score_results(out["test__scores"]) or {}, "agg__")
         test_single_scores_dict = _prefix_para_dict(
             _normalize_score_results(out["test__single__scores"]) or {}, "single__"
         )
@@ -994,7 +990,7 @@ def _extract_return_optimize_info(
     return_optimized: str,
     reverse,
     results,
-    rank_prefix: str = "rank__",
+    rank_prefix: str = "rank__agg__",
     score_prefix: str = "",
 ) -> tuple[int, float, dict[str, Any]]:
     """Extract the information from `return_optimized` and check if it is valid."""

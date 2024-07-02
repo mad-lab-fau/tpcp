@@ -40,7 +40,7 @@ def test_gridsearch():
     from examples.parameter_optimization._01_gridsearch import r_peaks, results
 
     assert_array_equal(r_peaks[:3], [77, 370, 663])
-    assert_almost_equal(results["f1_score"], [0.7198637, 0.7169006, 0.7089728])
+    assert_almost_equal(results["agg__f1_score"], [0.7198637, 0.7169006, 0.7089728])
 
 
 def test_optimizable_pipeline():
@@ -54,19 +54,19 @@ def test_gridsearchcv():
     from examples.parameter_optimization._03_gridsearch_cv import r_peaks, results
 
     assert_array_equal(r_peaks[:3], [77, 370, 663])
-    assert_almost_equal(results["mean__test__f1_score"], [0.8640027, 0.861629, 0.8655343])
+    assert_almost_equal(results["mean__test__agg__f1_score"], [0.8640027, 0.861629, 0.8655343])
 
 
 def test_validation():
     from examples.validation._01_validation import results
 
-    assert_almost_equal(results["f1_score"], [0.7089727])
+    assert_almost_equal(results["agg__f1_score"], [0.7089727])
 
 
 def test_cross_validate():
     from examples.validation._02_cross_validation import results
 
-    assert_almost_equal(results["test__f1_score"], [0.9770585, 0.7108303, 0.9250665])
+    assert_almost_equal(results["test__agg__f1_score"], [0.9770585, 0.7108303, 0.9250665])
 
 
 def test_advanced_cross_validate(snapshot):
@@ -166,7 +166,7 @@ def test_tensorflow_example():
     # It seems to be impossible to run the tensorflow example in a deterministic way, across different machines and
     # Python versions.
     # We therefore just check if the performance is larger 0.8, which is the case for all runs we have seen so far.
-    assert np.all(cv_results["test__per_sample__accuracy"] > 0.8)
+    assert np.all(cv_results["test__agg__per_sample__accuracy"] > 0.8)
 
 
 def test_caching_example():
