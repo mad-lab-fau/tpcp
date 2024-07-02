@@ -721,13 +721,7 @@ class GridSearchCV(
 
         n_splits = cv.get_n_splits(dataset)
 
-        # We need to wrap our pipeline for a consistent interface.
-        # In the future we might be able to allow objects with optimizer Interface as input directly.
-        optimizer = Optimize(
-            self.pipeline,
-            safe_optimize=self.safe_optimize,
-            optimize_with_info=self.optimize_with_info,
-        )
+        optimizer = self._wrap_pipeline()
 
         # For each para combi, we separate the pure parameters (parameters that do not affect the optimization) and
         # the hyperparameters.
@@ -832,6 +826,16 @@ class GridSearchCV(
             self.final_optimize_time_ = final_optimize_start_time - time.time()
 
         return self
+
+    def _wrap_pipeline(self):
+        # We need to wrap our pipeline for a consistent interface.
+        # In the future we might be able to allow objects with optimizer Interface as input directly.
+        optimizer = Optimize(
+            self.pipeline,
+            safe_optimize=self.safe_optimize,
+            optimize_with_info=self.optimize_with_info,
+        )
+        return optimizer
 
     def _format_results(self, candidate_params, n_splits, out, more_results=None):  # noqa: C901
         """Format the final result dict.
