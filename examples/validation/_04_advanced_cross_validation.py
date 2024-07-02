@@ -108,7 +108,7 @@ result_df = pd.DataFrame(results)
 
 # %%
 # We can see that the test data of the first fold contains only participants from group 1.
-result_df["test_data_labels"].explode()
+result_df["test__data_labels"].explode()
 
 # %%
 # This works fine when the groups are just "additional information", and are unlikely to affect the data within.
