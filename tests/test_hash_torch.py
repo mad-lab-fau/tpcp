@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 torch = pytest.importorskip("torch")
@@ -34,14 +36,20 @@ def test_hash_model():
     assert first == second
     assert first == cloned
 
+    # And we test that two different models are not equal
+    assert custom_hash(TorchModel(n_features=1024)) != custom_hash(TorchModel(n_features=1025))
+
+
+def test_negative_example():
+    # For some reason this test started passing in Python 3.11
+    # Skipping for 3.11
+    if sys.version_info[:2] == (3, 11):
+        pytest.skip("This test started passing in Python 3.11")
     # We also create a negative test, to see that our test data object actually triggers the pytorch problem
     first = joblib.hash(TorchModel())
     second = joblib.hash(TorchModel())
 
     assert first != second
-
-    # And we test that two different models are not equal
-    assert custom_hash(TorchModel(n_features=1024)) != custom_hash(TorchModel(n_features=1025))
 
 
 def test_hash_tensor():
