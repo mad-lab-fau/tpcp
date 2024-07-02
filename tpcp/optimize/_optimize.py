@@ -297,7 +297,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
 
         The dictionary contains the following entries:
 
-        param_*
+        param__*
             The value of a respective parameter
         params
             A dictionary representing all parameters
@@ -305,11 +305,11 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
             The aggregated value of a score over all data-points.
             If a single score is used for scoring, then the generic name "score" is used.
             Otherwise, multiple columns with the name of the respective scorer exist
-        rank_score / rank_{scorer-name}
+        rank__score / rank__{scorer-name}
             A sorting for each score from the highest to the lowest value.
             If lower or higher values are better, depends on the scoring function and needs to be interpreted
             accordingly.
-        single_score / single_{scorer-name}
+        single__score / single__{scorer-name}
             The individual scores per data point for each parameter combination.
             This is a list of values with the `len(dataset)`.
         data_labels
@@ -435,7 +435,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
                 return_optimized,
                 reverse_ranking,
                 results,
-                rank_prefix="rank_",
+                rank_prefix="rank__",
                 score_prefix="",
             )
             # We clone twice, in case one of the params was itself an algorithm.
@@ -456,10 +456,10 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         results = {}
 
         scores_dict = _normalize_score_results(out["scores"]) or {}
-        single_scores_dict = _normalize_score_results(out["single_scores"]) or {}
+        single_scores_dict = _normalize_score_results(out["single__scores"]) or {}
         for c, v in scores_dict.items():
             results[c] = v
-            results[f"rank_{c}"] = np.asarray(rankdata(-v, method="min"), dtype=np.int32)
+            results[f"rank__{c}"] = np.asarray(rankdata(-v, method="min"), dtype=np.int32)
         for c, _v in single_scores_dict.items():
             # Because of custom aggregators, it can be that single scores dicts have different keys than the aggregated
             # scores.
@@ -597,39 +597,39 @@ class GridSearchCV(
 
         The dictionary contains the following entries:
 
-        param_{parameter_name}
+        param__{parameter_name}
             The value of a respective parameter.
         params
             A dictionary representing all parameters.
-        mean_test_score / mean_test_{scorer_name}
+        test__mean__score / test__mean__{scorer_name}
             The average test score over all folds.
             If a single score is used for scoring, then the generic name "score" is used.
             Otherwise, multiple columns with the name of the respective scorer exist.
-        std_test_score / std_test_{scorer_name}
+        test__std__score / test__std__{scorer_name}
             The std of the test scores over all folds.
-        rank_test_score / rank_{scorer_name}
+        test__rank__score / test__rank__{scorer_name}
             The rank of the mean test score assuming higher values are better.
-        split{n}_test_score / split{n}_test_{scorer_name}
+        split{n}__test__score / split{n}__test__{scorer_name}
             The performance on the test set in fold n.
-        split{n}_test_single_score / split{n}_test_single_{scorer_name}
+        split{n}__test__single__score / split{n}__test__single__{scorer_name}
             The performance in fold n on every single data point in the test set.
-        split{n}_test_data_labels
+        split{n}__test__data_labels
             The ids of the data points used in the test set of fold n.
         mean_train_score / mean_train_{scorer_name}
             The average train score over all folds.
         std_train_score / std_train_{scorer_name}
             The std of the train scores over all folds.
-        split{n}_train_score / split{n}_train_{scorer_name}
+        split{n}__train__score / split{n}__train__{scorer_name}
             The performance on the train set in fold n.
-        rank_train_score / rank_{scorer_name}
+        rank_train__score / rank_{scorer_name}
             The rank of the mean train score assuming higher values are better.
-        split{n}_train_single_score / split{n}_train_single_{scorer_name}
+        split{n}__train__single__score / split{n}__train__single__{scorer_name}
             The performance in fold n on every single datapoint in the train set.
-        split{n}_train_data_labels
+        split{n}__train__data_labels
             The ids of the data points used in the train set of fold n.
-        mean_{optimize/score}_time
+        mean__{optimize/score}_time
             Average time over all folds spent for optimization and scoring, respectively.
-        std_{optimize/score}_time
+        std__{optimize/score}_time
             Standard deviation of the optimize/score times over all folds.
 
     optimized_pipeline_
@@ -798,12 +798,13 @@ class GridSearchCV(
         results = self._format_results(parameters, n_splits, out)
         self.cv_results_ = results
 
-        first_test_score = out[0]["test_scores"]
+        first_test_score = out[0]["test__scores"]
         self.multimetric_ = isinstance(first_test_score, dict)
         reverse_ranking, return_optimized = _validate_return_optimized(
             self.return_optimized, self.multimetric_, first_test_score
         )
         if return_optimized:
+            assert isinstance(return_optimized, str)
             (
                 self.best_index_,
                 self.best_score_,
@@ -812,8 +813,8 @@ class GridSearchCV(
                 return_optimized,
                 reverse_ranking,
                 results,
-                rank_prefix="rank_test_",
-                score_prefix="mean_test_",
+                rank_prefix="test__rank__",
+                score_prefix="test__mean__",
             )
             # We clone twice, in case one of the params was itself an algorithm.
             best_optimizer = Optimize(
@@ -863,10 +864,17 @@ class GridSearchCV(
 
             for split_idx, split in enumerate(array):
                 # Uses closure to alter the results
-                results[f"split{split_idx}_{key_name}"] = split
+                results[f"split{split_idx}__{key_name}"] = split
 
         def _store(key_name: str, array, weights=None, splits=False, rank=False):
             """Store numeric scores/times to the cv_results_."""
+            if "__" in key_name:
+                prefix, param = key_name.split("__", 1)
+                assert prefix in ("train", "test")
+                prefix = f"{prefix}__"
+            else:
+                prefix = ""
+                param = key_name
             # When iterated first by splits, then by parameters
             # We want `array` to have `n_candidates` rows and `n_splits` cols.
             array = np.array(array, dtype=np.float64).reshape(n_candidates, n_splits)
@@ -874,27 +882,28 @@ class GridSearchCV(
             if splits:
                 for split_idx in range(n_splits):
                     # Uses closure to alter the results
-                    results[f"split{split_idx}_{key_name}"] = array[:, split_idx]
+                    results[f"split{split_idx}__{key_name}"] = array[:, split_idx]
             array_means = np.average(array, axis=1, weights=weights)
-            results[f"mean_{key_name}"] = array_means
+            results[f"{prefix}mean__{param}"] = array_means
 
-            if key_name.startswith(("train_", "test_")) and np.any(~np.isfinite(array_means)):
+            if prefix and np.any(~np.isfinite(array_means)):
                 warnings.warn(
-                    f"One or more of the {key_name.split('_')[0]} scores are non-finite: {array_means}",
+                    f"One or more of the {key_name.split('__')[0]} scores are non-finite: {array_means}",
                     category=UserWarning,
                     stacklevel=2,
                 )
             # Weighted std is not directly available in numpy
             array_stds = np.sqrt(np.average((array - array_means[:, np.newaxis]) ** 2, axis=1, weights=weights))
-            results[f"std_{key_name}"] = array_stds
+            results[f"{prefix}std__{param}"] = array_stds
 
             if rank:
-                results[f"rank_{key_name}"] = np.asarray(rankdata(-array_means, method="min"), dtype=np.int32)
+                rank = np.asarray(rankdata(-array_means, method="min"), dtype=np.int32)
+                results[f"{prefix}rank__{param}"] = rank
 
         _store("optimize_time", out["optimize_time"])
         _store("score_time", out["score_time"])
-        _store_non_numeric("test_data_labels", out["test_data_labels"])
-        _store_non_numeric("train_data_labels", out["train_data_labels"])
+        _store_non_numeric("test__data_labels", out["test__data_labels"])
+        _store_non_numeric("train__data_labels", out["train__data_labels"])
         # Use one MaskedArray and mask all the places where the param is not
         # applicable for that candidate. Use defaultdict as each candidate may
         # not contain all the params
@@ -913,19 +922,19 @@ class GridSearchCV(
                 # An all masked empty array gets created for the key
                 # `"param_{name}"` at the first occurrence of `name`.
                 # Setting the value at an index also unmasks that index
-                param_results[f"param_{name}"][cand_idx] = value
+                param_results[f"param__{name}"][cand_idx] = value
 
         results.update(param_results)
         # Store a list of param dicts at the key 'params'
         results["params"] = candidate_params
 
-        test_scores_dict = _normalize_score_results(out["test_scores"]) or {}
-        test_single_scores_dict = _normalize_score_results(out["test_single_scores"]) or {}
+        test_scores_dict = _normalize_score_results(out["test__scores"]) or {}
+        test_single_scores_dict = _normalize_score_results(out["test__single__scores"]) or {}
 
         for scorer_name in test_scores_dict:
             # Computed the (weighted) mean and std for test scores alone
             _store(
-                f"test_{scorer_name}",
+                f"test__{scorer_name}",
                 test_scores_dict[scorer_name],
                 splits=True,
                 rank=True,
@@ -934,15 +943,15 @@ class GridSearchCV(
         for scorer_name in test_single_scores_dict:
             # Because of custom aggregators, it can be that single scores dicts have different keys than the aggregated
             # scores.
-            _store_non_numeric(f"test_single_{scorer_name}", test_single_scores_dict[scorer_name])
+            _store_non_numeric(f"test__{scorer_name}", test_single_scores_dict[scorer_name])
 
         if self.return_train_score:
-            train_scores_dict = _normalize_score_results(out["train_scores"])
-            train_single_scores_dict = _normalize_score_results(out["train_single_scores"])
+            train_scores_dict = _normalize_score_results(out["train__scores"])
+            train_single_scores_dict = _normalize_score_results(out["train__single__scores"])
             for scorer_name in train_scores_dict:
-                _store(f"train_{scorer_name}", train_scores_dict[scorer_name], splits=True)
+                _store(f"train__{scorer_name}", train_scores_dict[scorer_name], splits=True)
             for scorer_name in train_single_scores_dict:
-                _store_non_numeric(f"train_single_{scorer_name}", train_single_scores_dict[scorer_name])
+                _store_non_numeric(f"train__{scorer_name}", train_single_scores_dict[scorer_name])
 
         return results
 
@@ -984,7 +993,7 @@ def _extract_return_optimize_info(
     return_optimized: str,
     reverse,
     results,
-    rank_prefix: str = "rank_",
+    rank_prefix: str = "rank__",
     score_prefix: str = "",
 ) -> tuple[int, float, dict[str, Any]]:
     """Extract the information from `return_optimized` and check if it is valid."""

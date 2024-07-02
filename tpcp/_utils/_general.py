@@ -46,16 +46,16 @@ def _aggregate_final_results(results: list) -> dict:
     }
 
 
-def _normalize_score_results(scores: list, prefix="", single_score_key="score"):
+def _normalize_score_results(scores: list, single_score_key="score"):
     """Create a scoring dictionary based on the type of `scores`."""
     if scores[0] is None:
         # This is the case, when we have a custom aggregator that sets RETURN_RAW_SCORES to False.
         return None
     if isinstance(scores[0], dict):
         # multimetric scoring
-        return {prefix + k: v for k, v in _aggregate_final_results(scores).items()}
+        return _aggregate_final_results(scores)
     # single
-    return {prefix + single_score_key: scores}
+    return {single_score_key: scores}
 
 
 def _prefix_para_dict(params_dict: Optional[dict], prefix="pipeline__") -> Optional[dict]:

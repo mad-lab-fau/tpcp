@@ -15,7 +15,7 @@ from typing_extensions import TypedDict
 
 from tpcp._base import clone
 from tpcp._hash import custom_hash
-from tpcp._utils._general import _get_nested_paras
+from tpcp._utils._general import _get_nested_paras, _prefix_para_dict
 from tpcp.exceptions import OptimizationError, TestError
 
 if TYPE_CHECKING:
@@ -33,7 +33,7 @@ class _ScoreResults(TypedDict, total=False):
     """Type representing results of _score."""
 
     scores: _AGG_SCORE_TYPE
-    single_scores: _SINGLE_SCORE_TYPE
+    single__scores: _SINGLE_SCORE_TYPE
     score_time: float
     data_labels: list[Union[str, tuple[str, ...]]]
     parameters: Optional[dict[str, Any]]
@@ -42,14 +42,14 @@ class _ScoreResults(TypedDict, total=False):
 class _OptimizeScoreResults(TypedDict, total=False):
     """Type representing results of _score_and_optimize."""
 
-    test_scores: _AGG_SCORE_TYPE
-    test_single_scores: _SINGLE_SCORE_TYPE
-    train_scores: _AGG_SCORE_TYPE
-    train_single_scores: _SINGLE_SCORE_TYPE
+    test__scores: _AGG_SCORE_TYPE
+    test__single__scores: _SINGLE_SCORE_TYPE
+    train__scores: _AGG_SCORE_TYPE
+    train__single__scores: _SINGLE_SCORE_TYPE
     score_time: float
     optimize_time: float
-    train_data_labels: list[Union[str, tuple[str, ...]]]
-    test_data_labels: list[Union[str, tuple[str, ...]]]
+    train__data_labels: list[Union[str, tuple[str, ...]]]
+    test__data_labels: list[Union[str, tuple[str, ...]]]
     parameters: Optional[dict[str, Any]]
     optimizer: BaseOptimize
 
@@ -114,7 +114,10 @@ def _score(
             f"The test-set is:\n{[d.group_labels for d in dataset]}"
         ) from e
 
-    result: _ScoreResults = {"scores": agg_scores, "single_scores": single_scores}
+    result: _ScoreResults = {
+        "scores": agg_scores,
+        "single__scores": _prefix_para_dict(single_scores, "single__"),
+    }
     if return_times:
         result["score_time"] = score_time
     if return_data_labels:
@@ -204,7 +207,10 @@ def _optimize_and_score(
             f"The test-set is:\n{test_set}"
         ) from e
 
-    result: _OptimizeScoreResults = {"test_scores": agg_scores, "test_single_scores": single_scores}
+    result: _OptimizeScoreResults = {
+        "test__scores": agg_scores,
+        "test__single__scores": _prefix_para_dict(single_scores, "single__"),
+    }
     if return_train_score:
         try:
             train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set)
@@ -214,16 +220,16 @@ def _optimize_and_score(
                 f"above.\n{error_info or ''}\n\n"
                 f"The train-set is:\n{[d.group_labels for d in test_set]}"
             ) from e
-        result["train_scores"] = train_agg_scores
-        result["train_single_scores"] = train_single_scores
+        result["train__scores"] = train_agg_scores
+        result["train__single__scores"] = _prefix_para_dict(train_single_scores, "single__")
     if return_times:
         result["score_time"] = score_time
         result["optimize_time"] = optimize_time
     if return_data_labels:
         # Note we always return the train data attribute as it is interesting information independent of the train
         # score and has 0 runtime impact.
-        result["train_data_labels"] = train_set.group_labels
-        result["test_data_labels"] = test_set.group_labels
+        result["train__data_labels"] = train_set.group_labels
+        result["test__data_labels"] = test_set.group_labels
     if return_optimizer:
         # This is the actual trained optimizer. This means that `optimizer.optimized_pipeline_` contains the actual
         # instance of the trained pipeline.
