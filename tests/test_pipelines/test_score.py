@@ -19,7 +19,11 @@ class TestScoreMock:
 
     @pytest.mark.parametrize(
         ("enable_output", "out_para"),
-        (("return_parameters", "parameters"), ("return_data_labels", "data_labels"), ("return_times", "score_time")),
+        (
+            ("return_parameters", "parameters"),
+            ("return_data_labels", "data_labels"),
+            ("return_times", "debug__score_time"),
+        ),
     )
     def test_result_params(self, enable_output, out_para):
         result = _score(*self.dummy_paras, parameters=None, **{enable_output: True})
