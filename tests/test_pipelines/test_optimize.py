@@ -497,28 +497,28 @@ class TestGridSearchCV:
         assert list(results["params"]) == [{"para_1": 1}, {"para_1": 2}]
         # In this case the dummy scorer returns the same mean value (2) for each para.
         # Therefore, the ranking should be the same.
-        assert list(results["rank__test__score_1"]) == [1, 1]
-        assert list(results["rank__test__score_2"]) == [1, 1]
+        assert list(results["rank__test__agg__score_1"]) == [1, 1]
+        assert list(results["rank__test__agg__score_2"]) == [1, 1]
         folds = list(cv.split(DummyDataset()))
-        assert all(results["split0__test__score_1"] == np.mean(folds[0][1]))
-        assert all(results["split0__test__score_2"] == np.mean(folds[0][1])) + 1
-        assert all(results["split1__test__score_1"] == np.mean(folds[1][1]))
-        assert all(results["split1__test__score_2"] == np.mean(folds[1][1])) + 1
+        assert all(results["split0__test__agg__score_1"] == np.mean(folds[0][1]))
+        assert all(results["split0__test__agg__score_2"] == np.mean(folds[0][1])) + 1
+        assert all(results["split1__test__agg__score_1"] == np.mean(folds[1][1]))
+        assert all(results["split1__test__agg__score_2"] == np.mean(folds[1][1])) + 1
         assert all(
-            results["mean__test__score_1"]
-            == np.mean([results["split0__test__score_1"], results["split1__test__score_1"]])
+            results["mean__test__agg__score_1"]
+            == np.mean([results["split0__test__agg__score_1"], results["split1__test__agg__score_1"]])
         )
         assert all(
-            results["std__test__score_1"]
-            == np.std([results["split0__test__score_1"], results["split1__test__score_1"]])
+            results["std__test__agg__score_1"]
+            == np.std([results["split0__test__agg__score_1"], results["split1__test__agg__score_1"]])
         )
         assert all(
-            results["mean__test__score_2"]
-            == np.mean([results["split0__test__score_2"], results["split1__test__score_2"]])
+            results["mean__test__agg__score_2"]
+            == np.mean([results["split0__test__agg__score_2"], results["split1__test__agg__score_2"]])
         )
         assert all(
-            results["std__test__score_2"]
-            == np.std([results["split0__test__score_2"], results["split1__test__score_2"]])
+            results["std__test__agg__score_2"]
+            == np.std([results["split0__test__agg__score_2"], results["split1__test__agg__score_2"]])
         )
 
         assert gs.multimetric_ is True
