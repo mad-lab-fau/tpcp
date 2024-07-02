@@ -262,8 +262,8 @@ cv_results = cross_validate(Optimize(pipeline), FashionMNIST()[:100], scoring=sc
 
 # %%
 # We can now look at the results per group:
-cv_results["test_single_accuracy"]
+cv_results["test__single__accuracy"]
 
 # %%
 # And the overall accuracy as the average over all samples of all groups within a fold:
-cv_results["test_per_sample__accuracy"]
+cv_results["test__per_sample__accuracy"]

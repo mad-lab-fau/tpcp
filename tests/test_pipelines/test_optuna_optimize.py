@@ -218,7 +218,7 @@ class TestCustomOptunaOptimize:
 
         r = opti.search_results_
 
-        assert set(r["param_para_1"]) == set(scores.keys())
+        assert set(r["param__para_1"]) == set(scores.keys())
         assert {tuple(p.items()) for p in r["params"]} == {(("para_1", k),) for k in scores}
 
         if isinstance(pipe, OptimizablePipeline):
@@ -282,11 +282,11 @@ class TestOptunaSearch:
         optuna_search.optimize(DummyDataset())
         results = optuna_search.search_results_
 
-        assert "param_para_1" in results
+        assert "param__para_1" in results
         assert "score" in results
         assert results["score"][0] == np.mean(range(5))
-        assert "single_score" in results
-        assert results["single_score"][0] == list(range(5))
+        assert "single__score" in results
+        assert results["single__score"][0] == list(range(5))
         assert "data_labels" in results
 
         assert not any(c.startswith("user_attrs_") for c in results)
@@ -307,15 +307,15 @@ class TestOptunaSearch:
         optuna_search.optimize(DummyDataset())
         results = optuna_search.search_results_
 
-        assert "param_para_1" in results
+        assert "param__para_1" in results
         assert "score_1" in results
         assert results["score_1"][0] == np.mean(range(5))
         assert "score_2" in results
         assert results["score_2"][0] == np.mean(range(5)) + 1
-        assert "single_score_1" in results
-        assert results["single_score_1"][0] == list(range(5))
-        assert "single_score_2" in results
-        assert results["single_score_2"][0] == list(range(1, 6))
+        assert "single__score_1" in results
+        assert results["single__score_1"][0] == list(range(5))
+        assert "single__score_2" in results
+        assert results["single__score_2"][0] == list(range(1, 6))
         assert "data_labels" in results
 
         assert not any(c.startswith("user_attrs_") for c in results)

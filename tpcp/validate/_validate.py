@@ -3,7 +3,6 @@ from collections.abc import Iterator
 from functools import partial
 from typing import Any, Callable, Optional, Union
 
-import numpy as np
 from joblib import Parallel
 from sklearn.model_selection import BaseCrossValidator
 from tqdm.auto import tqdm
@@ -11,7 +10,7 @@ from tqdm.auto import tqdm
 from tpcp import Dataset, Pipeline
 from tpcp._base import _Default
 from tpcp._optimize import BaseOptimize
-from tpcp._utils._general import _aggregate_final_results, _normalize_score_results, _passthrough
+from tpcp._utils._general import _aggregate_final_results, _normalize_score_results, _passthrough, _prefix_para_dict
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.parallel import delayed
 from tpcp.validate._cross_val_helper import DatasetSplitter
@@ -150,10 +149,12 @@ def cross_validate(
     results = _aggregate_final_results(results)
 
     # Fix the formatting of all the score results
-    score_results = _reformat_scores(
-        ["test__scores", "test__single__scores", "train__scores", "train__single__scores"], results
-    )
-    results.update(score_results)
+    for group in ["test", "train"]:
+        scores = _prefix_para_dict(_normalize_score_results(results.pop(f"{group}__scores", [])), f"{group}__")
+        single_scores = _prefix_para_dict(
+            _normalize_score_results(results.pop(f"{group}__single__scores", [])), f"{group}__single__"
+        )
+        results = {**results, **single_scores, **scores}
 
     return results
 
@@ -225,26 +226,8 @@ def validate(
     results = _aggregate_final_results([results])
 
     # Fix the formatting of all the score results
-    score_results = _reformat_scores(["scores", "single__scores"], results)
-    results.update(score_results)
+    scores = _normalize_score_results(results.pop("scores", []))
+    single_scores = _prefix_para_dict(_normalize_score_results(results.pop("single__scores", [])), "single__")
+    results = {**results, **single_scores, **scores}
 
     return results
-
-
-def _propagate_values(
-    name: str, propagate_values: bool, values: Optional[list[Union[str, tuple[str, ...]]]], train_idx: list[int]
-):
-    if propagate_values is False or values is None:
-        return {}
-    return {name: np.array(values)[train_idx]}
-
-
-def _reformat_scores(score_names: list[str], score_results: dict[str, Any]):
-    # extract subtypes (e.g., precision, recall) of scores from nested score dictionaries
-    reformatted_results = {}
-    for name in score_names:
-        if name in score_results:
-            score = score_results.get(name)
-            # We use a new dict here, as it is unsafe to append a dict you are iterating over
-            reformatted_results.update(_normalize_score_results(score))
-    return reformatted_results
