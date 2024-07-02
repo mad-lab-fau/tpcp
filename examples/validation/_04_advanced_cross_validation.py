@@ -132,7 +132,7 @@ cv = DatasetSplitter(base_splitter=StratifiedKFold(n_splits=2), stratify="patien
 
 results = cross_validate(optimizable_pipe, data_imbalanced, scoring=score, cv=cv)
 result_df_stratified = pd.DataFrame(results)
-result_df_stratified["test_data_labels"].explode()
+result_df_stratified["test__data_labels"].explode()
 
 # %%
 # Now we can see that the groups are balanced in each fold and both folds get one of the remaining group 1 participants.
@@ -155,7 +155,7 @@ cv = DatasetSplitter(base_splitter=GroupKFold(n_splits=2), groupby="patient_grou
 
 results = cross_validate(optimizable_pipe, example_data, scoring=score, cv=cv)
 result_df_grouped = pd.DataFrame(results)
-result_df_grouped["test_data_labels"].explode()
+result_df_grouped["test__data_labels"].explode()
 
 # %%
 # We can see that this forces the creation of unequal sice splits to ensure that the groups are kept together.

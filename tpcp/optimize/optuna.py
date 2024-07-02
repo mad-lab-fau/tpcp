@@ -103,7 +103,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         def rename_param_columns(name: str):
             param_start = "params_"
             if name.startswith(param_start):
-                return "param_" + name[len(param_start) :]
+                return "param__" + name[len(param_start) :]
             return name
 
         base_df = (
@@ -427,7 +427,7 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         score
             The value of the score for a specific trial.
             If a trial was pruned this value is nan.
-        param_{parameter_name}
+        param__{parameter_name}
             The value of a respective parameter.
         params
             A dictionary representing all parameters.
@@ -726,7 +726,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
             The aggregated value of a score over all data-points.
             If a single score is used for scoring, then the generic name "score" is used.
             Otherwise, multiple columns with the name of the respective scorer exist
-        param_*
+        param__*
             The value of a respective parameter
         params
             A dictionary representing all parameters
@@ -872,7 +872,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
                 search_results.update(_invert_list_of_dicts(average_scores))
 
         if single_scores := search_results.pop("user_attrs___single_scores", None):
-            search_results.update({f"single_{k}": v for k, v in _invert_list_of_dicts(single_scores).items()})
+            search_results.update({f"single__{k}": v for k, v in _invert_list_of_dicts(single_scores).items()})
 
         # We add params back to the end of the dict to make it easier to read
         search_results["params"] = [self.sanitize_params(p) for p in search_results.pop("params")]

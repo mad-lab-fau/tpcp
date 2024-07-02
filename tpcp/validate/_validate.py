@@ -86,21 +86,21 @@ def cross_validate(
 
         The following fields are in the results:
 
-        test_score / test_{scorer-name}
+        test__score / test__{scorer-name}
             The aggregated value of a score over all data-points.
             If a single score is used for scoring, then the generic name "score" is used.
             Otherwise, multiple columns with the name of the respective scorer exist.
-        test_single_score / test_single_{scorer-name}
+        test__single__score / test__single__{scorer-name}
             The individual scores per datapoint per fold.
             This is a list of values with the `len(train_set)`.
-        test_data_labels
+        test__data_labels
             A list of data labels of the train set in the order the single score values are provided.
             These can be used to associate the `single_score` values with a certain data-point.
-        train_score / train_{scorer-name}
+        train__score / train__{scorer-name}
             Results for train set of each fold.
-        train_single_score / train_single_{scorer-name}
+        train__single__score / train__single__{scorer-name}
             Results for individual data points in the train set of each fold
-        train_data_labels
+        train__data_labels
            The data labels for the train set.
         optimize_time
             Time required to optimize the pipeline in each fold.
@@ -151,7 +151,7 @@ def cross_validate(
 
     # Fix the formatting of all the score results
     score_results = _reformat_scores(
-        ["test_scores", "test_single_scores", "train_scores", "train_single_scores"], results
+        ["test__scores", "test__single__scores", "train__scores", "train__single__scores"], results
     )
     results.update(score_results)
 
@@ -225,7 +225,7 @@ def validate(
     results = _aggregate_final_results([results])
 
     # Fix the formatting of all the score results
-    score_results = _reformat_scores(["scores", "single_scores"], results)
+    score_results = _reformat_scores(["scores", "single__scores"], results)
     results.update(score_results)
 
     return results
@@ -244,11 +244,7 @@ def _reformat_scores(score_names: list[str], score_results: dict[str, Any]):
     reformatted_results = {}
     for name in score_names:
         if name in score_results:
-            score = score_results.pop(name)
-            prefix = ""
-            if "_" in name:
-                prefix = name.rsplit("_", 1)[0] + "_"
-            score = _normalize_score_results(score, prefix)
+            score = score_results.get(name)
             # We use a new dict here, as it is unsafe to append a dict you are iterating over
-            reformatted_results.update(score)
+            reformatted_results.update(_normalize_score_results(score))
     return reformatted_results
