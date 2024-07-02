@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   also removes the need of forwarding the `mock_label` and `group_label` arguments to the underlying optimizer.
   The use of the `mock_label` and `group_label` arguments has been removed without depreciation.
   (https://github.com/mad-lab-fau/tpcp/pull/114)
+- All classes and methods that "grid-search" or "cross-validate" like output (`GridSearch`, `GridSearchCv`, `cross_validate`, `validate`)
+  have updated names for all their output attributes.
+  In most cases the output naming has switched from a single underscore to a double underscore to separate the different
+  parts of the output name to make it easier to programmatically access the output.
 
 ## [0.34.1] - 2024-07-02
 

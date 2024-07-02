@@ -107,7 +107,7 @@ performance
 # Thus, we retrieve have 12 values for each score.
 # Inspecting this list can help to identify potential issues with certain parts of your dataset.
 # To link the performance values to a specific datapoint, you can look at the `data_labels` field.
-single_performance = result_df[["single_precision", "single_recall", "single_f1_score", "data_labels"]]
+single_performance = result_df[["single__precision", "single__recall", "single__f1_score", "data_labels"]]
 single_performance
 
 # %%

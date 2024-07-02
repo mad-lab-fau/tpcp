@@ -68,16 +68,16 @@ class TestValidate:
         assert set(results.keys()) == {
             "data_labels",
             "score",
-            "single_score",
+            "single__score",
             "score_time",
         }
         result_row = results_df.iloc[0]  # result_df only has one row
-        assert all(len(result_row[key]) == len(ds) for key in ["data_labels", "single_score"])
+        assert all(len(result_row[key]) == len(ds) for key in ["data_labels", "single__score"])
         assert all(isinstance(result_row[key], float) for key in ["score", "score_time"])
 
         # The dummy scorer is returning the dataset group label -> The datapoint id is also the result
         all_ids = np.array(ds.group_labels).flatten()
-        assert all(np.array(result_row["data_labels"]).flatten() == np.array(result_row["single_score"]))
+        assert all(np.array(result_row["data_labels"]).flatten() == np.array(result_row["single__score"]))
         assert result_row["score"] == np.mean(all_ids)
 
     @pytest.mark.parametrize(
@@ -178,35 +178,35 @@ class TestCrossValidate:
 
         assert len(results_df) == 5  # n folds
         assert set(results.keys()) == {
-            "train_data_labels",
-            "test_data_labels",
-            "test_score",
-            "test_single_score",
-            "train_score",
-            "train_single_score",
+            "train__data_labels",
+            "test__data_labels",
+            "test__score",
+            "test__single__score",
+            "train__score",
+            "train__single__score",
             "score_time",
             "optimize_time",
         }
-        assert all(len(v) == len(ds) - 1 for v in results_df["train_data_labels"])
-        assert all(len(v) == len(ds) - 1 for v in results_df["train_single_score"])
-        assert all(len(v) == 1 for v in results_df["test_data_labels"])
-        assert all(len(v) == 1 for v in results_df["test_single_score"])
+        assert all(len(v) == len(ds) - 1 for v in results_df["train__data_labels"])
+        assert all(len(v) == len(ds) - 1 for v in results_df["train__single__score"])
+        assert all(len(v) == 1 for v in results_df["test__data_labels"])
+        assert all(len(v) == 1 for v in results_df["test__single__score"])
         # The dummy scorer is returning the dataset group label -> The datapoint id is also the result
         for i, r in results_df.iterrows():
             all_ids = np.array(ds.group_labels).flatten()
-            assert r["test_data_labels"] == [(i,)]
-            assert r["test_data_labels"][0][0] == r["test_single_score"][0]
-            assert r["test_score"] == i
+            assert r["test__data_labels"] == [(i,)]
+            assert r["test__data_labels"][0][0] == r["test__single__score"][0]
+            assert r["test__score"] == i
             all_ids = all_ids[all_ids != i]
-            assert all(np.array(r["train_data_labels"]).flatten() == all_ids)
-            assert all(np.array(r["train_data_labels"]).flatten() == np.array(r["train_single_score"]))
-            assert r["train_score"] == np.mean(all_ids)
+            assert all(np.array(r["train__data_labels"]).flatten() == all_ids)
+            assert all(np.array(r["train__data_labels"]).flatten() == np.array(r["train__single__score"]))
+            assert r["train__score"] == np.mean(all_ids)
 
     @pytest.mark.parametrize(
         ("kwargs", "expected"),
         (
             ({"return_optimizer": True}, ("optimizer",)),
-            ({"return_train_score": True}, ("train_score", "train_single_score")),
+            ({"return_train_score": True}, ("train__score", "train__single__score")),
         ),
     )
     def test_return_elements(self, kwargs, expected):

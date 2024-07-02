@@ -235,9 +235,9 @@ class TestGridSearchCommon:
         expected_ranking = [2, 2]
         expected_ranking[paras.index(best_value)] = 1
         if isinstance(self.optimizer, GridSearch):
-            results = gs.gs_results_["rank_score"]
+            results = gs.gs_results_["rank__score"]
         else:
-            results = gs.cv_results_["rank_test_score"]
+            results = gs.cv_results_["rank__test__score"]
         assert list(results) == expected_ranking
 
 
@@ -250,15 +250,15 @@ class TestGridSearch:
 
         assert len(results_df) == 2  # Parameters
         assert all(
-            s in results for s in ["data_labels", "score", "rank_score", "single_score", "params", "param_para_1"]
+            s in results for s in ["data_labels", "score", "rank__score", "single__score", "params", "param__para_1"]
         )
-        assert all(len(v) == 5 for v in results_df["single_score"])  # 5 data points
+        assert all(len(v) == 5 for v in results_df["single__score"])  # 5 data points
         assert all(len(v) == 5 for v in results_df["data_labels"])  # 5 data points
-        assert list(results["param_para_1"]) == [1, 2]
+        assert list(results["param__para_1"]) == [1, 2]
         assert list(results["params"]) == [{"para_1": 1}, {"para_1": 2}]
         # In this case the dummy scorer returns the same mean value (2) for each para.
         # Therefore, the ranking should be the same.
-        assert list(results["rank_score"]) == [1, 1]
+        assert list(results["rank__score"]) == [1, 1]
         assert list(results["score"]) == [2, 2]
 
         assert gs.multimetric_ is False
@@ -280,23 +280,23 @@ class TestGridSearch:
             for s in [
                 "data_labels",
                 "score_1",
-                "rank_score_1",
-                "single_score_1",
+                "rank__score_1",
+                "single__score_1",
                 "score_2",
-                "rank_score_2",
-                "single_score_2",
+                "rank__score_2",
+                "single__score_2",
                 "params",
-                "param_para_1",
+                "param__para_1",
             ]
         )
-        assert all(len(v) == 5 for c in ["single_score_1", "single_score_2"] for v in results_df[c])  # 5 data points
+        assert all(len(v) == 5 for c in ["single__score_1", "single__score_2"] for v in results_df[c])  # 5 data points
         assert all(len(v) == 5 for v in results_df["data_labels"])  # 5 data points
-        assert list(results["param_para_1"]) == [1, 2]
+        assert list(results["param__para_1"]) == [1, 2]
         assert list(results["params"]) == [{"para_1": 1}, {"para_1": 2}]
         # In this case the dummy scorer returns the same mean value (2) for each para.
         # Therefore, the ranking should be the same.
-        assert list(results["rank_score_1"]) == [1, 1]
-        assert list(results["rank_score_2"]) == [1, 1]
+        assert list(results["rank__score_1"]) == [1, 1]
+        assert list(results["rank__score_2"]) == [1, 1]
         assert list(results["score_1"]) == [2, 2]
         assert list(results["score_2"]) == [3, 3]
 
@@ -334,13 +334,13 @@ class TestGridSearch:
 
         # But we expect an agg value with the nested name
         assert "custom_agg__new_score_name" in results_df.columns
-        assert "rank_custom_agg__new_score_name" in results_df.columns
+        assert "rank__custom_agg__new_score_name" in results_df.columns
 
         # If we have the raw values depends on the settings of the aggregator
-        assert ("single_custom_agg" in results_df.columns) == return_raw_scores
+        assert ("single__custom_agg" in results_df.columns) == return_raw_scores
 
         # Wo don't expect a non-aggreagted version with the name of the final agg value
-        assert "single_custom_agg__new_score_name" not in results_df.columns
+        assert "single__custom_agg__new_score_name" not in results_df.columns
 
     @pytest.mark.parametrize("error_para", (1, 2))
     def test_custom_error_message(self, error_para):
@@ -385,41 +385,45 @@ class TestGridSearchCV:
 
         assert len(results_df) == 2  # Parameters
         assert set(results_df.columns) == {
-            "mean_optimize_time",
-            "std_optimize_time",
-            "mean_score_time",
-            "std_score_time",
-            "split0_test_data_labels",
-            "split0_train_data_labels",
-            "split1_test_data_labels",
-            "split1_train_data_labels",
-            "param_para_1",
+            "mean__optimize_time",
+            "std__optimize_time",
+            "mean__score_time",
+            "std__score_time",
+            "split0__test__data_labels",
+            "split0__train__data_labels",
+            "split1__test__data_labels",
+            "split1__train__data_labels",
+            "param__para_1",
             "params",
-            "split0_test_score",
-            "split1_test_score",
-            "mean_test_score",
-            "std_test_score",
-            "rank_test_score",
-            "split0_test_single_score",
-            "split1_test_single_score",
+            "split0__test__score",
+            "split1__test__score",
+            "mean__test__score",
+            "std__test__score",
+            "rank__test__score",
+            "split0__test__single__score",
+            "split1__test__single__score",
         }
 
-        assert all(len(v) == 2 for v in results_df["split0_test_single_score"])
-        assert all(len(v) == 2 for v in results_df["split0_test_data_labels"])
-        assert all(len(v) == 3 for v in results_df["split1_test_single_score"])
-        assert all(len(v) == 3 for v in results_df["split1_test_data_labels"])
-        assert list(results["param_para_1"]) == [1, 2]
+        assert all(len(v) == 2 for v in results_df["split0__test__single__score"])
+        assert all(len(v) == 2 for v in results_df["split0__test__data_labels"])
+        assert all(len(v) == 3 for v in results_df["split1__test__single__score"])
+        assert all(len(v) == 3 for v in results_df["split1__test__data_labels"])
+        assert list(results["param__para_1"]) == [1, 2]
         assert list(results["params"]) == [{"para_1": 1}, {"para_1": 2}]
         # fold 1 performance datapoints = [0, 1], fold 2 = [2, 3, 4].
         # The dummy scorer returns average of data points.
         # This is independent of the para.
         # Therefore, rank and score identical.
         folds = cv.split(ds)
-        assert all(results["split0_test_score"] == np.mean(next(folds)[1]))
-        assert all(results["split1_test_score"] == np.mean(next(folds)[1]))
-        assert all(results["mean_test_score"] == np.mean([results["split0_test_score"], results["split1_test_score"]]))
-        assert all(results["std_test_score"] == np.std([results["split0_test_score"], results["split1_test_score"]]))
-        assert all(results["rank_test_score"] == 1)
+        assert all(results["split0__test__score"] == np.mean(next(folds)[1]))
+        assert all(results["split1__test__score"] == np.mean(next(folds)[1]))
+        assert all(
+            results["mean__test__score"] == np.mean([results["split0__test__score"], results["split1__test__score"]])
+        )
+        assert all(
+            results["std__test__score"] == np.std([results["split0__test__score"], results["split1__test__score"]])
+        )
+        assert all(results["rank__test__score"] == 1)
         assert gs.multimetric_ is False
 
     @pytest.mark.parametrize(
@@ -448,62 +452,72 @@ class TestGridSearchCV:
 
         assert len(results_df) == 2  # Parameters
         assert set(results.keys()) == {
-            "mean_optimize_time",
-            "std_optimize_time",
-            "mean_score_time",
-            "std_score_time",
-            "split0_test_data_labels",
-            "split0_train_data_labels",
-            "split1_test_data_labels",
-            "split1_train_data_labels",
-            "param_para_1",
+            "mean__optimize_time",
+            "std__optimize_time",
+            "mean__score_time",
+            "std__score_time",
+            "split0__test__data_labels",
+            "split0__train__data_labels",
+            "split1__test__data_labels",
+            "split1__train__data_labels",
+            "param__para_1",
             "params",
-            "split0_test_score_1",
-            "split1_test_score_1",
-            "mean_test_score_1",
-            "std_test_score_1",
-            "rank_test_score_1",
-            "split0_test_single_score_1",
-            "split1_test_single_score_1",
-            "split0_test_score_2",
-            "split1_test_score_2",
-            "mean_test_score_2",
-            "std_test_score_2",
-            "rank_test_score_2",
-            "split0_test_single_score_2",
-            "split1_test_single_score_2",
+            "split0__test__score_1",
+            "split1__test__score_1",
+            "mean__test__score_1",
+            "std__test__score_1",
+            "rank__test__score_1",
+            "split0__test__single__score_1",
+            "split1__test__single__score_1",
+            "split0__test__score_2",
+            "split1__test__score_2",
+            "split0__test__score_2",
+            "split1__test__score_2",
+            "mean__test__score_2",
+            "std__test__score_2",
+            "rank__test__score_2",
+            "split0__test__single__score_2",
+            "split1__test__single__score_2",
         }
 
         assert all(
-            len(v) == 2 for c in ["split0_test_single_score_2", "split0_test_single_score_1"] for v in results_df[c]
+            len(v) == 2
+            for c in ["split0__test__single__score_2", "split0__test__single__score_1"]
+            for v in results_df[c]
         )
         assert all(
-            len(v) == 3 for c in ["split1_test_single_score_2", "split1_test_single_score_1"] for v in results_df[c]
+            len(v) == 3
+            for c in ["split1__test__single__score_2", "split1__test__single__score_1"]
+            for v in results_df[c]
         )
-        assert all(len(v) == 2 for v in results_df["split0_test_data_labels"])
-        assert all(len(v) == 3 for v in results_df["split1_test_data_labels"])
-        assert list(results["param_para_1"]) == [1, 2]
+        assert all(len(v) == 2 for v in results_df["split0__test__data_labels"])
+        assert all(len(v) == 3 for v in results_df["split1__test__data_labels"])
+        assert list(results["param__para_1"]) == [1, 2]
         assert list(results["params"]) == [{"para_1": 1}, {"para_1": 2}]
         # In this case the dummy scorer returns the same mean value (2) for each para.
         # Therefore, the ranking should be the same.
-        assert list(results["rank_test_score_1"]) == [1, 1]
-        assert list(results["rank_test_score_2"]) == [1, 1]
+        assert list(results["rank__test__score_1"]) == [1, 1]
+        assert list(results["rank__test__score_2"]) == [1, 1]
         folds = list(cv.split(DummyDataset()))
-        assert all(results["split0_test_score_1"] == np.mean(folds[0][1]))
-        assert all(results["split0_test_score_2"] == np.mean(folds[0][1])) + 1
-        assert all(results["split1_test_score_1"] == np.mean(folds[1][1]))
-        assert all(results["split1_test_score_2"] == np.mean(folds[1][1])) + 1
+        assert all(results["split0__test__score_1"] == np.mean(folds[0][1]))
+        assert all(results["split0__test__score_2"] == np.mean(folds[0][1])) + 1
+        assert all(results["split1__test__score_1"] == np.mean(folds[1][1]))
+        assert all(results["split1__test__score_2"] == np.mean(folds[1][1])) + 1
         assert all(
-            results["mean_test_score_1"] == np.mean([results["split0_test_score_1"], results["split1_test_score_1"]])
+            results["mean__test__score_1"]
+            == np.mean([results["split0__test__score_1"], results["split1__test__score_1"]])
         )
         assert all(
-            results["std_test_score_1"] == np.std([results["split0_test_score_1"], results["split1_test_score_1"]])
+            results["std__test__score_1"]
+            == np.std([results["split0__test__score_1"], results["split1__test__score_1"]])
         )
         assert all(
-            results["mean_test_score_2"] == np.mean([results["split0_test_score_2"], results["split1_test_score_2"]])
+            results["mean__test__score_2"]
+            == np.mean([results["split0__test__score_2"], results["split1__test__score_2"]])
         )
         assert all(
-            results["std_test_score_2"] == np.std([results["split0_test_score_2"], results["split1_test_score_2"]])
+            results["std__test__score_2"]
+            == np.std([results["split0__test__score_2"], results["split1__test__score_2"]])
         )
 
         assert gs.multimetric_ is True
@@ -524,20 +538,20 @@ class TestGridSearchCV:
 
         assert set(results.keys()).issuperset(
             {
-                "split0_train_data_labels",
-                "split1_train_data_labels",
-                "split0_train_score_1",
-                "split1_train_score_1",
-                "mean_train_score_1",
-                "std_train_score_1",
-                "split0_train_single_score_1",
-                "split1_train_single_score_1",
-                "split0_train_score_2",
-                "split1_train_score_2",
-                "mean_train_score_2",
-                "std_train_score_2",
-                "split0_train_single_score_2",
-                "split1_train_single_score_2",
+                "split0__train__data_labels",
+                "split1__train__data_labels",
+                "split0__train__score_1",
+                "split1__train__score_1",
+                "mean__train__score_1",
+                "std__train__score_1",
+                "split0__train__single__score_1",
+                "split1__train__single__score_1",
+                "split0__train__score_2",
+                "split1__train__score_2",
+                "mean__train__score_2",
+                "std__train__score_2",
+                "split0__train__single__score_2",
+                "split1__train__single__score_2",
             }
         )
 
@@ -661,18 +675,18 @@ class TestGridSearchCV:
 
         for split in range(2):
             # We don't expect an aggregated value with the name of the aggregator, as it returned a dict
-            assert f"split{split}_test_custom_agg" not in results_df.columns
+            assert f"split{split}__test__custom_agg" not in results_df.columns
 
             # But we expect an agg value with the nested name
-            assert f"split{split}_test_custom_agg__new_score_name" in results_df.columns
+            assert f"split{split}__test__custom_agg__new_score_name" in results_df.columns
 
             # If we have the raw values depends on the settings of the aggregator
-            assert (f"split{split}_test_single_custom_agg" in results_df.columns) == return_raw_scores
+            assert (f"split{split}__test__single__custom_agg" in results_df.columns) == return_raw_scores
 
             # Wo don't expect a non-aggreagted version with the name of the final agg value
-            assert f"split{split}_test_single_custom_agg__new_score_name" not in results_df.columns
+            assert f"split{split}__test__single__custom_agg__new_score_name" not in results_df.columns
 
-        assert "mean_test_custom_agg__new_score_name" in results_df.columns
+        assert "mean__test__custom_agg__new_score_name" in results_df.columns
 
     @pytest.mark.parametrize("error_fold", (0, 2))
     @pytest.mark.parametrize("error_para", (1, 2))

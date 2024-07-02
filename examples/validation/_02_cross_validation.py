@@ -130,7 +130,7 @@ result_df
 #
 # The main output are the test set performance values.
 # Each row corresponds to performance in respective fold.
-performance = result_df[["test_precision", "test_recall", "test_f1_score"]]
+performance = result_df[["test__precision", "test__recall", "test__f1_score"]]
 performance
 
 # %%
@@ -148,7 +148,7 @@ generalization_performance
 # Inspecting this list can help to identify potential issues with certain parts of your dataset.
 # To link the performance values to a specific datapoint, you can look at the `test_data_labels` field.
 single_performance = result_df[
-    ["test_single_precision", "test_single_recall", "test_single_f1_score", "test_data_labels"]
+    ["test__single__precision", "test__single__recall", "test__single__f1_score", "test__data_labels"]
 ]
 single_performance
 
@@ -159,13 +159,13 @@ single_performance
 # set.
 train_performance = result_df[
     [
-        "train_precision",
-        "train_recall",
-        "train_f1_score",
-        "train_single_precision",
-        "train_single_recall",
-        "train_single_f1_score",
-        "train_data_labels",
+        "train__precision",
+        "train__recall",
+        "train__f1_score",
+        "train__single__precision",
+        "train__single__recall",
+        "train__single__f1_score",
+        "train__data_labels",
     ]
 ]
 train_performance

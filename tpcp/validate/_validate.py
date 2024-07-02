@@ -3,7 +3,6 @@ from collections.abc import Iterator
 from functools import partial
 from typing import Any, Callable, Optional, Union
 
-import numpy as np
 from joblib import Parallel
 from sklearn.model_selection import BaseCrossValidator
 from tqdm.auto import tqdm
@@ -11,7 +10,7 @@ from tqdm.auto import tqdm
 from tpcp import Dataset, Pipeline
 from tpcp._base import _Default
 from tpcp._optimize import BaseOptimize
-from tpcp._utils._general import _aggregate_final_results, _normalize_score_results, _passthrough
+from tpcp._utils._general import _aggregate_final_results, _normalize_score_results, _passthrough, _prefix_para_dict
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.parallel import delayed
 from tpcp.validate._cross_val_helper import DatasetSplitter
@@ -86,21 +85,21 @@ def cross_validate(
 
         The following fields are in the results:
 
-        test_score / test_{scorer-name}
+        test__score / test__{scorer-name}
             The aggregated value of a score over all data-points.
             If a single score is used for scoring, then the generic name "score" is used.
             Otherwise, multiple columns with the name of the respective scorer exist.
-        test_single_score / test_single_{scorer-name}
+        test__single__score / test__single__{scorer-name}
             The individual scores per datapoint per fold.
             This is a list of values with the `len(train_set)`.
-        test_data_labels
+        test__data_labels
             A list of data labels of the train set in the order the single score values are provided.
             These can be used to associate the `single_score` values with a certain data-point.
-        train_score / train_{scorer-name}
+        train__score / train__{scorer-name}
             Results for train set of each fold.
-        train_single_score / train_single_{scorer-name}
+        train__single__score / train__single__{scorer-name}
             Results for individual data points in the train set of each fold
-        train_data_labels
+        train__data_labels
            The data labels for the train set.
         optimize_time
             Time required to optimize the pipeline in each fold.
@@ -150,10 +149,12 @@ def cross_validate(
     results = _aggregate_final_results(results)
 
     # Fix the formatting of all the score results
-    score_results = _reformat_scores(
-        ["test_scores", "test_single_scores", "train_scores", "train_single_scores"], results
-    )
-    results.update(score_results)
+    for group in ["test", "train"]:
+        scores = _prefix_para_dict(_normalize_score_results(results.pop(f"{group}__scores", [])), f"{group}__")
+        single_scores = _prefix_para_dict(
+            _normalize_score_results(results.pop(f"{group}__single__scores", [])), f"{group}__single__"
+        )
+        results = {**results, **single_scores, **scores}
 
     return results
 
@@ -225,30 +226,8 @@ def validate(
     results = _aggregate_final_results([results])
 
     # Fix the formatting of all the score results
-    score_results = _reformat_scores(["scores", "single_scores"], results)
-    results.update(score_results)
+    scores = _normalize_score_results(results.pop("scores", []))
+    single_scores = _prefix_para_dict(_normalize_score_results(results.pop("single__scores", [])), "single__")
+    results = {**results, **single_scores, **scores}
 
     return results
-
-
-def _propagate_values(
-    name: str, propagate_values: bool, values: Optional[list[Union[str, tuple[str, ...]]]], train_idx: list[int]
-):
-    if propagate_values is False or values is None:
-        return {}
-    return {name: np.array(values)[train_idx]}
-
-
-def _reformat_scores(score_names: list[str], score_results: dict[str, Any]):
-    # extract subtypes (e.g., precision, recall) of scores from nested score dictionaries
-    reformatted_results = {}
-    for name in score_names:
-        if name in score_results:
-            score = score_results.pop(name)
-            prefix = ""
-            if "_" in name:
-                prefix = name.rsplit("_", 1)[0] + "_"
-            score = _normalize_score_results(score, prefix)
-            # We use a new dict here, as it is unsafe to append a dict you are iterating over
-            reformatted_results.update(score)
-    return reformatted_results
