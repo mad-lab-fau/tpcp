@@ -235,9 +235,9 @@ class TestGridSearchCommon:
         expected_ranking = [2, 2]
         expected_ranking[paras.index(best_value)] = 1
         if isinstance(self.optimizer, GridSearch):
-            results = gs.gs_results_["rank__score"]
+            results = gs.gs_results_["rank__agg__score"]
         else:
-            results = gs.cv_results_["rank__test__score"]
+            results = gs.cv_results_["rank__test__agg__score"]
         assert list(results) == expected_ranking
 
 
@@ -250,7 +250,8 @@ class TestGridSearch:
 
         assert len(results_df) == 2  # Parameters
         assert all(
-            s in results for s in ["data_labels", "score", "rank__score", "single__score", "params", "param__para_1"]
+            s in results
+            for s in ["data_labels", "agg__score", "rank__agg__score", "single__score", "params", "param__para_1"]
         )
         assert all(len(v) == 5 for v in results_df["single__score"])  # 5 data points
         assert all(len(v) == 5 for v in results_df["data_labels"])  # 5 data points
@@ -258,8 +259,8 @@ class TestGridSearch:
         assert list(results["params"]) == [{"para_1": 1}, {"para_1": 2}]
         # In this case the dummy scorer returns the same mean value (2) for each para.
         # Therefore, the ranking should be the same.
-        assert list(results["rank__score"]) == [1, 1]
-        assert list(results["score"]) == [2, 2]
+        assert list(results["rank__agg__score"]) == [1, 1]
+        assert list(results["agg__score"]) == [2, 2]
 
         assert gs.multimetric_ is False
 
@@ -279,11 +280,11 @@ class TestGridSearch:
             s in results
             for s in [
                 "data_labels",
-                "score_1",
-                "rank__score_1",
+                "agg__score_1",
+                "rank__agg__score_1",
                 "single__score_1",
-                "score_2",
-                "rank__score_2",
+                "agg__score_2",
+                "rank__agg__score_2",
                 "single__score_2",
                 "params",
                 "param__para_1",
@@ -295,10 +296,10 @@ class TestGridSearch:
         assert list(results["params"]) == [{"para_1": 1}, {"para_1": 2}]
         # In this case the dummy scorer returns the same mean value (2) for each para.
         # Therefore, the ranking should be the same.
-        assert list(results["rank__score_1"]) == [1, 1]
-        assert list(results["rank__score_2"]) == [1, 1]
-        assert list(results["score_1"]) == [2, 2]
-        assert list(results["score_2"]) == [3, 3]
+        assert list(results["rank__agg__score_1"]) == [1, 1]
+        assert list(results["rank__agg__score_2"]) == [1, 1]
+        assert list(results["agg__score_1"]) == [2, 2]
+        assert list(results["agg__score_2"]) == [3, 3]
 
         assert gs.multimetric_ is True
 
@@ -330,11 +331,11 @@ class TestGridSearch:
         results_df = pd.DataFrame(results)
 
         # We don't expect an aggregated value with the name of the aggregator, as it returned a dict
-        assert "custom_agg" not in results_df.columns
+        assert "agg__custom_agg" not in results_df.columns
 
         # But we expect an agg value with the nested name
-        assert "custom_agg__new_score_name" in results_df.columns
-        assert "rank__custom_agg__new_score_name" in results_df.columns
+        assert "agg__custom_agg__new_score_name" in results_df.columns
+        assert "rank__agg__custom_agg__new_score_name" in results_df.columns
 
         # If we have the raw values depends on the settings of the aggregator
         assert ("single__custom_agg" in results_df.columns) == return_raw_scores
@@ -385,21 +386,21 @@ class TestGridSearchCV:
 
         assert len(results_df) == 2  # Parameters
         assert set(results_df.columns) == {
-            "mean__optimize_time",
-            "std__optimize_time",
-            "mean__score_time",
-            "std__score_time",
+            "mean__debug__optimize_time",
+            "std__debug__optimize_time",
+            "mean__debug__score_time",
+            "std__debug__score_time",
             "split0__test__data_labels",
             "split0__train__data_labels",
             "split1__test__data_labels",
             "split1__train__data_labels",
             "param__para_1",
             "params",
-            "split0__test__score",
-            "split1__test__score",
-            "mean__test__score",
-            "std__test__score",
-            "rank__test__score",
+            "split0__test__agg__score",
+            "split1__test__agg__score",
+            "mean__test__agg__score",
+            "std__test__agg__score",
+            "rank__test__agg__score",
             "split0__test__single__score",
             "split1__test__single__score",
         }
@@ -415,15 +416,17 @@ class TestGridSearchCV:
         # This is independent of the para.
         # Therefore, rank and score identical.
         folds = cv.split(ds)
-        assert all(results["split0__test__score"] == np.mean(next(folds)[1]))
-        assert all(results["split1__test__score"] == np.mean(next(folds)[1]))
+        assert all(results["split0__test__agg__score"] == np.mean(next(folds)[1]))
+        assert all(results["split1__test__agg__score"] == np.mean(next(folds)[1]))
         assert all(
-            results["mean__test__score"] == np.mean([results["split0__test__score"], results["split1__test__score"]])
+            results["mean__test__agg__score"]
+            == np.mean([results["split0__test__agg__score"], results["split1__test__agg__score"]])
         )
         assert all(
-            results["std__test__score"] == np.std([results["split0__test__score"], results["split1__test__score"]])
+            results["std__test__agg__score"]
+            == np.std([results["split0__test__agg__score"], results["split1__test__agg__score"]])
         )
-        assert all(results["rank__test__score"] == 1)
+        assert all(results["rank__test__agg__score"] == 1)
         assert gs.multimetric_ is False
 
     @pytest.mark.parametrize(
@@ -452,30 +455,28 @@ class TestGridSearchCV:
 
         assert len(results_df) == 2  # Parameters
         assert set(results.keys()) == {
-            "mean__optimize_time",
-            "std__optimize_time",
-            "mean__score_time",
-            "std__score_time",
+            "mean__debug__optimize_time",
+            "std__debug__optimize_time",
+            "mean__debug__score_time",
+            "std__debug__score_time",
             "split0__test__data_labels",
             "split0__train__data_labels",
             "split1__test__data_labels",
             "split1__train__data_labels",
             "param__para_1",
             "params",
-            "split0__test__score_1",
-            "split1__test__score_1",
-            "mean__test__score_1",
-            "std__test__score_1",
-            "rank__test__score_1",
+            "split0__test__agg__score_1",
+            "split1__test__agg__score_1",
+            "mean__test__agg__score_1",
+            "std__test__agg__score_1",
+            "rank__test__agg__score_1",
             "split0__test__single__score_1",
             "split1__test__single__score_1",
-            "split0__test__score_2",
-            "split1__test__score_2",
-            "split0__test__score_2",
-            "split1__test__score_2",
-            "mean__test__score_2",
-            "std__test__score_2",
-            "rank__test__score_2",
+            "split0__test__agg__score_2",
+            "split1__test__agg__score_2",
+            "mean__test__agg__score_2",
+            "std__test__agg__score_2",
+            "rank__test__agg__score_2",
             "split0__test__single__score_2",
             "split1__test__single__score_2",
         }
@@ -675,10 +676,10 @@ class TestGridSearchCV:
 
         for split in range(2):
             # We don't expect an aggregated value with the name of the aggregator, as it returned a dict
-            assert f"split{split}__test__custom_agg" not in results_df.columns
+            assert f"split{split}__test__agg__custom_agg" not in results_df.columns
 
             # But we expect an agg value with the nested name
-            assert f"split{split}__test__custom_agg__new_score_name" in results_df.columns
+            assert f"split{split}__test__agg__custom_agg__new_score_name" in results_df.columns
 
             # If we have the raw values depends on the settings of the aggregator
             assert (f"split{split}__test__single__custom_agg" in results_df.columns) == return_raw_scores
@@ -686,7 +687,7 @@ class TestGridSearchCV:
             # Wo don't expect a non-aggreagted version with the name of the final agg value
             assert f"split{split}__test__single__custom_agg__new_score_name" not in results_df.columns
 
-        assert "mean__test__custom_agg__new_score_name" in results_df.columns
+        assert "mean__test__agg__custom_agg__new_score_name" in results_df.columns
 
     @pytest.mark.parametrize("error_fold", (0, 2))
     @pytest.mark.parametrize("error_para", (1, 2))

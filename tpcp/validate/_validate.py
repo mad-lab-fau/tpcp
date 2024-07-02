@@ -150,7 +150,7 @@ def cross_validate(
 
     # Fix the formatting of all the score results
     for group in ["test", "train"]:
-        scores = _prefix_para_dict(_normalize_score_results(results.pop(f"{group}__scores", [])), f"{group}__")
+        scores = _prefix_para_dict(_normalize_score_results(results.pop(f"{group}__scores", [])), f"{group}__agg__")
         single_scores = _prefix_para_dict(
             _normalize_score_results(results.pop(f"{group}__single__scores", [])), f"{group}__single__"
         )
@@ -226,7 +226,7 @@ def validate(
     results = _aggregate_final_results([results])
 
     # Fix the formatting of all the score results
-    scores = _normalize_score_results(results.pop("scores", []))
+    scores = _prefix_para_dict(_normalize_score_results(results.pop("scores", [])), "agg__")
     single_scores = _prefix_para_dict(_normalize_score_results(results.pop("single__scores", [])), "single__")
     results = {**results, **single_scores, **scores}
 

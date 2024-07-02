@@ -160,12 +160,12 @@ results_df
 # The mean score is the primary parameter used to select the best parameter combi (if `return_optimized` is True).
 # All other values performance values are just there to provide further insight.
 
-results_df[["mean__test__precision", "mean__test__recall", "mean__test__f1_score"]]
+results_df.filter(like="mean__test__agg__")
 
 # %%
 # For even more insight, you can inspect the scores per datapoint:
 
-results_df.filter(like="test__single")
+results_df.filter(like="test__single__")
 
 # %%
 # If `return_optimized` was set to True (or the name of a score), a final optimization is performed using the best

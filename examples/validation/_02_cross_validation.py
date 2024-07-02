@@ -129,8 +129,10 @@ result_df
 # To simplify things a little, we will split the output into four parts:
 #
 # The main output are the test set performance values.
+# They are aggregated over all datapoints in each fold using the aggregation specified in the `scoring` function.
+# They all are prefixed with ``test__agg__`` to easily filter them out within the results.
 # Each row corresponds to performance in respective fold.
-performance = result_df[["test__precision", "test__recall", "test__f1_score"]]
+performance = result_df.filter(like="test__agg__")
 performance
 
 # %%
@@ -146,34 +148,32 @@ generalization_performance
 # In this example this is only a list with a single element per score, as we only had a single datapoint per fold.
 # In a real scenario, this will be a list of all datapoints.
 # Inspecting this list can help to identify potential issues with certain parts of your dataset.
-# To link the performance values to a specific datapoint, you can look at the `test_data_labels` field.
-single_performance = result_df[
-    ["test__single__precision", "test__single__recall", "test__single__f1_score", "test__data_labels"]
-]
+single_performance = result_df.filter(like="test__single__")
 single_performance
 
 # %%
-# Even further insight is provided by the train results (if activated in parameters).
+# To link the performance values to a specific datapoint, you can look at the `test__data_labels` field.
+# It is often quite handy to combine all the results into on df:
+exploded_results = (
+    single_performance.explode(single_performance.columns.to_list())
+    .rename_axis("fold")
+    .set_index(result_df["test__data_labels"].explode(), append=True)
+)
+exploded_results
+
+
+# %%
+# Even further insight is provided by the train results (if activated via ``return_train_score``).
 # These are the performance results on the train set and can indicate if the training provided meaningful results and
 # can also indicate over-fitting, if the performance of the test set is much worse than the performance on the train
 # set.
-train_performance = result_df[
-    [
-        "train__precision",
-        "train__recall",
-        "train__f1_score",
-        "train__single__precision",
-        "train__single__recall",
-        "train__single__f1_score",
-        "train__data_labels",
-    ]
-]
+train_performance = result_df.filter(like="train__")
 train_performance
 
 # %%
 # The final level of debug information is provided via the timings (note the long runtime in fold 0 can be explained
 # by the jit-compiler used in `BarthDtw`) ...
-timings = result_df[["score_time", "optimize_time"]]
+timings = result_df.filter(like="debug__")
 timings
 
 # %%
