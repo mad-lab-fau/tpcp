@@ -4,7 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - [unreleased]
+## [1.0.0] - 2024-07-03
+
+Note: This is a major version bump, because we have quite substantial breaking changes. The 1.0 should signal that we
+are now feature complete. Though the core APIs have been mostly stable for quite some time now.
 
 ### BREAKING CHANGE
 
@@ -17,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   have updated names for all their output attributes.
   In most cases the output naming has switched from a single underscore to a double underscore to separate the different
   parts of the output name to make it easier to programmatically access the output.
+  (https://github.com/mad-lab-fau/tpcp/pull/117)
 
 ## [0.34.1] - 2024-07-02
 
