@@ -70,15 +70,23 @@ class TestScorer:
             else:
                 assert v == np.mean(data.group_labels)
 
-    @pytest.mark.parametrize("bad_scorer", (lambda x, y: "test", lambda x, y: {"val": "test"}))
-    def test_bad_scorer(self, bad_scorer):
+    def test_bad_scorer_single(self):
         """Check that we catch cases where the scoring func returns invalid values independent of the error_score val."""
-        scorer = Scorer(bad_scorer)
+        scorer = Scorer(lambda x, y: "test")
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         with pytest.raises(ValidationError) as e:
             scorer(pipe, data)
-        assert "MeanAggregator can only be used with float values" in str(e.value)
+        assert "Aggregator for score '__single__' raised an exception" in str(e.value)
+
+    def test_bad_scorer_multiple(self):
+        """Check that we catch cases where the scoring func returns invalid values independent of the error_score val."""
+        scorer = Scorer(lambda x, y: {"val": "test"})
+        pipe = DummyOptimizablePipeline()
+        data = DummyDataset()
+        with pytest.raises(ValidationError) as e:
+            scorer(pipe, data)
+        assert "Aggregator for score 'val' raised an exception" in str(e.value)
 
     def test_callback_called(self):
         mock_score_func = Mock(return_value=1)
@@ -264,7 +272,7 @@ class TestCustomAggregator:
             data = DummyDataset()
             _ = scorer(pipe, data)
 
-        assert "The score values are not consistent." in str(e)
+        assert "Encountered multiple types of aggregators" in str(e)
 
     def test_inconsistent_return_multi(self):
         return_vals = cycle(
