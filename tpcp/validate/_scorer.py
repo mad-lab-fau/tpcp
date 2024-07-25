@@ -149,7 +149,7 @@ class FloatAggregator(Aggregator[float]):
             vals = self.func(values)
         except TypeError as e:
             raise ValidationError(
-                f"{self.__class__.__name__} can only be used with float values. Got the following values instead:"
+                f"Applying the float aggregation function {self.func} failed. "
                 f"\n\n{values}"
             ) from e
 
@@ -323,7 +323,7 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
 
         if is_single:
             # If we have only a single score, we return it directly
-            return agg_scores.get("__single__", agg_scores), raw_scores["__single__"]
+            return agg_scores.get("__single__", agg_scores), raw_scores.get("__single__", None)
         return agg_scores, raw_scores
 
     def _score(self, pipeline: PipelineT, dataset: DatasetT):

@@ -12,9 +12,10 @@ from tests.test_pipelines.conftest import (
     dummy_multi_score_func,
     dummy_single_score_func,
 )
+from tpcp import Pipeline
 from tpcp.exceptions import ScorerFailedError, ValidationError
 from tpcp.validate import Scorer
-from tpcp.validate._scorer import Aggregator, _passthrough_scoring, _validate_scorer, no_agg
+from tpcp.validate._scorer import Aggregator, _passthrough_scoring, _validate_scorer, no_agg, FloatAggregator
 
 
 class TestScorerCalls:
@@ -416,3 +417,71 @@ class TestCustomAggregator:
 
         assert thread_local_step == list(range(len(data)))
         assert thread_local_scores == [d.group_label.value for d in data]
+
+
+# We need to define the face scores func here, to make sure they are pickalable for multi-scoring and hashing
+def _return_1(x):
+    return 1
+
+def _return_2(x):
+    return 2
+
+def _return_3(x):
+    return 3
+
+def _return_4(x):
+    return 4
+
+def _return_5(x):
+    return 5
+
+class TestWeirdScoringStuff:
+
+    class DummyPipeline(Pipeline):
+        def __init__(self, values):
+            self.values = values
+
+        def get_value(self, dp):
+            return self.values[dp.group_label[0]]
+
+    # This needs to be static to be pickable
+    _funcs = [_return_1, _return_2, _return_3, _return_4, _return_5]
+
+    def test_different_config_considered_different(self):
+
+        def score_func(pipeline, data_point):
+            return FloatAggregator(self._funcs[pipeline.get_value(data_point)])(1)
+
+        scorer = Scorer(score_func)
+
+        with pytest.raises(ValidationError) as e:
+            _ = scorer(self.DummyPipeline(list(range(5))), DummyDataset())
+
+        assert "Based on the first value encountered" in str(e)
+
+    def test_same_config_considered_same(self):
+
+        def score_func(pipeline, data_point):
+            return FloatAggregator(self._funcs[3],  return_raw_scores=False)(1)
+
+        scorer = Scorer(score_func)
+
+        agg_val, _ = scorer(self.DummyPipeline(list(range(5))), DummyDataset())
+
+        assert agg_val == 4
+
+    def test_with_multiprocessing(self):
+
+        def score_func(pipeline, data_point):
+            return FloatAggregator(self._funcs[3], return_raw_scores=False)(1)
+
+        scorer = Scorer(score_func, n_jobs=2)
+
+        agg_val, _ = scorer(self.DummyPipeline(list(range(5))), DummyDataset())
+
+        assert agg_val == 4
+
+
+
+
+

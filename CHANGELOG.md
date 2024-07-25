@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Relative major overhall of how aggregator in scoring functions work. Before, aggregators were classes that were 
+  initialized with the value of a score. Now they are instances of a class that is called with the value of a score.
+  This change allows it to create "configurable" aggregators that get the configuration at initialization time.
+  (https://github.com/mad-lab-fau/tpcp/pull/118)
+  This comes with a couple of breaking changes:
+  - The most "user-facing" one is that the `NoAgg` aggregator is now called `no_agg` indicating that it is an instance 
+    of a class and not a class itself.
+  - All custom aggregators need to be rewritten, but you will likely find, that they are much simpler now.
+    (see the reworked examples for custom aggregators)
+
 ## [1.0.1] - 2024-10-18
 
 Fixes names of optional dependency groups. That should resolve install issues when using uv as package manager.
