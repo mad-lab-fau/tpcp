@@ -8,7 +8,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    ClassVar,
     Generic,
     Optional,
     TypeVar,
@@ -21,7 +20,7 @@ from tqdm.auto import tqdm
 from typing_extensions import Protocol, Self
 
 from tpcp import NOTHING
-from tpcp._base import BaseTpcpObject, _Nothing
+from tpcp._base import BaseTpcpObject, _Nothing, cf
 from tpcp._dataset import Dataset, DatasetT
 from tpcp._hash import custom_hash
 from tpcp._pipeline import Pipeline, PipelineT
@@ -36,7 +35,7 @@ T = TypeVar("T")
 AggReturnType = Union[float, dict[str, float], _Nothing]
 
 
-SingleScoreTypeT = Union[T, "AggregatorBase[Any]"]
+SingleScoreTypeT = Union[T, "Aggregator[Any]"]
 MultiScoreTypeT = dict[str, SingleScoreTypeT[T]]
 ScoreTypeT = Union[SingleScoreTypeT[T], MultiScoreTypeT[T]]
 
@@ -60,22 +59,52 @@ class ScoreCallback(Protocol[PipelineT, DatasetT, T]):
         ...
 
 
-class AggregatorBase(Generic[T]):
-    """Just a common base class for the aggregators."""
+class Aggregator(BaseTpcpObject, Generic[T]):
+    """Base class for aggregators.
+
+    You can subclass this class to create your own aggregators.
+    The only thing you should change, is to overwrite the `aggregate` method.
+    Everything else should not be modified.
+
+    Custom aggregators can then be used to wrap return values of score functions or they can be passed as
+    `default_aggregator` to the :class:`~tpcp.validate.Scorer` class.
+    """
 
     _value: T
 
-    def get_value(self) -> T:
-        """Return the value wrapped by aggregator."""
-        return self._value
+    return_raw_scores: bool
 
-    @classmethod
-    def aggregate(cls, /, values: Sequence[T], datapoints: Sequence[Dataset]) -> AggReturnType:
+    def __init__(self, *, return_raw_scores: bool = True) -> None:
+        self.return_raw_scores = return_raw_scores
+
+    def __repr__(self) -> str:
+        """Show the representation of the object."""
+        return f"{self!r}({self._value!r})"
+
+    def __call__(self, value: T) -> Self:
+        """Set the value of the aggregator.
+
+        This will return a clone of itself with the value set.
+
+        .. warning:: Cloning the object again will make it loose the value.
+        """
+        new_self = self.clone()
+        new_self._value = value
+        return new_self
+
+    def aggregate(self, /, values: Sequence[T], datapoints: Sequence[Dataset]) -> AggReturnType:
         """Aggregate the values."""
         raise NotImplementedError()
 
-    def _should_return_raw_scores(self):
-        raise NotImplementedError()
+    def get_value(self) -> T:
+        """Return the value wrapped by aggregator."""
+        if not hasattr(self, "_value"):
+            raise AttributeError(
+                "Aggregator has no value set yet. "
+                "When using a configurable aggregator, first create an instance and then set the value, by calling the instance. "
+                "E.g. `my_agg = MyAggregator(); my_agg(42)`."
+            )
+        return self._value
 
     def _assert_is_all_valid(self, values: Sequence[Any], _key_name: str):
         """Check if all scoring values are consistently of the same type.
@@ -93,61 +122,11 @@ class AggregatorBase(Generic[T]):
                 f"to be wrapped in an aggregator of type {type(self)}. "
                 f"However, we encountered the following additional types: {encountered_types}"
             )
-        return all(isinstance(v, type(self)) for v in values)
-
-    def _get_emtpy_instance(self) -> Self:
-        raise NotImplementedError()
-
-
-class ConfigurableAggregator(BaseTpcpObject, AggregatorBase[T], Generic[T]):
-    """Base class for aggregators.
-
-    You can subclass this class to create your own aggregators.
-    The only thing you should change, is to overwrite the `aggregate` method.
-    Everything else should not be modified.
-
-    Custom aggregators can then be used to wrap return values of score functions or they can be passed as
-    `default_aggregator` to the :class:`~tpcp.validate.Scorer` class.
-    """
-
-    def __init__(self, return_raw_scores: bool = True) -> None:
-        self.return_raw_scores = return_raw_scores
-
-    def __repr__(self) -> str:
-        """Show the representation of the object."""
-        return f"{self!r}({self._value!r})"
-
-    def _should_return_raw_scores(self):
-        return self.return_raw_scores
-
-    def __call__(self, value: float) -> Self:
-        """Set the value of the aggregator.
-
-        This will return a clone of itself with the value set.
-
-        .. warning:: Cloning the object again will make it loose the value.
-        """
-        new_self = self.clone()
-        new_self._value = value
-        return new_self
-
-    def get_value(self) -> T:
-        """Return the value wrapped by aggregator."""
-        if not hasattr(self, "_value"):
-            raise AttributeError(
-                "Aggregator has no value set yet. "
-                "When using a configurable aggregator, first create an instance and then set the value, by calling the instance. "
-                "E.g. `my_agg = MyAggregator(); my_agg(42)`."
-            )
-        return super().get_value()
-
-    def _assert_is_all_valid(self, values: Sequence[Any], _key_name: str):
-        super()._assert_is_all_valid(values, _key_name)
         config_hash = custom_hash(self.get_params())
         if not all(custom_hash(v.get_params()) == config_hash for v in values):
             raise ValidationError(
                 f"Based on the first value encountered for the scoring value {_key_name}, we expected all values to be "
-                f"to be wrapped in an configurable aggregator of type {type(self)} with the same configuration. "
+                f"to be wrapped in an aggregator of type {type(self)} with the same configuration. "
                 "However, we encountered at least one value with a different configuration. "
                 f"Expected configuration should be {self.get_params()}"
             )
@@ -157,52 +136,34 @@ class ConfigurableAggregator(BaseTpcpObject, AggregatorBase[T], Generic[T]):
         return self.clone()
 
 
-class Aggregator(AggregatorBase[T], Generic[T]):
-    """Base class for aggregators.
+class FloatAggregator(Aggregator[float]):
+    def __init__(
+        self, func: Callable[[Sequence[float]], Union[float, dict[str, float]]], *, return_raw_scores: bool = True
+    ) -> None:
+        self.func = func
+        super().__init__(return_raw_scores=return_raw_scores)
 
-    You can subclass this class to create your own aggregators.
-    The only thing you should change, is to overwrite the `aggregate` method.
-    Everything else should not be modified.
-
-    Custom aggregators can then be used to wrap return values of score functions or they can be passed as
-    `default_aggregator` to the :class:`~tpcp.validate.Scorer` class.
-    """
-
-    RETURN_RAW_SCORES: ClassVar[bool] = True
-
-    def __init__(self, _value: T) -> None:
-        self._value = _value
-
-    def __repr__(self) -> str:
-        """Show the representation of the object."""
-        return f"{self.__class__.__name__}({self._value!r})"
-
-    def aggregate(self, /, values: Sequence[T], datapoints: Sequence[Dataset]) -> AggReturnType:
-        """Aggregate the values."""
-        raise NotImplementedError()
-
-    def _should_return_raw_scores(self):
-        return self.RETURN_RAW_SCORES
-
-    def _get_emtpy_instance(self) -> Self:
-        """Return an empty instance of the aggregator with the same config, but no value."""
-        return self.__class__(None)
-
-
-class MeanAggregator(Aggregator[float]):
-    """Aggregator that calculates the mean of the values."""
-
-    def aggregate(self, /, values: Sequence[float], datapoints: Sequence[Dataset]) -> float:  # noqa: ARG002
+    def aggregate(self, /, values: Sequence[float], datapoints: Sequence[Dataset]) -> Union[float, dict[str, float]]:  # noqa: ARG002
         """Aggregate a sequence of floats by taking the mean."""
         try:
-            return float(np.mean(values))
+            vals = self.func(values)
         except TypeError as e:
             raise ValidationError(
-                f"MeanAggregator can only be used with float values. Got the following values instead:\n\n{values}"
+                f"{self.__class__.__name__} can only be used with float values. Got the following values instead:"
+                f"\n\n{values}"
             ) from e
 
+        if isinstance(vals, dict):
+            # We cast explicitly to float, to make sure that we get a float and not a float like
+            return {k: float(v) for k, v in vals.items()}
+        return float(vals)
 
-class NoAgg(Aggregator[Any]):
+
+mean_agg = FloatAggregator(np.mean)
+mean_agg.__doc__ = """Aggregator that calculates the mean of the values."""
+
+
+class _NoAgg(Aggregator[Any]):
     """Wrapper to wrap one or multiple output values of a scorer to prevent aggregation of these values.
 
     If one of the values in the return dictionary of a multi-value score function is wrapped with this class,
@@ -223,6 +184,10 @@ class NoAgg(Aggregator[Any]):
     def aggregate(self, /, values: Sequence[Any], datapoints: Sequence[Dataset]) -> _Nothing:  # noqa: ARG002
         """Return nothing, indicating no aggregation."""
         return NOTHING
+
+
+no_agg = _NoAgg()
+no_agg.__doc__ = _NoAgg.__doc__
 
 
 class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
@@ -267,7 +232,7 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
     """
 
     score_func: ScoreFunc[PipelineT, DatasetT, T]
-    default_aggregator: Union[type[Aggregator], ConfigurableAggregator]
+    default_aggregator: Aggregator
     single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT, T]]
     n_jobs: Optional[int]
     verbose: int
@@ -278,7 +243,7 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
         self,
         score_func: ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]],
         *,
-        default_aggregator: Union[type[Aggregator], ConfigurableAggregator] = MeanAggregator,
+        default_aggregator: Aggregator = cf(mean_agg),
         single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT, T]] = None,
         # Multiprocess_kwargs
         n_jobs: Optional[int] = None,
@@ -314,14 +279,14 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
 
     def _aggregate(
         self,
-        scores: dict[str, tuple[AggregatorBase[T], list[T]]],
+        scores: dict[str, tuple[Aggregator[T], list[T]]],
         datapoints: list[DatasetT],
     ) -> tuple[Union[float, dict[str, float]], Union[Optional[list[T]], dict[str, list[T]]]]:
         """Aggregate the scores."""
         is_single = len(scores) == 1 and "__single__" in scores
-        if is_single and isinstance(scores["__single__"][0], NoAgg):
+        if is_single and isinstance(scores["__single__"][0], _NoAgg):
             raise ValidationError(
-                "Scorer returned a NoAgg object. "
+                "Scorer returned a `no_agg` aggregator. "
                 "This is not allowed when returning only a single score value. "
                 "If you want to use a NoAgg scorer, return a dictionary of values, where one or "
                 "multiple values are wrapped with NoAgg."
@@ -330,7 +295,7 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
         raw_scores: dict[str, list[T]] = {}
         agg_scores: dict[str, float] = {}
         for name, (aggregator, raw_score) in scores.items():
-            if aggregator._should_return_raw_scores() is True:
+            if aggregator.return_raw_scores is True:
                 raw_scores[name] = list(raw_score)
             try:
                 agg_score = aggregator.aggregate(values=raw_score, datapoints=datapoints)
@@ -437,19 +402,19 @@ _non_homogeneous_scoring_error = ValidationError(
 )
 
 
-def _test_single_score_value(scores: list[any], default_agg: Union[type[Aggregator], ConfigurableAggregator]):
+def _test_single_score_value(scores: list[any], default_agg: Aggregator):
     # We expect a single score value from each datapoint
     # We check that no other value is a dictionary.
     # Other than that we can check nothing else here.
     # What datatypes are really allowed is controlled by the aggregator and will be checked there.
     if any(isinstance(s, dict) for s in scores):
         raise _non_homogeneous_scoring_error
-    if not isinstance(scores[0], AggregatorBase):
+    if not isinstance(scores[0], Aggregator):
         # If the score is not wrapped in an aggregator, we wrap it in the default aggregator.
-        scores = [default_agg(s) for s in scores]
+        scores = [default_agg.clone()(s) for s in scores]
     scores[0]._assert_is_all_valid(scores, "single score")
     return (
-        scores[0]._get_emtpy_instance(),
+        scores[0].clone(),
         [s.get_value() for s in scores],
     )
 
@@ -467,8 +432,8 @@ def _invert_list_of_dicts(list_of_dicts: list[dict[str, Any]]) -> dict[str, list
 def _check_and_invert_score_dict(
     #  I don't care that this is to complex, some things need to be complex
     scores: list[ScoreTypeT[T]],
-    default_agg: Union[type[Aggregator], ConfigurableAggregator],
-) -> dict[str, tuple[AggregatorBase[T], list[T]]]:
+    default_agg: Aggregator,
+) -> dict[str, tuple[Aggregator[T], list[T]]]:
     """Invert the scores dictionary to a list of scores."""
     first_score = scores[0]
     if not isinstance(first_score, dict):
@@ -476,7 +441,7 @@ def _check_and_invert_score_dict(
 
     expected_length = len(scores)
     inverted_scoring_dict = _invert_list_of_dicts(scores)
-    return_dict: dict[str, tuple[AggregatorBase[T], list[T]]] = {}
+    return_dict: dict[str, tuple[Aggregator[T], list[T]]] = {}
     for key, values in inverted_scoring_dict.items():
         if len(values) != expected_length:
             raise ValidationError(
