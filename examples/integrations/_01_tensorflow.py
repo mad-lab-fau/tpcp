@@ -228,12 +228,12 @@ from collections.abc import Sequence
 from tpcp.validate import Aggregator
 
 
-class SingleValueAccuracy(Aggregator[np.ndarray]):
-    RETURN_RAW_SCORES = False
-
-    @classmethod
+class SingleValueAccuracy(Aggregator[tuple[np.ndarray, np.ndarray]]):
     def aggregate(cls, /, values: Sequence[tuple[np.ndarray, np.ndarray]], **_) -> dict[str, float]:
         return {"accuracy": accuracy_score(np.hstack([v[0] for v in values]), np.hstack([v[1] for v in values]))}
+
+
+single_value_accuracy = SingleValueAccuracy()
 
 
 def scoring(pipeline, datapoint):
@@ -242,7 +242,7 @@ def scoring(pipeline, datapoint):
 
     return {
         "accuracy": accuracy_score(result, reference),
-        "per_sample": SingleValueAccuracy((result, reference)),
+        "per_sample": single_value_accuracy((result, reference)),
     }
 
 

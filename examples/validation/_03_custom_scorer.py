@@ -110,7 +110,6 @@ import numpy as np
 
 assert baseline_results_agg["f1_score"] == np.mean(baseline_results_single["f1_score"])
 
-from tpcp.exceptions import ValidationError
 
 # %%
 # We can change this behaviour by implementing a custom Aggregator.
@@ -121,18 +120,9 @@ from tpcp.exceptions import ValidationError
 # Below we have implemented a custom aggregator that calculates the median of the per-datapoint scores.
 # In addition, it prints a log message when it is called, so we can better understand how it works.
 from tpcp.validate import Aggregator
+from tpcp.validate._scorer import FloatAggregator
 
-
-class MedianAggregator(Aggregator):
-    @classmethod
-    def aggregate(cls, /, values: Sequence[float], **_) -> float:
-        print("Median Aggregator called")
-        try:
-            return float(np.median(values))
-        except TypeError as e:
-            raise ValidationError(
-                f"MedianAggregator can only be used with float values. Got the following values instead:\nn{values}"
-            ) from e
+median_agg = FloatAggregator(np.median)
 
 
 # %%
@@ -143,7 +133,7 @@ class MedianAggregator(Aggregator):
 # 2. By wrapping specific return values of the score method.
 #
 # Let's start with the first way.
-median_results_agg, median_results_single = Scorer(score, default_aggregator=MedianAggregator)(pipe, example_data)
+median_results_agg, median_results_single = Scorer(score, default_aggregator=median_agg)(pipe, example_data)
 median_results_agg
 # %%
 # We can see via the log-printing that the aggregator was called 3 times (once per score).
@@ -169,7 +159,7 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
         tolerance=tolerance_s * datapoint.sampling_rate_hz,
     )
     precision, recall, f1_score = precision_recall_f1_score(matches)
-    return {"precision": precision, "recall": recall, "f1_score": MedianAggregator(f1_score)}
+    return {"precision": precision, "recall": recall, "f1_score": median_agg(f1_score)}
 
 
 partial_median_results_agg, partial_median_results_single = Scorer(score)(pipe, example_data)
@@ -206,17 +196,11 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     return {"precision": precision, "recall": recall, "f1_score": f1_score}
 
 
-class MeanAndStdAggregator(Aggregator[float]):
-    @classmethod
-    def aggregate(cls, /, values: Sequence[float], **_) -> dict[str, float]:
-        print("MeanAndStdAggregator Aggreagtor called")
-        try:
-            return {"mean": float(np.mean(values)), "std": float(np.std(values))}
-        except TypeError as e:
-            raise ValidationError(
-                "MeanAndStdAggregator can only be used with float values. "
-                f"Got the following values instead:\n\n{values}"
-            ) from e
+def mean_and_std(vals: Sequence[float]):
+    return {"mean": float(np.mean(vals)), "std": float(np.std(vals))}
+
+
+MeanAndStdAggregator = FloatAggregator(mean_and_std)
 
 
 multi_agg_agg, multi_agg_single = Scorer(score, default_aggregator=MeanAndStdAggregator)(pipe, example_data)
@@ -240,11 +224,13 @@ multi_agg_agg
 
 
 class SingleValuePrecisionRecallF1(Aggregator[np.ndarray]):
-    @classmethod
-    def aggregate(cls, /, values: Sequence[np.ndarray], **_) -> dict[str, float]:
+    def aggregate(self, /, values: Sequence[np.ndarray], **_) -> dict[str, float]:
         print("SingleValuePrecisionRecallF1 Aggregator called")
         precision, recall, f1_score = precision_recall_f1_score(np.vstack(values))
         return {"precision": precision, "recall": recall, "f1_score": f1_score}
+
+
+single_value_precision_recall_f1_agg = SingleValuePrecisionRecallF1()
 
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
@@ -263,7 +249,7 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
         "precision": precision,
         "recall": recall,
         "f1_score": f1_score,
-        "per_sample": SingleValuePrecisionRecallF1(matches),
+        "per_sample": single_value_precision_recall_f1_agg(matches),
     }
 
 
@@ -279,8 +265,30 @@ complicated_agg
 complicated_single["per_sample"]
 
 # %%
-# However, we can customize this behaviour for our aggregator by setting the `RETURN_RAW_SCORE` class variable to False:
-SingleValuePrecisionRecallF1.RETURN_RAW_SCORES = False
+# However, we can customize this behaviour for our aggregator by creating an instance of the aggregator in which we set
+# `return_raw_scores` class variable to
+# False for the our specific
+single_value_precision_recall_f1_agg_no_raw = SingleValuePrecisionRecallF1(return_raw_scores=False)
+
+
+def score(pipeline: MyPipeline, datapoint: ECGExampleData):
+    # We use the `safe_run` wrapper instead of just run. This is always a good idea.
+    # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
+    # will clone it again.
+    pipeline = pipeline.safe_run(datapoint)
+    tolerance_s = 0.02  # We just use 20 ms for this example
+    matches = match_events_with_reference(
+        pipeline.r_peak_positions_.to_numpy(),
+        datapoint.r_peak_positions_.to_numpy(),
+        tolerance=tolerance_s * datapoint.sampling_rate_hz,
+    )
+    precision, recall, f1_score = precision_recall_f1_score(matches)
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1_score,
+        "per_sample": single_value_precision_recall_f1_agg_no_raw(matches),
+    }
 
 
 # %%
@@ -290,6 +298,104 @@ SingleValuePrecisionRecallF1.RETURN_RAW_SCORES = False
 complicated_agg_now_raw, complicated_single_no_raw = Scorer(score)(pipe, example_data)
 complicated_single_no_raw.keys()
 
+
+# %%
+# Generalizing the custom aggregator
+# ----------------------------------
+# In the previous examples, that can calculate values after concatenating all values.
+# However, it only works for the precision, recall and f1-score.
+# We can generalize this, by extracting the calculation of the precision, recall and f1-score into a parameter of
+# the aggregator.
+# This way, we can use the same aggregator for different scores.
+from typing import Callable, Union
+
+
+class SingleValueAggregator(Aggregator[np.ndarray]):
+    def __init__(
+        self, func: Callable[[Sequence[np.ndarray]], Union[float, dict[str, float]]], *, return_raw_scores: bool = True
+    ):
+        self.func = func
+        super().__init__(return_raw_scores=return_raw_scores)
+
+    def aggregate(self, /, values: Sequence[np.ndarray], **_) -> dict[str, float]:
+        print("SingleValueAggregator Aggregator called")
+        return self.func(np.vstack(values))
+
+
+# %%
+# With this our aggregator from before becomes just a special case of the new aggregator.
+def calculate_precision_recall_f1(matches: Sequence[np.ndarray]) -> dict[str, float]:
+    precision, recall, f1_score = precision_recall_f1_score(np.vstack(matches))
+    return {"precision": precision, "recall": recall, "f1_score": f1_score}
+
+
+single_value_precision_recall_f1_agg_from_gen = SingleValueAggregator(calculate_precision_recall_f1)
+
+
+def score(pipeline: MyPipeline, datapoint: ECGExampleData):
+    # We use the `safe_run` wrapper instead of just run. This is always a good idea.
+    # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
+    # will clone it again.
+    pipeline = pipeline.safe_run(datapoint)
+    tolerance_s = 0.02  # We just use 20 ms for this example
+    matches = match_events_with_reference(
+        pipeline.r_peak_positions_.to_numpy(),
+        datapoint.r_peak_positions_.to_numpy(),
+        tolerance=tolerance_s * datapoint.sampling_rate_hz,
+    )
+    precision, recall, f1_score = precision_recall_f1_score(matches)
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1_score,
+        "per_sample": single_value_precision_recall_f1_agg_from_gen(matches),
+    }
+
+
+complicated_agg, complicated_single = Scorer(score)(pipe, example_data)
+complicated_agg
+
+# %%
+# We can even move the initialization of the aggregator into the score function.
+# This allows us to make the score function itself generalizable.
+#
+# This works, because we check if the aggregators all have the same config, but we don't enforce them to all be the
+# same object.
+#
+# This allows for quite powerful and flexible scoring functions that we could then use with `partial` to create
+# different versions of the score function.
+from functools import partial
+
+
+def score(pipeline: MyPipeline, datapoint: ECGExampleData, *, agg_func: Callable, return_raw_scores: bool = True):
+    # We use the `safe_run` wrapper instead of just run. This is always a good idea.
+    # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
+    # will clone it again.
+    pipeline = pipeline.safe_run(datapoint)
+    tolerance_s = 0.02  # We just use 20 ms for this example
+    matches = match_events_with_reference(
+        pipeline.r_peak_positions_.to_numpy(),
+        datapoint.r_peak_positions_.to_numpy(),
+        tolerance=tolerance_s * datapoint.sampling_rate_hz,
+    )
+    precision, recall, f1_score = precision_recall_f1_score(matches)
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1_score,
+        "per_sample": SingleValueAggregator(agg_func, return_raw_scores=return_raw_scores)(matches),
+    }
+
+
+# %%
+# With that we can reconstruct the `return_raw_scores=False` behaviour from before.
+complicated_agg_now_raw, complicated_single_no_raw = Scorer(
+    partial(score, agg_func=calculate_precision_recall_f1, return_raw_scores=False)
+)(pipe, example_data)
+complicated_agg_now_raw
+
+# %%
+complicated_single_no_raw.keys()
 
 # %%
 # Weighted Aggregation
@@ -305,19 +411,27 @@ example_data
 
 
 # %%
-# For this our aggregator will use the `datapoint` parameter to find out which group the datapoint belongs and then
-# average the values using pandas groupby function.
-# We also return the values of the individual groups.
-# Note that we must return everything as a dict of float values.
-#
-class GroupWeightedAggregator(Aggregator[float]):
-    @classmethod
-    def aggregate(cls, /, values: Sequence[float], datapoints: Sequence[ECGExampleData], **_) -> dict[str, float]:
-        print("GroupWeightedAggregator Aggregator called")
-        patient_groups = [d.group_label.patient_group for d in datapoints]
-        data = pd.DataFrame({"value": values, "patient_groups": patient_groups})
-        per_group = data.groupby("patient_groups").mean()["value"]
+# For this, we use everything we learned before and create a general `GroupWeightedAggregator`.
+# The aggregator will apply an arbitrary function to the values, but group the values by a specific column in the
+# datapoint index first and then take the average over the results.
+class MacroAgg(Aggregator[float]):
+    def __init__(
+        self, func: Union[Callable[[Sequence[float]], float], str], groupby: str, *, return_raw_scores: bool = True
+    ):
+        self.func = func
+        self.groupby = groupby
+        super().__init__(return_raw_scores=return_raw_scores)
+
+    def aggregate(self, /, values: Sequence[float], datapoints: Sequence[ECGExampleData], **_) -> dict[str, float]:
+        patient_groups = [d.group_label for d in datapoints]
+        data_index = pd.MultiIndex.from_tuples(patient_groups, names=patient_groups[0]._fields)
+
+        data = pd.DataFrame({"value": values}, index=data_index)
+        per_group = data.groupby(self.groupby).agg(self.func)["value"]
         return {**per_group.to_dict(), "group_mean": per_group.mean()}
+
+
+macro_mean = MacroAgg("mean", "patient_group")
 
 
 # %%
@@ -335,7 +449,7 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
         tolerance=tolerance_s * datapoint.sampling_rate_hz,
     )
     precision, recall, f1_score = precision_recall_f1_score(matches)
-    return {"precision": precision, "recall": recall, "f1_score": GroupWeightedAggregator(f1_score)}
+    return {"precision": precision, "recall": recall, "f1_score": macro_mean(f1_score)}
 
 
 group_weighted_agg, group_weighted_single = Scorer(score)(pipe, example_data)
@@ -351,7 +465,7 @@ group_weighted_agg
 # This will return only the single values and no aggregated items.
 #
 # In the example below, we will only aggregate the precision and recall, but not the f1-score.
-from tpcp.validate import NoAgg
+from tpcp.validate import no_agg
 
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
@@ -366,7 +480,7 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
         tolerance=tolerance_s * datapoint.sampling_rate_hz,
     )
     precision, recall, f1_score = precision_recall_f1_score(matches)
-    return {"precision": precision, "recall": recall, "f1_score": NoAgg(f1_score)}
+    return {"precision": precision, "recall": recall, "f1_score": no_agg(f1_score)}
 
 
 # %%

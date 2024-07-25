@@ -307,17 +307,17 @@ class TestGridSearch:
     def test_with_custom_aggregator(self, return_raw_scores):
         # This aggregator returns values with new names
         class Agg(Aggregator):
-            RETURN_RAW_SCORES = return_raw_scores
-
             @classmethod
             def aggregate(cls, /, values, datapoints):
                 return {"new_score_name": np.mean(values)}
+
+        agg = Agg(return_raw_scores=return_raw_scores)
 
         def scoring(pipeline, data_point):
             return {
                 "score_1": data_point.group_labels[0][0],
                 "score_2": data_point.group_labels[0][0] + 1,
-                "custom_agg": Agg(data_point.group_labels[0][0]),
+                "custom_agg": agg(data_point.group_labels[0][0]),
             }
 
         gs = GridSearch(
@@ -650,17 +650,17 @@ class TestGridSearchCV:
 
         # This aggregator returns values with new names
         class Agg(Aggregator):
-            RETURN_RAW_SCORES = return_raw_scores
-
             @classmethod
             def aggregate(cls, /, values, datapoints):
                 return {"new_score_name": np.mean(values)}
+
+        agg = Agg(return_raw_scores=return_raw_scores)
 
         def scoring(pipeline, data_point):
             return {
                 "score_1": data_point.group_labels[0][0],
                 "score_2": data_point.group_labels[0][0] + 1,
-                "custom_agg": Agg(data_point.group_labels[0][0]),
+                "custom_agg": agg(data_point.group_labels[0][0]),
             }
 
         gs = GridSearchCV(
