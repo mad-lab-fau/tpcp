@@ -76,7 +76,6 @@ pipe = MyPipeline()
 # We will use a similar score function as we used in the QRS detection example.
 # It returns the precision, recall and f1 score of the QRS detection for each datapoint.
 
-
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
     # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
@@ -95,6 +94,9 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
 # %%
 # By default, these values will be aggregated by averaging over all datapoints.
 # We can see that by running an instance of the scorer on the example dataset.
+#
+# This happens because by default the :class:`~tpcp.validate.Scorer` uses the :obj:`~tpcp.validate.agg_mean` to
+# aggregate all values.
 from tpcp.validate import Scorer
 
 baseline_results_agg, baseline_results_single = Scorer(score)(pipe, example_data)
@@ -113,14 +115,17 @@ assert baseline_results_agg["f1_score"] == np.mean(baseline_results_single["f1_s
 
 # %%
 # We can change this behaviour by implementing a custom Aggregator.
-# This is a simple class inheriting from :class:`tpcp.validate.Aggregator`, implementing a `aggregate` class - method.
-# This method gets the score values and the datapoints that generated them as keyword only arguments.
-# (Note, if you need just the values and not the datapoints, you can use the `**_` syntax to catch all unused parameters.)
+# There are a couple of ways to do this.
+# For many simple cases, we can use the :class:`~tpcp.validate.FloatAggregator` class, which is also the class
+# :obj:`~tpcp.validate.agg_mean` is an instance of.
 #
-# Below we have implemented a custom aggregator that calculates the median of the per-datapoint scores.
-# In addition, it prints a log message when it is called, so we can better understand how it works.
-from tpcp.validate import Aggregator
-from tpcp.validate._scorer import FloatAggregator
+# As long, as we just to use a different function that takes a sequence of floats and returns a float, we can use
+# this class.
+# For more complex cases, we can inherit from the :class:`~tpcp.validate.Aggregator` class and implement the `aggregate`
+# method ourselves (we will see that below).
+#
+# For now, we will use the :class:`~tpcp.validate.FloatAggregator` but with the `np.median` function.
+from tpcp.validate import FloatAggregator
 
 median_agg = FloatAggregator(np.median)
 
@@ -145,7 +150,6 @@ assert median_results_agg["precision"] == np.median(median_results_single["preci
 # All scores without a specific aggregator will be aggregated by the default aggregator.
 #
 # Below, only the F1-score will be aggregated by the median aggregator.
-
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
@@ -178,7 +182,8 @@ assert partial_median_results_agg["precision"] == np.mean(partial_median_results
 # Multi-Return Aggregator
 # -----------------------
 # Sometimes an aggregator needs to return multiple values.
-# We can easily do that, by returning a dict from the `aggregate` method.
+# We can easily do that, by returning a dict from the `aggregate` method or in case of the `FloatAggregator` by passing
+# a function that returns a dict.
 #
 # As example, we will calculate the mean and standard deviation of the returned scores in one aggregation.
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
@@ -212,8 +217,13 @@ multi_agg_agg
 # %%
 # Complicated Aggregation
 # -----------------------
-# In cases where we do not want to or can not aggregate the scores on a per-datapoint basis, we can return arbitrary
-# data from the score function and pass it to a complex aggregator.
+# When we do more complicated aggregations, we can use the :class:`~tpcp.validate.Aggregator` as base class for a custom
+# aggregator.
+#
+# Below we show an example, where we calculate the precision, recall and f1-score without aggregating on a datapoint
+# level, but rather first combining all predictions and references across all datapoints before calculating the
+# precision, recall and f1-score.
+#
 # There are no restrictions on the data you can pass from the scorer.
 # Only the aggregator needs to be able to handle the values and then return a float or a dict with float values.
 #
@@ -221,7 +231,9 @@ multi_agg_agg
 # aggregating on a datapoint level first.
 # For that we return the raw `matches` from the score function and wrap them into an aggregator that concatenates all
 # of them, before throwing them into the `precision_recall_f1_score` function.
-
+#
+# Note, that the actual aggregation is an instance of our custom class, NOT the class itself.
+from tpcp.validate import Aggregator
 
 class SingleValuePrecisionRecallF1(Aggregator[np.ndarray]):
     def aggregate(self, /, values: Sequence[np.ndarray], **_) -> dict[str, float]:
@@ -266,10 +278,8 @@ complicated_single["per_sample"]
 
 # %%
 # However, we can customize this behaviour for our aggregator by creating an instance of the aggregator in which we set
-# `return_raw_scores` class variable to
-# False for the our specific
+# `return_raw_scores` class variable to False for our specific usecase.
 single_value_precision_recall_f1_agg_no_raw = SingleValuePrecisionRecallF1(return_raw_scores=False)
-
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
@@ -307,8 +317,11 @@ complicated_single_no_raw.keys()
 # We can generalize this, by extracting the calculation of the precision, recall and f1-score into a parameter of
 # the aggregator.
 # This way, we can use the same aggregator for different scores.
+#
+# Note, that we don't provide such generalized aggregators in tpcp on purpose, as they really depend on the specific
+# usecase, your data, and the type of scores you want to calculate.
+# Hence, we recommend to use these examples as a starting point to implement your own custom aggregators.
 from typing import Callable, Union
-
 
 class SingleValueAggregator(Aggregator[np.ndarray]):
     def __init__(
@@ -318,7 +331,6 @@ class SingleValueAggregator(Aggregator[np.ndarray]):
         super().__init__(return_raw_scores=return_raw_scores)
 
     def aggregate(self, /, values: Sequence[np.ndarray], **_) -> dict[str, float]:
-        print("SingleValueAggregator Aggregator called")
         return self.func(np.vstack(values))
 
 
