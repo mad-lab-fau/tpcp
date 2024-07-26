@@ -239,7 +239,7 @@ class TestCustomAggregator:
         _ = scorer(pipe, data)
 
         expected_called = (
-            len([s for s in scorer_return.values() if not isinstance(s, type(no_agg))])
+            len([s for s in scorer_return.values() if not isinstance(s, type(no_agg(None)))])
             if isinstance(scorer_return, dict)
             else 1
         )

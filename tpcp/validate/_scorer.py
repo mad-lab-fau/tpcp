@@ -420,7 +420,7 @@ def _test_single_score_value(scores: list[any], default_agg: Aggregator):
         raise _non_homogeneous_scoring_error
     if not isinstance(scores[0], Aggregator):
         # If the score is not wrapped in an aggregator, we wrap it in the default aggregator.
-        scores = [default_agg.clone()(s) for s in scores]
+        scores = [default_agg(s) for s in scores]
     scores[0]._assert_is_all_valid(scores, "single score")
     return (
         scores[0].clone(),
