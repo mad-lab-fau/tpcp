@@ -76,6 +76,7 @@ pipe = MyPipeline()
 # We will use a similar score function as we used in the QRS detection example.
 # It returns the precision, recall and f1 score of the QRS detection for each datapoint.
 
+
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
     # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
@@ -150,6 +151,7 @@ assert median_results_agg["precision"] == np.median(median_results_single["preci
 # All scores without a specific aggregator will be aggregated by the default aggregator.
 #
 # Below, only the F1-score will be aggregated by the median aggregator.
+
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
@@ -235,6 +237,7 @@ multi_agg_agg
 # Note, that the actual aggregation is an instance of our custom class, NOT the class itself.
 from tpcp.validate import Aggregator
 
+
 class SingleValuePrecisionRecallF1(Aggregator[np.ndarray]):
     def aggregate(self, /, values: Sequence[np.ndarray], **_) -> dict[str, float]:
         print("SingleValuePrecisionRecallF1 Aggregator called")
@@ -281,6 +284,7 @@ complicated_single["per_sample"]
 # `return_raw_scores` class variable to False for our specific usecase.
 single_value_precision_recall_f1_agg_no_raw = SingleValuePrecisionRecallF1(return_raw_scores=False)
 
+
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
     # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
@@ -322,6 +326,7 @@ complicated_single_no_raw.keys()
 # usecase, your data, and the type of scores you want to calculate.
 # Hence, we recommend to use these examples as a starting point to implement your own custom aggregators.
 from typing import Callable, Union
+
 
 class SingleValueAggregator(Aggregator[np.ndarray]):
     def __init__(
