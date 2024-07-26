@@ -393,7 +393,7 @@ class TestCustomAggregator:
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         _ = scorer(pipe, data)
-        assert mock_method.called_with(values=list(data), datapoints=list(data))
+        mock_method.assert_called_with(values=list(data), datapoints=list(data))
 
     @pytest.mark.parametrize("n_jobs", (1, 2))
     def test_single_value_callback_called_correctly(self, n_jobs):
