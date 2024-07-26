@@ -15,7 +15,7 @@ from tests.test_pipelines.conftest import (
 from tpcp import Pipeline
 from tpcp.exceptions import ScorerFailedError, ValidationError
 from tpcp.validate import Scorer
-from tpcp.validate._scorer import Aggregator, _passthrough_scoring, _validate_scorer, no_agg, FloatAggregator
+from tpcp.validate._scorer import Aggregator, FloatAggregator, _passthrough_scoring, _validate_scorer, no_agg
 
 
 class TestScorerCalls:
@@ -423,20 +423,24 @@ class TestCustomAggregator:
 def _return_1(x):
     return 1
 
+
 def _return_2(x):
     return 2
+
 
 def _return_3(x):
     return 3
 
+
 def _return_4(x):
     return 4
+
 
 def _return_5(x):
     return 5
 
-class TestWeirdScoringStuff:
 
+class TestWeirdScoringStuff:
     class DummyPipeline(Pipeline):
         def __init__(self, values):
             self.values = values
@@ -448,7 +452,6 @@ class TestWeirdScoringStuff:
     _funcs = [_return_1, _return_2, _return_3, _return_4, _return_5]
 
     def test_different_config_considered_different(self):
-
         def score_func(pipeline, data_point):
             return FloatAggregator(self._funcs[pipeline.get_value(data_point)])(1)
 
@@ -460,9 +463,8 @@ class TestWeirdScoringStuff:
         assert "Based on the first value encountered" in str(e)
 
     def test_same_config_considered_same(self):
-
         def score_func(pipeline, data_point):
-            return FloatAggregator(self._funcs[3],  return_raw_scores=False)(1)
+            return FloatAggregator(self._funcs[3], return_raw_scores=False)(1)
 
         scorer = Scorer(score_func)
 
@@ -471,7 +473,6 @@ class TestWeirdScoringStuff:
         assert agg_val == 4
 
     def test_with_multiprocessing(self):
-
         def score_func(pipeline, data_point):
             return FloatAggregator(self._funcs[3], return_raw_scores=False)(1)
 
@@ -480,8 +481,3 @@ class TestWeirdScoringStuff:
         agg_val, _ = scorer(self.DummyPipeline(list(range(5))), DummyDataset())
 
         assert agg_val == 4
-
-
-
-
-

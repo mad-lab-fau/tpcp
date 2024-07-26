@@ -149,8 +149,7 @@ class FloatAggregator(Aggregator[float]):
             vals = self.func(values)
         except TypeError as e:
             raise ValidationError(
-                f"Applying the float aggregation function {self.func} failed. "
-                f"\n\n{values}"
+                f"Applying the float aggregation function {self.func} failed. " f"\n\n{values}"
             ) from e
 
         if isinstance(vals, dict):
