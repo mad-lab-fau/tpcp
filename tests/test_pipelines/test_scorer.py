@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 import numpy as np
 import pytest
+from pandas._testing import assert_frame_equal
 
 from tests.test_pipelines.conftest import (
     DummyDataset,
@@ -393,7 +394,12 @@ class TestCustomAggregator:
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         _ = scorer(pipe, data)
-        mock_method.assert_called_with(values=list(data), datapoints=list(data))
+        assert mock_method.call_count == 1
+        for v_real, d_real, d_exp in zip(
+            mock_method.call_args[1]["values"], mock_method.call_args[1]["datapoints"], data
+        ):
+            assert_frame_equal(d_real.index, d_exp.index)
+            assert_frame_equal(v_real.index, d_exp.index)
 
     @pytest.mark.parametrize("n_jobs", (1, 2))
     def test_single_value_callback_called_correctly(self, n_jobs):
