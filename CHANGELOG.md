@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2024-07-03
 
-Note: This is a major version bump, because we have quite substantial breaking changes. The 1.0 should signal that we
+Note: This is a major version bump, because we have quite substantial breaking changes. The 1.0 should not signal that we
 are now feature complete. Though the core APIs have been mostly stable for quite some time now.
 
 ### BREAKING CHANGE
