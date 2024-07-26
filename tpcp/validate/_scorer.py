@@ -158,10 +158,6 @@ class FloatAggregator(Aggregator[float]):
         return float(vals)
 
 
-mean_agg = FloatAggregator(np.mean)
-mean_agg.__doc__ = """Aggregator that calculates the mean of the values."""
-
-
 class _NoAgg(Aggregator[Any]):
     """Wrapper to wrap one or multiple output values of a scorer to prevent aggregation of these values.
 
@@ -175,7 +171,7 @@ class _NoAgg(Aggregator[Any]):
     --------
     >>> def score_func(pipe, dataset):
     ...     ...
-    ...     return {"score_val_1": score, "some_metadata": NoAgg(metadata)}
+    ...     return {"score_val_1": score, "some_metadata": no_agg(metadata)}
     >>> my_scorer = Scorer(score_func)
 
     """
@@ -185,8 +181,22 @@ class _NoAgg(Aggregator[Any]):
         return NOTHING
 
 
-no_agg = _NoAgg()
+# We wrap the existing aggregators in functions, so that we can properly document them.
+_no_agg = _NoAgg()
+
+
+def no_agg(value: Any) -> _NoAgg:
+    return _no_agg(value)
+
+
 no_agg.__doc__ = _NoAgg.__doc__
+
+_mean_agg = FloatAggregator(np.mean)
+
+
+def mean_agg(value: float) -> FloatAggregator:
+    """Calculate the mean of the values."""
+    return _mean_agg(value)
 
 
 class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
