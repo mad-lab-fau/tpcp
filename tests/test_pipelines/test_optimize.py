@@ -850,5 +850,5 @@ class TestOptimizeBase:
         with patch.object(DummyOptimizablePipeline, "run", return_value=return_val) as mock_method:
             out = self.optimizer.run(ds)
 
-        assert mock_method.called_with(ds)
+        mock_method.assert_called_with(ds)
         assert return_val == out

@@ -43,7 +43,7 @@ def test_hash_model():
 def test_negative_example():
     # For some reason this test started passing in Python 3.11
     # Skipping for 3.11
-    if sys.version_info[:2] == (3, 11):
+    if sys.version_info[:2][0] == 3 and sys.version_info[:2][1] >= 11:
         pytest.skip("This test started passing in Python 3.11")
     # We also create a negative test, to see that our test data object actually triggers the pytorch problem
     first = joblib.hash(TorchModel())
