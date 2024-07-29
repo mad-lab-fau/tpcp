@@ -36,14 +36,22 @@ def example_func(a, b):
     return a + b
 
 
-class ExampleClassMultiAction(Algorithm):
+class ExampleClassMultiAction(ExampleClass):
     _action_methods = ["action", "action_2"]
 
+    def action_2(self, x):
+        self.result_1_ = (x + self.a + self.b) * 2
+        self.result_2_ = (x + self.a - self.b) * 2
 
-@pytest.fixture()
-def example_class():
-    yield ExampleClass
-    remove_any_cache(ExampleClass)
+        # We use a warning here to make it detectable that the function was called.
+        warnings.warn("This function was called without caching.", CacheWarning)
+        return self
+
+
+@pytest.fixture(params=(({}, ExampleClass), ({"action_method_name": "action_2"}, ExampleClassMultiAction)))
+def example_class(request):
+    yield request.param
+    remove_any_cache(request.param[1])
 
 
 @pytest.fixture()
@@ -66,7 +74,7 @@ def hybrid_cache_clear():
     hybrid_cache.__cache_registry__.clear()
 
 
-class TestGlobalDiskCache:
+class TestGlobalCache:
     cache_method: Callable[[type[Algorithm]], type[Algorithm]]
 
     @pytest.fixture(autouse=True, params=["disk", "ram"])
@@ -77,76 +85,84 @@ class TestGlobalDiskCache:
             self.cache_method = partial(global_ram_cache, None)
 
     def test_caching_twice_same_instance(self, example_class):
-        self.cache_method()(example_class)
+        config, example_class = example_class
+        action_name = config.get("action_method_name", "action")
+        multiplier = 2 if action_name == "action_2" else 1
+        self.cache_method(**config)(example_class)
         example = example_class(1, 2)
         with pytest.warns(CacheWarning):
-            example.action(3)
+            getattr(example, action_name)(3)
 
-        assert example.result_1_ == 6
+        assert example.result_1_ == 6 * multiplier
 
         with pytest.warns(CacheWarning):
-            example.action(2)
-        assert example.result_1_ == 5
+            getattr(example, action_name)(2)
+        assert example.result_1_ == 5 * multiplier
 
         with pytest.warns(None) as w:
-            example.action(3)
-        assert example.result_1_ == 6
+            getattr(example, action_name)(3)
+        assert example.result_1_ == 6 * multiplier
         assert not w
 
     def test_caching_twice_new_instance(self, example_class):
-        self.cache_method()(example_class)
+        config, example_class = example_class
+        action_name = config.get("action_method_name", "action")
+        multiplier = 2 if action_name == "action_2" else 1
+        self.cache_method(**config)(example_class)
         example = example_class(1, 2)
         with pytest.warns(CacheWarning):
-            example.action(3)
-        assert example.result_1_ == 6
+            getattr(example, action_name)(3)
+        assert example.result_1_ == 6 * multiplier
 
         with pytest.warns(CacheWarning):
-            example.action(2)
-        assert example.result_1_ == 5
+            getattr(example, action_name)(2)
+        assert example.result_1_ == 5 * multiplier
 
         example = example_class(1, 2)
         with pytest.warns(None) as w:
-            example.action(3)
-        assert example.result_1_ == 6
+            getattr(example, action_name)(3)
+        assert example.result_1_ == 6 * multiplier
         assert not w
 
     def test_cache_invalidated_on_para_change(self, example_class):
-        self.cache_method()(example_class)
+        config, example_class = example_class
+        action_name = config.get("action_method_name", "action")
+        multiplier = 2 if action_name == "action_2" else 1
 
+        self.cache_method(**config)(example_class)
         example = example_class(1, 2)
         with pytest.warns(CacheWarning):
-            example.action(3)
-        assert example.result_1_ == 6
+            getattr(example, action_name)(3)
+        assert example.result_1_ == 6 * multiplier
 
         example.set_params(a=4)
 
         with pytest.warns(CacheWarning):
-            example.action(3)
-        assert example.result_1_ == 9
+            getattr(example, action_name)(3)
+        assert example.result_1_ == 9 * multiplier
 
     def test_cache_only(self, example_class):
-        self.cache_method(cache_only=["result_1_"])(example_class)
+        config, example_class = example_class
+        action_name = config.get("action_method_name", "action")
+        multiplier = 2 if action_name == "action_2" else 1
+        self.cache_method(cache_only=["result_1_"], **config)(example_class)
 
         # We expect the uncached and the cached version to both not have result_2_ available.
 
         example = example_class(1, 2)
         with pytest.warns(CacheWarning):
-            example.action(2)
-        assert example.result_1_ == 5
+            getattr(example, action_name)(2)
+        assert example.result_1_ == 5 * multiplier
         assert not hasattr(example, "result_2_")
 
         example = example.clone()
 
         # Now in the cached version
         with pytest.warns(None) as w:
-            example.action(2)
+            getattr(example, action_name)(2)
         assert not w
-        assert example.result_1_ == 5
+        assert example.result_1_ == 5 * multiplier
         assert not hasattr(example, "result_2_")
-
-    def test_error_on_classes_with_multiple_action_methods(self):
-        with pytest.raises(NotImplementedError):
-            self.cache_method()(ExampleClassMultiAction)
 
 
 class TestHybridCache:
