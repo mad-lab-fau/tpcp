@@ -15,6 +15,7 @@ from typing import (
 )
 
 import numpy as np
+import pandas as pd
 from joblib import Parallel
 from tqdm.auto import tqdm
 from typing_extensions import Protocol, Self
@@ -156,6 +157,66 @@ class FloatAggregator(Aggregator[float]):
             # We cast explicitly to float, to make sure that we get a float and not a float like
             return {k: float(v) for k, v in vals.items()}
         return float(vals)
+
+
+class MacroFloatAggregator(Aggregator[float]):
+    """Aggregate first on the provided `groupby` level and then aggregate these results.
+
+    The aggregation returns the individual values per group and the final aggregated value.
+
+    Parameters
+    ----------
+    groupby
+        The dataset index columns to groupby.
+        This must be a valid subset of the dataset index columns used in the scoring.
+    group_agg
+        The function that is applied per group.
+        Note, that we only support functions that return a single float value.
+        Due to the internal implementation, this function actually gets passed a Series of float values.
+        Default is the mean.
+    final_agg
+        The function that is applied across the per-group results.
+        Note, that we only support functions that return a single float value.
+        Due to the internal implementation, this function actually gets passed a Series of float values.
+        Default is the mean.
+    final_agg_name
+        The name of the final aggregated value.
+        This is the key in the returned dictionary.
+    return_raw_scores
+        If True, the raw scores are returned in the result
+
+    """
+
+    def __init__(
+        self,
+        *,
+        groupby: Union[str, list[str]],
+        group_agg: Callable[[pd.DataFrame], float] = np.mean,
+        final_agg: Callable[[pd.DataFrame], float] = np.mean,
+        final_agg_name: str = "macro",
+        return_raw_scores: bool = True,
+    ) -> None:
+        self.groupby = groupby
+        self.group_agg = group_agg
+        self.final_agg = final_agg
+        self.final_agg_name = final_agg_name
+        super().__init__(return_raw_scores=return_raw_scores)
+
+    def aggregate(self, /, values: Sequence[T], datapoints: Sequence[Dataset]) -> dict[str, float]:
+        data_labels = [d.group_label for d in datapoints]
+        data_index = pd.MultiIndex.from_tuples(data_labels, names=data_labels[0]._fields)
+
+        data = pd.Series(values, index=data_index)
+        per_group = data.groupby(self.groupby).agg(self.group_agg)
+        if isinstance(per_group.index, pd.MultiIndex):
+            per_group.index = per_group.index.to_flat_index()
+        if self.final_agg_name in per_group.index:
+            raise ValueError(
+                f"One of the groups is named like the provided `final_agg_name` ({self.final_agg_name}). "
+                "This is not allowed. "
+                "Provide a different value for the `final_agg_name` parameter of the MacroFloatAggregator."
+            )
+        return {**per_group.to_dict(), self.final_agg_name: self.final_agg(per_group)}
 
 
 class _NoAgg(Aggregator[Any]):
