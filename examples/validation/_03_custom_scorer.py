@@ -13,15 +13,21 @@ However, sometimes this is not exactly what we want.
 In this case, you need to create a custom scorer or custom aggregator to also control how scores are averaged over all
 datapoints.
 
-In the following, we will demonstrate solutions for two typical usecases:
+Four general usecases arise for custom scorers:
 
-1. Instead of averaging the scores you want to use another metric (e.g. median) or you want to weight the scores
-   based on the datatype.
-2. You want to calculate a score, that can not be first aggregated on a datapoint level.
-   This can happen, if each datapoint has multiple events.
-   If you score (e.g. F1 score) on each datapoint first, you will get a different result, compared to calculating the F1
-   score across all events of a dataset, independent of the datapoint they belong to.
-   (Note, which of the two cases you want will depend on your usecase and the data distributions per datapoint)
+1. You actually don't want to score anything, but just want to collect some metadata, or pass results out of the method
+   unchanged for later analysis. This can be easily done using :func:`~tpcp.validate.no_agg` (See first example below)
+2. You can properly calculate a performance value on a single datapoint, but you don't want to take the mean over all
+   datapoints, but rather use a different aggregation metrics (e.g. median, ...).
+   This can be done by using the existing :class:`~tpcp.validate.FloatAggregator` class with a new function (See second
+   and third example below)
+3. Similar to 3, but you require additional information passed through the aggregation function. This could be the
+   datapoints itself (e.g. to calculate a Macro Average) or some other metadata required for the aggregation.
+   This can be done by inheriting from the :class:`~tpcp.validate.Aggregator` class and implementing the `aggregate`
+   method (See fourth example below).
+4. You want to calculate a score, that can not be first aggregated on a datapoint level.
+   For example, you are detecting events in a dataset and you want to calculate the F1 score across all events of a
+   dataset, without first aggregating the F1 score on a datapoint level.
 
 """
 from collections.abc import Sequence
@@ -67,14 +73,32 @@ class MyPipeline(Pipeline[ECGExampleData]):
         return self
 
 
+# %%
+# We set up a global cache for our pipeline to speed up the repeated evaluation we do below.
+from tpcp.caching import global_ram_cache
+
+global_ram_cache(action_method_name="run")(MyPipeline)
+
+
 pipe = MyPipeline()
 
 # %%
-# Custom Median Scorer
-# --------------------
-# To create a custom score aggregation, we first need a score function.
-# We will use a similar score function as we used in the QRS detection example.
-# It returns the precision, recall and f1 score of the QRS detection for each datapoint.
+# No Aggregation
+# --------------
+# Sometimes you might want to return data from a score function that should not be aggregated.
+# This could be arbitrary metadata or scores will value that can not be averaged.
+# In this case you can simply use the :func:`~tpcp.validate.no_agg` aggregator.
+# This will return only the single values and no aggregated items.
+#
+# In the example below, we will calculate the precision, recall and f1-score for each datapoint and in addition return
+# the number of labeled reference values as "metadata".
+# This metadata will not be aggregated, but still be available in the single results.
+#
+# .. note:: At the moment we don't support returning only no-aggregated from a scorer.
+#           At least one value must be aggregated, so that it can be used to rank results.
+#           If you really need this (e.g. in combination with :func:`~tpcp.validate.validat`), you can return a dummy
+#           value that is not used in the aggregation.
+from tpcp.validate import no_agg
 
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
@@ -89,55 +113,76 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
         tolerance=tolerance_s * datapoint.sampling_rate_hz,
     )
     precision, recall, f1_score = precision_recall_f1_score(matches)
-    return {"precision": precision, "recall": recall, "f1_score": f1_score}
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1_score,
+        "n_labels": no_agg(len(datapoint.r_peak_positions_)),
+    }
 
 
 # %%
-# By default, these values will be aggregated by averaging over all datapoints.
-# We can see that by running an instance of the scorer on the example dataset.
-#
-# This happens because by default the :class:`~tpcp.validate.Scorer` uses the :obj:`~tpcp.validate.agg_mean` to
-# aggregate all values.
+# We can see that the n_labels is not contained in the aggregated results.
 from tpcp.validate import Scorer
 
-baseline_results_agg, baseline_results_single = Scorer(score)(pipe, example_data)
-baseline_results_agg
+no_agg_agg, no_agg_single = Scorer(score)(pipe, example_data)
+no_agg_agg
 
 # %%
-baseline_results_single
+# But we can still access the value in the single results.
+no_agg_single["n_labels"]
 
 # %%
-# The scorer provides the results per datapoint and the aggregated values.
-# We can see that the aggregation was performed using the average
+# Custom Median Scorer
+# --------------------
+# If we want to change the way the scores are aggregated, we can use a custom aggregator.
+# For simple cases, this does not require to implement a new class, but we can use the
+# :class:`~tpcp.validate.FloatAggregator` directly.
+# It assumes that we have a function that takes a sequence of floats and returns a float.
+#
+# Aggregators are simply instances of the :class:`~tpcp.validate.Aggregator` classes.
+# So we can create a new instance of the :class:`~tpcp.validate.FloatAggregator` with a new function.
+#
+# Below we simply use the median as an example.
 import numpy as np
 
-assert baseline_results_agg["f1_score"] == np.mean(baseline_results_single["f1_score"])
-
-
-# %%
-# We can change this behaviour by implementing a custom Aggregator.
-# There are a couple of ways to do this.
-# For many simple cases, we can use the :class:`~tpcp.validate.FloatAggregator` class, which is also the class
-# :obj:`~tpcp.validate.agg_mean` is an instance of.
-#
-# As long, as we just to use a different function that takes a sequence of floats and returns a float, we can use
-# this class.
-# For more complex cases, we can inherit from the :class:`~tpcp.validate.Aggregator` class and implement the `aggregate`
-# method ourselves (we will see that below).
-#
-# For now, we will use the :class:`~tpcp.validate.FloatAggregator` but with the `np.median` function.
 from tpcp.validate import FloatAggregator
 
 median_agg = FloatAggregator(np.median)
 
+# %%
+# Then we reuse the score function from before and wrap the F1-score with the median aggregator.
+# For all other values, the default aggregator will be used (which is the mean).
+
+
+# .. warning:: Note, that you score function must return the same aggregator for a scores across all datapoints.
+#              If not, we will raise an error!
+def score(pipeline: MyPipeline, datapoint: ECGExampleData):
+    # We use the `safe_run` wrapper instead of just run. This is always a good idea.
+    # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
+    # will clone it again.
+    pipeline = pipeline.safe_run(datapoint)
+    tolerance_s = 0.02  # We just use 20 ms for this example
+    matches = match_events_with_reference(
+        pipeline.r_peak_positions_.to_numpy(),
+        datapoint.r_peak_positions_.to_numpy(),
+        tolerance=tolerance_s * datapoint.sampling_rate_hz,
+    )
+    precision, recall, f1_score = precision_recall_f1_score(matches)
+    return {"precision": precision, "recall": recall, "f1_score": f1_score, "median_f1_score": median_agg(f1_score)}
+
 
 # %%
-# We can apply this Aggregator in two ways:
-#
-# 1. By using it as `default_aggregator` in the Scorer constructor.
-#    In this case, the aggregator will be used for all scores.
-# 2. By wrapping specific return values of the score method.
-#
+median_results_agg, median_results_single = Scorer(score)(pipe, example_data)
+median_results_agg
+
+# %%
+assert median_results_agg["median_f1_score"] == np.median(median_results_single["f1_score"])
+assert median_results_agg["f1_score"] == np.mean(median_results_single["f1_score"])
+
+# %%
+# .. note:: We could also change the default aggregator for all scores by using the `default_aggregator` parameter of
+#           the :class:`~tpcp.validate.Scorer` class (See the next example).
 # Let's start with the first way.
 median_results_agg, median_results_single = Scorer(score, default_aggregator=median_agg)(pipe, example_data)
 median_results_agg
@@ -147,40 +192,6 @@ assert median_results_agg["f1_score"] == np.median(median_results_single["f1_sco
 assert median_results_agg["precision"] == np.median(median_results_single["precision"])
 
 # %%
-# In the second case, we can select which scores we want to aggregate in a different way.
-# All scores without a specific aggregator will be aggregated by the default aggregator.
-#
-# Below, only the F1-score will be aggregated by the median aggregator.
-
-
-def score(pipeline: MyPipeline, datapoint: ECGExampleData):
-    # We use the `safe_run` wrapper instead of just run. This is always a good idea.
-    # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
-    # will clone it again.
-    pipeline = pipeline.safe_run(datapoint)
-    tolerance_s = 0.02  # We just use 20 ms for this example
-    matches = match_events_with_reference(
-        pipeline.r_peak_positions_.to_numpy(),
-        datapoint.r_peak_positions_.to_numpy(),
-        tolerance=tolerance_s * datapoint.sampling_rate_hz,
-    )
-    precision, recall, f1_score = precision_recall_f1_score(matches)
-    return {"precision": precision, "recall": recall, "f1_score": median_agg(f1_score)}
-
-
-partial_median_results_agg, partial_median_results_single = Scorer(score)(pipe, example_data)
-partial_median_results_agg
-
-# %%
-assert partial_median_results_agg["f1_score"] == np.median(partial_median_results_single["f1_score"])
-assert partial_median_results_agg["precision"] == np.mean(partial_median_results_single["precision"])
-
-# %%
-# .. warning:: Note, that you score function must return the same aggregator for a score across all datapoints.
-#              If not, we will raise an error!
-
-
-# %%
 # Multi-Return Aggregator
 # -----------------------
 # Sometimes an aggregator needs to return multiple values.
@@ -188,6 +199,18 @@ assert partial_median_results_agg["precision"] == np.mean(partial_median_results
 # a function that returns a dict.
 #
 # As example, we will calculate the mean and standard deviation of the returned scores in one aggregation.
+# This could be applied individually to each score (as seen in the previous example) or to all scores at once using
+# the `default_aggregator` parameter.
+# We will demonstrate the latter here.
+
+
+def mean_and_std(vals: Sequence[float]):
+    return {"mean": float(np.mean(vals)), "std": float(np.std(vals))}
+
+
+mean_and_std_agg = FloatAggregator(mean_and_std)
+
+
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
     # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
@@ -203,24 +226,75 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     return {"precision": precision, "recall": recall, "f1_score": f1_score}
 
 
-def mean_and_std(vals: Sequence[float]):
-    return {"mean": float(np.mean(vals)), "std": float(np.std(vals))}
-
-
-MeanAndStdAggregator = FloatAggregator(mean_and_std)
-
-
-multi_agg_agg, multi_agg_single = Scorer(score, default_aggregator=MeanAndStdAggregator)(pipe, example_data)
+multi_agg_agg, multi_agg_single = Scorer(score, default_aggregator=mean_and_std_agg)(pipe, example_data)
 
 # %%
 # When multiple values are returned, the names are concatenated with the names of the scores using `__`.
 multi_agg_agg
 
 # %%
-# Complicated Aggregation
-# -----------------------
-# When we do more complicated aggregations, we can use the :class:`~tpcp.validate.Aggregator` as base class for a custom
-# aggregator.
+# Macro Aggregation
+# -----------------
+# In some datasets (in particular, when we have multiple recordings per participant), we might want to calculate a
+# single performance value for each participant and then average these values.
+# Fundamentally, this is a little tricky with tpcp, as all of our processing happens per datapoint, and each datapoint
+# is usually one recording, to simplify the pipeline structures.
+#
+# Hence, we need to shift some of the aggregation complexity into our scoring function.
+# As this is a little complicated and such a common usecase, tpcp provides a helper class for this:
+# :class:`~tpcp.validate.MacroFloatAggregator`.
+# It allows us to define an initial grouping based on the dataset index columns and define how values are aggregated
+# first per group and then across all groups.
+from tpcp.validate import MacroFloatAggregator
+
+macro_average_patient_group = MacroFloatAggregator(groupby="patient_group", group_agg=np.mean, final_agg=np.mean)
+
+# %%
+# We will apply this aggregation to the F1-score:
+
+
+def score(pipeline: MyPipeline, datapoint: ECGExampleData):
+    # We use the `safe_run` wrapper instead of just run. This is always a good idea.
+    # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
+    # will clone it again.
+    pipeline = pipeline.safe_run(datapoint)
+    tolerance_s = 0.02  # We just use 20 ms for this example
+    matches = match_events_with_reference(
+        pipeline.r_peak_positions_.to_numpy(),
+        datapoint.r_peak_positions_.to_numpy(),
+        tolerance=tolerance_s * datapoint.sampling_rate_hz,
+    )
+    precision, recall, f1_score = precision_recall_f1_score(matches)
+    return {"precision": precision, "recall": recall, "f1_score": macro_average_patient_group(f1_score)}
+
+
+# %%
+# We can see that we now get the "single" aggregation values per group (`f1_score__{group}`) and the final aggregated
+# values (`f1_score__macro`).
+macro_agg, macro_single = Scorer(score)(pipe, example_data)
+macro_agg
+
+# %%
+# The raw values are still available in the single results.
+macro_single["f1_score"]
+
+# %%
+# So far we did not need to implement a fully custom aggregation, as we `tpcp` could provide helper funcs for typical
+# usecases.
+# However, if you need to do more complicated things with your score values, or pass other things than floats to your
+# scores, you will need a custom aggregator as shown in the next example.
+
+# %%
+# Fully Custom Aggregation
+# ------------------------
+# In the next example, we want to aggregate on a "lower" level than a single datapoint.
+# In the previous example, where we wanted to aggregate first on a "higher" level than a single datapoint.
+# In this case we could provide tpcp-helper, as the higher levels were defined by the used `Dataset`.
+# Hence, we could make some assumptions about how the passed data will look like.
+#
+# However, if you want to go more granular as a single datapoint, we can not know what datastructures you are dealing
+# with.
+# Therefore, you need to create a completely custom aggregation by subclassing :class:`~tpcp.validate.Aggregator`.
 #
 # Below we show an example, where we calculate the precision, recall and f1-score without aggregating on a datapoint
 # level, but rather first combining all predictions and references across all datapoints before calculating the
@@ -415,96 +489,5 @@ complicated_agg_now_raw
 complicated_single_no_raw.keys()
 
 # %%
-# Weighted Aggregation
-# --------------------
-# So far all aggregators only used the values for aggregation.
-# However, sometimes we want to treat values differently depending on where they came from.
-# For these "complicated" weighting cases, we can use the `datapoint` parameter that is passed to the `aggregate`
-# method.
-#
-# In the following example, we want to calculate the Macro Average over all participant groups (see dataset below).
-# This means, we want to average the parameters first in each group and then average the results.
-example_data
-
-
-# %%
-# For this, we use everything we learned before and create a general `GroupWeightedAggregator`.
-# The aggregator will apply an arbitrary function to the values, but group the values by a specific column in the
-# datapoint index first and then take the average over the results.
-class MacroAgg(Aggregator[float]):
-    def __init__(
-        self, func: Union[Callable[[Sequence[float]], float], str], groupby: str, *, return_raw_scores: bool = True
-    ):
-        self.func = func
-        self.groupby = groupby
-        super().__init__(return_raw_scores=return_raw_scores)
-
-    def aggregate(self, /, values: Sequence[float], datapoints: Sequence[ECGExampleData], **_) -> dict[str, float]:
-        patient_groups = [d.group_label for d in datapoints]
-        data_index = pd.MultiIndex.from_tuples(patient_groups, names=patient_groups[0]._fields)
-
-        data = pd.DataFrame({"value": values}, index=data_index)
-        per_group = data.groupby(self.groupby).agg(self.func)["value"]
-        return {**per_group.to_dict(), "group_mean": per_group.mean()}
-
-
-macro_mean = MacroAgg("mean", "patient_group")
-
-
-# %%
-# In our score function, we wrap the f1-score with the new aggregator (we could of cause also wrap the others,
-# or use the `default_aggregator` parameter).
-def score(pipeline: MyPipeline, datapoint: ECGExampleData):
-    # We use the `safe_run` wrapper instead of just run. This is always a good idea.
-    # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
-    # will clone it again.
-    pipeline = pipeline.safe_run(datapoint)
-    tolerance_s = 0.02  # We just use 20 ms for this example
-    matches = match_events_with_reference(
-        pipeline.r_peak_positions_.to_numpy(),
-        datapoint.r_peak_positions_.to_numpy(),
-        tolerance=tolerance_s * datapoint.sampling_rate_hz,
-    )
-    precision, recall, f1_score = precision_recall_f1_score(matches)
-    return {"precision": precision, "recall": recall, "f1_score": macro_mean(f1_score)}
-
-
-group_weighted_agg, group_weighted_single = Scorer(score)(pipe, example_data)
-group_weighted_agg
-
-
-# %%
-# No-Aggregation Aggregator
-# -------------------------
-# Sometimes you might want to return data from a score function that should not be aggregated.
-# This could be arbitrary metadata or scores will value that can not be averaged.
-# In this case you can simply use the :class:`~tpcp.validate.NoAgg` aggregator.
-# This will return only the single values and no aggregated items.
-#
-# In the example below, we will only aggregate the precision and recall, but not the f1-score.
-from tpcp.validate import no_agg
-
-
-def score(pipeline: MyPipeline, datapoint: ECGExampleData):
-    # We use the `safe_run` wrapper instead of just run. This is always a good idea.
-    # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
-    # will clone it again.
-    pipeline = pipeline.safe_run(datapoint)
-    tolerance_s = 0.02  # We just use 20 ms for this example
-    matches = match_events_with_reference(
-        pipeline.r_peak_positions_.to_numpy(),
-        datapoint.r_peak_positions_.to_numpy(),
-        tolerance=tolerance_s * datapoint.sampling_rate_hz,
-    )
-    precision, recall, f1_score = precision_recall_f1_score(matches)
-    return {"precision": precision, "recall": recall, "f1_score": no_agg(f1_score)}
-
-
-# %%
-# We can see that the f1-score is not contained in the aggregated results.
-no_agg_agg, no_agg_single = Scorer(score)(pipe, example_data)
-no_agg_agg
-
-# %%
-# But we can still access the value in the single results.
-no_agg_single["f1_score"]
+# Parameterizing Score Functions
+# ------------------------------

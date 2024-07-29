@@ -116,7 +116,6 @@ def test_dataclasses():
 
 def test_custom_scorer():
     from examples.validation._03_custom_scorer import (
-        baseline_results_agg,
         complicated_agg,
         complicated_single_no_raw,
         group_weighted_agg,
