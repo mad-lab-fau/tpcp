@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The global cache helper now support algorithms with multiple action methods by specifying the name of the action 
+  method you want to cache.
+
 ### Changed
 
 - Relative major overhall of how aggregator in scoring functions work. Before, aggregators were classes that were 
