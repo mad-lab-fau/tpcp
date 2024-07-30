@@ -11,13 +11,14 @@ The same way, by default tpcp will not forward sklearn global configs through tp
 However, you can likely configure the callbacks in tpcp to make that work.
 """
 import functools
+import multiprocessing
 from typing import Callable, TypeVar
 
 import joblib
 
 T = TypeVar("T")
 CalbackReturnType = tuple[T, Callable[[T], None]]
-_PARALLEL_CONTEXT_CALLBACKS: list[Callable[[], CalbackReturnType]] = []
+_PARALLEL_CONTEXT_CALLBACKS: dict[str, [Callable[[], CalbackReturnType]]] = {}
 
 
 def delayed(func):
@@ -70,21 +71,27 @@ def delayed(func):
     This means, if you are calling `delayed` long before the actual parallel execution, the getters might not capture
     the correct state of the global variables.
 
+    Setters might be called multiple times in the same process, if the process pool is reused by multiple jobs.
+    The callbacks should be robust against this and not break.
+
     """
     _parallel_setter = []
-    for g in _PARALLEL_CONTEXT_CALLBACKS:
+    for g in _PARALLEL_CONTEXT_CALLBACKS.values():
         _parallel_setter.append(g())
 
     @functools.wraps(func)
     def inner(*args, **kwargs):
-        for value, setter in _parallel_setter:
-            setter(value)
+        # When the function is called in the main process, we just call the function
+        # Otherwise we actually run our setters.
+        if multiprocessing.parent_process() is not None:
+            for value, setter in _parallel_setter:
+                setter(value)
         return func(*args, **kwargs)
 
     return joblib.delayed(inner)
 
 
-def register_global_parallel_callback(callback: Callable[[], tuple[T, Callable[[T], None]]]):
+def register_global_parallel_callback(callback: Callable[[], tuple[T, Callable[[T], None]]], name=None) -> str:
     """Register a callback to transfer information to parallel workers.
 
     This callback should be used together with :func:`~tpcp.parallel.delayed` in a joblib parallel context.
@@ -103,9 +110,43 @@ def register_global_parallel_callback(callback: Callable[[], tuple[T, Callable[[
     callback : Callable[[], Tuple[T, Callable[[T], None]]]
         The callback function that will be called when :func:`~tpcp.parallel.delayed` is called in the main process.
         The callback should return a value and a setter function.
+    name
+        Optional name of the callback function.
+        This can be used to remove the callback again.
+        If None a random name will be used.
+        The random name can be obtained via the return value
+
+    Returns
+    -------
+    str
+        The name of the callback. This can be used to remove the callback
 
     """
-    _PARALLEL_CONTEXT_CALLBACKS.append(callback)
+    if name is None:
+        # Generate random name
+        name = str(id(callback))
+    if name in _PARALLEL_CONTEXT_CALLBACKS:
+        raise ValueError(f"Callback with name {name} already registered.")
+    _PARALLEL_CONTEXT_CALLBACKS[name] = callback
+
+    return name
 
 
-__all__ = ["delayed", "register_global_parallel_callback"]
+def remove_global_parallel_callback(name: str):
+    """Remove a registered callback.
+
+    This can be used to remove a callback that was registered using :func:`~tpcp.parallel.register_global_parallel_callback`.
+
+    Parameters
+    ----------
+    name : str
+        The name of the callback that should be removed.
+
+    """
+    if name in _PARALLEL_CONTEXT_CALLBACKS:
+        del _PARALLEL_CONTEXT_CALLBACKS[name]
+    else:
+        raise KeyError(f"Callback with name {name} not found.")
+
+
+__all__ = ["delayed", "register_global_parallel_callback", "remove_global_parallel_callback"]
