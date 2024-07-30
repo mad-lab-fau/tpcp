@@ -49,7 +49,6 @@ from tpcp.exceptions import (
     ValidationError,
 )
 
-
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -701,7 +700,7 @@ def _is_builtin_class_instance(obj: Any) -> bool:
     return type(obj).__module__ == "builtins"
 
 
-def clone(algorithm: T, *, safe: bool = False) -> T:  # noqa: C901, PLR0911
+def clone(algorithm: T, *, safe: bool = False) -> T:  # noqa: C901, PLR0911, PLR0912
     """Construct a new algorithm object with the same parameters.
 
     This is a modified version from sklearn and the original was published under a BSD-3 license and the original file

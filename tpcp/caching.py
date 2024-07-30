@@ -121,14 +121,14 @@ def _handle_double_cached(obj, action_name, cache_type):
 def _register_global_parallel_callback(func, name):
     def wrapper(_):
         func()
-    def _callback():
 
+    def _callback():
         return None, wrapper
 
     register_global_parallel_callback(_callback, name=name)
 
 
-def global_disk_cache(
+def global_disk_cache(  # noqa: C901
     memory: Memory = Memory(None),
     *,
     cache_only: Optional[Sequence[str]] = None,
@@ -180,7 +180,7 @@ def global_disk_cache(
     """
     _global_cache_warning()
 
-    def inner(algorithm_object: type[Algorithm]):
+    def inner(algorithm_object: type[Algorithm]):  # noqa: C901
         # This only return the first action method, but this is fine for now
         # This method is "unbound", as we are working on the class, not an instance
         to_cache_action_method_name, action_method_raw = _get_action_method(algorithm_object, action_method_name)
@@ -276,7 +276,7 @@ def remove_disk_cache(algorithm_object: type[Algorithm]):
     return algorithm_object
 
 
-def global_ram_cache(
+def global_ram_cache(  # noqa: C901
     max_n: Optional[int] = None,
     *,
     cache_only: Optional[Sequence[str]] = None,
