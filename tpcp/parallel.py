@@ -60,10 +60,12 @@ def delayed(func):
     ...     return config["assume_finite"]
     >>>
     >>> # register the callback
-    >>> register_global_parallel_callback(callback)
+    >>> name = register_global_parallel_callback(callback)
     >>> # call the worker function in parallel
     >>> Parallel(n_jobs=2)(delayed(worker_func)() for _ in range(2))
     [True, True]
+    >>> # remove the callback again
+    >>> remove_global_parallel_callback(name)
 
     Notes
     -----
