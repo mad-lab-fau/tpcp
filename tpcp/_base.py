@@ -49,16 +49,6 @@ from tpcp.exceptions import (
     ValidationError,
 )
 
-try:
-    import tensorflow as tf
-except ImportError:
-    tf = None
-
-try:
-    import torch
-except ImportError:
-    torch = None
-
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -710,7 +700,7 @@ def _is_builtin_class_instance(obj: Any) -> bool:
     return type(obj).__module__ == "builtins"
 
 
-def clone(algorithm: T, *, safe: bool = False) -> T:  # noqa: C901, PLR0911
+def clone(algorithm: T, *, safe: bool = False) -> T:  # noqa: C901, PLR0911, PLR0912
     """Construct a new algorithm object with the same parameters.
 
     This is a modified version from sklearn and the original was published under a BSD-3 license and the original file
@@ -757,6 +747,19 @@ def clone(algorithm: T, *, safe: bool = False) -> T:  # noqa: C901, PLR0911
                 "it does not seem to be a compatible algorithm/pipline class or general `tpcp` object as it does not "
                 "inherit from `BaseTpcpObject` or `Algorithm` or `Pipeline`."
             )
+        # We delay an potential tensorflow and torch input until here, because the import is expensive.
+        # We only import, when the modules have been used before.
+        # Let's hope this does not explode in a multi-processing context, but let's see.
+        if "tensorflow" in sys.modules:
+            import tensorflow as tf
+        else:
+            tf = None
+
+        if "torch" in sys.modules:
+            import torch
+        else:
+            torch = None
+
         # We have one special case for torch here, as apparently torch objects can not be deepcopied.
         # https://github.com/pytorch/tutorials/issues/2177
         if torch is not None and isinstance(algorithm, torch.nn.Module):

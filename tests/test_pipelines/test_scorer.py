@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 import numpy as np
 import pytest
+from pandas._testing import assert_frame_equal
 
 from tests.test_pipelines.conftest import (
     DummyDataset,
@@ -12,9 +13,10 @@ from tests.test_pipelines.conftest import (
     dummy_multi_score_func,
     dummy_single_score_func,
 )
+from tpcp import Pipeline
 from tpcp.exceptions import ScorerFailedError, ValidationError
 from tpcp.validate import Scorer
-from tpcp.validate._scorer import Aggregator, NoAgg, _passthrough_scoring, _validate_scorer
+from tpcp.validate._scorer import Aggregator, FloatAggregator, _passthrough_scoring, _validate_scorer, no_agg
 
 
 class TestScorerCalls:
@@ -70,15 +72,23 @@ class TestScorer:
             else:
                 assert v == np.mean(data.group_labels)
 
-    @pytest.mark.parametrize("bad_scorer", (lambda x, y: "test", lambda x, y: {"val": "test"}))
-    def test_bad_scorer(self, bad_scorer):
+    def test_bad_scorer_single(self):
         """Check that we catch cases where the scoring func returns invalid values independent of the error_score val."""
-        scorer = Scorer(bad_scorer)
+        scorer = Scorer(lambda x, y: "test")
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         with pytest.raises(ValidationError) as e:
             scorer(pipe, data)
-        assert "MeanAggregator can only be used with float values" in str(e.value)
+        assert "Aggregator for score '__single__' raised an exception" in str(e.value)
+
+    def test_bad_scorer_multiple(self):
+        """Check that we catch cases where the scoring func returns invalid values independent of the error_score val."""
+        scorer = Scorer(lambda x, y: {"val": "test"})
+        pipe = DummyOptimizablePipeline()
+        data = DummyDataset()
+        with pytest.raises(ValidationError) as e:
+            scorer(pipe, data)
+        assert "Aggregator for score 'val' raised an exception" in str(e.value)
 
     def test_callback_called(self):
         mock_score_func = Mock(return_value=1)
@@ -191,15 +201,16 @@ class TestScorerUtils:
 
 class TestCustomAggregator:
     class MultiAgg(Aggregator):
-        @classmethod
-        def aggregate(cls, /, values: Sequence[float], **_) -> dict[str, float]:
+        def aggregate(self, /, values: Sequence[float], **_) -> dict[str, float]:
             return {"mean": float(np.mean(values)), "std": float(np.std(values))}
+
+    multi_agg = MultiAgg()
 
     @pytest.mark.parametrize(
         ("score_type", "scorefunc"), [("single", lambda x, y: 3), ("multi", lambda x, y: {"value": 3})]
     )
     def test_multi_agg(self, score_type, scorefunc):
-        scorer = Scorer(scorefunc, default_aggregator=self.MultiAgg)
+        scorer = Scorer(scorefunc, default_aggregator=self.multi_agg)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         agg, single = scorer(pipe, data)
@@ -216,18 +227,20 @@ class TestCustomAggregator:
         def aggregate(cls, /, values: Sequence[float], **_) -> float:
             return 0
 
+    dummy_agg = DummyAgg()
+
     @pytest.mark.parametrize(
-        "scorer_return", (1, {"val": 1}, {"val": 1, "val2": 2}, {"val": 1, "val2": 2, "val3": NoAgg(None)})
+        "scorer_return", (1, {"val": 1}, {"val": 1, "val2": 2}, {"val": 1, "val2": 2, "val3": no_agg(None)})
     )
     @mock.patch("tests.test_pipelines.test_scorer.TestCustomAggregator.DummyAgg.aggregate", return_value=1)
     def test_default_agg_method(self, mock_aggregate, scorer_return):
-        scorer = Scorer(lambda x, y: scorer_return, default_aggregator=self.DummyAgg)
+        scorer = Scorer(lambda x, y: scorer_return, default_aggregator=self.dummy_agg)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         _ = scorer(pipe, data)
 
         expected_called = (
-            len([s for s in scorer_return.values() if not isinstance(s, NoAgg)])
+            len([s for s in scorer_return.values() if not isinstance(s, type(no_agg(None)))])
             if isinstance(scorer_return, dict)
             else 1
         )
@@ -240,11 +253,11 @@ class TestCustomAggregator:
             (1, 0),
             ({"val": 1}, 0),
             ({"val": 1, "val2": 2}, 0),
-            ({"val": 1, "val2": 2, "val3": NoAgg(None)}, 0),
-            (DummyAgg(1), 1),
-            ({"val": DummyAgg(1)}, 1),
-            ({"val": DummyAgg(1), "val2": DummyAgg(2)}, 2),
-            ({"val": DummyAgg(1), "val2": 2, "val3": NoAgg(3)}, 1),
+            ({"val": 1, "val2": 2, "val3": no_agg(None)}, 0),
+            (dummy_agg(1), 1),
+            ({"val": dummy_agg(1)}, 1),
+            ({"val": dummy_agg(1), "val2": dummy_agg(2)}, 2),
+            ({"val": dummy_agg(1), "val2": 2, "val3": no_agg(3)}, 1),
         ),
     )
     @mock.patch("tests.test_pipelines.test_scorer.TestCustomAggregator.DummyAgg.aggregate", return_value=1)
@@ -256,7 +269,7 @@ class TestCustomAggregator:
         assert mock_aggregate.call_count == expected_val
 
     def test_inconsistent_return_single(self):
-        return_vals = cycle([self.DummyAgg(1), 3])
+        return_vals = cycle([self.dummy_agg(1), 3])
 
         with pytest.raises(ValidationError) as e:
             scorer = Scorer(lambda x, y: next(return_vals))
@@ -264,11 +277,11 @@ class TestCustomAggregator:
             data = DummyDataset()
             _ = scorer(pipe, data)
 
-        assert "The score values are not consistent." in str(e)
+        assert "Encountered multiple types of aggregators" in str(e)
 
     def test_inconsistent_return_multi(self):
         return_vals = cycle(
-            [{"val1": self.DummyAgg(1), "val2": 3}, {"val1": self.DummyAgg(1), "val2": self.DummyAgg(5)}]
+            [{"val1": self.dummy_agg(1), "val2": 3}, {"val1": self.dummy_agg(1), "val2": self.dummy_agg(5)}]
         )
 
         with pytest.raises(ValidationError) as e:
@@ -281,17 +294,17 @@ class TestCustomAggregator:
 
     def test_no_agg_single_raises(self):
         with pytest.raises(ValidationError) as e:
-            scorer = Scorer(lambda x, y: NoAgg(None))
+            scorer = Scorer(lambda x, y: no_agg(None))
             pipe = DummyOptimizablePipeline()
             data = DummyDataset()
             _ = scorer(pipe, data)
 
-        assert "Scorer returned a NoAgg object. " in str(e)
+        assert "Scorer returned a `no_agg` aggregator. " in str(e)
 
     @pytest.mark.parametrize("n_jobs", (1, 2))
     def test_score_return_val_multi_score_no_agg(self, n_jobs):
         def multi_score_func(pipeline, data_point):
-            return {"score_1": data_point.group_labels[0], "no_agg_score": NoAgg(str(data_point.group_labels))}
+            return {"score_1": data_point.group_labels[0], "no_agg_score": no_agg(str(data_point.group_labels))}
 
         scorer = Scorer(multi_score_func, n_jobs=n_jobs)
         pipe = DummyOptimizablePipeline()
@@ -321,7 +334,7 @@ class TestCustomAggregator:
             return "invalid"
 
     @pytest.mark.parametrize("score_func", (lambda x, y: 1, lambda x, y: {"val": 1}))
-    @pytest.mark.parametrize("aggregator", [InvalidMultiAgg, InvalidSingleAgg])
+    @pytest.mark.parametrize("aggregator", [InvalidMultiAgg(), InvalidSingleAgg()])
     def test_invalid_aggregator_return_type(self, aggregator, score_func):
         scorer = Scorer(score_func, default_aggregator=aggregator)
         pipe = DummyOptimizablePipeline()
@@ -342,7 +355,12 @@ class TestCustomAggregator:
 
     def test_all_aggregators_called_correctly(self):
         def score_func(p, d):
-            return {"agg1": self._TestAgg1(None), "agg2": self._TestAgg2(None), "default_agg": 3, "no_agg": NoAgg(4)}
+            return {
+                "agg1": self._TestAgg1()(None),
+                "agg2": self._TestAgg2()(None),
+                "default_agg": 3,
+                "no_agg": no_agg(4),
+            }
 
         scorer = Scorer(score_func)
         pipe = DummyOptimizablePipeline()
@@ -365,18 +383,23 @@ class TestCustomAggregator:
         if score_func_type == "single":
 
             def score_func(x, y):
-                return self.DatapointAgg(y)
+                return self.DatapointAgg()(y)
 
         else:
 
             def score_func(x, y):
-                return {"val": self.DatapointAgg(y)}
+                return {"val": self.DatapointAgg()(y)}
 
         scorer = Scorer(score_func)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
         _ = scorer(pipe, data)
-        assert mock_method.called_with(values=list(data), datapoints=list(data))
+        assert mock_method.call_count == 1
+        for v_real, d_real, d_exp in zip(
+            mock_method.call_args[1]["values"], mock_method.call_args[1]["datapoints"], data
+        ):
+            assert_frame_equal(d_real.index, d_exp.index)
+            assert_frame_equal(v_real.index, d_exp.index)
 
     @pytest.mark.parametrize("n_jobs", (1, 2))
     def test_single_value_callback_called_correctly(self, n_jobs):
@@ -400,3 +423,67 @@ class TestCustomAggregator:
 
         assert thread_local_step == list(range(len(data)))
         assert thread_local_scores == [d.group_label.value for d in data]
+
+
+# We need to define the face scores func here, to make sure they are pickalable for multi-scoring and hashing
+def _return_1(x):
+    return 1
+
+
+def _return_2(x):
+    return 2
+
+
+def _return_3(x):
+    return 3
+
+
+def _return_4(x):
+    return 4
+
+
+def _return_5(x):
+    return 5
+
+
+class TestWeirdScoringStuff:
+    class DummyPipeline(Pipeline):
+        def __init__(self, values):
+            self.values = values
+
+        def get_value(self, dp):
+            return self.values[dp.group_label[0]]
+
+    # This needs to be static to be pickable
+    _funcs = [_return_1, _return_2, _return_3, _return_4, _return_5]
+
+    def test_different_config_considered_different(self):
+        def score_func(pipeline, data_point):
+            return FloatAggregator(self._funcs[pipeline.get_value(data_point)])(1)
+
+        scorer = Scorer(score_func)
+
+        with pytest.raises(ValidationError) as e:
+            _ = scorer(self.DummyPipeline(list(range(5))), DummyDataset())
+
+        assert "Based on the first value encountered" in str(e)
+
+    def test_same_config_considered_same(self):
+        def score_func(pipeline, data_point):
+            return FloatAggregator(self._funcs[3], return_raw_scores=False)(1)
+
+        scorer = Scorer(score_func)
+
+        agg_val, _ = scorer(self.DummyPipeline(list(range(5))), DummyDataset())
+
+        assert agg_val == 4
+
+    def test_with_multiprocessing(self):
+        def score_func(pipeline, data_point):
+            return FloatAggregator(self._funcs[3], return_raw_scores=False)(1)
+
+        scorer = Scorer(score_func, n_jobs=2)
+
+        agg_val, _ = scorer(self.DummyPipeline(list(range(5))), DummyDataset())
+
+        assert agg_val == 4

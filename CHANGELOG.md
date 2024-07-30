@@ -4,9 +4,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The global cache helper now support algorithms with multiple action methods by specifying the name of the action 
+  method you want to cache.
+
+### Changed
+
+- Relative major overhall of how aggregator in scoring functions work. Before, aggregators were classes that were 
+  initialized with the value of a score. Now they are instances of a class that is called with the value of a score.
+  This change allows it to create "configurable" aggregators that get the configuration at initialization time.
+  (https://github.com/mad-lab-fau/tpcp/pull/118)
+  This comes with a couple of breaking changes:
+  - The most "user-facing" one is that the `NoAgg` aggregator is now called `no_agg` indicating that it is an instance 
+    of a class and not a class itself.
+  - All custom aggregators need to be rewritten, but you will likely find, that they are much simpler now.
+    (see the reworked examples for custom aggregators)
+
 ## [1.0.0] - 2024-07-03
 
-Note: This is a major version bump, because we have quite substantial breaking changes. The 1.0 should signal that we
+Note: This is a major version bump, because we have quite substantial breaking changes. The 1.0 should not signal that we
 are now feature complete. Though the core APIs have been mostly stable for quite some time now.
 
 ### BREAKING CHANGE
