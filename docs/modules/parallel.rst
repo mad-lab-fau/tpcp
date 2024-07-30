@@ -16,3 +16,4 @@ Functions
 
     delayed
     register_global_parallel_callback
+    remove_global_parallel_callback

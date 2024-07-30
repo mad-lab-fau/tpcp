@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The global cache helper now support algorithms with multiple action methods by specifying the name of the action 
   method you want to cache.
+  (https://github.com/mad-lab-fau/tpcp/pull/118)
+
+- 
 
 ### Changed
 
@@ -22,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     of a class and not a class itself.
   - All custom aggregators need to be rewritten, but you will likely find, that they are much simpler now.
     (see the reworked examples for custom aggregators)
+
+### Fixed
+
+- Fixed massive performance regression in version 0.34.1 affecting people that had tensorflow or torch installed, but 
+  did not use it in their code.
+  The reason for that was, that we imported the two modules in the global scope, which caused importing tpcp to be very
+  slow.
+  This was particularly noticeable in case of multiprocessing, as the module was imported in every worker process.
+  We now only import the module, within the clone function and only, if you had imported it before.
+  (https://github.com/mad-lab-fau/tpcp/pull/118)
 
 ## [1.0.1] - 2024-10-18
 
