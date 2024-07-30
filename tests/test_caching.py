@@ -1,17 +1,17 @@
+import multiprocessing
+import pickle
 import warnings
 from functools import partial
-from typing import Callable
+from typing import Callable, Literal
 
 import joblib
 import pytest
 from joblib import Memory
+from joblib.externals.loky import get_reusable_executor
 
+from tests._example_pipelines import CacheWarning, ExampleClassOtherModule
 from tpcp import Algorithm
-from tpcp.caching import global_disk_cache, global_ram_cache, hybrid_cache, remove_any_cache
-
-
-class CacheWarning(UserWarning):
-    pass
+from tpcp.caching import global_disk_cache, global_ram_cache, hybrid_cache, remove_any_cache, _is_cached
 
 
 class ExampleClass(Algorithm):
@@ -53,6 +53,11 @@ def example_class(request):
     yield request.param
     remove_any_cache(request.param[1])
 
+@pytest.fixture()
+def simple_example_class(request):
+    yield ExampleClassOtherModule
+    remove_any_cache(ExampleClassOtherModule)
+
 
 @pytest.fixture()
 def joblib_cache():
@@ -76,14 +81,16 @@ def hybrid_cache_clear():
 
 class TestGlobalCache:
     cache_method: Callable[[type[Algorithm]], type[Algorithm]]
+    cache_method_name: Literal["disk", "ram"]
 
     @pytest.fixture(autouse=True, params=["disk", "ram"])
     def get_cache_method(self, request, joblib_cache):
         if request.param == "disk":
             self.cache_method = partial(global_disk_cache, joblib_cache)
+
         else:
             self.cache_method = partial(global_ram_cache, None)
-
+        self.cache_method_name = request.param
     def test_caching_twice_same_instance(self, example_class):
         config, example_class = example_class
         action_name = config.get("action_method_name", "action")
@@ -163,6 +170,66 @@ class TestGlobalCache:
         assert not w
         assert example.result_1_ == 5 * multiplier
         assert not hasattr(example, "result_2_")
+
+    def test_double_cache_warning(self, example_class):
+        config, example_class = example_class
+        action_name = config.get("action_method_name", "action")
+        self.cache_method(**config)(example_class)
+        with pytest.warns(UserWarning, match=f"The action method {action_name} of {example_class.__name__} is already cached"):
+            self.cache_method(**config)(example_class)
+
+    @pytest.mark.parametrize("restore_in_parallel_process", [True, False])
+    def test_cache_correctly_restored_in_parallel_process(self, simple_example_class, restore_in_parallel_process):
+        from tpcp.parallel import delayed
+        from joblib import Parallel
+
+
+        self.cache_method(restore_in_parallel_process=restore_in_parallel_process)(simple_example_class)
+
+        # Hot cache (only matters for disk)
+        simple_example_class(1, 2).action(1)
+
+        def worker_func(pipe):
+            if restore_in_parallel_process is False:
+                assert _is_cached(simple_example_class, "action") is False
+            if self.cache_method_name == "disk" and restore_in_parallel_process is True:
+                # Disk cache can work across processes. This means, already on the first call in the new process,
+                # we should get the cached result.
+                with pytest.warns(None) as w:
+                    pipe.action(1)
+                assert not w
+            else:
+                # For RAM cache the cache is reset in the new process, so the first call is expected to be uncached.
+                with pytest.warns(CacheWarning):
+                    pipe.action(1)
+
+            if restore_in_parallel_process is True:
+                # Id we set the restore option to True, the second call should be correctly cached
+                with pytest.warns(None) as w:
+                    pipe.action(1)
+                assert not w
+            else:
+                with pytest.warns(CacheWarning):
+                    pipe.action(1)
+
+        Parallel(n_jobs=2)(delayed(worker_func)(simple_example_class(1, 2)) for _ in range(2))
+        # This is important! Otherwise, the different parameterized versions of the test reuse the same processes.
+        # Hence, the global caching will already be reactivated in the new process.
+        get_reusable_executor().shutdown(wait=True)
+
+
+class TestFurtherCachingStuff:
+    def test_double_cache_error_disk_first(self, joblib_cache, simple_example_class):
+        global_disk_cache(joblib_cache)(simple_example_class)
+        with pytest.raises(ValueError):
+            global_ram_cache()(simple_example_class)
+
+    def test_double_cache_error_ram_first(self, joblib_cache, simple_example_class):
+        global_ram_cache(None)(simple_example_class)
+        with pytest.raises(ValueError):
+            global_disk_cache(joblib_cache)(simple_example_class)
+
+
 
 
 class TestHybridCache:
