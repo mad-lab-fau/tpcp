@@ -1,15 +1,18 @@
 """Helper for caching related tasks."""
 import binascii
+import contextlib
 import functools
 import multiprocessing
 import warnings
 from collections.abc import Sequence
+from pickle import PicklingError
 from typing import Callable, Generic, Optional, TypeVar, Union
 
 from joblib import Memory
 
 from tpcp import Algorithm, get_action_methods_names, get_results, make_action_safe
 from tpcp._hash import custom_hash
+from tpcp.parallel import register_global_parallel_callback, remove_global_parallel_callback
 
 _ALREADY_WARNED = False
 
@@ -87,11 +90,50 @@ class UniversalHashableWrapper(Generic[T]):
         return custom_hash(self.obj) == custom_hash(other.obj)
 
 
+def _is_cached(obj, action_name):
+    method = getattr(obj, action_name)
+    cache_type = getattr(method, "__cache_type__", None)
+    if cache_type is None:
+        return False
+    assert cache_type in ["disk", "ram"]
+    return cache_type
+
+
+def _handle_double_cached(obj, action_name, cache_type):
+    is_cached = _is_cached(obj, action_name)
+    if not is_cached:
+        return False
+    if is_cached == cache_type:
+        warnings.warn(
+            f"The action method {action_name} of {obj.__name__} is already cached using global {cache_type} "
+            "cache. "
+            "Repeated calls (even with changed settings have no effect)",
+            stacklevel=2,
+        )
+        return True
+    raise ValueError(
+        f"The action method {action_name} of {obj.__name__} is already cached using global {is_cached}. "
+        f"Caching it again using a global {cache_type} cache is not supported. "
+        "Remove the global cache for the object first, before trying to cache it again."
+    )
+
+
+def _register_global_parallel_callback(func, name):
+    def wrapper(_):
+        func()
+    def _callback():
+
+        return None, wrapper
+
+    register_global_parallel_callback(_callback, name=name)
+
+
 def global_disk_cache(
     memory: Memory = Memory(None),
     *,
     cache_only: Optional[Sequence[str]] = None,
     action_method_name: Optional[str] = None,
+    restore_in_parallel_process: bool = True,
 ):
     """Wrap an algorithm/pipeline class to enable joblib based disk cashing for its primary action method.
 
@@ -123,6 +165,9 @@ def global_disk_cache(
         This might be helpful to reduce the size of the cache.
     action_method_name
         In case the object you want to cache has multiple action methods, you can specify the name of the action method.
+    restore_in_parallel_process
+        If True, we will register a global parallel callback, that the diskcache will be correctly restored when using
+        joblib parallel with the tpcp implementation of :func:`~tpcp.parallel.delayed`.
 
     Returns
     -------
@@ -138,33 +183,69 @@ def global_disk_cache(
     def inner(algorithm_object: type[Algorithm]):
         # This only return the first action method, but this is fine for now
         # This method is "unbound", as we are working on the class, not an instance
-        to_cache_action_method_name, action_method = _get_action_method(algorithm_object, action_method_name)
+        to_cache_action_method_name, action_method_raw = _get_action_method(algorithm_object, action_method_name)
+
+        if _handle_double_cached(algorithm_object, to_cache_action_method_name, "disk"):
+            return
+
+        # Here we register a global callback, that caching is correctly restored in parallel processes using our
+        # own "delayed" implementation.
+        if restore_in_parallel_process:
+
+            def recreate_cache():
+                # Note, we need to check if the object is already cached to avoid the double cache warning
+                if not _is_cached(algorithm_object, to_cache_action_method_name):
+                    global_disk_cache(
+                        memory,
+                        cache_only=cache_only,
+                        action_method_name=action_method_name,
+                        restore_in_parallel_process=False,
+                    )(algorithm_object)
+
+            _register_global_parallel_callback(
+                recreate_cache,
+                name=f"global_disk_cache__{algorithm_object.__qualname__}__{to_cache_action_method_name}",
+            )
 
         # We need to make the action method safe, as we are going to do weird stuff that expects correct implementation
-        action_method = make_action_safe(action_method)
+        action_method = make_action_safe(action_method_raw)
 
-        __cache_key = f"{_instance_level_disk_cache_key}__{to_cache_action_method_name}"
+        # our cached function gets the args, the kwargs and "fake self" as input.
+        # Fake self is a clean clone of the algorithm instance.
+        # It basically only encodes the parameters and the "name" of the algorithm.
+        # We also pass the name of the action method to ensure that we record individual versions of the cache
+        # for each action method.
+        @memory.cache()
+        def cached_action_method(__fake_self, __cache_only, __action_name, *args, **kwargs):
+            after_action_instance: Algorithm = action_method(__fake_self, *args, **kwargs)
+            # We return the results instead of the instance, as the results can be easily pickled.
+            if __cache_only is None:
+                return get_results(after_action_instance)
+            return {k: v for k, v in get_results(after_action_instance).items() if k in __cache_only}
 
         @functools.wraps(action_method)
         def wrapper(self, *args_outer, **kwargs_outer):
-            if getattr(self, __cache_key, None) is None:
-                # our cached function gets the args, the kwargs and "fake self" as input.
-                # Fake self is a clean clone of the algorithm instance.
-                # It basically only encodes the parameters and the "name" of the algorithm.
-                # We also pass the name of the action method to ensure that we record individual versions of the cache
-                # for each action method.
-                def cachable_inner(__fake_self, __cache_only, to_cache_action_method_name, *args, **kwargs):  # noqa: ARG001
-                    after_action_instance: Algorithm = action_method(__fake_self, *args, **kwargs)
-                    # We return the results instead of the instance, as the results can be easily pickled.
-                    if __cache_only is None:
-                        return get_results(after_action_instance)
-                    return {k: v for k, v in get_results(after_action_instance).items() if k in __cache_only}
-
-                cached_inner = memory.cache(cachable_inner)
-                setattr(self, __cache_key, cached_inner)
-
-            cached_inner = getattr(self, __cache_key)
-            results = cached_inner(self.clone(), cache_only, to_cache_action_method_name, *args_outer, **kwargs_outer)
+            # We maintain a little cached function cache on each instance, to avoid recreating the wrapped func each
+            # time the method is called.
+            cache_store = getattr(self, _instance_level_disk_cache_key, {})
+            if (cached_method := cache_store.get(to_cache_action_method_name, None)) is None:
+                cache_store[to_cache_action_method_name] = cached_action_method
+                cached_method = cached_action_method
+                setattr(self, _instance_level_disk_cache_key, cache_store)
+            try:
+                results = cached_method(
+                    self.clone(), cache_only, to_cache_action_method_name, *args_outer, **kwargs_outer
+                )
+            except PicklingError as e:
+                if multiprocessing.parent_process() is None and "__main__" in str(e):
+                    raise
+                raise ValueError(
+                    f"Attempting to retrieve a cached result for class {algorithm_object.__name__} "
+                    "failed after restoring the object in the child process. "
+                    "This is an expected error, if you defined the algorithm class in your main file. "
+                    "To use global caching together with multi-processing, you must define all "
+                    "classes that should be cached outside of the main file."
+                ) from e
 
             # manually "glue" the results back to the instance
             for result_name, result in results.items():
@@ -172,25 +253,35 @@ def global_disk_cache(
 
             return self
 
-        wrapper.__wrapped__ = action_method
+        # This is used to restore the method and identify, if a method is cached.
+        wrapper.__wrapped__ = action_method_raw
+        wrapper.__cache_type__ = "disk"
 
         setattr(algorithm_object, to_cache_action_method_name, wrapper)
-        return algorithm_object
 
     return inner
 
 
 def remove_disk_cache(algorithm_object: type[Algorithm]):
-    """Remove the disk cache from an algorithm class."""
+    """Remove the disk cache from an algorithm class.
+
+    .. warning:: This only removes the cache for all future instances! Existing instances will still use the cache
+    """
     for action_name in get_action_methods_names(algorithm_object):
         action_method = getattr(algorithm_object, action_name)
         if getattr(action_method, "__wrapped__", None) is not None:
             setattr(algorithm_object, action_name, action_method.__wrapped__)
+            with contextlib.suppress(KeyError):
+                remove_global_parallel_callback(f"global_disk_cache__{algorithm_object.__qualname__}__{action_name}")
     return algorithm_object
 
 
 def global_ram_cache(
-    max_n: Optional[int] = None, *, cache_only: Optional[Sequence[str]] = None, action_method_name: Optional[str] = None
+    max_n: Optional[int] = None,
+    *,
+    cache_only: Optional[Sequence[str]] = None,
+    action_method_name: Optional[str] = None,
+    restore_in_parallel_process: bool = True,
 ):
     """Wrap an algorithm/pipeline class to enable LRU based RAM cashing for the specified action method.
 
@@ -198,6 +289,12 @@ def global_ram_cache(
        only the results are "re-attached" to the original object.
        In case you rely on side effects of the action method, this might cause issues.
        But, if you are relying on side effects, you are probably doing something wrong anyway.
+
+    .. warning:: RAM cached objects can only be used with parallel processing, when the Algorithm/Pipeline class is
+       defined NOT in the main module.
+       Otherwise, you will get strange pickling errors.
+       In general, using RAM cache with multi-processing does likely not make sense, as the RAM cache can not be shared
+       between the individual processes.
 
     Parameters
     ----------
@@ -212,6 +309,12 @@ def global_ram_cache(
         This might be helpful to reduce the size of the cache.
     action_method_name
         In case the object you want to cache has multiple action methods, you can specify the name of the action method.
+    restore_in_parallel_process
+        If True, we will register a global parallel callback, that the diskcache will be correctly restored when using
+        joblib parallel with the tpcp implementation of :func:`~tpcp.parallel.delayed`.
+
+        .. warning:: This will only restore the cached setting, however, the actual cache is not shared and does not
+                     carry over to the new process
 
     Returns
     -------
@@ -228,38 +331,56 @@ def global_ram_cache(
         cache_only = tuple(cache_only)
 
     def inner(algorithm_object: type[Algorithm]):
-        to_cache_action_method_name, action_method = _get_action_method(algorithm_object, action_method_name)
+        to_cache_action_method_name, action_method_raw = _get_action_method(algorithm_object, action_method_name)
+
+        if _handle_double_cached(algorithm_object, to_cache_action_method_name, "ram"):
+            return algorithm_object
+
+        # Here we register a global callback, that caching is correctly restored in parallel processes using our
+        # own "delayed" implementation.
+        if restore_in_parallel_process:
+
+            def recreate_cache():
+                # Note, we need to check if the object is already cached to avoid the double cache warning
+                if not _is_cached(algorithm_object, to_cache_action_method_name):
+                    global_ram_cache(
+                        max_n=max_n,
+                        cache_only=cache_only,
+                        action_method_name=action_method_name,
+                        restore_in_parallel_process=False,
+                    )(algorithm_object)
+
+            _register_global_parallel_callback(
+                recreate_cache, name=f"global_ram_cache__{algorithm_object.__qualname__}__{to_cache_action_method_name}"
+            )
 
         # We need to make the action method safe, as we are going to do weird stuff that expects correct implementation
-        action_method = make_action_safe(action_method)
+        action_method = make_action_safe(action_method_raw)
+
+        @functools.lru_cache(max_n)
+        def cached_action(__fake_self, __cache_only, hashable_args, hashable_kwargs):
+            after_action_instance: Algorithm = action_method(
+                # Note: We need to clone the object here again.
+                # the LRU cache seems to calculate the hash of the object only after the function call.
+                # So we need to make sure that the object is not modified in the meantime.
+                __fake_self.obj.clone(),
+                *hashable_args.obj,
+                **hashable_kwargs.obj,
+            )
+            if __cache_only is None:
+                return get_results(after_action_instance)
+            return {k: v for k, v in get_results(after_action_instance).items() if k in __cache_only}
 
         @functools.wraps(action_method)
         def wrapper(self, *args_outer, **kwargs_outer):
-            if getattr(self, _class_level_lru_cache_key, None) is None or to_cache_action_method_name not in getattr(
-                self, _class_level_lru_cache_key
-            ):
-
-                def cachable_inner(__fake_self, __cache_only, hashable_args, hashable_kwargs):
-                    after_action_instance: Algorithm = action_method(
-                        # Note: We need to clone the object here again.
-                        # the LRU cache seems to calculate the hash of the object only after the function call.
-                        # So we need to make sure that the object is not modified in the meantime.
-                        __fake_self.obj.clone(),
-                        *hashable_args.obj,
-                        **hashable_kwargs.obj,
-                    )
-                    if __cache_only is None:
-                        return get_results(after_action_instance)
-                    return {k: v for k, v in get_results(after_action_instance).items() if k in __cache_only}
-
-                # Create a LRUCache with max_n entries and store it on the class.
-                # This way it is unique and shared between all instances of the class.
-                cached_inner = {to_cache_action_method_name: functools.lru_cache(max_n)(cachable_inner)}
-                setattr(algorithm_object, _class_level_lru_cache_key, cached_inner)
-
-            cached_inner = getattr(self, _class_level_lru_cache_key)
-
-            results = cached_inner[to_cache_action_method_name](
+            # Compared to the disk cache, the cash store is maintained on the class level to be shared between all
+            # instances
+            cache_store = getattr(algorithm_object, _class_level_lru_cache_key, {})
+            if (cached_method := cache_store.get(to_cache_action_method_name, None)) is None:
+                cache_store[to_cache_action_method_name] = cached_action
+                cached_method = cached_action
+                setattr(algorithm_object, _class_level_lru_cache_key, cache_store)
+            results = cached_method(
                 UniversalHashableWrapper(self.clone()),
                 cache_only,
                 UniversalHashableWrapper(args_outer),
@@ -272,7 +393,9 @@ def global_ram_cache(
 
             return self
 
-        wrapper.__wrapped__ = action_method
+        # This is used to restore the method and identify, if a method is cached.
+        wrapper.__wrapped__ = action_method_raw
+        wrapper.__cache_type__ = "ram"
 
         setattr(algorithm_object, to_cache_action_method_name, wrapper)
         return algorithm_object
@@ -288,6 +411,10 @@ def remove_ram_cache(algorithm_object: type[Algorithm]):
         action_method = getattr(algorithm_object, action_method_name)
         if getattr(action_method, "__wrapped__", None) is not None:
             setattr(algorithm_object, action_method_name, action_method.__wrapped__)
+            with contextlib.suppress(KeyError):
+                remove_global_parallel_callback(
+                    f"global_ram_cache__{algorithm_object.__qualname__}__{action_method_name}"
+                )
 
     if getattr(algorithm_object, _class_level_lru_cache_key, None) is not None:
         delattr(algorithm_object, _class_level_lru_cache_key)
