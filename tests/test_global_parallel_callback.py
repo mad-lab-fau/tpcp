@@ -14,6 +14,7 @@ def reset_parallel_context():
     yield
     parallel._PARALLEL_CONTEXT_CALLBACKS = {}
 
+
 def test_simple_callback():
     set_config("set")
 
@@ -35,7 +36,6 @@ def test_simple_callback():
     register_global_parallel_callback(callback)
 
     assert joblib.Parallel(n_jobs=2)(delayed(func)() for _ in range(2)) == ["set", "set"]
-
 
 
 def test_doctest():
