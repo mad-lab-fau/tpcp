@@ -427,9 +427,10 @@ def remove_any_cache(algorithm_object: type[Algorithm]):
     return remove_disk_cache(remove_ram_cache(algorithm_object))
 
 
-def get_ram_cache_obj(algorithm_object: type[Algorithm]):
+def get_ram_cache_obj(algorithm_object: type[Algorithm], action_method_name: Optional[str] = None) -> Optional:
     """Get the RAM cache object from an algorithm class."""
-    return getattr(algorithm_object, _class_level_lru_cache_key, None)["cached_func"]
+    action_method_name, _ = _get_action_method(algorithm_object, action_method_name)
+    return getattr(algorithm_object, _class_level_lru_cache_key, None)[action_method_name]
 
 
 _GLOBAL_CACHE_REGISTRY: dict[tuple[str, str], Callable] = {}
