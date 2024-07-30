@@ -1,5 +1,3 @@
-import multiprocessing
-import pickle
 import warnings
 from functools import partial
 from typing import Callable, Literal
@@ -11,7 +9,7 @@ from joblib.externals.loky import get_reusable_executor
 
 from tests._example_pipelines import CacheWarning, ExampleClassOtherModule
 from tpcp import Algorithm
-from tpcp.caching import global_disk_cache, global_ram_cache, hybrid_cache, remove_any_cache, _is_cached
+from tpcp.caching import _is_cached, global_disk_cache, global_ram_cache, hybrid_cache, remove_any_cache
 
 
 class ExampleClass(Algorithm):
@@ -53,6 +51,7 @@ def example_class(request):
     yield request.param
     remove_any_cache(request.param[1])
 
+
 @pytest.fixture()
 def simple_example_class(request):
     yield ExampleClassOtherModule
@@ -91,6 +90,7 @@ class TestGlobalCache:
         else:
             self.cache_method = partial(global_ram_cache, None)
         self.cache_method_name = request.param
+
     def test_caching_twice_same_instance(self, example_class):
         config, example_class = example_class
         action_name = config.get("action_method_name", "action")
@@ -175,14 +175,16 @@ class TestGlobalCache:
         config, example_class = example_class
         action_name = config.get("action_method_name", "action")
         self.cache_method(**config)(example_class)
-        with pytest.warns(UserWarning, match=f"The action method {action_name} of {example_class.__name__} is already cached"):
+        with pytest.warns(
+            UserWarning, match=f"The action method {action_name} of {example_class.__name__} is already cached"
+        ):
             self.cache_method(**config)(example_class)
 
     @pytest.mark.parametrize("restore_in_parallel_process", [True, False])
     def test_cache_correctly_restored_in_parallel_process(self, simple_example_class, restore_in_parallel_process):
-        from tpcp.parallel import delayed
         from joblib import Parallel
 
+        from tpcp.parallel import delayed
 
         self.cache_method(restore_in_parallel_process=restore_in_parallel_process)(simple_example_class)
 
@@ -228,8 +230,6 @@ class TestFurtherCachingStuff:
         global_ram_cache(None)(simple_example_class)
         with pytest.raises(ValueError):
             global_disk_cache(joblib_cache)(simple_example_class)
-
-
 
 
 class TestHybridCache:
