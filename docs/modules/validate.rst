@@ -28,6 +28,7 @@ Scoring
     Scorer
     Aggregator
     FloatAggregator
+    MacroFloatAggregator
 
 .. currentmodule:: tpcp.validate
 

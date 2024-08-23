@@ -11,8 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The global cache helper now support algorithms with multiple action methods by specifying the name of the action 
   method you want to cache.
   (https://github.com/mad-lab-fau/tpcp/pull/118)
-- Global disk cache helper should now be able to cache the action methods of algorithm classes defined in the main \
+- Global disk cache helper should now be able to cache the action methods of algorithm classes defined in the main 
   script.
+  (https://github.com/mad-lab-fau/tpcp/pull/118)
+- There are new builtin `FloatAggregator` and `MacroFloatAggregator` that should cover many of the use cases that 
+  previously required custom aggregators.
   (https://github.com/mad-lab-fau/tpcp/pull/118)
 
 
