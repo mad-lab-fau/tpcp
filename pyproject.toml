@@ -29,8 +29,8 @@ optuna = {version = ">=2.10", optional = true}
 attrs = {version = ">=22.1.0", optional = true}
 
 [tool.poetry.extras]
-_torch_cpu = ["torch"]
-_tensorflow = ["tensorflow-cpu"]
+x-torch_cpu = ["torch"]
+x-tensorflow = ["tensorflow-cpu"]
 optuna = ["optuna"]
 attrs = ["attrs"]
 
