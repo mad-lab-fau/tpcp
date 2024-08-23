@@ -217,7 +217,7 @@ class TestGlobalCache:
         Parallel(n_jobs=2)(delayed(worker_func)(simple_example_class(1, 2)) for _ in range(2))
         # This is important! Otherwise, the different parameterized versions of the test reuse the same processes.
         # Hence, the global caching will already be reactivated in the new process.
-        get_reusable_executor().shutdown(wait=True)
+
 
 
 class TestFurtherCachingStuff:
