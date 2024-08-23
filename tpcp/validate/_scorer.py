@@ -80,7 +80,10 @@ class Aggregator(BaseTpcpObject, Generic[T]):
 
     def __repr__(self) -> str:
         """Show the representation of the object."""
-        return f"{self!r}({self._value!r})"
+        existing_repr = super().__repr__()
+        if hasattr(self, "_value"):
+            return f"{existing_repr}({self._value!r})"
+        return existing_repr
 
     def __call__(self, value: T) -> Self:
         """Set the value of the aggregator.
