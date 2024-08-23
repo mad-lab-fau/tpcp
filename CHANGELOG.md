@@ -18,7 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   previously required custom aggregators.
   (https://github.com/mad-lab-fau/tpcp/pull/118)
 
-
 ### Changed
 
 - Relative major overhall of how aggregator in scoring functions work. Before, aggregators were classes that were 
