@@ -4,9 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2024-10-18
+
+Fixes names of optional dependency groups. That should resolve install issues when using uv as package manager.
+
 ## [1.0.0] - 2024-07-03
 
-Note: This is a major version bump, because we have quite substantial breaking changes. The 1.0 should signal that we
+Note: This is a major version bump, because we have quite substantial breaking changes. The 1.0 should not signal that we
 are now feature complete. Though the core APIs have been mostly stable for quite some time now.
 
 ### BREAKING CHANGE
