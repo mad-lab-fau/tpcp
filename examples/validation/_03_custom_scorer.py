@@ -38,15 +38,10 @@ from pathlib import Path
 # -----
 # We will simply reuse the pipline from the general QRS detection example.
 # For all of our custom scorer, we will use this pipeline and apply it to all datapoints of the ECG example dataset.
-import pandas as pd
-
 from examples.algorithms.algorithms_qrs_detection_final import (
-    QRSDetector,
     match_events_with_reference,
-    precision_recall_f1_score,
 )
 from examples.datasets.datasets_final_ecg import ECGExampleData
-from tpcp import Parameter, Pipeline, cf
 
 try:
     HERE = Path(__file__).parent
@@ -54,6 +49,13 @@ except NameError:
     HERE = Path().resolve()
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
+
+import pandas as pd
+from joblib.memory import Memory
+
+from examples.algorithms.algorithms_qrs_detection_final import QRSDetector, precision_recall_f1_score
+from examples.datasets.datasets_final_ecg import ECGExampleData
+from tpcp import Parameter, Pipeline, cf
 
 
 class MyPipeline(Pipeline[ECGExampleData]):
@@ -75,10 +77,9 @@ class MyPipeline(Pipeline[ECGExampleData]):
 
 # %%
 # We set up a global cache for our pipeline to speed up the repeated evaluation we do below.
-from tpcp.caching import global_ram_cache
+from tpcp.caching import global_disk_cache
 
-global_ram_cache(action_method_name="run")(MyPipeline)
-
+global_disk_cache(memory=Memory("./.cache"), restore_in_parallel_process=True, action_method_name="run")(MyPipeline)
 
 pipe = MyPipeline()
 
@@ -96,7 +97,7 @@ pipe = MyPipeline()
 #
 # .. note:: At the moment we don't support returning only no-aggregated from a scorer.
 #           At least one value must be aggregated, so that it can be used to rank results.
-#           If you really need this (e.g. in combination with :func:`~tpcp.validate.validat`), you can return a dummy
+#           If you really need this (e.g. in combination with :func:`~tpcp.validate.validate`), you can return a dummy
 #           value that is not used in the aggregation.
 from tpcp.validate import no_agg
 
@@ -184,12 +185,12 @@ assert median_results_agg["f1_score"] == np.mean(median_results_single["f1_score
 # .. note:: We could also change the default aggregator for all scores by using the `default_aggregator` parameter of
 #           the :class:`~tpcp.validate.Scorer` class (See the next example).
 # Let's start with the first way.
-median_results_agg, median_results_single = Scorer(score, default_aggregator=median_agg)(pipe, example_data)
+all_median_results_agg, all_median_results_single = Scorer(score, default_aggregator=median_agg)(pipe, example_data)
 median_results_agg
 # %%
 # We can see via the log-printing that the aggregator was called 3 times (once per score).
-assert median_results_agg["f1_score"] == np.median(median_results_single["f1_score"])
-assert median_results_agg["precision"] == np.median(median_results_single["precision"])
+assert all_median_results_agg["f1_score"] == np.median(all_median_results_single["f1_score"])
+assert all_median_results_agg["precision"] == np.median(all_median_results_single["precision"])
 
 # %%
 # Multi-Return Aggregator
@@ -447,7 +448,8 @@ complicated_agg, complicated_single = Scorer(score)(pipe, example_data)
 complicated_agg
 
 # %%
-# We can even move the initialization of the aggregator into the score function.
+# We can even move the initialization of the aggregator into the score function, or pass the Aggregator itself as a
+# parameter.
 # This allows us to make the score function itself generalizable.
 #
 # This works, because we check if the aggregators all have the same config, but we don't enforce them to all be the
@@ -455,15 +457,17 @@ complicated_agg
 #
 # This allows for quite powerful and flexible scoring functions that we could then use with `partial` to create
 # different versions of the score function.
-from functools import partial
+#
+# While we are at it, we also make the `tolerance_s` a parameter of the score function.
 
 
-def score(pipeline: MyPipeline, datapoint: ECGExampleData, *, agg_func: Callable, return_raw_scores: bool = True):
+def score(
+    pipeline: MyPipeline, datapoint: ECGExampleData, *, tolerance_s: float, per_sample_agg: Aggregator[np.ndarray]
+):
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
     # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
     # will clone it again.
     pipeline = pipeline.safe_run(datapoint)
-    tolerance_s = 0.02  # We just use 20 ms for this example
     matches = match_events_with_reference(
         pipeline.r_peak_positions_.to_numpy(),
         datapoint.r_peak_positions_.to_numpy(),
@@ -474,20 +478,31 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData, *, agg_func: Callable
         "precision": precision,
         "recall": recall,
         "f1_score": f1_score,
-        "per_sample": SingleValueAggregator(agg_func, return_raw_scores=return_raw_scores)(matches),
+        "per_sample": per_sample_agg(matches),
     }
 
 
 # %%
-# With that we can reconstruct the `return_raw_scores=False` behaviour from before.
+# With that we can reconstruct the `return_raw_scores=False` behaviour from before using a partial or a lambda
+from functools import partial
+
 complicated_agg_now_raw, complicated_single_no_raw = Scorer(
-    partial(score, agg_func=calculate_precision_recall_f1, return_raw_scores=False)
+    partial(
+        score,
+        per_sample_agg=SingleValueAggregator(calculate_precision_recall_f1, return_raw_scores=False),
+        tolerance_s=0.02,
+    ),
+    # Note: You could also run this with multiple jobs, but this creates issues with the way we test the examples.
+    n_jobs=1,
 )(pipe, example_data)
 complicated_agg_now_raw
 
 # %%
 complicated_single_no_raw.keys()
 
+
 # %%
-# Parameterizing Score Functions
-# ------------------------------
+# And finally remove the cache to not affect other examples.
+from tpcp.caching import remove_any_cache
+
+remove_any_cache(MyPipeline)
