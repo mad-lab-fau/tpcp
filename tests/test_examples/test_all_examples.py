@@ -116,30 +116,29 @@ def test_dataclasses():
 
 def test_custom_scorer():
     from examples.validation._03_custom_scorer import (
+        all_median_results_agg,
         complicated_agg,
         complicated_single_no_raw,
-        group_weighted_agg,
+        macro_agg,
         median_results_agg,
         multi_agg_agg,
         no_agg_agg,
-        partial_median_results_agg,
     )
 
-    assert_almost_equal(baseline_results_agg["f1_score"], 0.7089728)
-    assert_almost_equal(median_results_agg["f1_score"], 0.9173713)
-    assert_almost_equal(partial_median_results_agg["f1_score"], median_results_agg["f1_score"])
-    assert_almost_equal(partial_median_results_agg["precision"], baseline_results_agg["precision"])
-    assert_almost_equal(multi_agg_agg["f1_score__mean"], baseline_results_agg["f1_score"])
+    assert "n_labels" not in no_agg_agg
+
+    assert_almost_equal(median_results_agg["f1_score"], 0.7089728)
+    assert_almost_equal(median_results_agg["median_f1_score"], 0.9173713)
+    assert_almost_equal(all_median_results_agg["f1_score"], median_results_agg["median_f1_score"])
+    assert_almost_equal(multi_agg_agg["f1_score__mean"], median_results_agg["f1_score"])
     assert_almost_equal(multi_agg_agg["f1_score__std"], 0.39387732846763174)
 
-    assert_almost_equal(complicated_agg["f1_score"], baseline_results_agg["f1_score"])
+    assert macro_agg["f1_score__macro"] == 0.7089727629059107
+
     assert_almost_equal(complicated_agg["per_sample__f1_score"], 0.8172557027823545)
-
-    assert "f1_score" not in no_agg_agg
-
-    assert group_weighted_agg["f1_score__group_mean"] == 0.7089727629059107
+    assert_almost_equal(complicated_agg["f1_score"], median_results_agg["f1_score"])
     for i in range(1, 4):
-        assert f"f1_score__group_{i}" in group_weighted_agg
+        assert f"f1_score__group_{i}" in macro_agg
 
     assert "per_sample" not in complicated_single_no_raw
 
