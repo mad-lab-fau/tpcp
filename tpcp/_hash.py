@@ -2,10 +2,11 @@
 import contextlib
 import os
 import pickle
-import struct
 import sys
+import types
 from pathlib import Path
 
+from joblib.func_inspect import get_func_code
 from joblib.hashing import Hasher, NumpyHasher
 
 Pickler = pickle._Pickler
@@ -32,6 +33,8 @@ class NoMemoizeHasher(Hasher):
 
         Namely, this implementation fixes the following issues:
 
+        - Hashing of globally and objects defined in closures, namely dynamic classes and functions.
+          We do that by not hashing the object completely, but only the qualname and the code object.
         - Because we skip memoization, we need to handle the case where the object is self-referential.
           We just catch the error and raise a more descriptive error message.
 
@@ -44,61 +47,29 @@ class NoMemoizeHasher(Hasher):
                 "The custom hasher used in tpcp does not support hashing of self-referential objects."
             ) from e
 
-    def save_global(self, obj, name=None, pack=struct.pack):
-        """We overwrite this method to fix the issue with objects defined in the `__main__` module.
-
-        We need to handle the case where the object is defined in the `__main__` module.
-        For some reason, this can lead to pickle issues.
-        Based on some information I found, this should not happen, but it still does...
-        To fix it, we detect, when an object is defined in `__main__` and temporarily add it to the "real" module
-        representing the main function.
-        Afterwards we do some cleanup.
-        Not sure if really required, but it seems to work.
-        Overall very hacky, but I don't see a better way to fix this.
-
-        The implementation provided by the parent class (joblib.hashing.Hasher) should work, but it does not.
-        I think the second call to `save_global` there is causing the issue.
-        In our version we first fix the module before calling save_global again.
-
-        Note that we are not using super() here, as we want to skip the faulty implementation in the parent class.
-
-        We also need to modify the dispatch table to force our custom save_global method.
-        See below this method for the implementation.
-        """
-        kwargs = {"name": name, "pack": pack}
-        del kwargs["pack"]
+    def save(self, obj):
         try:
-            Pickler.save_global(self, obj, **kwargs)
+            super().save(obj)
         except pickle.PicklingError:
-            modules_modified = []
-            if getattr(obj, "__module__", None) == "__main__":
-                try:
-                    name = obj.__qualname__
-                    to_add_obj = obj
-                except AttributeError:
-                    name = obj.__class__.__qualname__
-                    to_add_obj = obj.__class__
-                mod = sys.modules["__main__"]
-                if not hasattr(mod, name):
-                    modules_modified.append((mod, name))
-                    setattr(mod, name, to_add_obj)
-            try:
-                Pickler.save_global(self, obj, **kwargs)
-            finally:
-                # Remove all new entries made to the main module.
-                for mod, name in modules_modified:
-                    delattr(mod, name)
+            if not ("<locals>" in obj.__qualname__ or "__main__" in obj.__module__):
+                raise
+            # These are problematic cases that sometimes lead to issues.
+            # We need to handle the case where an obj is defined in a closure.
+            # This can lead to issues, as the object is not hashable.
+            # We therefore destruct the object into its parts and cache them individually.
+            # https://stackoverflow.com/questions/46768213/how-to-hash-a-class-or-function-definition
+            #
+            # It might be that there are rare cases, where this is not enough,
+            # and we would get false-positives equality of objects.
+            # However, in the context of tpcp, that is not really a concern. In most possible cases, this just means
+            # that some (likely obscure) guardrail will not trigger for you.
+            if isinstance(obj, types.FunctionType):
+                obj = ("F", obj.__qualname__, get_func_code(obj), vars(obj))
 
-    # We also need to rewrite the dispatch table to force our custom save_global method.
-    dispatch = Hasher.dispatch.copy()
-    # builtin
-    dispatch[type(len)] = save_global
-    # type
-    dispatch[type(object)] = save_global
-    # classobj
-    dispatch[type(Hasher)] = save_global
-    # function
-    dispatch[type(pickle.dump)] = save_global
+            if isinstance(obj, type):
+                obj = ("C", obj.__qualname__, obj.__bases__, dict(vars(obj)))
+
+            super().save(obj)
 
 
 class NoMemoizeNumpyHasher(NoMemoizeHasher, NumpyHasher):
@@ -152,8 +123,7 @@ class NNHasher(NoMemoizeNumpyHasher):
             from tensorflow.python.keras.utils.generic_utils import SharedObjectSavingScope, serialize_keras_object
 
             with SharedObjectSavingScope():
-                NumpyHasher.save(
-                    self,
+                super().save(
                     [obj.__class__.__name__, serialize_keras_object(obj), obj.get_weights()],
                 )
             return
@@ -161,7 +131,7 @@ class NNHasher(NoMemoizeNumpyHasher):
         if self.torch and isinstance(obj, (self.torch.nn.Module, self.torch.Tensor)):
             obj = self._convert_tensors_to_numpy(obj)
 
-        NumpyHasher.save(self, obj)
+        super().save(obj)
 
 
 # This function is modified based on
@@ -169,7 +139,8 @@ class NNHasher(NoMemoizeNumpyHasher):
 def custom_hash(obj, hash_name="md5", coerce_mmap=False):
     """Quick calculation of a hash to identify uniquely Python objects containing numpy arrays and torch models.
 
-    This function is modified based on `joblib.hash` so that it can properly handle torch models.
+    This function is modified based on `joblib.hash` so that it can properly handle torch and tensorflow objects.
+    It adds some further "fixes" for dynamically defined functions.
 
     Parameters
     ----------
