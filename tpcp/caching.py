@@ -3,6 +3,7 @@ import binascii
 import contextlib
 import functools
 import multiprocessing
+import sys
 import warnings
 from collections.abc import Sequence
 from pickle import PicklingError
@@ -181,6 +182,12 @@ def global_disk_cache(  # noqa: C901
     _global_cache_warning()
 
     def inner(algorithm_object: type[Algorithm]):  # noqa: C901
+        if "<locals>" in algorithm_object.__qualname__:
+            raise ValueError(
+                "Global disk caching does not work with classes defined in inner scopes. "
+                "The used classes need to be defined on the top level of a module or script."
+            )
+
         # This only return the first action method, but this is fine for now
         # This method is "unbound", as we are working on the class, not an instance
         to_cache_action_method_name, action_method_raw = _get_action_method(algorithm_object, action_method_name)
@@ -232,20 +239,50 @@ def global_disk_cache(  # noqa: C901
                 cache_store[to_cache_action_method_name] = cached_action_method
                 cached_method = cached_action_method
                 setattr(self, _instance_level_disk_cache_key, cache_store)
+
+            new_instance = self.clone()
+            current_type = type(new_instance)
             try:
                 results = cached_method(
-                    self.clone(), cache_only, to_cache_action_method_name, *args_outer, **kwargs_outer
+                    new_instance, cache_only, to_cache_action_method_name, *args_outer, **kwargs_outer
                 )
-            except PicklingError as e:
-                if multiprocessing.parent_process() is None and "__main__" in str(e):
+            except PicklingError:
+                if (
+                    multiprocessing.parent_process() is None
+                    or not getattr(current_type, "__module__", None) == "__main__"
+                ):
                     raise
-                raise ValueError(
-                    f"Attempting to retrieve a cached result for class {algorithm_object.__name__} "
-                    "failed after restoring the object in the child process. "
-                    "This is an expected error, if you defined the algorithm class in your main file. "
-                    "To use global caching together with multi-processing, you must define all "
-                    "classes that should be cached outside of the main file."
-                ) from e
+
+                # This is some black magic...
+                # For some reason, if you defined your pipeline class in __main__, it can not be correctly pickled.
+                # However, joblib memory needs to pickle it to hash it properly.
+                # In a multi-process scenario, the class is send over to the subprocess using cloud pickle.
+                # This means that the pickling issue can be circumvented there.
+                # However, it is then not possible anymore to import the class in the subprocess, as __main__ is defined
+                # differently.
+                # To make it importable, and with that properly pickalable, we use the workaround below, that is already
+                # used by joblib in other cases:
+                # We manually add the obj to the new __main__ in the subprocess.
+                modules_modified = []
+
+                try:
+                    name = current_type.__qualname__
+                    to_add_obj = current_type
+                except AttributeError:
+                    name = current_type.__class__.__qualname__
+                    to_add_obj = current_type.__class__
+                mod = sys.modules["__main__"]
+                if not hasattr(mod, name):
+                    modules_modified.append((mod, name))
+                    setattr(mod, name, to_add_obj)
+                try:
+                    results = cached_method(
+                        new_instance, cache_only, to_cache_action_method_name, *args_outer, **kwargs_outer
+                    )
+                finally:
+                    # Remove all new entries made to the main module.
+                    for mod, name in modules_modified:
+                        delattr(mod, name)
 
             # manually "glue" the results back to the instance
             for result_name, result in results.items():
