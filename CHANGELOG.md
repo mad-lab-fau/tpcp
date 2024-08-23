@@ -11,8 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The global cache helper now support algorithms with multiple action methods by specifying the name of the action 
   method you want to cache.
   (https://github.com/mad-lab-fau/tpcp/pull/118)
+- Global disk cache helper should now be able to cache the action methods of algorithm classes defined in the main \
+  script.
+  (https://github.com/mad-lab-fau/tpcp/pull/118)
 
-- 
 
 ### Changed
 
@@ -34,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   slow.
   This was particularly noticeable in case of multiprocessing, as the module was imported in every worker process.
   We now only import the module, within the clone function and only, if you had imported it before.
+  (https://github.com/mad-lab-fau/tpcp/pull/118)
+- The custom hash function now has a different way of hashing functions and classes defined in local scopes.
+  This should prevent strange pickling errors from just using "tpcp" normally.
   (https://github.com/mad-lab-fau/tpcp/pull/118)
 
 ## [1.0.1] - 2024-10-18
