@@ -109,7 +109,7 @@ def register_global_parallel_callback(callback: Callable[[], tuple[T, Callable[[
 
     Parameters
     ----------
-    callback : Callable[[], Tuple[T, Callable[[T], None]]]
+    callback
         The callback function that will be called when :func:`~tpcp.parallel.delayed` is called in the main process.
         The callback should return a value and a setter function.
     name
