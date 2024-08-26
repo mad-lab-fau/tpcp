@@ -9,19 +9,21 @@ from tqdm.auto import tqdm
 
 from tpcp import Dataset, Pipeline
 from tpcp._base import _Default
+from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
+from tpcp._pipeline import PipelineT
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results, _passthrough, _prefix_para_dict
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.parallel import delayed
 from tpcp.validate._cross_val_helper import DatasetSplitter
-from tpcp.validate._scorer import Scorer, _validate_scorer
+from tpcp.validate._scorer import Scorer, _validate_scorer, ScorerTypes, ScoreFunc
 
 
 def cross_validate(
-    optimizable: BaseOptimize,
-    dataset: Dataset,
+    optimizable: BaseOptimize[PipelineT, DatasetT],
+    dataset: DatasetT,
     *,
-    scoring: Optional[Callable],
+    scoring: ScoreFunc[PipelineT, DatasetT],
     cv: Optional[Union[DatasetSplitter, int, BaseCrossValidator, Iterator]] = None,
     n_jobs: Optional[int] = None,
     verbose: int = 0,
@@ -159,15 +161,15 @@ def cross_validate(
 
 
 def validate(
-    pipeline: Pipeline,
-    dataset: Dataset,
+    pipeline: PipelineT,
+    dataset: DatasetT,
     *,
-    scoring: Optional[Union[Callable, Scorer]],
+    scoring: ScorerTypes[PipelineT, DatasetT],
     n_jobs: Optional[int] = _Default(None),
     verbose: int = _Default(0),
     pre_dispatch: Union[str, int] = _Default("2*n_jobs"),
     progress_bar: bool = _Default(True),
-):
+) -> dict[str, Any]:
     """Evaluate a pipeline on a dataset without any optimization.
 
     Parameters

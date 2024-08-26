@@ -233,7 +233,7 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
         return self
 
 
-class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT, T]):
+class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]):
     """Perform a grid search over various parameters.
 
     This scores the pipeline for every combination of data points in the provided dataset and parameter combinations
@@ -333,7 +333,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
     """
 
     parameter_grid: ParameterGrid
-    scoring: ScorerTypes[PipelineT, DatasetT, T]
+    scoring: ScorerTypes[PipelineT, DatasetT]
     n_jobs: Optional[int]
     return_optimized: Union[bool, str]
     pre_dispatch: Union[int, str]
@@ -350,7 +350,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         pipeline: PipelineT,
         parameter_grid: ParameterGrid,
         *,
-        scoring: ScorerTypes[PipelineT, DatasetT, T],
+        scoring: ScorerTypes[PipelineT, DatasetT],
         n_jobs: Optional[int] = None,
         return_optimized: Union[bool, str] = True,
         pre_dispatch: Union[int, str] = "n_jobs",
@@ -497,7 +497,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
 
 class GridSearchCV(
     BaseOptimize[OptimizablePipelineT, DatasetT],
-    Generic[OptimizablePipelineT, DatasetT, T],
+    Generic[OptimizablePipelineT, DatasetT],
 ):
     """Exhaustive (hyper)parameter search using a cross validation based score to optimize pipeline parameters.
 
@@ -654,7 +654,7 @@ class GridSearchCV(
 
     pipeline: OptimizablePipelineT
     parameter_grid: ParameterGrid
-    scoring: ScorerTypes[OptimizablePipelineT, DatasetT, T]
+    scoring: ScorerTypes[OptimizablePipelineT, DatasetT]
     return_optimized: Union[bool, str]
     cv: Optional[Union[DatasetSplitter, int, BaseCrossValidator, Iterator]]
     pure_parameters: Union[bool, list[str]]
@@ -678,7 +678,7 @@ class GridSearchCV(
         pipeline: OptimizablePipelineT,
         parameter_grid: ParameterGrid,
         *,
-        scoring: ScorerTypes[OptimizablePipelineT, DatasetT, T],
+        scoring: ScorerTypes[OptimizablePipelineT, DatasetT],
         return_optimized: Union[bool, str] = True,
         cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
         pure_parameters: Union[bool, list[str]] = False,

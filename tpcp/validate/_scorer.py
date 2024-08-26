@@ -36,24 +36,24 @@ T = TypeVar("T")
 AggReturnType = Union[float, dict[str, float], _Nothing]
 
 
-SingleScoreTypeT = Union[T, "Aggregator[Any]"]
-MultiScoreTypeT = dict[str, SingleScoreTypeT[T]]
-ScoreTypeT = Union[SingleScoreTypeT[T], MultiScoreTypeT[T]]
+SingleScoreType = Union[float, "Aggregator[Any]"]
+MultiScoreType = dict[str, SingleScoreType]
+ScoreType = Union[SingleScoreType, MultiScoreType]
 
-ScoreFuncSingle = Callable[[PipelineT, DatasetT], SingleScoreTypeT[T]]
-ScoreFuncMultiple = Callable[[PipelineT, DatasetT], MultiScoreTypeT[T]]
-ScoreFunc = Callable[[PipelineT, DatasetT], ScoreTypeT[T]]
+ScoreFuncSingle = Callable[[PipelineT, DatasetT], SingleScoreType]
+ScoreFuncMultiple = Callable[[PipelineT, DatasetT], MultiScoreType]
+ScoreFunc = Callable[[PipelineT, DatasetT], ScoreType]
 
 
-class ScoreCallback(Protocol[PipelineT, DatasetT, T]):
+class ScoreCallback(Protocol[PipelineT, DatasetT]):
     """Callback signature for scorer callbacks."""
 
     def __call__(
         self,
         *,
         step: int,
-        scores: tuple[ScoreTypeT[T], ...],
-        scorer: Scorer[PipelineT, DatasetT, T],
+        scores: tuple[ScoreType, ...],
+        scorer: Scorer[PipelineT, DatasetT],
         pipeline: PipelineT,
         dataset: DatasetT,
     ) -> None:
@@ -263,7 +263,7 @@ def mean_agg(value: float) -> FloatAggregator:
     return _mean_agg(value)
 
 
-class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
+class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
     """A scorer to score multiple data points of a dataset and average the results.
 
     Parameters
@@ -304,9 +304,9 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
 
     """
 
-    score_func: ScoreFunc[PipelineT, DatasetT, T]
+    score_func: ScoreFunc[PipelineT, DatasetT]
     default_aggregator: Aggregator
-    single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT, T]]
+    single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT]]
     n_jobs: Optional[int]
     verbose: int
     pre_dispatch: Union[str, int]
@@ -314,7 +314,7 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
 
     def __init__(
         self,
-        score_func: ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]],
+        score_func: ScoreFunc[PipelineT, DatasetT, ScoreType],
         final_aggregator: Optional[Callable] = None,
         *,
         default_aggregator: Aggregator = cf(mean_agg),
@@ -354,9 +354,9 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
 
     def _aggregate(
         self,
-        scores: dict[str, tuple[Aggregator[T], list[T]]],
+        scores: dict[str, tuple[Aggregator, list]],
         datapoints: list[DatasetT],
-    ) -> tuple[Union[float, dict[str, float]], Union[Optional[list[T]], dict[str, list[T]]]]:
+    ) -> tuple[Union[float, dict[str, float]], Union[Optional[list], dict[str, list]]]:
         """Aggregate the scores."""
         is_single = len(scores) == 1 and "__single__" in scores
         if is_single and isinstance(scores["__single__"][0], _NoAgg):
@@ -367,7 +367,7 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
                 "multiple values are wrapped with `no_agg`."
             )
 
-        raw_scores: dict[str, list[T]] = {}
+        raw_scores: dict[str, list] = {}
         agg_scores: dict[str, float] = {}
         for name, (aggregator, raw_score) in scores.items():
             if aggregator.return_raw_scores is True:
@@ -417,7 +417,7 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
                 ) from e
             return i, score
 
-        scores: list[ScoreTypeT[T]] = []
+        scores: list[ScoreType] = []
 
         pbar = partial(tqdm, total=len(dataset), desc="Datapoints") if self.progress_bar else _passthrough
         parallel = Parallel(
@@ -443,14 +443,14 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
         return agg_scores, raw_scores
 
 
-ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]], Scorer[PipelineT, DatasetT, ScoreTypeT[T]]]
+ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT], Scorer[PipelineT, DatasetT]]
 
 
 def _validate_scorer(
-    scoring: ScorerTypes[PipelineT, DatasetT, Any],
+    scoring: ScorerTypes[PipelineT, DatasetT],
     pipeline: PipelineT,
-    base_class: type[Scorer[Any, Any, Any]] = Scorer,
-) -> Scorer[PipelineT, DatasetT, Any]:
+    base_class: type[Scorer[Any, Any]] = Scorer,
+) -> Scorer[PipelineT, DatasetT]:
     """Convert the provided scoring method into a valid scorer object."""
     if scoring is None:
         raise ValueError(
@@ -504,9 +504,9 @@ def _invert_list_of_dicts(list_of_dicts: list[dict[str, Any]]) -> dict[str, list
 
 def _check_and_invert_score_dict(
     #  I don't care that this is to complex, some things need to be complex
-    scores: list[ScoreTypeT[T]],
+    scores: list[ScoreType],
     default_agg: Aggregator,
-) -> dict[str, tuple[Aggregator[T], list[T]]]:
+) -> dict[str, tuple[Aggregator, list]]:
     """Invert the scores dictionary to a list of scores."""
     first_score = scores[0]
     if not isinstance(first_score, dict):
@@ -514,7 +514,7 @@ def _check_and_invert_score_dict(
 
     expected_length = len(scores)
     inverted_scoring_dict = _invert_list_of_dicts(scores)
-    return_dict: dict[str, tuple[Aggregator[T], list[T]]] = {}
+    return_dict: dict[str, tuple[Aggregator, list]] = {}
     for key, values in inverted_scoring_dict.items():
         if len(values) != expected_length:
             raise ValidationError(
