@@ -93,17 +93,69 @@ def test_hash_nested_wrapped_different():
 
     obj1 = FloatAggregator(func)
 
-    @functools.wraps(func)
-    def _func(a):
-        return func(a)
+    def decorator(func):
+        @functools.wraps(func)
+        def _func(a):
+            return func(a)
 
-    obj2 = FloatAggregator(_func)
+        return _func
+
+    obj2 = FloatAggregator(decorator(func))
 
     assert custom_hash(obj1) != custom_hash(obj2)
 
 
+def test_hash_lambdas_same():
+    def func(a, b):
+        return np.mean(a) + b
+
+    def func2():
+        return FloatAggregator(lambda a: func(a, 1))
+
+    obj1 = func2()
+    obj2 = func2()
+
+    assert custom_hash(obj1) == custom_hash(obj2)
+
+
 def test_hash_lambdas_different():
+    # This is quite interesting, these two lambdas are different, as they have different names, as they are
+    # defined in the same scope. in the pevious test, where there was only on lambda defined, the names were the same
+    # hence the hash the same.
     obj1 = FloatAggregator(lambda a: np.mean(a))
-    obj2 = FloatAggregator(lambda a: np.mean(a))
+    obj2 = obj1
+    obj1 = FloatAggregator(lambda a: np.mean(a))
+    assert custom_hash(obj1) != custom_hash(obj2)
+
+
+def test_hash_partials_same():
+    def func(a, b):
+        return np.mean(a) + b
+
+    obj1 = FloatAggregator(functools.partial(func, b=1))
+    obj2 = FloatAggregator(functools.partial(func, b=1))
+
+    assert custom_hash(obj1) == custom_hash(obj2)
+
+
+def test_hash_partials_different():
+    def func(a, b):
+        return np.mean(a) + b
+
+    obj1 = FloatAggregator(functools.partial(func, b=1))
+    obj2 = FloatAggregator(functools.partial(func, b=2))
+
+    assert custom_hash(obj1) != custom_hash(obj2)
+
+
+def test_hash_partials_different2():
+    def func(a, b):
+        return np.mean(a) + b
+
+    def func2(a, b):
+        return np.mean(a) + b
+
+    obj1 = FloatAggregator(functools.partial(func, b=1))
+    obj2 = FloatAggregator(functools.partial(func2, b=1))
 
     assert custom_hash(obj1) != custom_hash(obj2)

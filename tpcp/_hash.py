@@ -4,6 +4,7 @@ import os
 import pickle
 import sys
 import types
+import warnings
 from pathlib import Path
 
 from joblib.func_inspect import get_func_code
@@ -64,6 +65,17 @@ class NoMemoizeHasher(Hasher):
             # However, in the context of tpcp, that is not really a concern. In most possible cases, this just means
             # that some (likely obscure) guardrail will not trigger for you.
             if isinstance(obj, types.FunctionType):
+                if "<lambda>" in obj.__qualname__:
+                    warnings.warn(
+                        "You are attempting to hash a lambda defined within a closure, likely because you used it as a "
+                        "parameter to a tpcp object (e.g. an Aggregator). "
+                        "While this works most of the time, it can to lead to some unexpected false positive hash "
+                        "equalities, depending on how you define the lambdas. "
+                        "We highly recommend to use a named function or a `functools.partial` instead.",
+                        stacklevel=1,
+                    )
+                # Note, that for lambdas this actully hashes the entire definition line.
+                # This means potentially more of the surrounding code than the lambda itself is hashed.
                 obj = ("F", obj.__qualname__, get_func_code(obj), vars(obj))
 
             if isinstance(obj, type):
