@@ -199,11 +199,12 @@ from optuna import Trial
 
 from tpcp.optimize.optuna import CustomOptunaOptimize
 from tpcp.types import DatasetT, PipelineT
+from typing import Generic
 from tpcp.validate import Scorer
 
 
 @dataclass(repr=False)
-class OptunaSearch(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT]):
+class OptunaSearch(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT], Generic[PipelineT, DatasetT]):
     # We need to provide default values in Python <3.10, as we can not use the keyword-only syntax for dataclasses.
     create_search_space: Optional[Callable[[Trial], None]] = None
     score_function: Optional[Callable[[PipelineT, DatasetT], float]] = None
@@ -291,7 +292,7 @@ def create_search_space(trial: Trial):
 # Finally, we are ready to run the pipeline.
 # We create a new instance and set the stopping criteria (in this case 10 random trials).
 # Then we can use the familiar :class:`~tpcp.optimize.Optimize` interface to run everything.
-opti = OptunaSearch(
+opti = OptunaSearch[MyPipeline, ECGExampleData](
     pipe,
     get_study_params,
     create_search_space=create_search_space,
@@ -384,7 +385,7 @@ from optuna import TrialPruned
 
 
 @dataclass(repr=False)
-class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT]):
+class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT], Generic[PipelineT, DatasetT]):
     # We need to provide default values in Python <3.10, as we can not use the keyword-only syntax for dataclasses.
     create_search_space: Optional[Callable[[Trial], None]] = None
     score_function: Optional[Callable[[PipelineT, DatasetT], float]] = None
@@ -442,7 +443,7 @@ def get_study_params(seed):
     return {"direction": "maximize", "sampler": sampler, "pruner": MinDatapointPerformancePruner(0.3)}
 
 
-opti_early_stop = OptunaSearchEarlyStopping(
+opti_early_stop = OptunaSearchEarlyStopping[MyPipeline, ECGExampleData](
     pipe,
     get_study_params,
     create_search_space=create_search_space,

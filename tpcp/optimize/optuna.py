@@ -765,7 +765,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
     """
 
     create_search_space: Callable[[Trial], None]
-    scoring: ScorerTypes[PipelineT, DatasetT, T]
+    scoring: ScorerTypes[PipelineT, DatasetT]
     score_name: Optional[str]
 
     multimetric_: bool
@@ -776,7 +776,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         get_study_params: Callable[[int], StudyParamsDict],
         create_search_space: Callable[[Trial], None],
         *,
-        scoring: ScorerTypes[PipelineT, DatasetT, T],
+        scoring: ScorerTypes[PipelineT, DatasetT],
         score_name: Optional[str] = None,
         n_trials: Optional[int] = None,
         timeout: Optional[float] = None,
