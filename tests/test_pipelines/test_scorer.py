@@ -16,7 +16,7 @@ from tests.test_pipelines.conftest import (
 from tpcp import Pipeline
 from tpcp.exceptions import ScorerFailedError, ValidationError
 from tpcp.validate import Scorer
-from tpcp.validate._scorer import Aggregator, FloatAggregator, _passthrough_scoring, _validate_scorer, no_agg
+from tpcp.validate._scorer import Aggregator, FloatAggregator, _validate_scorer, no_agg
 
 
 class TestScorerCalls:
@@ -174,25 +174,22 @@ class TestScorerUtils:
     @pytest.mark.parametrize(
         ("scoring", "expected"),
         (
-            (None, Scorer(_passthrough_scoring)),
             (_dummy_func, Scorer(_dummy_func)),
             (Scorer(_dummy_func_2), Scorer(_dummy_func_2)),
         ),
     )
     def test_validate_scorer(self, scoring, expected):
         pipe = DummyOptimizablePipeline()
-        pipe.score = lambda x: x
         out = _validate_scorer(scoring, pipe)
         assert isinstance(out, type(expected))
         assert out.score_func == expected.score_func
 
     def test_score_not_implemented(self):
-        with pytest.raises(NotImplementedError):
-            _validate_scorer(None, DummyOptimizablePipeline())
+        with pytest.raises(ValueError):
+            _validate_scorer(None, None)
 
     def test_invalid_input(self):
         pipe = DummyOptimizablePipeline()
-        pipe.score = lambda x: x
         with pytest.raises(ValueError) as e:
             _validate_scorer("something invalid", pipe)
 

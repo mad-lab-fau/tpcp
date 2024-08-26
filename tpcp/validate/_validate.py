@@ -21,7 +21,7 @@ def cross_validate(
     optimizable: BaseOptimize,
     dataset: Dataset,
     *,
-    scoring: Optional[Callable] = None,
+    scoring: Optional[Callable],
     cv: Optional[Union[DatasetSplitter, int, BaseCrossValidator, Iterator]] = None,
     n_jobs: Optional[int] = None,
     verbose: int = 0,
@@ -46,7 +46,6 @@ def cross_validate(
     scoring
         A callable that can score a single data point given a pipeline.
         This function should return either a single score or a dictionary of scores.
-        If scoring is `None` the default `score` method of the optimizable is used instead.
     cv
         The cross-validation strategy to use.
         For simple use-cases the same input as for the sklearn cross-validation function are supported.
@@ -163,7 +162,7 @@ def validate(
     pipeline: Pipeline,
     dataset: Dataset,
     *,
-    scoring: Optional[Union[Callable, Scorer]] = None,
+    scoring: Optional[Union[Callable, Scorer]],
     n_jobs: Optional[int] = _Default(None),
     verbose: int = _Default(0),
     pre_dispatch: Union[str, int] = _Default("2*n_jobs"),
@@ -180,7 +179,6 @@ def validate(
     scoring
         A callable that can score a single data point given a pipeline.
         This function should return either a single score or a dictionary of scores.
-        If scoring is `None` the default `score` method of the optimizable is used instead.
     n_jobs
         Number of jobs to run in parallel.
         One job is created per datapoint.

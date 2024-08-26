@@ -24,7 +24,7 @@ from tpcp import NOTHING
 from tpcp._base import BaseTpcpObject, _Nothing, cf
 from tpcp._dataset import Dataset, DatasetT
 from tpcp._hash import custom_hash
-from tpcp._pipeline import Pipeline, PipelineT
+from tpcp._pipeline import PipelineT
 from tpcp._utils._general import _passthrough
 from tpcp.exceptions import ScorerFailedError, ValidationError
 from tpcp.parallel import delayed
@@ -435,18 +435,15 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
                         dataset=dataset,
                     )
 
-        agg_scores, raw_scores = self._aggregate(_check_and_invert_score_dict(scores, self.default_aggregator), list(dataset))
+        agg_scores, raw_scores = self._aggregate(
+            _check_and_invert_score_dict(scores, self.default_aggregator), list(dataset)
+        )
         if self.final_aggregator:
             return self.final_aggregator(agg_scores, raw_scores, pipeline, dataset)
         return agg_scores, raw_scores
 
 
-ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]], Scorer[PipelineT, DatasetT, ScoreTypeT[T]], None]
-
-
-def _passthrough_scoring(pipeline: Pipeline[DatasetT], datapoint: DatasetT):
-    """Call the score method of the pipeline to score the input."""
-    return pipeline.score(datapoint)
+ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]], Scorer[PipelineT, DatasetT, ScoreTypeT[T]]]
 
 
 def _validate_scorer(
@@ -456,15 +453,13 @@ def _validate_scorer(
 ) -> Scorer[PipelineT, DatasetT, Any]:
     """Convert the provided scoring method into a valid scorer object."""
     if scoring is None:
-        # If scoring is None, we will try to use the score method of the pipeline
-        # However, we run score once with an empty dataset and check if it is actually implemented:
-        try:
-            pipeline.score(Dataset())  # type: ignore  # noqa: PGH003
-        except NotImplementedError as e:
-            raise e  # noqa: TRY201
-        except Exception:  # noqa: BLE001
-            pass
-        scoring = _passthrough_scoring
+        raise ValueError(
+            "You passed None for the scoring function. "
+            "This is not supported anymore in tpcp>1.1.0. "
+            "In earlier versions, this would have used the `score` method of the pipeline. "
+            "However, this option was removed to simplify the API. "
+            "Extract your method as a separate function and explicitly pass it to `scoring`"
+        )
     if isinstance(scoring, base_class):
         return scoring
     if callable(scoring):

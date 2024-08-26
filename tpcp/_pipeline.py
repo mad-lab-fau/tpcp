@@ -1,5 +1,5 @@
 """Base Classes for custom pipelines."""
-from typing import Any, ClassVar, Generic, TypeVar, Union
+from typing import Any, ClassVar, Generic, TypeVar
 
 from typing_extensions import Self
 
@@ -73,30 +73,6 @@ class Pipeline(Algorithm, Generic[DatasetT]):
         if getattr(run_method, ACTION_METHOD_INDICATOR, False) is True:
             return run_method(datapoint)
         return _check_safe_run(self, run_method, datapoint)
-
-    def score(self, datapoint: DatasetT) -> Union[float, dict[str, float]]:
-        """Calculate performance of the pipeline on a datapoint with reference information.
-
-        This is an optional method and does not need to be implemented in many cases.
-        Usually stand-a-lone functions are better suited as scorer.
-
-        A typical score method will call `self.run(datapoint)` and then compare the results with reference values
-        also available on the dataset.
-
-        Parameters
-        ----------
-        datapoint
-            An instance of a :class:`tpcp.Dataset` containing only a single datapoint.
-            The structure of the data and the available reference information will depend on the dataset.
-
-        Returns
-        -------
-        score
-            A float or dict of float quantifying the quality of the pipeline on the provided data.
-            A higher score is always better.
-
-        """
-        raise NotImplementedError()  # pragma: no cover
 
 
 class OptimizablePipeline(Pipeline[DatasetT]):
