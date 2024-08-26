@@ -315,6 +315,7 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
     def __init__(
         self,
         score_func: ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]],
+        final_aggregator: Optional[Callable] = None,
         *,
         default_aggregator: Aggregator = cf(mean_agg),
         single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT, T]] = None,
@@ -324,6 +325,7 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
         pre_dispatch: Union[str, int] = "2*n_jobs",
         progress_bar: bool = True,
     ) -> None:
+        self.final_aggregator = final_aggregator
         self.score_func = score_func
         self.default_aggregator = default_aggregator
         self.single_score_callback = single_score_callback
@@ -362,7 +364,7 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
                 "Scorer returned a `no_agg` aggregator. "
                 "This is not allowed when returning only a single score value. "
                 "If you want to use a NoAgg scorer, return a dictionary of values, where one or "
-                "multiple values are wrapped with NoAgg."
+                "multiple values are wrapped with `no_agg`."
             )
 
         raw_scores: dict[str, list[T]] = {}
@@ -433,7 +435,10 @@ class Scorer(Generic[PipelineT, DatasetT, T], BaseTpcpObject):
                         dataset=dataset,
                     )
 
-        return self._aggregate(_check_and_invert_score_dict(scores, self.default_aggregator), list(dataset))
+        agg_scores, raw_scores = self._aggregate(_check_and_invert_score_dict(scores, self.default_aggregator), list(dataset))
+        if self.final_aggregator:
+            return self.final_aggregator(agg_scores, raw_scores, pipeline, dataset)
+        return agg_scores, raw_scores
 
 
 ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT, ScoreTypeT[T]], Scorer[PipelineT, DatasetT, ScoreTypeT[T]], None]

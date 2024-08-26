@@ -382,7 +382,7 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
 # Now we can see that the raw matches array is not returned anymore.
 # In case of a single scorer, the single return value would just be `None`, instead of a dict with the respective key
 # missing.
-complicated_agg_now_raw, complicated_single_no_raw = Scorer(score)(pipe, example_data)
+complicated_agg_no_raw, complicated_single_no_raw = Scorer(score)(pipe, example_data)
 complicated_single_no_raw.keys()
 
 
@@ -483,7 +483,7 @@ def score(
 # With that we can reconstruct the `return_raw_scores=False` behaviour from before using a partial or a lambda
 from functools import partial
 
-complicated_agg_now_raw, complicated_single_no_raw = Scorer(
+complicated_agg_no_raw, complicated_single_no_raw = Scorer(
     partial(
         score,
         per_sample_agg=SingleValueAggregator(calculate_precision_recall_f1, return_raw_scores=False),
@@ -492,11 +492,64 @@ complicated_agg_now_raw, complicated_single_no_raw = Scorer(
     # Note: You could also run this with multiple jobs, but this creates issues with the way we test the examples.
     n_jobs=1,
 )(pipe, example_data)
-complicated_agg_now_raw
+
+complicated_agg_no_raw
 
 # %%
 complicated_single_no_raw.keys()
 
+
+# %%
+# After Score Function
+# --------------------
+# While writing custom aggregators is a nice way of configuring your scoring on the level of single datapoints, at some
+# point you might be hiding a lot of complexity in these custom aggregators, that is not easy to understand and
+# discover.
+# In this case we have the `final_aggregator` parameter of the :class:`~tpcp.validate.Scorer` class as escape
+# hatch.
+# This function is called with the output of the score function, the pipeline object and the dataset.
+# So you should have all the information available to perform any kind of aggregation you want.
+#
+# Here we will demonstrate, how you could implement the custom scorer example from above in a `after_score_function`.
+# What method you prefer is up to you.
+#
+# For this to work, we pass the raw matches out of the score function to use them in the final aggregation.
+# There we have full control over the results and can calculate the precision, recall and f1-score across all
+# datapoints and remove the raw matches from the final results.
+
+def score(
+    pipeline: MyPipeline, datapoint: ECGExampleData, *, tolerance_s: float
+):
+    # We use the `safe_run` wrapper instead of just run. This is always a good idea.
+    # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
+    # will clone it again.
+    pipeline = pipeline.safe_run(datapoint)
+    matches = match_events_with_reference(
+        pipeline.r_peak_positions_.to_numpy(),
+        datapoint.r_peak_positions_.to_numpy(),
+        tolerance=tolerance_s * datapoint.sampling_rate_hz,
+    )
+    precision, recall, f1_score = precision_recall_f1_score(matches)
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1_score,
+        "_raw": no_agg(matches),
+    }
+
+def final_aggregator(agg_results: dict[str, float], raw_results: dict[str, list], pipeline: MyPipeline, dataset:ECGExampleData):
+    # We use pop, as we don't want to have the raw matches in our final results, but this is up to you.
+    raw_matches = raw_results.pop("_raw")
+    matches = np.vstack(raw_matches)
+    precision, recall, f1_score = precision_recall_f1_score(matches)
+    agg_results["per_sample__precision"] = precision
+    agg_results["per_sample__recall"] = recall
+    agg_results["per_sample__f1_score"] = f1_score
+    return agg_results, raw_results
+
+agg_final_agg, raw_final_agg = Scorer(partial(score, tolerance_s=0.02), final_aggregator=final_aggregator)(pipe, example_data)
+
+agg_final_agg
 
 # %%
 # And finally remove the cache to not affect other examples.
