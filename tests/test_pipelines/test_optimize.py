@@ -128,8 +128,8 @@ class TestGridSearchCommon:
         autouse=True,
         ids=["GridSearch", "GridSearchCV"],
         params=(
-            GridSearch(DummyOptimizablePipeline(), parameter_grid=ParameterGrid({"para_1": [1, 2]})),
-            GridSearchCV(DummyOptimizablePipeline(), ParameterGrid({"para_1": [1, 2]}), cv=2),
+            GridSearch(DummyOptimizablePipeline(), parameter_grid=ParameterGrid({"para_1": [1, 2]}), scoring=NOTHING),
+            GridSearchCV(DummyOptimizablePipeline(), ParameterGrid({"para_1": [1, 2]}), cv=2, scoring=NOTHING),
         ),
     )
     def gridsearch(self, request):
@@ -837,7 +837,7 @@ class TestOptimizeBase:
         autouse=True,
         params=(
             Optimize(DummyOptimizablePipeline()),
-            GridSearch(DummyOptimizablePipeline(), ParameterGrid({"para_1": [1]})),
+            GridSearch(DummyOptimizablePipeline(), ParameterGrid({"para_1": [1]}), scoring=NOTHING),
         ),
     )
     def optimizer_instance(self, request):

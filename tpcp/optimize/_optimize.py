@@ -260,7 +260,6 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
     scoring
         A callable that can score a single data point given a pipeline.
         This function should return either a single score or a dictionary of scores.
-        If scoring is `None` the default `score` method of the pipeline is used instead.
 
         Note that if scoring returns a dictionary, `return_optimized` must be set to the name of the score that
         should be used for ranking.
@@ -351,7 +350,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT,
         pipeline: PipelineT,
         parameter_grid: ParameterGrid,
         *,
-        scoring: ScorerTypes[PipelineT, DatasetT, T] = None,
+        scoring: ScorerTypes[PipelineT, DatasetT, T],
         n_jobs: Optional[int] = None,
         return_optimized: Union[bool, str] = True,
         pre_dispatch: Union[int, str] = "n_jobs",
@@ -517,7 +516,6 @@ class GridSearchCV(
     scoring
         A callable that can score a single data point given a pipeline.
         This function should return either a single score or a dictionary of scores.
-        If scoring is `None` the default `score` method of the pipeline is used instead.
 
         .. note:: If scoring returns a dictionary, `return_optimized` must be set to the name of the score that
                   should be used for ranking.
@@ -680,7 +678,7 @@ class GridSearchCV(
         pipeline: OptimizablePipelineT,
         parameter_grid: ParameterGrid,
         *,
-        scoring: ScorerTypes[OptimizablePipelineT, DatasetT, T] = None,
+        scoring: ScorerTypes[OptimizablePipelineT, DatasetT, T],
         return_optimized: Union[bool, str] = True,
         cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
         pure_parameters: Union[bool, list[str]] = False,

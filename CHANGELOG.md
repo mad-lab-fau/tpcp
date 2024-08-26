@@ -43,6 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This should prevent strange pickling errors from just using "tpcp" normally.
   (https://github.com/mad-lab-fau/tpcp/pull/118)
 
+### Removed
+
+- `score` functions implemented directly as method on the pipeline class are no longer supported.
+  Score functions now need to be independent functions that take a pipeline instance as their first argument. 
+  For this reason, it is also no longer supported to pass `None` as argument to `scoring` in any validate or optimize 
+  method.
+
+
 ## [1.0.1] - 2024-10-18
 
 Fixes names of optional dependency groups. That should resolve install issues when using uv as package manager.

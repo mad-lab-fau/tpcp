@@ -39,10 +39,3 @@ class BaseOptimize(Algorithm, Generic[PipelineT, DatasetT]):
         This is a wrapper to contain API compatibility with `Pipeline`.
         """
         return self.optimized_pipeline_.safe_run(datapoint)
-
-    def score(self, datapoint: DatasetT) -> Union[float, dict[str, float]]:
-        """Run score of the optimized pipeline.
-
-        This is a wrapper to contain API compatibility with `Pipeline`.
-        """
-        return self.optimized_pipeline_.score(datapoint)
