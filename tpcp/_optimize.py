@@ -2,7 +2,7 @@
 
 This is in a separate file to avoid circular imports.
 """
-from typing import Any, ClassVar, Generic, Union, TypeVar
+from typing import Any, ClassVar, Generic
 
 from typing_extensions import Self
 

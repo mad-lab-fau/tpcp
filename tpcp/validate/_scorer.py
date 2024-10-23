@@ -44,6 +44,10 @@ ScoreFuncSingle = Callable[[PipelineT, DatasetT], SingleScoreType]
 ScoreFuncMultiple = Callable[[PipelineT, DatasetT], MultiScoreType]
 ScoreFunc = Callable[[PipelineT, DatasetT], ScoreType]
 
+FinalAggregatorType = Callable[
+    [dict[str, float], dict[str, list], PipelineT, DatasetT], tuple[dict[str, float], dict[str, list]]
+]
+
 
 class ScoreCallback(Protocol[PipelineT, DatasetT]):
     """Callback signature for scorer callbacks."""
@@ -306,6 +310,7 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
 
     score_func: ScoreFunc[PipelineT, DatasetT]
     default_aggregator: Aggregator
+    final_aggregator: Optional[FinalAggregatorType[PipelineT, DatasetT]]
     single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT]]
     n_jobs: Optional[int]
     verbose: int
@@ -315,8 +320,8 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
     def __init__(
         self,
         score_func: ScoreFunc[PipelineT, DatasetT, ScoreType],
-        final_aggregator: Optional[Callable] = None,
         *,
+        final_aggregator: Optional[FinalAggregatorType[PipelineT, DatasetT]] = None,
         default_aggregator: Aggregator = cf(mean_agg),
         single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT, T]] = None,
         # Multiprocess_kwargs
@@ -334,12 +339,9 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
         self.pre_dispatch = pre_dispatch
         self.progress_bar = progress_bar
 
-    # The typing for IndividualScoreType here is not perfect, but not sure how to fix.
-    # For the aggregated scores, we can easily parameterize the value based on the generic, but not for the single
-    # scores
     def __call__(
         self, pipeline: PipelineT, dataset: DatasetT
-    ) -> tuple[Union[float, dict[str, float]], Union[Optional[list[T]], dict[str, list[T]]]]:
+    ) -> tuple[Union[float, dict[str, float]], Union[Optional[list], dict[str, list]]]:
         """Score the pipeline with the provided data.
 
         Returns
@@ -448,7 +450,7 @@ ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT], Scorer[PipelineT, DatasetT]]
 
 def _validate_scorer(
     scoring: ScorerTypes[PipelineT, DatasetT],
-    pipeline: PipelineT,
+        *,
     base_class: type[Scorer[Any, Any]] = Scorer,
 ) -> Scorer[PipelineT, DatasetT]:
     """Convert the provided scoring method into a valid scorer object."""

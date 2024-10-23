@@ -101,6 +101,7 @@ pipe = MyPipeline()
 #           value that is not used in the aggregation.
 from tpcp.validate import no_agg
 
+
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
     # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
@@ -358,6 +359,7 @@ complicated_single["per_sample"]
 # `return_raw_scores` class variable to False for our specific usecase.
 single_value_precision_recall_f1_agg_no_raw = SingleValuePrecisionRecallF1(return_raw_scores=False)
 
+
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
     # We use the `safe_run` wrapper instead of just run. This is always a good idea.
     # We don't need to clone the pipeline here, as GridSearch will already clone the pipeline internally and `run`
@@ -399,6 +401,7 @@ complicated_single_no_raw.keys()
 # usecase, your data, and the type of scores you want to calculate.
 # Hence, we recommend to use these examples as a starting point to implement your own custom aggregators.
 from typing import Callable, Union
+
 
 class SingleValueAggregator(Aggregator[np.ndarray]):
     def __init__(
@@ -555,6 +558,13 @@ agg_final_agg, raw_final_agg = Scorer(partial(score, tolerance_s=0.02), final_ag
 )
 
 agg_final_agg
+# %%
+# We can see, that this results in the same output as before, but the calculation is more explicit and not hidden away
+# in one of the aggregators.
+# Which version you choose is up to you.
+#
+# Speaking from experience, using the `final_aggregator` is a better choice for complex one-off evaluations.
+# In case you plan to reuse the same aggregation multiple times, a custom aggregator might be the better choice.
 
 # %%
 # And finally remove the cache to not affect other examples.

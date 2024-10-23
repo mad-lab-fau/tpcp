@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - There are new builtin `FloatAggregator` and `MacroFloatAggregator` that should cover many of the use cases that 
   previously required custom aggregators.
   (https://github.com/mad-lab-fau/tpcp/pull/118)
+- Scorers now support passing a `final_aggregator`. This is called after all scoring and aggregation happens and allows
+  to implement complicated "meta" aggregation that depends on the results of all scores of all datapoints.
+  Note, that we are not sure yet, if this should be used more as an escape hedge and overusing it should be considered
+  an anti-pattern, or if it is exactly the other way around.
+  We need to experiment in a couple of real-life applications to figure this out.
+  (https://github.com/mad-lab-fau/tpcp/pull/120)
 
 ### Changed
 
@@ -49,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Score functions now need to be independent functions that take a pipeline instance as their first argument. 
   For this reason, it is also no longer supported to pass `None` as argument to `scoring` in any validate or optimize 
   method.
+  (https://github.com/mad-lab-fau/tpcp/pull/120)
 
 
 ## [1.0.1] - 2024-10-18

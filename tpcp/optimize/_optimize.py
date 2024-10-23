@@ -374,7 +374,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
 
         """
         self.dataset = dataset
-        scoring = _validate_scorer(self.scoring, self.pipeline)
+        scoring = _validate_scorer(self.scoring)
 
         # We use a similar structure as sklearn's GridSearchCV here, but instead of calling something equivalent to
         # `fit_score`, we call `score`, which just applies and scores the pipeline on the entirety of our dataset as
@@ -714,7 +714,7 @@ class GridSearchCV(
         """
         self.dataset = dataset
 
-        scoring = _validate_scorer(self.scoring, self.pipeline)
+        scoring = _validate_scorer(self.scoring)
 
         cv = self.cv if isinstance(self.cv, DatasetSplitter) else DatasetSplitter(self.cv)
 

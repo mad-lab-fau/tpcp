@@ -811,7 +811,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         """
         # Here we define our objective function
 
-        scoring = _validate_scorer(self.scoring, self.pipeline)
+        scoring = _validate_scorer(self.scoring)
 
         # In a multiprocessing case, this function is called once in the main process and then in the worker processes.
         # The first call in the main process allows us to set the multimetric_ attribute.

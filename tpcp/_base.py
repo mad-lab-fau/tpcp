@@ -766,7 +766,7 @@ def clone(algorithm: T, *, safe: bool = False) -> T:  # noqa: C901, PLR0911, PLR
             buffer = io.BytesIO()
             torch.save(algorithm, buffer)
             buffer.seek(0)
-            model = torch.load(buffer)
+            model = torch.load(buffer, weights_only=False)
             buffer.close()
             return model
         if tf is not None and isinstance(algorithm, tf.keras.Model):

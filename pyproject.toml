@@ -47,7 +47,7 @@ memory-profiler = "^0.58.0"
 matplotlib = "^3.4.3"
 toml = "^0.10.2"
 Sphinx = "^7.2.6"
-ruff = "^0.1.8"
+ruff = "0.1.8"
 
 
 [[tool.poetry.source]]
