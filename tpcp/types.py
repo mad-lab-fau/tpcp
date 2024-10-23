@@ -3,7 +3,6 @@
 Note, this module only imports them, but they are defined close to places where they are used.
 """
 
-
 from tpcp._algorithm import AlgorithmT
 from tpcp._base import BaseTpcpObjectT
 from tpcp._dataset import DatasetT

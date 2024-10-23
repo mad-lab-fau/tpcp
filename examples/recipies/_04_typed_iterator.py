@@ -167,15 +167,16 @@ dataset = ECGExampleData(data_path)
 # Note that we can type these functions using the `TypedIteratorResultTuple` type.
 # Like the iterator itself, this type is generic and allows you to specify the input and output types.
 # So in our case, the input is `ECGExampleData` and the output is `QRSResultType`.
-from typing_extensions import TypeAlias
-
 from tpcp.misc import TypedIteratorResultTuple
+from typing_extensions import TypeAlias
 
 result_tup: TypeAlias = TypedIteratorResultTuple[ECGExampleData, QRSResultType]
 
 
 def concat_r_peak_positions(results: list[result_tup]):
-    return pd.concat({r.input.group_label: r.result.r_peak_positions for r in results})
+    return pd.concat(
+        {r.input.group_label: r.result.r_peak_positions for r in results}
+    )
 
 
 def aggregate_n_r_peaks(results: list[result_tup]):
@@ -194,10 +195,16 @@ aggregations = [
 # We can then iterate over the dataset and apply the QRS detection algorithm.
 from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
 
-qrs_iterator = TypedIterator[ECGExampleData, QRSResultType](QRSResultType, aggregations=aggregations)
+qrs_iterator = TypedIterator[ECGExampleData, QRSResultType](
+    QRSResultType, aggregations=aggregations
+)
 
 for d, r in qrs_iterator.iterate(dataset):
-    r.r_peak_positions = QRSDetector().detect(d.data["ecg"], sampling_rate_hz=d.sampling_rate_hz).r_peak_positions_
+    r.r_peak_positions = (
+        QRSDetector()
+        .detect(d.data["ecg"], sampling_rate_hz=d.sampling_rate_hz)
+        .r_peak_positions_
+    )
     r.n_r_peaks = len(r.r_peak_positions)
 
 # %%
@@ -234,10 +241,16 @@ from tpcp.misc import BaseTypedIterator
 CustomTypeT = TypeVar("CustomTypeT")
 
 
-class SectionIterator(BaseTypedIterator[pd.DataFrame, CustomTypeT], Generic[CustomTypeT]):
-    def iterate(self, data: pd.DataFrame, sections: pd.DataFrame) -> Iterator[tuple[pd.DataFrame, CustomTypeT]]:
+class SectionIterator(
+    BaseTypedIterator[pd.DataFrame, CustomTypeT], Generic[CustomTypeT]
+):
+    def iterate(
+        self, data: pd.DataFrame, sections: pd.DataFrame
+    ) -> Iterator[tuple[pd.DataFrame, CustomTypeT]]:
         # We turn the sections into a generator of dataframes
-        data_iterable = (data.iloc[s.start : s.end] for s in sections.itertuples(index=False))
+        data_iterable = (
+            data.iloc[s.start : s.end] for s in sections.itertuples(index=False)
+        )
         # We use the `_iterate` method to do the heavy lifting
         yield from self._iterate(data_iterable)
 
@@ -288,9 +301,13 @@ custom_iterator.results_.n_samples
 # They work as before, but the aggregation results are not available on the result object, but rather as raw dictionary
 # via the ``additional_results_`` attribute.
 # We show that below with the section iterator we defined above.
-aggregations = [("sum_n_samples", lambda results: sum(r.result.n_samples for r in results))]
+aggregations = [
+    ("sum_n_samples", lambda results: sum(r.result.n_samples for r in results))
+]
 
-custom_iterator = SectionIterator[SimpleResultType](SimpleResultType, aggregations=aggregations)
+custom_iterator = SectionIterator[SimpleResultType](
+    SimpleResultType, aggregations=aggregations
+)
 
 for d, r in custom_iterator.iterate(dummy_data, dummy_sections):
     r.n_samples = len(d)

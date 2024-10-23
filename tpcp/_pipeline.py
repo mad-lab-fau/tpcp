@@ -1,4 +1,5 @@
 """Base Classes for custom pipelines."""
+
 from typing import Any, ClassVar, Generic, TypeVar
 
 from typing_extensions import Self

@@ -1,4 +1,5 @@
 """Helper for caching related tasks."""
+
 import binascii
 import contextlib
 import functools
@@ -71,7 +72,10 @@ class UniversalHashableWrapper(Generic[T]):
     >>> import pandas as pd
     >>>
     >>> @functools.lru_cache(maxsize=1)
-    ... def add(a: UniversalHashableWrapper[pd.DataFrame], b: UniversalHashableWrapper[pd.DataFrame]):
+    ... def add(
+    ...     a: UniversalHashableWrapper[pd.DataFrame],
+    ...     b: UniversalHashableWrapper[pd.DataFrame],
+    ... ):
     ...     return a.obj + b.obj
     >>> df1 = pd.DataFrame({"a": [1, 2, 3]})
     >>> df2 = pd.DataFrame({"a": [4, 5, 6]})

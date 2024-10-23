@@ -67,7 +67,7 @@ def test_hash_tensor():
     assert custom_hash(torch.tensor([0, 1, 3])) != custom_hash(torch.tensor([0, 1, 2]))
 
 
-@pytest.mark.parametrize("c", (list, tuple))
+@pytest.mark.parametrize("c", [list, tuple])
 def test_container_tensor(torch_objects, c):
     tmp = c([torch_objects])
     assert custom_hash(tmp) == custom_hash(clone(tmp))

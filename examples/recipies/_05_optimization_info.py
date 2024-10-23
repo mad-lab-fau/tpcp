@@ -33,6 +33,15 @@ examples to return additional information from the optimization.
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_curve
+from tpcp import (
+    HyperParameter,
+    OptimizableParameter,
+    OptimizablePipeline,
+    Parameter,
+    cf,
+    make_optimize_safe,
+)
+from tpcp.optimize import Optimize
 from typing_extensions import Self
 
 from examples.algorithms.algorithms_qrs_detection_final import (
@@ -40,8 +49,6 @@ from examples.algorithms.algorithms_qrs_detection_final import (
     match_events_with_reference,
 )
 from examples.datasets.datasets_final_ecg import ECGExampleData
-from tpcp import HyperParameter, OptimizableParameter, OptimizablePipeline, Parameter, cf, make_optimize_safe
-from tpcp.optimize import Optimize
 
 # %%
 # In the algorithm class below, we basically reimplemented the `OptimizableQrsDetector` from the algorithm example.
@@ -72,14 +79,19 @@ class OptimizableQrsDetectorWithInfo(QRSDetector):
 
     @make_optimize_safe
     def self_optimize_with_info(
-        self, ecg_data: list[pd.Series], r_peaks: list[pd.Series], sampling_rate_hz: float
+        self,
+        ecg_data: list[pd.Series],
+        r_peaks: list[pd.Series],
+        sampling_rate_hz: float,
     ) -> tuple[Self, dict[str, np.ndarray]]:
         all_labels = []
         all_peak_heights = []
         for d, p in zip(ecg_data, r_peaks):
             filtered = self._filter(d.to_numpy().flatten(), sampling_rate_hz)
             # Find all potential peaks without the height threshold
-            potential_peaks = self._search_strategy(filtered, sampling_rate_hz, use_height=False)
+            potential_peaks = self._search_strategy(
+                filtered, sampling_rate_hz, use_height=False
+            )
             # Determine the label for each peak, by matching them with our ground truth
             labels = np.zeros(potential_peaks.shape)
             matches = match_events_with_reference(
@@ -87,7 +99,9 @@ class OptimizableQrsDetectorWithInfo(QRSDetector):
                 reference=np.atleast_2d(p.to_numpy().astype(int)).T,
                 tolerance=self.r_peak_match_tolerance_s * sampling_rate_hz,
             )
-            tp_matches = matches[(~np.isnan(matches)).all(axis=1), 0].astype(int)
+            tp_matches = matches[(~np.isnan(matches)).all(axis=1), 0].astype(
+                int
+            )
             labels[tp_matches] = 1
             labels = labels.astype(bool)
             all_labels.append(labels)
@@ -99,14 +113,28 @@ class OptimizableQrsDetectorWithInfo(QRSDetector):
         fpr, tpr, thresholds = roc_curve(all_labels, all_peak_heights)
         youden_index = tpr - fpr
         # The best Youden index gives us a balance between sensitivity and specificity.
-        self.min_r_peak_height_over_baseline = thresholds[np.argmax(youden_index)]
+        self.min_r_peak_height_over_baseline = thresholds[
+            np.argmax(youden_index)
+        ]
 
         # Here we create the additional infor object:
-        additional_info = {"all_youden_index": youden_index, "all_thresholds": thresholds}
+        additional_info = {
+            "all_youden_index": youden_index,
+            "all_thresholds": thresholds,
+        }
         return self, additional_info
 
-    def self_optimize(self, ecg_data: list[pd.Series], r_peaks: list[pd.Series], sampling_rate_hz: float) -> Self:
-        return self.self_optimize_with_info(ecg_data=ecg_data, r_peaks=r_peaks, sampling_rate_hz=sampling_rate_hz)[0]
+    def self_optimize(
+        self,
+        ecg_data: list[pd.Series],
+        r_peaks: list[pd.Series],
+        sampling_rate_hz: float,
+    ) -> Self:
+        return self.self_optimize_with_info(
+            ecg_data=ecg_data,
+            r_peaks=r_peaks,
+            sampling_rate_hz=sampling_rate_hz,
+        )[0]
 
 
 # %%
@@ -126,7 +154,12 @@ class MyPipeline(OptimizablePipeline[ECGExampleData]):
 
     r_peak_positions_: pd.Series
 
-    def __init__(self, algorithm: OptimizableQrsDetectorWithInfo = cf(OptimizableQrsDetectorWithInfo())):
+    def __init__(
+        self,
+        algorithm: OptimizableQrsDetectorWithInfo = cf(
+            OptimizableQrsDetectorWithInfo()
+        ),
+    ):
         self.algorithm = algorithm
 
     @make_optimize_safe
@@ -136,7 +169,9 @@ class MyPipeline(OptimizablePipeline[ECGExampleData]):
         # Note: We need to clone the algorithm instance, to make sure we don't leak any data between runs.
         algo = self.algorithm.clone()
         # Here we call the `self_optimize_with_info` method!
-        self.algorithm, additional_data = algo.self_optimize_with_info(ecg_data, r_peaks, dataset.sampling_rate_hz)
+        self.algorithm, additional_data = algo.self_optimize_with_info(
+            ecg_data, r_peaks, dataset.sampling_rate_hz
+        )
         return self, additional_data
 
     def run(self, datapoint: ECGExampleData):
@@ -163,7 +198,9 @@ except NameError:
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
 
-train_set, test_set = train_test_split(example_data, train_size=0.7, random_state=0)
+train_set, test_set = train_test_split(
+    example_data, train_size=0.7, random_state=0
+)
 # We only want a single dataset in the test set
 test_set = test_set[0]
 

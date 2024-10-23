@@ -54,7 +54,9 @@ data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 
 # Note that we sort the files explicitly, as the file order might depend on the operating system.
 # Otherwise, the ordering of our dataset might not be reproducible
-participant_ids = [f.name.split("_")[0] for f in sorted(data_path.glob("*_all.csv"))]
+participant_ids = [
+    f.name.split("_")[0] for f in sorted(data_path.glob("*_all.csv"))
+]
 
 
 # %%
@@ -67,9 +69,13 @@ from itertools import cycle
 
 import pandas as pd
 
-patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
+patient_group = [
+    g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)
+]
 
-data_index = pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+data_index = pd.DataFrame(
+    {"patient_group": patient_group, "participant": participant_ids}
+)
 data_index
 
 # %%
@@ -97,9 +103,19 @@ class ECGExampleData(Dataset):
         super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
 
     def create_index(self) -> pd.DataFrame:
-        participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
-        patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
-        df = pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        participant_ids = [
+            f.name.split("_")[0]
+            for f in sorted(self.data_path.glob("*_all.csv"))
+        ]
+        patient_group = [
+            g
+            for g, _ in zip(
+                cycle(("group_1", "group_2", "group_3")), participant_ids
+            )
+        ]
+        df = pd.DataFrame(
+            {"patient_group": patient_group, "participant": participant_ids}
+        )
         # Some additional checks to avoid common issues
         if len(df) == 0:
             raise ValueError(
@@ -160,15 +176,27 @@ class ECGExampleData(Dataset):
         """
         # Check that there is only a single participant in the dataset
         if not self.is_single(None):
-            raise ValueError("Data can only be accessed, when there is just a single participant in the dataset.")
+            raise ValueError(
+                "Data can only be accessed, when there is just a single participant in the dataset."
+            )
         # Reconstruct the ecg file path based on the data index
         p_id = self.index["participant"][0]
         return pd.read_pickle(self.data_path / f"{p_id}.pk.gz")
 
     def create_index(self) -> pd.DataFrame:
-        participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
-        patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
-        df = pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        participant_ids = [
+            f.name.split("_")[0]
+            for f in sorted(self.data_path.glob("*_all.csv"))
+        ]
+        patient_group = [
+            g
+            for g, _ in zip(
+                cycle(("group_1", "group_2", "group_3")), participant_ids
+            )
+        ]
+        df = pd.DataFrame(
+            {"patient_group": patient_group, "participant": participant_ids}
+        )
         # Some additional checks to avoid common issues
         if len(df) == 0:
             raise ValueError(
@@ -266,13 +294,28 @@ class ECGExampleData(Dataset):
         self.assert_is_single(None, "labeled_r_peaks_")
         r_peaks = self.r_peak_positions_
         r_peaks["label"] = "normal"
-        r_peaks.loc[r_peaks["r_peak_position"].isin(self.pvc_positions_["pvc_position"]), "label"] = "pvc"
+        r_peaks.loc[
+            r_peaks["r_peak_position"].isin(
+                self.pvc_positions_["pvc_position"]
+            ),
+            "label",
+        ] = "pvc"
         return r_peaks
 
     def create_index(self) -> pd.DataFrame:
-        participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
-        patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
-        df = pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        participant_ids = [
+            f.name.split("_")[0]
+            for f in sorted(self.data_path.glob("*_all.csv"))
+        ]
+        patient_group = [
+            g
+            for g, _ in zip(
+                cycle(("group_1", "group_2", "group_3")), participant_ids
+            )
+        ]
+        df = pd.DataFrame(
+            {"patient_group": patient_group, "participant": participant_ids}
+        )
         # Some additional checks to avoid common issues
         if len(df) == 0:
             raise ValueError(
@@ -389,13 +432,28 @@ class ECGExampleData(Dataset[ECGExampleDataGroupLabel]):
         self.assert_is_single(None, "labeled_r_peaks_")
         r_peaks = self.r_peak_positions_
         r_peaks["label"] = "normal"
-        r_peaks.loc[r_peaks["r_peak_position"].isin(self.pvc_positions_["pvc_position"]), "label"] = "pvc"
+        r_peaks.loc[
+            r_peaks["r_peak_position"].isin(
+                self.pvc_positions_["pvc_position"]
+            ),
+            "label",
+        ] = "pvc"
         return r_peaks
 
     def create_index(self) -> pd.DataFrame:
-        participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
-        patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
-        df = pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        participant_ids = [
+            f.name.split("_")[0]
+            for f in sorted(self.data_path.glob("*_all.csv"))
+        ]
+        patient_group = [
+            g
+            for g, _ in zip(
+                cycle(("group_1", "group_2", "group_3")), participant_ids
+            )
+        ]
+        df = pd.DataFrame(
+            {"patient_group": patient_group, "participant": participant_ids}
+        )
         # Some additional checks to avoid common issues
         if len(df) == 0:
             raise ValueError(
@@ -510,13 +568,28 @@ class ECGExampleData(Dataset[ECGExampleDataGroupLabel]):
         self.assert_is_single(None, "labeled_r_peaks_")
         r_peaks = self.r_peak_positions_
         r_peaks["label"] = "normal"
-        r_peaks.loc[r_peaks["r_peak_position"].isin(self.pvc_positions_["pvc_position"]), "label"] = "pvc"
+        r_peaks.loc[
+            r_peaks["r_peak_position"].isin(
+                self.pvc_positions_["pvc_position"]
+            ),
+            "label",
+        ] = "pvc"
         return r_peaks
 
     def create_index(self) -> pd.DataFrame:
-        participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
-        patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
-        df = pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        participant_ids = [
+            f.name.split("_")[0]
+            for f in sorted(self.data_path.glob("*_all.csv"))
+        ]
+        patient_group = [
+            g
+            for g, _ in zip(
+                cycle(("group_1", "group_2", "group_3")), participant_ids
+            )
+        ]
+        df = pd.DataFrame(
+            {"patient_group": patient_group, "participant": participant_ids}
+        )
         # Some additional checks to avoid common issues
         if len(df) == 0:
             raise ValueError(

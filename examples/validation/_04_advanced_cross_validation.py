@@ -11,6 +11,7 @@ This two concepts of "grouping" and "stratification" are sometimes complicated t
 common) cases are not supported by the standard sklearn cross-validation splitters, without "abusing" the API.
 For this reason, we create dedicated support for this in tpcp to tackle these cases with a little more confidence.
 """
+
 # %%
 # Let's start by re-creating the simple example from the normal cross-validation example.
 #
@@ -31,9 +32,9 @@ example_data = ECGExampleData(data_path)
 # Pipeline
 # ++++++++
 import pandas as pd
+from tpcp import Parameter, Pipeline, cf
 
 from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
-from tpcp import Parameter, Pipeline, cf
 
 
 class MyPipeline(Pipeline):
@@ -56,7 +57,10 @@ class MyPipeline(Pipeline):
 # %%
 # The Scorer
 # ++++++++++
-from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference, precision_recall_f1_score
+from examples.algorithms.algorithms_qrs_detection_final import (
+    match_events_with_reference,
+    precision_recall_f1_score,
+)
 
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
@@ -87,14 +91,15 @@ example_data
 #
 # To show the impact of grouping and stratification, we take a subset of the data, that removes some participants from
 # "group_1" to create an imbalance.
-data_imbalanced = example_data.get_subset(index=example_data.index.query("participant not in ['114', '121']"))
+data_imbalanced = example_data.get_subset(
+    index=example_data.index.query("participant not in ['114', '121']")
+)
 
 # %%
 # Running a simple cross-validation with 2 folds, will have all group-1 participants in the test data of the first fold:
 #
 # Note, that we skip optimization of the pipeline, to keep the example simple and fast.
 from sklearn.model_selection import KFold
-
 from tpcp.optimize import DummyOptimize
 from tpcp.validate import cross_validate
 
@@ -103,7 +108,9 @@ cv = KFold(n_splits=2)
 pipe = MyPipeline()
 optimizable_pipe = DummyOptimize(pipe)
 
-results = cross_validate(optimizable_pipe, data_imbalanced, scoring=score, cv=cv)
+results = cross_validate(
+    optimizable_pipe, data_imbalanced, scoring=score, cv=cv
+)
 result_df = pd.DataFrame(results)
 
 # %%
@@ -125,12 +132,15 @@ result_df["test__data_labels"].explode()
 # We will provide it with a base splitter that enables stratification (in this case a `StratifiedKFold` splitter) and
 # the column(s) to stratify by.
 from sklearn.model_selection import StratifiedKFold
-
 from tpcp.validate import DatasetSplitter
 
-cv = DatasetSplitter(base_splitter=StratifiedKFold(n_splits=2), stratify="patient_group")
+cv = DatasetSplitter(
+    base_splitter=StratifiedKFold(n_splits=2), stratify="patient_group"
+)
 
-results = cross_validate(optimizable_pipe, data_imbalanced, scoring=score, cv=cv)
+results = cross_validate(
+    optimizable_pipe, data_imbalanced, scoring=score, cv=cv
+)
 result_df_stratified = pd.DataFrame(results)
 result_df_stratified["test__data_labels"].explode()
 
@@ -151,7 +161,9 @@ result_df_stratified["test__data_labels"].explode()
 # Note, that we use the "non-subsampled" example data here.
 from sklearn.model_selection import GroupKFold
 
-cv = DatasetSplitter(base_splitter=GroupKFold(n_splits=2), groupby="patient_group")
+cv = DatasetSplitter(
+    base_splitter=GroupKFold(n_splits=2), groupby="patient_group"
+)
 
 results = cross_validate(optimizable_pipe, example_data, scoring=score, cv=cv)
 result_df_grouped = pd.DataFrame(results)

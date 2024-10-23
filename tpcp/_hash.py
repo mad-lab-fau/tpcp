@@ -1,4 +1,5 @@
 """A custom hash function implementation that properly supports pytorch."""
+
 import contextlib
 import os
 import pickle

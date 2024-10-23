@@ -12,6 +12,7 @@ As example, we are going to Gridsearch some parameters of the `QRSDetector` we i
 :ref:`custom_algorithms_qrs_detection`.
 
 """
+
 # %%
 # To perform a GridSearch (or any other form of parameter optimization in Gaitmap), we first need to have a
 # **Dataset**, a **Pipeline** and a **score** function.
@@ -60,9 +61,9 @@ example_data = ECGExampleData(data_path)
 #
 # For the final GridSearch, we need an instance of the pipeline object.
 import pandas as pd
+from tpcp import Parameter, Pipeline, cf
 
 from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
-from tpcp import Parameter, Pipeline, cf
 
 
 class MyPipeline(Pipeline[ECGExampleData]):
@@ -110,7 +111,10 @@ pipe = MyPipeline()
 # In this case we compare the identified R-peaks with the reference and identify which R-peaks were correctly
 # found within a certain margin around the reference points
 # Based on these matches, we calculate the precision, the recall, and the f1-score using some helper functions.
-from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference, precision_recall_f1_score
+from examples.algorithms.algorithms_qrs_detection_final import (
+    match_events_with_reference,
+    precision_recall_f1_score,
+)
 
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
@@ -138,7 +142,9 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
 # As this is a nested paramater, we use the `__` syntax to set it.
 from sklearn.model_selection import ParameterGrid
 
-parameters = ParameterGrid({"algorithm__high_pass_filter_cutoff_hz": [0.25, 0.5, 1]})
+parameters = ParameterGrid(
+    {"algorithm__high_pass_filter_cutoff_hz": [0.25, 0.5, 1]}
+)
 
 # %%
 # Running the GridSearch

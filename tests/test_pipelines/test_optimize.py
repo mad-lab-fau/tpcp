@@ -35,7 +35,7 @@ class TestMetaFunctionalityGridSearch(TestAlgorithmMixin):
     ALGORITHM_CLASS = GridSearch
     ONLY_DEFAULT_PARAMS = False
 
-    @pytest.fixture()
+    @pytest.fixture
     def after_action_instance(self) -> GridSearch:
         gs = GridSearch(DummyOptimizablePipeline(), ParameterGrid({"para_1": [1]}), scoring=dummy_single_score_func)
         gs.optimize(DummyDataset())
@@ -47,7 +47,7 @@ class TestMetaFunctionalityGridSearchCV(TestAlgorithmMixin):
     ALGORITHM_CLASS = GridSearchCV
     ONLY_DEFAULT_PARAMS = False
 
-    @pytest.fixture()
+    @pytest.fixture
     def after_action_instance(self) -> GridSearchCV:
         gs = GridSearchCV(
             DummyOptimizablePipeline(), ParameterGrid({"para_1": [1]}), cv=2, scoring=dummy_single_score_func
@@ -96,7 +96,7 @@ class TestMetaFunctionalityOptimize(TestAlgorithmMixin):
     ALGORITHM_CLASS = Optimize
     ONLY_DEFAULT_PARAMS = False
 
-    @pytest.fixture()
+    @pytest.fixture
     def after_action_instance(self) -> Optimize:
         gs = self.ALGORITHM_CLASS(DummyOptimizablePipelineWithInfo())
         gs.optimize(DummyDataset())
@@ -111,7 +111,7 @@ class TestMetaFunctionalityDummyOptimize(TestAlgorithmMixin):
     ALGORITHM_CLASS = DummyOptimize
     ONLY_DEFAULT_PARAMS = False
 
-    @pytest.fixture()
+    @pytest.fixture
     def after_action_instance(self) -> DummyOptimize:
         gs = self.ALGORITHM_CLASS(DummyPipeline())
         gs.optimize(DummyDataset())
@@ -135,7 +135,7 @@ class TestGridSearchCommon:
     def gridsearch(self, request):
         self.optimizer = request.param.clone()
 
-    @pytest.mark.parametrize("return_optimized", (True, False, "some_str", "score", "-score"))
+    @pytest.mark.parametrize("return_optimized", [True, False, "some_str", "score", "-score"])
     def test_return_optimized_single(self, return_optimized):
         gs = self.optimizer
         gs.set_params(
@@ -173,7 +173,7 @@ class TestGridSearchCommon:
             assert not hasattr(gs, "best_score_")
             assert not hasattr(gs, "optimized_pipeline_")
 
-    @pytest.mark.parametrize("return_optimized", (False, "score_1", "score_2"))
+    @pytest.mark.parametrize("return_optimized", [False, "score_1", "score_2"])
     def test_return_optimized_multi(self, return_optimized):
         gs = self.optimizer
         gs.set_params(
@@ -198,7 +198,7 @@ class TestGridSearchCommon:
             assert not hasattr(gs, "best_score_")
             assert not hasattr(gs, "optimized_pipeline_")
 
-    @pytest.mark.parametrize("return_optimized", (True, "some_str"))
+    @pytest.mark.parametrize("return_optimized", [True, "some_str"])
     def test_return_optimized_multi_exception(self, return_optimized):
         gs = self.optimizer
         gs.set_params(
@@ -210,7 +210,7 @@ class TestGridSearchCommon:
         with pytest.raises(ValueError):
             gs.optimize(DummyDataset())
 
-    @pytest.mark.parametrize("best_value", (1, 2))
+    @pytest.mark.parametrize("best_value", [1, 2])
     def test_rank(self, best_value):
         def dummy_best_scorer(best):
             def scoring(pipe, ds):
@@ -303,7 +303,7 @@ class TestGridSearch:
 
         assert gs.multimetric_ is True
 
-    @pytest.mark.parametrize("return_raw_scores", (False, True))
+    @pytest.mark.parametrize("return_raw_scores", [False, True])
     def test_with_custom_aggregator(self, return_raw_scores):
         # This aggregator returns values with new names
         class Agg(Aggregator):
@@ -343,7 +343,7 @@ class TestGridSearch:
         # Wo don't expect a non-aggreagted version with the name of the final agg value
         assert "single__custom_agg__new_score_name" not in results_df.columns
 
-    @pytest.mark.parametrize("error_para", (1, 2))
+    @pytest.mark.parametrize("error_para", [1, 2])
     def test_custom_error_message(self, error_para):
         def simple_scorer(pipeline, data_point):
             pipeline.run(data_point)
@@ -362,11 +362,11 @@ class TestGridSearch:
 class TestGridSearchCV:
     @pytest.mark.parametrize(
         "kwargs",
-        (
+        [
             {},
             {"n_jobs": 5, "verbose": 1, "pre_dispatch": 5, "progress_bar": False},
             {"n_jobs": 2, "progress_bar": False},
-        ),
+        ],
     )
     def test_single_score(self, kwargs):
         """Test scoring when only a single performance parameter."""
@@ -431,11 +431,11 @@ class TestGridSearchCV:
 
     @pytest.mark.parametrize(
         "kwargs",
-        (
+        [
             {},
             {"n_jobs": 5, "verbose": 1, "pre_dispatch": 5, "progress_bar": False},
             {"n_jobs": 2, "progress_bar": False},
-        ),
+        ],
     )
     def test_multi_score(self, kwargs):
         """Test scoring when only a multiple performance parameter."""
@@ -576,7 +576,7 @@ class TestGridSearchCV:
         # Final optimize was called with all the data.
         assert len(mock.call_args_list[-1][0][1]) == 5
 
-    @pytest.mark.parametrize(("pure_paras", "call_count"), ((False, 6 * 2), (True, 2 * 2), (["para_1"], 2 * 2)))
+    @pytest.mark.parametrize(("pure_paras", "call_count"), [(False, 6 * 2), (True, 2 * 2), (["para_1"], 2 * 2)])
     def test_pure_parameters(self, pure_paras, call_count):
         optimized_pipe = DummyOptimizablePipeline()
         optimized_pipe.optimized = True
@@ -644,7 +644,7 @@ class TestGridSearchCV:
                 assert result["optimizer"].optimized_pipeline_.para_2 == "some_other_value"
                 assert result["optimizer"].optimized_pipeline_.optimized == "some_other_value"
 
-    @pytest.mark.parametrize("return_raw_scores", (False, True))
+    @pytest.mark.parametrize("return_raw_scores", [False, True])
     def test_with_custom_aggregator(self, return_raw_scores):
         cv = PredefinedSplit(test_fold=[0, 0, 1, 1, 1])  # Test Fold 0 has len==2 and 1 has len == 3
 
@@ -689,8 +689,8 @@ class TestGridSearchCV:
 
         assert "mean__test__agg__custom_agg__new_score_name" in results_df.columns
 
-    @pytest.mark.parametrize("error_fold", (0, 2))
-    @pytest.mark.parametrize("error_para", (1, 2))
+    @pytest.mark.parametrize("error_fold", [0, 2])
+    @pytest.mark.parametrize("error_para", [1, 2])
     def test_custom_error_message(self, error_para, error_fold):
         def simple_scorer(pipeline, data_point):
             pipeline.run(data_point)
@@ -749,7 +749,7 @@ class TestOptimize:
         assert joblib.hash(mutable_instance) == joblib.hash(opt.optimized_pipeline_.para_mutable)
         assert joblib.hash(p.para_mutable) != joblib.hash(opt.optimized_pipeline_.para_mutable)
 
-    @pytest.mark.parametrize("use_safe", (True, False))
+    @pytest.mark.parametrize("use_safe", [True, False])
     def test_safe_optimize(self, use_safe):
         """Test that we can disable the safe check.
 
@@ -768,7 +768,7 @@ class TestOptimize:
             else:
                 assert len(w) == 0
 
-    @pytest.mark.parametrize("wrap", (True, False))
+    @pytest.mark.parametrize("wrap", [True, False])
     def test_double_wrap(self, wrap):
         """Test that we do not check twice."""
         optimized_pipe = DummyOptimizablePipelineUnsafe()
@@ -787,7 +787,7 @@ class TestOptimize:
             # If we double wrap, the warning should appear twice
             assert len(w) == 1
 
-    @pytest.mark.parametrize("use_with_info", (True, False))
+    @pytest.mark.parametrize("use_with_info", [True, False])
     def test_correct_method_called(self, use_with_info):
         optimized_pipe = DummyOptimizablePipeline()
         ds = DummyDataset()

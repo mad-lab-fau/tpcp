@@ -12,7 +12,6 @@ Even though it has only 3 parameters, it requires over 20 lines of code to defin
 """
 
 import pandas as pd
-
 from tpcp import Algorithm, Parameter
 
 
@@ -55,7 +54,9 @@ from dataclasses import dataclass, field
 from typing import ClassVar
 
 
-@dataclass(repr=False)  # We disable the automatic repr generation, as we have one. The default one might cause errors.
+@dataclass(
+    repr=False
+)  # We disable the automatic repr generation, as we have one. The default one might cause errors.
 class QRSDetector(Algorithm):
     _action_methods: ClassVar[str] = "detect"
 
@@ -75,7 +76,11 @@ class QRSDetector(Algorithm):
 
 # %%
 # We still get all parameters in the init:
-QRSDetector(high_pass_filter_cutoff_hz=4, max_heart_rate_bpm=200, min_r_peak_height_over_baseline=1)
+QRSDetector(
+    high_pass_filter_cutoff_hz=4,
+    max_heart_rate_bpm=200,
+    min_r_peak_height_over_baseline=1,
+)
 
 
 # %%
@@ -95,7 +100,10 @@ class ModifiedQRSDetector(QRSDetector):
 
 
 ModifiedQRSDetector(
-    high_pass_filter_cutoff_hz=4, max_heart_rate_bpm=200, min_r_peak_height_over_baseline=1, new_parameter=3
+    high_pass_filter_cutoff_hz=4,
+    max_heart_rate_bpm=200,
+    min_r_peak_height_over_baseline=1,
+    new_parameter=3,
 )
 
 
@@ -120,10 +128,18 @@ from tpcp import Dataset
 
 
 @dataclass(repr=False)
-class CustomDataset(Dataset.as_dataclass()):  # Note the `as_dataclass` call here!
+class CustomDataset(
+    Dataset.as_dataclass()
+):  # Note the `as_dataclass` call here!
     def create_index(self) -> pd.DataFrame:
         return pd.DataFrame(
-            list(product(("patient_1", "patient_2", "patient_3"), ("test_1", "test_2"), ("1", "2"))),
+            list(
+                product(
+                    ("patient_1", "patient_2", "patient_3"),
+                    ("test_1", "test_2"),
+                    ("1", "2"),
+                )
+            ),
             columns=["patient", "test", "extra"],
         )
 
@@ -154,7 +170,9 @@ class FilterAlgorithm(Algorithm):
 
 @dataclass
 class HigherLevelFilter(QRSDetector):
-    filter_algorithm: Parameter[FilterAlgorithm] = field(default_factory=lambda: FilterAlgorithm(3, 2))
+    filter_algorithm: Parameter[FilterAlgorithm] = field(
+        default_factory=lambda: FilterAlgorithm(3, 2)
+    )
 
 
 # %%
@@ -185,7 +203,9 @@ nested_object_is_different
 from attrs import Factory, define, field
 
 
-@define(kw_only=True, slots=False, repr=False)  # Slots Don't play nice with tpcp!
+@define(
+    kw_only=True, slots=False, repr=False
+)  # Slots Don't play nice with tpcp!
 class QRSDetector(Algorithm):
     _action_methods: ClassVar[str] = "detect"
 
@@ -201,7 +221,9 @@ class QRSDetector(Algorithm):
     _HIGH_PASS_FILTER_ORDER: ClassVar[int] = 4
 
 
-@define(kw_only=True, slots=False, repr=False)  # Slots Don't play nice with tpcp!
+@define(
+    kw_only=True, slots=False, repr=False
+)  # Slots Don't play nice with tpcp!
 class FilterAlgorithm(Algorithm):
     _action_methods: ClassVar = "filter"
 
@@ -213,9 +235,13 @@ class FilterAlgorithm(Algorithm):
     filtered_signal_: pd.Series = field(init=False)
 
 
-@define(kw_only=True, slots=False, repr=False)  # Slots Don't play nice with tpcp!
+@define(
+    kw_only=True, slots=False, repr=False
+)  # Slots Don't play nice with tpcp!
 class HigherLevelFilter(QRSDetector):
-    filter_algorithm: Parameter[FilterAlgorithm] = Factory(lambda: FilterAlgorithm(cutoff_hz=3, order=2))
+    filter_algorithm: Parameter[FilterAlgorithm] = Factory(
+        lambda: FilterAlgorithm(cutoff_hz=3, order=2)
+    )
 
 
 HigherLevelFilter()
@@ -223,13 +249,23 @@ HigherLevelFilter()
 # To support subclassing tpcp parameters with existing inits, we provide a `as_attrs` method on the respective classes.
 
 
-@define(kw_only=True, slots=False, repr=False)  # Slots Don't play nice with tpcp!
+@define(
+    kw_only=True, slots=False, repr=False
+)  # Slots Don't play nice with tpcp!
 class CustomDataset(Dataset.as_attrs()):  # Note the `as_attrs` call here!
-    custom_param: float  # We don't need a default, as we are using `kw_only` in define
+    custom_param: (
+        float  # We don't need a default, as we are using `kw_only` in define
+    )
 
     def create_index(self) -> pd.DataFrame:
         return pd.DataFrame(
-            list(product(("patient_1", "patient_2", "patient_3"), ("test_1", "test_2"), ("1", "2"))),
+            list(
+                product(
+                    ("patient_1", "patient_2", "patient_3"),
+                    ("test_1", "test_2"),
+                    ("1", "2"),
+                )
+            ),
             columns=["patient", "test", "extra"],
         )
 

@@ -1,4 +1,5 @@
 """Base class for all datasets."""
+
 import warnings
 from collections.abc import Iterator, Sequence
 from keyword import iskeyword
@@ -553,7 +554,13 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
     >>> from tpcp import Dataset
     >>>
     >>> test_index = pd.DataFrame(
-    ...     list(product(("patient_1", "patient_2", "patient_3"), ("test_1", "test_2"), ("1", "2"))),
+    ...     list(
+    ...         product(
+    ...             ("patient_1", "patient_2", "patient_3"),
+    ...             ("test_1", "test_2"),
+    ...             ("1", "2"),
+    ...         )
+    ...     ),
     ...     columns=["patient", "test", "extra"],
     ... )
     >>> # We create a little dummy dataset by passing an index directly to `test_index`
@@ -651,7 +658,9 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
 
     We can also get arbitary subsets from the dataset:
 
-    >>> subset = grouped_dataset.get_subset(patient=["patient_1", "patient_2"], extra="2")
+    >>> subset = grouped_dataset.get_subset(
+    ...     patient=["patient_1", "patient_2"], extra="2"
+    ... )
     >>> subset  # doctest: +NORMALIZE_WHITESPACE
     Dataset [4 groups/rows]
     <BLANKLINE>
@@ -738,13 +747,11 @@ T = TypeVar("T")
 
 
 @overload
-def _ensure_is_list(x: list[T]) -> list[T]:
-    ...
+def _ensure_is_list(x: list[T]) -> list[T]: ...
 
 
 @overload
-def _ensure_is_list(x: T) -> list[T]:
-    ...
+def _ensure_is_list(x: T) -> list[T]: ...
 
 
 def _ensure_is_list(x):

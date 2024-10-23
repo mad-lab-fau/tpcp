@@ -1,6 +1,7 @@
 line-length = 120
 target-version = "py39"
 
+[lint]
 select = [
     # pyflakes
     "F",
@@ -92,12 +93,18 @@ ignore = [
     "PD013",
     # No Any annotations
     "ANN401",
+    # Self annotation
+    "ANN101",
     # To many arguments
     "PLR0913",
+    # Class attribute shadows builtin
+    "A003",
+    # No typing for `cls`
+    "ANN102",
     # Ignore because of formatting
     "ISC001",
-    # Ignore line length warnings. The formatter knows better.
-    "E501",
+    # Syntax not supported in Python 3.9
+    "UP007"
 ]
 
 
@@ -110,13 +117,9 @@ exclude = [
 ]
 
 
-[pydocstyle]
+[lint.pydocstyle]
 convention = "numpy"
 
-[pyupgrade]
-# Preserve types, even if a file imports `from __future__ import annotations`.
-keep-runtime-typing = true
-
 [format]
-# Docstring formatting is opt-in. Enable it by setting this option to `true`.
 docstring-code-format = true
+docstring-code-line-length = 80

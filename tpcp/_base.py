@@ -3,6 +3,7 @@
 These classes are in a separate module to avoid circular imports.
 In basically all cases, you do not need them.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -148,7 +149,7 @@ def _retry_eval_with_missing_locals(
     # We use a value here instead of a "while True" to not get the program stuck in an endless loop.
     for _ in range(100):
         try:
-            val = eval(expression, globalns, localns)  # noqa: PGH001
+            val = eval(expression, globalns, localns)
             break
         except NameError as e:
             missing = str(e).split("'")[1]
@@ -691,9 +692,7 @@ def _is_dangerous_mutable(field: inspect.Parameter) -> bool:
     """Check if a parameter is one of the mutable objects "considered" dangerous."""
     if field.default is inspect.Parameter.empty or isinstance(field.default, BaseFactory):
         return False
-    if isinstance(field.default, _get_dangerous_mutable_types()):
-        return True
-    return False
+    return isinstance(field.default, _get_dangerous_mutable_types())
 
 
 def _is_builtin_class_instance(obj: Any) -> bool:

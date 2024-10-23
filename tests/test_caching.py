@@ -52,27 +52,27 @@ def example_class(request):
     remove_any_cache(request.param[1])
 
 
-@pytest.fixture()
+@pytest.fixture
 def simple_example_class(request):
     yield ExampleClassOtherModule
     remove_any_cache(ExampleClassOtherModule)
 
 
-@pytest.fixture()
+@pytest.fixture
 def joblib_cache():
     memory = joblib.Memory(location=".cache", verbose=0)
     yield memory
     memory.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def joblib_cache_verbose():
     memory = joblib.Memory(location=".cache", verbose=10)
     yield memory
     memory.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def hybrid_cache_clear():
     yield None
     hybrid_cache.__cache_registry__.clear()

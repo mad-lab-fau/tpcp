@@ -120,7 +120,7 @@ class TestScorer:
         pipe = DummyOptimizablePipeline()
         scorer(pipeline=pipe, dataset=DummyDataset())
 
-    @pytest.mark.parametrize("reversed", (True, False))
+    @pytest.mark.parametrize("reversed", [True, False])
     def test_non_homogeneus_return(self, reversed):
         non_homogeneous_return = [3, {"val": 3}]
         if reversed:
@@ -173,13 +173,13 @@ def _dummy_func_2(x):
 class TestScorerUtils:
     @pytest.mark.parametrize(
         ("scoring", "expected"),
-        (
+        [
             (_dummy_func, Scorer(_dummy_func)),
             (Scorer(_dummy_func_2), Scorer(_dummy_func_2)),
-        ),
+        ],
     )
     def test_validate_scorer(self, scoring, expected):
-        pipe = DummyOptimizablePipeline()
+        DummyOptimizablePipeline()
         out = _validate_scorer(scoring)
         assert isinstance(out, type(expected))
         assert out.score_func == expected.score_func
@@ -189,7 +189,7 @@ class TestScorerUtils:
             _validate_scorer(None)
 
     def test_invalid_input(self):
-        pipe = DummyOptimizablePipeline()
+        DummyOptimizablePipeline()
         with pytest.raises(ValueError) as e:
             _validate_scorer("something invalid")
 
@@ -227,7 +227,7 @@ class TestCustomAggregator:
     dummy_agg = DummyAgg()
 
     @pytest.mark.parametrize(
-        "scorer_return", (1, {"val": 1}, {"val": 1, "val2": 2}, {"val": 1, "val2": 2, "val3": no_agg(None)})
+        "scorer_return", [1, {"val": 1}, {"val": 1, "val2": 2}, {"val": 1, "val2": 2, "val3": no_agg(None)}]
     )
     @mock.patch("tests.test_pipelines.test_scorer.TestCustomAggregator.DummyAgg.aggregate", return_value=1)
     def test_default_agg_method(self, mock_aggregate, scorer_return):
@@ -246,7 +246,7 @@ class TestCustomAggregator:
 
     @pytest.mark.parametrize(
         ("scorer_return", "expected_val"),
-        (
+        [
             (1, 0),
             ({"val": 1}, 0),
             ({"val": 1, "val2": 2}, 0),
@@ -255,7 +255,7 @@ class TestCustomAggregator:
             ({"val": dummy_agg(1)}, 1),
             ({"val": dummy_agg(1), "val2": dummy_agg(2)}, 2),
             ({"val": dummy_agg(1), "val2": 2, "val3": no_agg(3)}, 1),
-        ),
+        ],
     )
     @mock.patch("tests.test_pipelines.test_scorer.TestCustomAggregator.DummyAgg.aggregate", return_value=1)
     def test_selective_agg(self, mock_aggregate, scorer_return, expected_val):
@@ -298,7 +298,7 @@ class TestCustomAggregator:
 
         assert "Scorer returned a `no_agg` aggregator. " in str(e)
 
-    @pytest.mark.parametrize("n_jobs", (1, 2))
+    @pytest.mark.parametrize("n_jobs", [1, 2])
     def test_score_return_val_multi_score_no_agg(self, n_jobs):
         def multi_score_func(pipeline, data_point):
             return {"score_1": data_point.group_labels[0], "no_agg_score": no_agg(str(data_point.group_labels))}
@@ -330,7 +330,7 @@ class TestCustomAggregator:
         def aggregate(cls, **_):
             return "invalid"
 
-    @pytest.mark.parametrize("score_func", (lambda x, y: 1, lambda x, y: {"val": 1}))
+    @pytest.mark.parametrize("score_func", [lambda x, y: 1, lambda x, y: {"val": 1}])
     @pytest.mark.parametrize("aggregator", [InvalidMultiAgg(), InvalidSingleAgg()])
     def test_invalid_aggregator_return_type(self, aggregator, score_func):
         scorer = Scorer(score_func, default_aggregator=aggregator)
@@ -374,7 +374,7 @@ class TestCustomAggregator:
         def aggregate(cls, /, values, datapoints):
             return 1
 
-    @pytest.mark.parametrize("score_func_type", ("single", "multi"))
+    @pytest.mark.parametrize("score_func_type", ["single", "multi"])
     @mock.patch("tests.test_pipelines.test_scorer.TestCustomAggregator.DatapointAgg.aggregate", return_value=1)
     def test_datapoints_forwarded_to_agg(self, mock_method, score_func_type):
         if score_func_type == "single":
@@ -398,7 +398,7 @@ class TestCustomAggregator:
             assert_frame_equal(d_real.index, d_exp.index)
             assert_frame_equal(v_real.index, d_exp.index)
 
-    @pytest.mark.parametrize("n_jobs", (1, 2))
+    @pytest.mark.parametrize("n_jobs", [1, 2])
     def test_single_value_callback_called_correctly(self, n_jobs):
         """This tests that the callback is called in the main thread and not in the parallel threads."""
 

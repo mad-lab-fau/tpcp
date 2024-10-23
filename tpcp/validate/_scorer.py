@@ -1,4 +1,5 @@
 """Helper to score pipelines."""
+
 from __future__ import annotations
 
 import traceback
@@ -60,8 +61,7 @@ class ScoreCallback(Protocol[PipelineT, DatasetT]):
         scorer: Scorer[PipelineT, DatasetT],
         pipeline: PipelineT,
         dataset: DatasetT,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 class Aggregator(BaseTpcpObject, Generic[T]):
@@ -109,7 +109,8 @@ class Aggregator(BaseTpcpObject, Generic[T]):
         if not hasattr(self, "_value"):
             raise AttributeError(
                 "Aggregator has no value set yet. "
-                "When using a configurable aggregator, first create an instance and then set the value, by calling the instance. "
+                "When using a configurable aggregator, first create an instance and then set the value, by calling the "
+                "instance. "
                 "E.g. `my_agg = MyAggregator(); my_agg(42)`."
             )
         return self._value
@@ -279,16 +280,20 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
         It should have the following call signature:
 
         >>> def callback(
-        ...     *, step: int, scores: Tuple[_SCORE_TYPE, ...], scorer: "Scorer", pipeline: Pipeline, dataset: Dataset, **_
-        ... ) -> None:
-        ...     ...
+        ...     *,
+        ...     step: int,
+        ...     scores: Tuple[_SCORE_TYPE, ...],
+        ...     scorer: "Scorer",
+        ...     pipeline: Pipeline,
+        ...     dataset: Dataset,
+        ...     **_,
+        ... ) -> None: ...
 
         All parameters will be passed as keyword arguments.
         This means, if your callback only needs a subset of the defined parameters, you can ignore them by using
         unused kwargs:
 
-        >>> def callback(*, step: int, pipeline: Pipeline, **_):
-        ...     ...
+        >>> def callback(*, step: int, pipeline: Pipeline, **_): ...
 
     n_jobs
         The number of parallel jobs to run.
@@ -376,7 +381,7 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
                 raw_scores[name] = list(raw_score)
             try:
                 agg_score = aggregator.aggregate(values=raw_score, datapoints=datapoints)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 raise ValidationError(
                     f"Aggregator for score '{name}' raised an exception while aggregating scores. "
                     "Scroll up to see the original exception."
@@ -400,7 +405,7 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
 
         if is_single:
             # If we have only a single score, we return it directly
-            return agg_scores.get("__single__", agg_scores), raw_scores.get("__single__", None)
+            return agg_scores.get("__single__", agg_scores), raw_scores.get("__single__")
         return agg_scores, raw_scores
 
     def _score(self, pipeline: PipelineT, dataset: DatasetT):
@@ -408,7 +413,7 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
                 score = self.score_func(pipeline.clone(), d)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 raise ScorerFailedError(
                     f"Scorer raised an exception while scoring data point {i} ({d.group_label}). "
                     "Tpcp does not support that (compared to sklearn) and you need to handle error cases yourself "
@@ -450,7 +455,7 @@ ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT], Scorer[PipelineT, DatasetT]]
 
 def _validate_scorer(
     scoring: ScorerTypes[PipelineT, DatasetT],
-        *,
+    *,
     base_class: type[Scorer[Any, Any]] = Scorer,
 ) -> Scorer[PipelineT, DatasetT]:
     """Convert the provided scoring method into a valid scorer object."""

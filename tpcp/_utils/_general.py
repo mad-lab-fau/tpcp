@@ -1,4 +1,5 @@
 """Some helper to work with the format the results of GridSearches and CVs."""
+
 from __future__ import annotations
 
 import copy
@@ -31,7 +32,12 @@ def _aggregate_final_results(results: list) -> dict:
 
     Example
     -------
-    >>> results = [{"a": 1, "b": 10}, {"a": 2, "b": 2}, {"a": 3, "b": 3}, {"a": 10, "b": 10}]
+    >>> results = [
+    ...     {"a": 1, "b": 10},
+    ...     {"a": 2, "b": 2},
+    ...     {"a": 3, "b": 3},
+    ...     {"a": 10, "b": 10},
+    ... ]
     >>>
     >>> _aggregate_final_results(results)  # doctest: +SKIP
     {'a': array([1, 2, 3, 10]),

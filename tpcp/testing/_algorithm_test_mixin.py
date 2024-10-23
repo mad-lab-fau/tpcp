@@ -1,4 +1,5 @@
 """A mixin for all common tests that should be run on all algorithm classes."""
+
 import inspect
 from typing import Generic
 
@@ -56,7 +57,7 @@ class TestAlgorithmMixin(Generic[BaseTpcpObjectT]):
 
     _IGNORED_NAMES = ()
 
-    @pytest.fixture()
+    @pytest.fixture
     def after_action_instance(self, **kwargs) -> BaseTpcpObjectT:  # noqa: PT004
         """Return an instance of the algorithm class AFTER the action is performed.
 

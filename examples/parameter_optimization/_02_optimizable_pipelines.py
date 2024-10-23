@@ -58,10 +58,18 @@ This example shows how such a pipeline should be implemented and how it can be o
 #
 
 import pandas as pd
+from tpcp import (
+    OptimizableParameter,
+    OptimizablePipeline,
+    Parameter,
+    cf,
+    make_optimize_safe,
+)
 
-from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDetector
+from examples.algorithms.algorithms_qrs_detection_final import (
+    OptimizableQrsDetector,
+)
 from examples.datasets.datasets_final_ecg import ECGExampleData
-from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf, make_optimize_safe
 
 
 class MyPipeline(OptimizablePipeline[ECGExampleData]):
@@ -70,7 +78,9 @@ class MyPipeline(OptimizablePipeline[ECGExampleData]):
 
     r_peak_positions_: pd.Series
 
-    def __init__(self, algorithm: OptimizableQrsDetector = cf(OptimizableQrsDetector())):
+    def __init__(
+        self, algorithm: OptimizableQrsDetector = cf(OptimizableQrsDetector())
+    ):
         self.algorithm = algorithm
 
     @make_optimize_safe
@@ -79,7 +89,9 @@ class MyPipeline(OptimizablePipeline[ECGExampleData]):
         r_peaks = [d.r_peak_positions_["r_peak_position"] for d in dataset]
         # Note: We need to clone the algorithm instance, to make sure we don't leak any data between runs.
         algo = self.algorithm.clone()
-        self.algorithm = algo.self_optimize(ecg_data, r_peaks, dataset.sampling_rate_hz)
+        self.algorithm = algo.self_optimize(
+            ecg_data, r_peaks, dataset.sampling_rate_hz
+        )
         return self
 
     def run(self, datapoint: ECGExampleData):
@@ -115,7 +127,9 @@ except NameError:
 data_path = HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
 example_data = ECGExampleData(data_path)
 
-train_set, test_set = train_test_split(example_data, train_size=0.7, random_state=0)
+train_set, test_set = train_test_split(
+    example_data, train_size=0.7, random_state=0
+)
 # We only want a single dataset in the test set
 test_set = test_set[0]
 (train_set.group_labels, test_set.group_labels)
@@ -129,7 +143,10 @@ pipeline = MyPipeline()
 
 # We use the `safe_run` wrapper instead of just run. This is always a good idea.
 results = pipeline.safe_run(test_set)
-print("The default `min_r_peak_height_over_baseline` is", pipeline.algorithm.min_r_peak_height_over_baseline)
+print(
+    "The default `min_r_peak_height_over_baseline` is",
+    pipeline.algorithm.min_r_peak_height_over_baseline,
+)
 print("Number of R-Peaks:", len(results.r_peak_positions_))
 
 
@@ -148,7 +165,10 @@ from tpcp.optimize import Optimize
 # Remember we only optimize on the `train_set`.
 optimized_pipe = Optimize(pipeline).optimize(train_set)
 optimized_results = optimized_pipe.safe_run(test_set)
-print("The optimized `min_r_peak_height_over_baseline` is", optimized_results.algorithm.min_r_peak_height_over_baseline)
+print(
+    "The optimized `min_r_peak_height_over_baseline` is",
+    optimized_results.algorithm.min_r_peak_height_over_baseline,
+)
 print("Number of R-Peaks:", len(optimized_results.r_peak_positions_))
 
 # %%

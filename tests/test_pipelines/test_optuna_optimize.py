@@ -91,7 +91,7 @@ class TestMetaFunctionalityOptuna(TestAlgorithmMixin):
     ONLY_DEFAULT_PARAMS = False
     _IGNORED_NAMES = ("create_search_space", "scoring", "mock_objective")
 
-    @pytest.fixture()
+    @pytest.fixture
     def after_action_instance(self) -> DummyOptunaOptimizer:
         gs = DummyOptunaOptimizer(
             DummyOptimizablePipeline(),
@@ -144,7 +144,7 @@ class TestCustomOptunaOptimize:
 
         assert isinstance(mock_objective.call_args[0][0], Trial)
 
-    @pytest.mark.parametrize("return_optimize", (True, False))
+    @pytest.mark.parametrize("return_optimize", [True, False])
     def test_return_optimized(self, return_optimize):
         mock_objective = Mock(return_value=3)
 
@@ -183,8 +183,8 @@ class TestCustomOptunaOptimize:
 
         assert mock.call_args[0][1] is dataset
 
-    @pytest.mark.parametrize("pipe", (DummyOptimizablePipeline(), DummyPipeline()))
-    @pytest.mark.parametrize("n_jobs", (1, 2))
+    @pytest.mark.parametrize("pipe", [DummyOptimizablePipeline(), DummyPipeline()])
+    @pytest.mark.parametrize("n_jobs", [1, 2])
     def test_correct_paras_selected(self, pipe, n_jobs, tmp_path):
         # Should select 1, as it has the highest score
         scores = {0: 1, 1: 2, 2: 0}
@@ -256,7 +256,7 @@ class TestMetaFunctionalityOptunaSearch(TestAlgorithmMixin):
     ALGORITHM_CLASS = OptunaSearch
     ONLY_DEFAULT_PARAMS = False
 
-    @pytest.fixture()
+    @pytest.fixture
     def after_action_instance(self) -> OptunaSearch:
         gs = OptunaSearch(
             DummyOptimizablePipeline(),
@@ -293,7 +293,7 @@ class TestOptunaSearch:
 
         assert optuna_search.optimized_pipeline_.get_params()["para_1"] == optuna_search.best_params_["para_1"]
 
-    @pytest.mark.parametrize("score_name", ("score_2", "score_1"))
+    @pytest.mark.parametrize("score_name", ["score_2", "score_1"])
     def test_search_result_columns_multi_score(self, score_name):
         optuna_search = OptunaSearch(
             DummyOptimizablePipeline(),
@@ -325,7 +325,7 @@ class TestOptunaSearch:
         # The dummy scorer returns the datapoint id for score 1 and the datapoint id + 1 for score 2.
         assert optuna_search.best_score_ == np.mean(range(5)) + int(score_name == "score_2")
 
-    @pytest.mark.parametrize("score_name", ("score_3", False, None))
+    @pytest.mark.parametrize("score_name", ["score_3", False, None])
     def test_multi_metric_wrong_score_name(self, score_name):
         with pytest.raises(ValueError):
             OptunaSearch(
@@ -373,7 +373,7 @@ class TestOptunaSearch:
         assert optuna_search.best_params_["para_1"] == "('a', 'b')"
         assert optuna_search.best_params_["para_2"] == ("a", "b")
 
-    @pytest.mark.parametrize("ignore_seed", (True, False, 42))
+    @pytest.mark.parametrize("ignore_seed", [True, False, 42])
     def test_multiprocessing_does_not_repeat_trials(self, ignore_seed):
         # Note, we expect this test to path independent of the seed.
         # In both cases, a new instance of TPE sampler is created internally for each process.

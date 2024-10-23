@@ -33,14 +33,14 @@ def test_composite_deep_get_params():
 
 @pytest.mark.parametrize(
     "values",
-    (
+    [
         (None, True),
         ([("name", "something")], True),
         ("something", False),
         ([(1, "something")], False),
         ([("name", "something"), (1, "something")], False),
         ([("name", "something", "some_other")], False),
-    ),
+    ],
 )
 def test_raises_with_invalid_composite(values):
     test_instance = create_test_class(

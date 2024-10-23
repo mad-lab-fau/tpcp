@@ -3,6 +3,7 @@
 This is inspired by github.com/syrusakbary/snapshottest.
 Note that it can not be used in combination with this module!
 """
+
 import re
 from pathlib import Path
 from typing import Optional, Union
@@ -123,17 +124,17 @@ class PyTestSnapshotTest:
             raise TypeError(f"The dtype {type(value)} is not supported for snapshot testing")
 
     def _retrieve(self, dtype):
-        if dtype == pd.DataFrame:
+        if dtype is pd.DataFrame:
             filename = self._file_name_json
             if not filename.is_file():
                 raise SnapshotNotFoundError
             return pd.read_json(filename, orient="table")
-        if dtype == np.ndarray:
+        if dtype is np.ndarray:
             filename = self._file_name_csv
             if not filename.is_file():
                 raise SnapshotNotFoundError
             return np.genfromtxt(filename, delimiter=",")
-        if dtype == str:
+        if dtype is str:
             filename = self._file_name_txt
             if not filename.is_file():
                 raise SnapshotNotFoundError
@@ -213,13 +214,15 @@ class PyTestSnapshotTest:
         default_float_cols = df.select_dtypes(include=["float64"]).columns
         if not float_cols.equals(default_float_cols):
             raise ValueError(
-                f"DataFrame contains non-default float dtypes: {df[float_cols].dtypes}, which are not supported for snapshot testing. Consider converting them to 'float64' or to use the flag `check_dtype=False`."
+                f"DataFrame contains non-default float dtypes: {df[float_cols].dtypes}, which are not supported for "
+                "snapshot testing. Consider converting them to 'float64' or to use the flag `check_dtype=False`."
             )
         int_cols = df.select_dtypes(include=[int]).columns
         default_int_cols = df.select_dtypes(include=["int64"]).columns
         if not int_cols.equals(default_int_cols):
             raise ValueError(
-                f"DataFrame contains non-default int dtypes: {df[int_cols].dtypes}, which are not supported for snapshot testing. Consider converting them to 'int64' or to use the flag `check_dtype=False`."
+                f"DataFrame contains non-default int dtypes: {df[int_cols].dtypes}, which are not supported for "
+                "snapshot testing. Consider converting them to 'int64' or to use the flag `check_dtype=False`."
             )
 
     @staticmethod
@@ -244,7 +247,7 @@ class PyTestSnapshotTest:
         return sanitized_df
 
 
-@pytest.fixture()
+@pytest.fixture
 def snapshot(request):
     with PyTestSnapshotTest(request) as snapshot_test:
         yield snapshot_test

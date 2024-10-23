@@ -7,13 +7,13 @@ The final ECG Example dataset
 This is the final ECG Example dataset, that we developed step by step in the example :ref:`custom_dataset_ecg`.
 This file can be used as quick reference or to import the class into other examples without side effects.
 """
+
 from functools import lru_cache
 from itertools import cycle
 from pathlib import Path
 from typing import Literal, NamedTuple, Optional, Union
 
 import pandas as pd
-
 from tpcp import Dataset
 
 
@@ -98,13 +98,28 @@ class ECGExampleData(Dataset[ECGExampleDataGroupLabel]):
         self.assert_is_single(None, "labeled_r_peaks_")
         r_peaks = self.r_peak_positions_
         r_peaks["label"] = "normal"
-        r_peaks.loc[r_peaks["r_peak_position"].isin(self.pvc_positions_["pvc_position"]), "label"] = "pvc"
+        r_peaks.loc[
+            r_peaks["r_peak_position"].isin(
+                self.pvc_positions_["pvc_position"]
+            ),
+            "label",
+        ] = "pvc"
         return r_peaks
 
     def create_index(self) -> pd.DataFrame:
-        participant_ids = [f.name.split("_")[0] for f in sorted(self.data_path.glob("*_all.csv"))]
-        patient_group = [g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)]
-        df = pd.DataFrame({"patient_group": patient_group, "participant": participant_ids})
+        participant_ids = [
+            f.name.split("_")[0]
+            for f in sorted(self.data_path.glob("*_all.csv"))
+        ]
+        patient_group = [
+            g
+            for g, _ in zip(
+                cycle(("group_1", "group_2", "group_3")), participant_ids
+            )
+        ]
+        df = pd.DataFrame(
+            {"patient_group": patient_group, "participant": participant_ids}
+        )
         if len(df) == 0:
             raise ValueError(
                 "The dataset is empty. Are you sure you selected the correct folder? Current folder is: "

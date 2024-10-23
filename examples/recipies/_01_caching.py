@@ -94,13 +94,13 @@ Below, you can see an example Dataset that uses this pattern.
 Note, that we factored out the processing that we want to cache into a global pure function and then cache this function
 every time we call the data attribute.
 """
+
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
 import pandas as pd
 from joblib import Memory
-
 from tpcp import Dataset
 
 
@@ -223,8 +223,9 @@ cache.clear()
 #    (at least in the context of joblib based multiprocessing).
 #
 # Below we demonstrate how to apply the decorator to a class after the fact.
-from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
 from tpcp.caching import global_disk_cache, remove_any_cache
+
+from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
 
 memory = Memory(HERE / ".cache", verbose=10)
 global_disk_cache(memory)(QRSDetector)
@@ -234,7 +235,9 @@ global_disk_cache(memory)(QRSDetector)
 # We load the example dataset here to demonstrate this.
 from examples.datasets.datasets_final_ecg import ECGExampleData
 
-example_data = ECGExampleData(HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data")
+example_data = ECGExampleData(
+    HERE.parent.parent / "example_data/ecg_mit_bih_arrhythmia/data"
+)
 ecg_data = example_data[0].data["ecg"]
 
 # %%
@@ -385,7 +388,9 @@ class ConfigurableMemoryCachedDataset(Dataset):
         super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
 
     def _cached_get_data(self, participant_id: int):
-        return hybrid_cache(lru_cache_maxsize=self.lru_cache_size)(_get_data)(participant_id)
+        return hybrid_cache(lru_cache_maxsize=self.lru_cache_size)(_get_data)(
+            participant_id
+        )
 
     @property
     def data(self):

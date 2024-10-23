@@ -83,7 +83,7 @@ class TestSafeAction:
         assert before_wrap_id != wrapped_id
         assert second_wrapped_id == wrapped_id
 
-    @pytest.mark.parametrize(("name", "warn"), (("run", False), ("other_name", True)))
+    @pytest.mark.parametrize(("name", "warn"), [("run", False), ("other_name", True)])
     def test_wrapper_checks_name(self, name, warn):
         test_func = DummyActionPipelineUnsafe.run
         test_func.__name__ = name
@@ -96,7 +96,7 @@ class TestSafeAction:
         if warn:
             assert "The `make_action_safe` decorator should only be applied to an action method" in str(w[0])
 
-    @pytest.mark.parametrize("pipe", (PipelineInputModify, PipelineInputModifyNested))
+    @pytest.mark.parametrize("pipe", [PipelineInputModify, PipelineInputModifyNested])
     def test_modify_input_paras_simple(self, pipe):
         with pytest.raises(ValueError) as e:
             make_action_safe(pipe.run)(pipe(), DummyDataset()[0])
@@ -141,7 +141,7 @@ class TestSafeOptimize:
         assert before_wrap_id != wrapped_id
         assert second_wrapped_id == wrapped_id
 
-    @pytest.mark.parametrize(("name", "warn"), (("self_optimize", False), ("other_name", True)))
+    @pytest.mark.parametrize(("name", "warn"), [("self_optimize", False), ("other_name", True)])
     def test_wrapper_checks_name(self, name, warn):
         test_func = DummyOptimizablePipelineUnsafe.self_optimize
         test_func.__name__ = name
@@ -154,7 +154,7 @@ class TestSafeOptimize:
         if warn:
             assert "The `make_optimize_safe` decorator is only meant for the `self_optimize`" in str(w[0])
 
-    @pytest.mark.parametrize(("output", "warn"), (({}, True), ({"optimized": True}, False)))
+    @pytest.mark.parametrize(("output", "warn"), [({}, True), ({"optimized": True}, False)])
     def test_optimize_warns(self, output, warn):
         optimized_pipe = DummyOptimizablePipelineUnsafe()
         for k, v in output.items():
@@ -172,7 +172,7 @@ class TestSafeOptimize:
             if len(w) > 0:
                 assert "Optimizing the algorithm doesn't seem to have changed" in str(w[0])
 
-    @pytest.mark.parametrize("output", ({"some_random_para_": "val"}, {"optimized": True, "some_random_para_": "val"}))
+    @pytest.mark.parametrize("output", [{"some_random_para_": "val"}, {"optimized": True, "some_random_para_": "val"}])
     def test_other_para_modified_error(self, output):
         optimized_pipe = DummyOptimizablePipelineUnsafe()
         for k, v in output.items():
@@ -238,7 +238,7 @@ class TestSafeOptimize:
             self.para["a"] = 3
             return self
 
-    @pytest.mark.parametrize("klass", (PipelineModifyOtherParas, PipelineModifyOtherParasMutable))
+    @pytest.mark.parametrize("klass", [PipelineModifyOtherParas, PipelineModifyOtherParasMutable])
     def test_non_opti_para_changed(self, klass):
         with pytest.raises(RuntimeError) as e:
             make_optimize_safe(klass.self_optimize)(klass(), DummyDataset())
@@ -348,7 +348,7 @@ class TestSafeOptimize:
 
 
 class TestPipelineSafeRun:
-    @pytest.mark.parametrize("wrapped", (True, False))
+    @pytest.mark.parametrize("wrapped", [True, False])
     def test_checks_only_performed_once(self, wrapped):
         # We mock _check_safe_run from _algorithm_utils.py to test if it is really only called once
         with mock.patch("tpcp._algorithm_utils._check_safe_run") as mock_check:

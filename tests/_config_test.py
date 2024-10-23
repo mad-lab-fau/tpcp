@@ -1,4 +1,5 @@
 """A test module required by the test_global_parallel_callback.py test."""
+
 _GLOBAL_CONFIG = None
 
 

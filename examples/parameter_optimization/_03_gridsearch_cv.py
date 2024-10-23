@@ -14,6 +14,7 @@ To learn more about the concept, review the :ref:`evaluation guide <algorithm_ev
 tuning hyperparameters <https://scikit-learn.org/stable/modules/grid_search.html#grid-search>`_.
 
 """
+
 import random
 
 import pandas as pd
@@ -39,6 +40,8 @@ example_data = ECGExampleData(data_path)
 
 from typing import Any
 
+from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf
+
 # %%
 # The Pipeline
 # ------------
@@ -49,8 +52,9 @@ from typing import Any
 #
 # For more information about the pipeline below check our examples on :ref:`optimize_pipelines`.
 # Todo: Full dedicated example for `PureParameter`
-from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDetector
-from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf
+from examples.algorithms.algorithms_qrs_detection_final import (
+    OptimizableQrsDetector,
+)
 
 
 class MyPipeline(OptimizablePipeline[ECGExampleData]):
@@ -59,7 +63,9 @@ class MyPipeline(OptimizablePipeline[ECGExampleData]):
 
     r_peak_positions_: pd.Series
 
-    def __init__(self, algorithm: OptimizableQrsDetector = cf(OptimizableQrsDetector())):
+    def __init__(
+        self, algorithm: OptimizableQrsDetector = cf(OptimizableQrsDetector())
+    ):
         self.algorithm = algorithm
 
     def self_optimize(self, dataset: ECGExampleData, **kwargs: Any):
@@ -67,7 +73,9 @@ class MyPipeline(OptimizablePipeline[ECGExampleData]):
         r_peaks = [d.r_peak_positions_["r_peak_position"] for d in dataset]
         # Note: We need to clone the algorithm instance, to make sure we don't leak any data between runs.
         algo = self.algorithm.clone()
-        self.algorithm = algo.self_optimize(ecg_data, r_peaks, dataset.sampling_rate_hz)
+        self.algorithm = algo.self_optimize(
+            ecg_data, r_peaks, dataset.sampling_rate_hz
+        )
         return self
 
     def run(self, datapoint: ECGExampleData) -> Self:
@@ -87,7 +95,10 @@ pipe = MyPipeline()
 # The scorer is identical to the scoring function used in the other examples.
 # The F1-score is still the most important parameter for our comparison.
 
-from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference, precision_recall_f1_score
+from examples.algorithms.algorithms_qrs_detection_final import (
+    match_events_with_reference,
+    precision_recall_f1_score,
+)
 
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData) -> dict[str, float]:
@@ -131,7 +142,9 @@ cv = KFold(n_splits=2)
 # However, to keep things simple, we will only test a couple of values for `high_pass_filter_cutoff_hz`.
 from sklearn.model_selection import ParameterGrid
 
-parameters = ParameterGrid({"algorithm__high_pass_filter_cutoff_hz": [0.25, 0.5, 1]})
+parameters = ParameterGrid(
+    {"algorithm__high_pass_filter_cutoff_hz": [0.25, 0.5, 1]}
+)
 
 # %%
 # GridSearchCV
@@ -141,7 +154,13 @@ parameters = ParameterGrid({"algorithm__high_pass_filter_cutoff_hz": [0.25, 0.5,
 # Then we can simply run the search using the `optimize` method.
 from tpcp.optimize import GridSearchCV
 
-gs = GridSearchCV(pipeline=MyPipeline(), parameter_grid=parameters, scoring=score, cv=cv, return_optimized="f1_score")
+gs = GridSearchCV(
+    pipeline=MyPipeline(),
+    parameter_grid=parameters,
+    scoring=score,
+    cv=cv,
+    return_optimized="f1_score",
+)
 gs = gs.optimize(example_data)
 
 # %%
