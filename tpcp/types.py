@@ -10,12 +10,9 @@ from tpcp._dataset import DatasetT
 from tpcp._pipeline import OptimizablePipelineT, PipelineT
 from tpcp.validate._scorer import (
     AggReturnType,
-    MultiScoreTypeT,
     ScoreFunc,
     ScoreFuncMultiple,
     ScoreFuncSingle,
-    ScoreTypeT,
-    SingleScoreTypeT,
 )
 
 __all__ = [
@@ -24,9 +21,6 @@ __all__ = [
     "OptimizablePipelineT",
     "DatasetT",
     "AlgorithmT",
-    "ScoreTypeT",
-    "SingleScoreTypeT",
-    "MultiScoreTypeT",
     "AggReturnType",
     "ScoreFuncSingle",
     "ScoreFuncMultiple",

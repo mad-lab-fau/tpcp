@@ -1,13 +1,12 @@
 """Helper to validate/evaluate pipelines and Optimize."""
 from collections.abc import Iterator
 from functools import partial
-from typing import Any, Callable, Optional, Union
+from typing import Any, Optional, Union
 
 from joblib import Parallel
 from sklearn.model_selection import BaseCrossValidator
 from tqdm.auto import tqdm
 
-from tpcp import Dataset, Pipeline
 from tpcp._base import _Default
 from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
@@ -16,7 +15,7 @@ from tpcp._utils._general import _aggregate_final_results, _normalize_score_resu
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.parallel import delayed
 from tpcp.validate._cross_val_helper import DatasetSplitter
-from tpcp.validate._scorer import Scorer, _validate_scorer, ScorerTypes, ScoreFunc
+from tpcp.validate._scorer import ScoreFunc, Scorer, ScorerTypes, _validate_scorer
 
 
 def cross_validate(
@@ -113,7 +112,7 @@ def cross_validate(
             instance.
 
     """
-    scoring = _validate_scorer(scoring, optimizable.pipeline)
+    scoring = _validate_scorer(scoring)
 
     cv = cv if isinstance(cv, DatasetSplitter) else DatasetSplitter(base_splitter=cv)
 
@@ -211,7 +210,7 @@ def validate(
         if isinstance(value, _Default):
             scoring_args[arg] = value.get_value()
 
-    scoring = _validate_scorer(scoring, pipeline)
+    scoring = _validate_scorer(scoring)
 
     scoring.set_params(**scoring_args)
 

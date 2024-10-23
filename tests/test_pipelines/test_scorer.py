@@ -180,18 +180,18 @@ class TestScorerUtils:
     )
     def test_validate_scorer(self, scoring, expected):
         pipe = DummyOptimizablePipeline()
-        out = _validate_scorer(scoring, pipe)
+        out = _validate_scorer(scoring)
         assert isinstance(out, type(expected))
         assert out.score_func == expected.score_func
 
     def test_score_not_implemented(self):
         with pytest.raises(ValueError):
-            _validate_scorer(None, None)
+            _validate_scorer(None)
 
     def test_invalid_input(self):
         pipe = DummyOptimizablePipeline()
         with pytest.raises(ValueError) as e:
-            _validate_scorer("something invalid", pipe)
+            _validate_scorer("something invalid")
 
         assert "A valid scorer must either be a instance of" in str(e)
 

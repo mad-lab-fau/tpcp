@@ -194,12 +194,12 @@ def f1_score(pipeline: MyPipeline, datapoint: ECGExampleData) -> float:
 #
 # With that, our implementation looks as follows:
 from dataclasses import dataclass
+from typing import Generic
 
 from optuna import Trial
 
 from tpcp.optimize.optuna import CustomOptunaOptimize
 from tpcp.types import DatasetT, PipelineT
-from typing import Generic
 from tpcp.validate import Scorer
 
 

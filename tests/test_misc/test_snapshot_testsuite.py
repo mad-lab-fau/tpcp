@@ -30,7 +30,7 @@ class TestSnapshot:
         ).set_index("dummy_index")
         snapshot.assert_match(df, "dummy_df_with_timeseries")
 
-    @pytest.mark.parametrize("freq", ["D", "H", "T", "S", "ms", "us", "ns"])
+    @pytest.mark.parametrize("freq", ["D", "h", "t", "d", "ms", "us", "ns"])
     def test_snapshot_df_timeseries_with_tz(self, freq, snapshot):
         # TODO
         df_len = 10

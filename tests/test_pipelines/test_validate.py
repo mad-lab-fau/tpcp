@@ -90,7 +90,7 @@ class TestValidate:
         """
         ds = DummyDataset()
         pipeline = DummyPipeline()
-        scorer = _validate_scorer(dummy_single_score_func, pipeline)
+        scorer = _validate_scorer(dummy_single_score_func)
         with pytest.raises(ValueError):
             validate(pipeline, ds, scoring=scorer, **multiprocess_args)
 
