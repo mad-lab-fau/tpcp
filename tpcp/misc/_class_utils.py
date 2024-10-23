@@ -1,4 +1,5 @@
 """Some utility functions for classes."""
+
 import functools
 import inspect
 from typing import Any, Callable, Generic, Optional, TypeVar
@@ -53,7 +54,8 @@ def set_defaults(**defaults: Unpack[dict[str, Any]]) -> Callable[[Callable[P, R]
     This decorator returns a wrapped version of the function, with the specified default values set.
     This can be useful when you want to set default values programmatically, such as loading them from a file.
 
-    This decorator also works on class methods, and can be used to set default values of class initialization parameters.
+    This decorator also works on class methods, and can be used to set default values of class initialization
+    parameters.
 
     Note that the new default values must be a subset of the function's parameters.
     Also, you cannot set default values for parameters that already have a default value.

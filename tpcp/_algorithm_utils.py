@@ -30,13 +30,11 @@ P = ParamSpec("P")
 
 
 @overload
-def _split_returns(values: tuple[T, K]) -> tuple[T, K]:
-    ...
+def _split_returns(values: tuple[T, K]) -> tuple[T, K]: ...
 
 
 @overload
-def _split_returns(values: T) -> tuple[T, tuple[_Nothing, _Nothing]]:
-    ...
+def _split_returns(values: T) -> tuple[T, tuple[_Nothing, _Nothing]]: ...
 
 
 def _split_returns(values):
@@ -139,9 +137,7 @@ def get_results(instance: Algorithm) -> dict[str, Any]:
 
 def is_action_applied(instance: Algorithm) -> bool:
     """Check if the action method was already called/results were generated."""
-    if len(get_results(instance)) == 0:
-        return False
-    return True
+    return len(get_results(instance)) != 0
 
 
 def _check_safe_run(algorithm: AlgorithmT, old_method: Callable, *args: Any, **kwargs: Any) -> AlgorithmT:

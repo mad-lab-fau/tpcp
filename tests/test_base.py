@@ -1,4 +1,5 @@
 """This tests the BaseAlgorithm and fundamental functionality."""
+
 import dataclasses
 from collections import namedtuple
 from inspect import Parameter, signature
@@ -83,7 +84,7 @@ def example_test_class_initialised(request) -> tuple[Algorithm, dict[str, Any]]:
     return test_instance, request.param
 
 
-@pytest.fixture()
+@pytest.fixture
 def example_test_class_after_action(example_test_class_initialised) -> tuple[Algorithm, dict[str, Any]]:
     test_instance, params = example_test_class_initialised
     action_params = {
@@ -459,7 +460,7 @@ def test_with_info_calls_self_optimize():
     assert test.result_ == "optimized"
 
 
-@pytest.mark.parametrize("method", ("self_optimize_with_info", "self_optimize"))
+@pytest.mark.parametrize("method", ["self_optimize_with_info", "self_optimize"])
 def test_not_implemented_error_if_no_opti_method(method):
     # If both methods are not implemented, we should get a NotImplemented Error
 

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import wfdb  # noqa: import-error
+import wfdb
 
 selected_participants = ["100", "102", "104", "105", "106", "108", "114", "116", "119", "121", "123", "200"]
 
@@ -23,13 +23,13 @@ for p in selected_participants:
     anno = wfdb.rdann(p, "atr", pn_dir="mitdb")
     all_r = np.unique(
         anno.sample[
-            np.in1d(
+            np.isin(
                 anno.symbol,
                 ["N", "L", "R", "B", "A", "a", "J", "S", "V", "r", "F", "e", "j", "n", "E", "/", "f", "Q", "?"],
             )
         ]
     )
-    pvc = np.unique(anno.sample[np.in1d(anno.symbol, ["V"])])
+    pvc = np.unique(anno.sample[np.isin(anno.symbol, ["V"])])
     all_r = pd.DataFrame({"R": all_r})
     pvc = pd.DataFrame({"PVC": pvc})
 

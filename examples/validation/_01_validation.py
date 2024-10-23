@@ -15,6 +15,7 @@ For this, we will reuse the pipeline and data from the example on :ref:`gridsear
 If you want to have more information on how the dataset and pipeline is built, head over to this example.
 Here we will just copy the code over.
 """
+
 # %%
 # Dataset
 from pathlib import Path
@@ -31,9 +32,9 @@ example_data = ECGExampleData(data_path)
 # %%
 # Pipeline
 import pandas as pd
+from tpcp import Parameter, Pipeline, cf
 
 from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
-from tpcp import Parameter, Pipeline, cf
 
 
 class MyPipeline(Pipeline[ECGExampleData]):
@@ -58,7 +59,10 @@ class MyPipeline(Pipeline[ECGExampleData]):
 # ----------
 # The scorer is identical to the scoring function used in the other examples.
 # The F1-score is still the most important parameter for our comparison.
-from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference, precision_recall_f1_score
+from examples.algorithms.algorithms_qrs_detection_final import (
+    match_events_with_reference,
+    precision_recall_f1_score,
+)
 
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):

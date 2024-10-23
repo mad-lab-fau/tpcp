@@ -15,11 +15,19 @@ import pandas as pd
 from scipy import signal
 from scipy.spatial import KDTree, minkowski_distance
 from sklearn.metrics import roc_curve
+from tpcp import (
+    Algorithm,
+    HyperParameter,
+    OptimizableParameter,
+    Parameter,
+    make_action_safe,
+    make_optimize_safe,
+)
 
-from tpcp import Algorithm, HyperParameter, OptimizableParameter, Parameter, make_action_safe, make_optimize_safe
 
-
-def match_events_with_reference(events: np.ndarray, reference: np.ndarray, tolerance: Union[int, float]) -> np.ndarray:
+def match_events_with_reference(
+    events: np.ndarray, reference: np.ndarray, tolerance: Union[int, float]
+) -> np.ndarray:
     """Find matches in two lists based on the distance between their vectors.
 
     Parameters
@@ -64,7 +72,9 @@ def match_events_with_reference(events: np.ndarray, reference: np.ndarray, toler
     # were the right side closest neighbor resulted in the same pairing as the left side closest neighbor ensuring
     # that we have true one-to-one-matches
     # p = 1 is used to select the Manhatten distance
-    l_nearest_distance, l_nearest_neighbor = right_tree.query(events, p=1, workers=-1)
+    l_nearest_distance, l_nearest_neighbor = right_tree.query(
+        events, p=1, workers=-1
+    )
     _, r_nearest_neighbor = left_tree.query(reference, p=1, workers=-1)
 
     # Filter the once that are true one-to-one matches
@@ -80,19 +90,35 @@ def match_events_with_reference(events: np.ndarray, reference: np.ndarray, toler
     if index_large_matches.size > 0:
         # Minkowski with p = np.inf uses the Chebyshev distance
         output = (
-            minkowski_distance(events[index_large_matches], reference[valid_matches[index_large_matches, 1]], p=np.inf)
+            minkowski_distance(
+                events[index_large_matches],
+                reference[valid_matches[index_large_matches, 1]],
+                p=np.inf,
+            )
             > tolerance
         )
 
-        valid_matches = np.delete(valid_matches, index_large_matches[output], axis=0)
+        valid_matches = np.delete(
+            valid_matches, index_large_matches[output], axis=0
+        )
 
     valid_matches = valid_matches
     # Add invalid pairs to the output array
-    missing_l_indexes = np.setdiff1d(np.arange(len(events)), valid_matches[:, 0])
-    missing_l_matches = np.vstack([missing_l_indexes, np.full(len(missing_l_indexes), np.nan)]).T
-    missing_r_indexes = np.setdiff1d(np.arange(len(reference)), valid_matches[:, 1])
-    missing_r_matches = np.vstack([np.full(len(missing_r_indexes), np.nan), missing_r_indexes]).T
-    valid_matches = np.vstack([valid_matches, missing_l_matches, missing_r_matches])
+    missing_l_indexes = np.setdiff1d(
+        np.arange(len(events)), valid_matches[:, 0]
+    )
+    missing_l_matches = np.vstack(
+        [missing_l_indexes, np.full(len(missing_l_indexes), np.nan)]
+    ).T
+    missing_r_indexes = np.setdiff1d(
+        np.arange(len(reference)), valid_matches[:, 1]
+    )
+    missing_r_matches = np.vstack(
+        [np.full(len(missing_r_indexes), np.nan), missing_r_indexes]
+    ).T
+    valid_matches = np.vstack(
+        [valid_matches, missing_l_matches, missing_r_matches]
+    )
 
     return valid_matches
 
@@ -105,7 +131,11 @@ def precision_recall_f1_score(matches: np.ndarray):
     len_reference = np.sum(~np.isnan(matches[:, 1]))
     precision = n_tp / len_events if len_events > 0 else 0
     recall = n_tp / len_reference if len_reference > 0 else 0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
+    f1 = (
+        2 * precision * recall / (precision + recall)
+        if precision + recall > 0
+        else 0
+    )
     return precision, recall, f1
 
 
@@ -138,24 +168,35 @@ class QRSDetector(Algorithm):
         ecg = single_channel_ecg.to_numpy().flatten()
 
         filtered_signal = self._filter(ecg, sampling_rate_hz)
-        peak_positions = self._search_strategy(filtered_signal, sampling_rate_hz)
+        peak_positions = self._search_strategy(
+            filtered_signal, sampling_rate_hz
+        )
 
         self.r_peak_positions_ = pd.Series(peak_positions)
         return self
 
     def _search_strategy(
-        self, filtered_signal: np.ndarray, sampling_rate_hz: float, use_height: bool = True
+        self,
+        filtered_signal: np.ndarray,
+        sampling_rate_hz: float,
+        use_height: bool = True,
     ) -> np.ndarray:
         # Calculate the minimal distance based on the expected heart rate
-        min_distance_between_peaks = 1 / (self.max_heart_rate_bpm / 60) * sampling_rate_hz
+        min_distance_between_peaks = (
+            1 / (self.max_heart_rate_bpm / 60) * sampling_rate_hz
+        )
 
         height = None
         if use_height:
             height = self.min_r_peak_height_over_baseline
-        peaks, _ = signal.find_peaks(filtered_signal, distance=min_distance_between_peaks, height=height)
+        peaks, _ = signal.find_peaks(
+            filtered_signal, distance=min_distance_between_peaks, height=height
+        )
         return peaks
 
-    def _filter(self, ecg_signal: np.ndarray, sampling_rate_hz: float) -> np.ndarray:
+    def _filter(
+        self, ecg_signal: np.ndarray, sampling_rate_hz: float
+    ) -> np.ndarray:
         sos = signal.butter(
             btype="high",
             N=self._HIGH_PASS_FILTER_ORDER,
@@ -185,13 +226,20 @@ class OptimizableQrsDetector(QRSDetector):
         )
 
     @make_optimize_safe
-    def self_optimize(self, ecg_data: list[pd.Series], r_peaks: list[pd.Series], sampling_rate_hz: float):
+    def self_optimize(
+        self,
+        ecg_data: list[pd.Series],
+        r_peaks: list[pd.Series],
+        sampling_rate_hz: float,
+    ):
         all_labels = []
         all_peak_heights = []
         for d, p in zip(ecg_data, r_peaks):
             filtered = self._filter(d.to_numpy().flatten(), sampling_rate_hz)
             # Find all potential peaks without the height threshold
-            potential_peaks = self._search_strategy(filtered, sampling_rate_hz, use_height=False)
+            potential_peaks = self._search_strategy(
+                filtered, sampling_rate_hz, use_height=False
+            )
             # Determine the label for each peak, by matching them with our ground truth
             labels = np.zeros(potential_peaks.shape)
             matches = match_events_with_reference(
@@ -199,7 +247,9 @@ class OptimizableQrsDetector(QRSDetector):
                 reference=np.atleast_2d(p.to_numpy().astype(int)).T,
                 tolerance=self.r_peak_match_tolerance_s * sampling_rate_hz,
             )
-            tp_matches = matches[(~np.isnan(matches)).all(axis=1), 0].astype(int)
+            tp_matches = matches[(~np.isnan(matches)).all(axis=1), 0].astype(
+                int
+            )
             labels[tp_matches] = 1
             labels = labels.astype(bool)
             all_labels.append(labels)
@@ -211,5 +261,7 @@ class OptimizableQrsDetector(QRSDetector):
         fpr, tpr, thresholds = roc_curve(all_labels, all_peak_heights)
         youden_index = tpr - fpr
         # The best Youden index gives us a balance between sensitivity and specificity.
-        self.min_r_peak_height_over_baseline = thresholds[np.argmax(youden_index)]
+        self.min_r_peak_height_over_baseline = thresholds[
+            np.argmax(youden_index)
+        ]
         return self

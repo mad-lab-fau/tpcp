@@ -10,7 +10,7 @@ class TestClassproperty:
     def test_simple_case(self):
         class MyClass:
             @classproperty
-            def test(cls):
+            def test(self):
                 return 1
 
         assert MyClass.test == 1
@@ -80,7 +80,7 @@ class TestSetDefaults:
     def test_help_text_contains_new_defaults(self):
         @set_defaults(a=1, b=2)
         def function(a, b, c=3):
-            """This is a test function"""
+            """This is a test function."""
             return a, b, c
 
         help_text = str(inspect.signature(function))

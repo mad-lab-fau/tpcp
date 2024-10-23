@@ -34,7 +34,6 @@ For a pipeline, we need to create a custom Dataset class, as this is the expecte
 
 """
 
-
 # %%
 # The Dataset
 # -----------
@@ -56,7 +55,6 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-
 from tpcp import Dataset
 
 tf.keras.utils.set_random_seed(812)
@@ -67,8 +65,12 @@ tf.config.experimental.enable_op_determinism()
 def get_fashion_mnist_data():
     # Note: We throw train and test sets together, as we don't care about the official split here.
     #       We will create our own split later.
-    (train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.fashion_mnist.load_data()
-    return np.array(list(train_images) + list(test_images)), list(train_labels) + list(test_labels)
+    (train_images, train_labels), (test_images, test_labels) = (
+        tf.keras.datasets.fashion_mnist.load_data()
+    )
+    return np.array(list(train_images) + list(test_images)), list(
+        train_labels
+    ) + list(test_labels)
 
 
 class FashionMNIST(Dataset):
@@ -76,7 +78,10 @@ class FashionMNIST(Dataset):
         self.assert_is_single(None, "input_as_array")
         group_id = int(self.group_label.group_id)
         images, _ = get_fashion_mnist_data()
-        return images[group_id * 60 : (group_id + 1) * 60].reshape((60, 28, 28)) / 255
+        return (
+            images[group_id * 60 : (group_id + 1) * 60].reshape((60, 28, 28))
+            / 255
+        )
 
     def labels_as_array(self) -> np.ndarray:
         self.assert_is_single(None, "labels_as_array")
@@ -139,9 +144,13 @@ dataset[0].labels_as_array().shape
 import warnings
 from typing import Optional
 
+from tpcp import (
+    OptimizablePipeline,
+    OptiPara,
+    make_action_safe,
+    make_optimize_safe,
+)
 from typing_extensions import Self
-
-from tpcp import OptimizablePipeline, OptiPara, make_action_safe, make_optimize_safe
 
 
 class KerasPipeline(OptimizablePipeline):
@@ -151,7 +160,12 @@ class KerasPipeline(OptimizablePipeline):
 
     predictions_: np.ndarray
 
-    def __init__(self, n_dense_layer_nodes=128, n_train_epochs=5, _model: Optional[tf.keras.Sequential] = None):
+    def __init__(
+        self,
+        n_dense_layer_nodes=128,
+        n_train_epochs=5,
+        _model: Optional[tf.keras.Sequential] = None,
+    ):
         self.n_dense_layer_nodes = n_dense_layer_nodes
         self.n_train_epochs = n_train_epochs
         self._model = _model
@@ -162,8 +176,12 @@ class KerasPipeline(OptimizablePipeline):
 
     @make_optimize_safe
     def self_optimize(self, dataset, **_) -> Self:
-        data = tf.convert_to_tensor(np.vstack([d.input_as_array() for d in dataset]))
-        labels = tf.convert_to_tensor(np.hstack([d.labels_as_array() for d in dataset]))
+        data = tf.convert_to_tensor(
+            np.vstack([d.input_as_array() for d in dataset])
+        )
+        labels = tf.convert_to_tensor(
+            np.hstack([d.labels_as_array() for d in dataset])
+        )
 
         print(data.shape)
         if self._model is not None:
@@ -173,14 +191,18 @@ class KerasPipeline(OptimizablePipeline):
             [
                 tf.keras.layers.Input((28, 28)),
                 tf.keras.layers.Flatten(),
-                tf.keras.layers.Dense(self.n_dense_layer_nodes, activation="relu"),
+                tf.keras.layers.Dense(
+                    self.n_dense_layer_nodes, activation="relu"
+                ),
                 tf.keras.layers.Dense(10),
             ]
         )
 
         self._model.compile(
             optimizer="adam",
-            loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+            loss=tf.keras.losses.SparseCategoricalCrossentropy(
+                from_logits=True
+            ),
             metrics=["accuracy"],
         )
 
@@ -229,8 +251,15 @@ from tpcp.validate import Aggregator
 
 
 class SingleValueAccuracy(Aggregator[tuple[np.ndarray, np.ndarray]]):
-    def aggregate(cls, /, values: Sequence[tuple[np.ndarray, np.ndarray]], **_) -> dict[str, float]:
-        return {"accuracy": accuracy_score(np.hstack([v[0] for v in values]), np.hstack([v[1] for v in values]))}
+    def aggregate(
+        self, /, values: Sequence[tuple[np.ndarray, np.ndarray]], **_
+    ) -> dict[str, float]:
+        return {
+            "accuracy": accuracy_score(
+                np.hstack([v[0] for v in values]),
+                np.hstack([v[1] for v in values]),
+            )
+        }
 
 
 single_value_accuracy = SingleValueAccuracy()
@@ -258,7 +287,9 @@ from tpcp.optimize import Optimize
 from tpcp.validate import cross_validate
 
 pipeline = KerasPipeline(n_train_epochs=10)
-cv_results = cross_validate(Optimize(pipeline), FashionMNIST()[:100], scoring=scoring, cv=3)
+cv_results = cross_validate(
+    Optimize(pipeline), FashionMNIST()[:100], scoring=scoring, cv=3
+)
 
 # %%
 # We can now look at the results per group:

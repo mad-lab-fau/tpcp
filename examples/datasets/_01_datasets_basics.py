@@ -76,7 +76,9 @@ dataset
 # For this, you can primarily use the method `get_subset`.
 # Here we want to select only recording 2 and 3 from participant 1 to 4.
 # Note that the returned subset is an instance of your dataset class as well.
-subset = dataset.get_subset(participant=["p1", "p2", "p3", "p4"], recording=["rec_2", "rec_3"])
+subset = dataset.get_subset(
+    participant=["p1", "p2", "p3", "p4"], recording=["rec_2", "rec_3"]
+)
 subset
 
 # %%
@@ -186,7 +188,9 @@ print("Test:\n", test)
 # %%
 # Such splitting always occurs on a data-point level and can therefore be influenced by grouping.
 # If we want to split our datasets into training and testing, but only based on the participants, we can do this:
-train, test = train_test_split(final_subset.groupby("participant"), train_size=0.5)
+train, test = train_test_split(
+    final_subset.groupby("participant"), train_size=0.5
+)
 print("Train:\n", train, end="\n\n")
 print("Test:\n", test)
 
@@ -208,7 +212,9 @@ for train, test in cv.split(grouped_subset):
 # For this, we can use `GroupKFold` in combination with `dataset.create_string_group_labels`.
 #
 # `create_string_group_labels` generates a unique string identifier for each row/group:
-group_labels = final_subset.create_string_group_labels(["participant", "recording"])
+group_labels = final_subset.create_string_group_labels(
+    ["participant", "recording"]
+)
 group_labels
 
 # %%
@@ -227,7 +233,9 @@ for train, test in cv.split(final_subset, groups=group_labels):
 # to specify the grouping and stratification.
 from tpcp.validate import DatasetSplitter
 
-cv = DatasetSplitter(GroupKFold(n_splits=2), groupby=["participant", "recording"])
+cv = DatasetSplitter(
+    GroupKFold(n_splits=2), groupby=["participant", "recording"]
+)
 
 for train, test in cv.split(final_subset):
     # We only print the train set here
@@ -239,7 +247,9 @@ for train, test in cv.split(final_subset):
 # But, the columns that should be contained in the label must be a subset of the groupby columns in this case.
 #
 # The number of group labels is 4 in this case, as there are only 4 groups after grouping the datset.
-group_labels = final_subset.groupby(["participant", "recording"]).create_string_group_labels("participant")
+group_labels = final_subset.groupby(
+    ["participant", "recording"]
+).create_string_group_labels("participant")
 group_labels
 
 # %%
@@ -308,10 +318,14 @@ class CustomDataset(Dataset):
         # Note that we need to make our checks from the least restrictive to the most restrictive (if there is only a
         # single trail, there is only just a single recording).
         if self.is_single(["participant", "recording"]):
-            return "This is the data for participant {} and rec {}".format(*self.group_label)
+            return "This is the data for participant {} and rec {}".format(
+                *self.group_label
+            )
         # None -> single row
         if self.is_single(None):
-            return "This is the data for participant {}, rec {} and trial {}".format(*self.group_label)
+            return "This is the data for participant {}, rec {} and trial {}".format(
+                *self.group_label
+            )
         raise ValueError(
             "Data can only be accessed when their is only a single recording of a single participant in the subset"
         )
@@ -324,8 +338,12 @@ class CustomDataset(Dataset):
     def segmented_stride_list_(self) -> str:
         # We use assert here, as we don't have multiple options.
         # (We could also used `None` for the `groupby_cols` here)
-        self.assert_is_single(["participant", "recording", "trial"], "segmented_stride_list_")
-        return "This is the segmented stride list for participant {}, rec {} and trial {}".format(*self.group_label)
+        self.assert_is_single(
+            ["participant", "recording", "trial"], "segmented_stride_list_"
+        )
+        return "This is the segmented stride list for participant {}, rec {} and trial {}".format(
+            *self.group_label
+        )
 
     def create_index(self):
         return index
@@ -342,7 +360,9 @@ print(single_trial.segmented_stride_list_)
 # If we only select a recording, we get an error for the stride list:
 
 # We select only recording 3 here, as it has 2 trials.
-single_recording = test_dataset.get_subset(recording="rec_3").groupby(["participant", "recording"])[0]
+single_recording = test_dataset.get_subset(recording="rec_3").groupby(
+    ["participant", "recording"]
+)[0]
 print(single_recording.data)
 try:
     print(single_recording.segmented_stride_list_)

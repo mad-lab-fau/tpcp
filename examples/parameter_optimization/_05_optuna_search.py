@@ -24,10 +24,10 @@ Therefore, we provide Optuna equivalents for these usecases to make use of the a
 from pathlib import Path
 
 import pandas as pd
+from tpcp import Parameter, Pipeline, cf
 
 from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
 from examples.datasets.datasets_final_ecg import ECGExampleData
-from tpcp import Parameter, Pipeline, cf
 
 try:
     HERE = Path(__file__).parent
@@ -81,15 +81,22 @@ def get_study_params(seed):
 # Which value sin this search space will actually be evaluated depends on the chosen sampler.
 # This also needs to be a function that takes the current trial object as input.
 def create_search_space(trial: Trial):
-    trial.suggest_float("algorithm__min_r_peak_height_over_baseline", 0.1, 2, step=0.1)
-    trial.suggest_float("algorithm__high_pass_filter_cutoff_hz", 0.1, 2, step=0.1)
+    trial.suggest_float(
+        "algorithm__min_r_peak_height_over_baseline", 0.1, 2, step=0.1
+    )
+    trial.suggest_float(
+        "algorithm__high_pass_filter_cutoff_hz", 0.1, 2, step=0.1
+    )
 
 
 # %%
 # Score
 # -----
 # We use the same scoring function as in the `GridSearch` example:
-from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference, precision_recall_f1_score
+from examples.algorithms.algorithms_qrs_detection_final import (
+    match_events_with_reference,
+    precision_recall_f1_score,
+)
 
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
@@ -116,7 +123,13 @@ def score(pipeline: MyPipeline, datapoint: ECGExampleData):
 from tpcp.optimize.optuna import OptunaSearch
 
 opti = OptunaSearch(
-    pipe, get_study_params, create_search_space, scoring=score, n_trials=10, score_name="f1_score", random_seed=42
+    pipe,
+    get_study_params,
+    create_search_space,
+    scoring=score,
+    n_trials=10,
+    score_name="f1_score",
+    random_seed=42,
 )
 opti = opti.optimize(example_data)
 

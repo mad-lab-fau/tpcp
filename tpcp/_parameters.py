@@ -1,4 +1,5 @@
 """Type annotations to indicate the use case of specific parameters."""
+
 from enum import Enum, auto
 from inspect import cleandoc
 from typing import Annotated, TypeVar

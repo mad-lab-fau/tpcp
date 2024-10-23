@@ -335,11 +335,11 @@ class TestDataset:
             _ = Dataset(subset_index=_create_valid_index(), groupby_cols=select_lvl)[subscript]
 
     @pytest.mark.parametrize(
-        "groupby_level", (["patients"], ["patients", "tests"], ["patients", "tests", "extra with space"])
+        "groupby_level", [["patients"], ["patients", "tests"], ["patients", "tests", "extra with space"]]
     )
     @pytest.mark.parametrize(
         ("index", "is_single_level"),
-        (
+        [
             (
                 _create_valid_index(
                     {
@@ -377,7 +377,7 @@ class TestDataset:
                 ),
                 [["patients"], ["patients", "tests"], ["patients", "tests", "extra with space"], None],
             ),
-        ),
+        ],
     )
     def test_is_single(self, index, is_single_level, groupby_level):
         ds = Dataset(subset_index=index, groupby_cols=groupby_level)
@@ -547,7 +547,7 @@ class TestDataset:
 
     @pytest.mark.parametrize(
         ("column_names"),
-        (["else", "b", "c"], ["a", "has space", "c"], ["a", "b", "has-special-char"], ["a", "b", "1number_first"]),
+        [["else", "b", "c"], ["a", "has space", "c"], ["a", "b", "has-special-char"], ["a", "b", "1number_first"]],
     )
     def test_warning_index_no_valid_attribute(self, column_names):
         class TestDataset(Dataset):
@@ -573,12 +573,12 @@ class TestDataset:
 
     @pytest.mark.parametrize(
         ("groupby", "groupby_labels", "unique"),
-        (
+        [
             (None, "patients", 3),
             (None, ["patients"], 3),
             (None, ["patients", "extra with space"], 6),
             (["patients", "tests"], ["patients"], 3),
-        ),
+        ],
     )
     def test_create_string_group_labels(self, groupby, groupby_labels, unique):
         ds = Dataset(subset_index=_create_valid_index(), groupby_cols=groupby)
@@ -625,7 +625,7 @@ class TestDataset:
 
     @pytest.mark.parametrize(
         ("groupby_cols", "expected_length", "expected_labels"),
-        (
+        [
             (
                 None,
                 12,
@@ -670,7 +670,7 @@ class TestDataset:
                     ("test_3", "patient_3"),
                 ],
             ),
-        ),
+        ],
     )
     def test_group_labels(self, groupby_cols, expected_length, expected_labels):
         ds = Dataset(subset_index=_create_valid_index(), groupby_cols=groupby_cols)
@@ -680,13 +680,13 @@ class TestDataset:
 
     @pytest.mark.parametrize(
         "groupby_cols",
-        (
+        [
             None,
             "patients",
             "tests",
             ["patients", "tests"],
             ["tests", "patients"],
-        ),
+        ],
     )
     def test_index_as_tuples(self, groupby_cols):
         expected_labels = [

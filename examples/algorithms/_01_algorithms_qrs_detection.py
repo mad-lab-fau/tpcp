@@ -56,7 +56,6 @@ Ok that is still a bunch of code... But let's focus on the aspects that are impo
 import numpy as np
 import pandas as pd
 from scipy import signal
-
 from tpcp import Algorithm, Parameter, make_action_safe
 
 
@@ -89,24 +88,35 @@ class QRSDetector(Algorithm):
         ecg = single_channel_ecg.to_numpy().flatten()
 
         filtered_signal = self._filter(ecg, sampling_rate_hz)
-        peak_positions = self._search_strategy(filtered_signal, sampling_rate_hz)
+        peak_positions = self._search_strategy(
+            filtered_signal, sampling_rate_hz
+        )
 
         self.r_peak_positions_ = pd.Series(peak_positions)
         return self
 
     def _search_strategy(
-        self, filtered_signal: np.ndarray, sampling_rate_hz: float, use_height: bool = True
+        self,
+        filtered_signal: np.ndarray,
+        sampling_rate_hz: float,
+        use_height: bool = True,
     ) -> np.ndarray:
         # Calculate the minimal distance based on the expected heart rate
-        min_distance_between_peaks = 1 / (self.max_heart_rate_bpm / 60) * sampling_rate_hz
+        min_distance_between_peaks = (
+            1 / (self.max_heart_rate_bpm / 60) * sampling_rate_hz
+        )
 
         height = None
         if use_height:
             height = self.min_r_peak_height_over_baseline
-        peaks, _ = signal.find_peaks(filtered_signal, distance=min_distance_between_peaks, height=height)
+        peaks, _ = signal.find_peaks(
+            filtered_signal, distance=min_distance_between_peaks, height=height
+        )
         return peaks
 
-    def _filter(self, ecg_signal: np.ndarray, sampling_rate_hz: float) -> np.ndarray:
+    def _filter(
+        self, ecg_signal: np.ndarray, sampling_rate_hz: float
+    ) -> np.ndarray:
         sos = signal.butter(
             btype="high",
             N=self._HIGH_PASS_FILTER_ORDER,
@@ -195,9 +205,11 @@ plt.show()
 # Again, there are probably better ways to do it... But this is just an example, and we already have way too much code
 # that is not relevant for you to understand the basics of Algorithms.
 from sklearn.metrics import roc_curve
-
-from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference
 from tpcp import HyperParameter, OptimizableParameter, make_optimize_safe
+
+from examples.algorithms.algorithms_qrs_detection_final import (
+    match_events_with_reference,
+)
 
 
 class OptimizableQrsDetector(QRSDetector):
@@ -219,13 +231,20 @@ class OptimizableQrsDetector(QRSDetector):
         )
 
     @make_optimize_safe
-    def self_optimize(self, ecg_data: list[pd.Series], r_peaks: list[pd.Series], sampling_rate_hz: float):
+    def self_optimize(
+        self,
+        ecg_data: list[pd.Series],
+        r_peaks: list[pd.Series],
+        sampling_rate_hz: float,
+    ):
         all_labels = []
         all_peak_heights = []
         for d, p in zip(ecg_data, r_peaks):
             filtered = self._filter(d.to_numpy().flatten(), sampling_rate_hz)
             # Find all potential peaks without the height threshold
-            potential_peaks = self._search_strategy(filtered, sampling_rate_hz, use_height=False)
+            potential_peaks = self._search_strategy(
+                filtered, sampling_rate_hz, use_height=False
+            )
             # Determine the label for each peak, by matching them with our ground truth
             labels = np.zeros(potential_peaks.shape)
             matches = match_events_with_reference(
@@ -233,7 +252,9 @@ class OptimizableQrsDetector(QRSDetector):
                 reference=p.to_numpy().astype(int),
                 tolerance=self.r_peak_match_tolerance_s * sampling_rate_hz,
             )
-            tp_matches = matches[(~np.isnan(matches)).all(axis=1), 0].astype(int)
+            tp_matches = matches[(~np.isnan(matches)).all(axis=1), 0].astype(
+                int
+            )
             labels[tp_matches] = 1
             labels = labels.astype(bool)
             all_labels.append(labels)
@@ -245,7 +266,9 @@ class OptimizableQrsDetector(QRSDetector):
         fpr, tpr, thresholds = roc_curve(all_labels, all_peak_heights)
         youden_index = tpr - fpr
         # The best Youden index gives us a balance between sensitivity and specificity.
-        self.min_r_peak_height_over_baseline = thresholds[np.argmax(youden_index)]
+        self.min_r_peak_height_over_baseline = thresholds[
+            np.argmax(youden_index)
+        ]
         return self
 
 
@@ -262,7 +285,9 @@ train_ecg_data = [d.data["ecg"] for d in train_data]
 train_r_peaks = [d.r_peak_positions_["r_peak_position"] for d in train_data]
 
 algorithm = OptimizableQrsDetector()
-algorithm = algorithm.self_optimize(train_ecg_data, train_r_peaks, train_data.sampling_rate_hz)
+algorithm = algorithm.self_optimize(
+    train_ecg_data, train_r_peaks, train_data.sampling_rate_hz
+)
 
 # %%
 # After the optimization, we can access the modified parameters.

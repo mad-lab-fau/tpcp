@@ -50,11 +50,11 @@ class CustomOptimizablePipelineWithRunError(OptimizablePipeline):
 class TestValidate:
     @pytest.mark.parametrize(
         "kwargs",
-        (
+        [
             {},
             {"n_jobs": 5, "verbose": 1, "pre_dispatch": 5, "progress_bar": False},
             {"n_jobs": 2, "progress_bar": False},
-        ),
+        ],
     )
     def test_scores(self, kwargs):
         """Test that the scores are calculated correctly and the result dict has the expected structure."""
@@ -82,7 +82,7 @@ class TestValidate:
 
     @pytest.mark.parametrize(
         "multiprocess_args",
-        ({"n_jobs": 1}, {"verbose": 1}, {"pre_dispatch": 1}, {"progress_bar": False}, {"n_jobs": 1, "verbose": 1}),
+        [{"n_jobs": 1}, {"verbose": 1}, {"pre_dispatch": 1}, {"progress_bar": False}, {"n_jobs": 1, "verbose": 1}],
     )
     def test_arguments_set_twice_error(self, multiprocess_args):
         """Test that an error is raised when a scorer object is passed for scoring,
@@ -97,11 +97,11 @@ class TestValidate:
     @patch("tpcp.validate._validate._score", autospec=True)
     @pytest.mark.parametrize(
         "multiprocess_args",
-        (
+        [
             {"n_jobs": 5},
             {"n_jobs": None, "pre_dispatch": 5},
             {"n_jobs": 1, "verbose": 1, "pre_dispatch": 1, "progress_bar": False},
-        ),
+        ],
     )
     def test_multiprocessing_parameters_set_correctly(self, mock_score, multiprocess_args):
         """Check if multiprocessing arguments are passed to scorer correctly."""
@@ -155,11 +155,11 @@ class TestCrossValidate:
 
     @pytest.mark.parametrize(
         "kwargs",
-        (
+        [
             {},
             {"n_jobs": 5, "verbose": 1, "pre_dispatch": 5, "progress_bar": False},
             {"n_jobs": 2, "progress_bar": False},
-        ),
+        ],
     )
     def test_single_score(self, kwargs):
         ds = DummyDataset()
@@ -204,10 +204,10 @@ class TestCrossValidate:
 
     @pytest.mark.parametrize(
         ("kwargs", "expected"),
-        (
+        [
             ({"return_optimizer": True}, ("optimizer",)),
             ({"return_train_score": True}, ("train__agg__score", "train__single__score")),
-        ),
+        ],
     )
     def test_return_elements(self, kwargs, expected):
         results = cross_validate(Optimize(DummyOptimizablePipeline()), DummyDataset(), scoring=dummy_single_score_func)
@@ -227,7 +227,7 @@ class TestCrossValidate:
         for o in optimizers:
             assert o is not optimizer
 
-    @pytest.mark.parametrize("error_fold", (0, 2))
+    @pytest.mark.parametrize("error_fold", [0, 2])
     def test_cross_validate_opti_error(self, error_fold):
         with pytest.raises(OptimizationError) as e:
             cross_validate(
@@ -239,7 +239,7 @@ class TestCrossValidate:
 
         assert f"This error occurred in fold {error_fold}" in str(e.value)
 
-    @pytest.mark.parametrize("error_fold", (0, 2))
+    @pytest.mark.parametrize("error_fold", [0, 2])
     def test_cross_validate_test_error(self, error_fold):
         def simple_scorer(pipeline, data_point):
             pipeline.run(data_point)
@@ -255,7 +255,7 @@ class TestCrossValidate:
 
         assert f"This error occurred in fold {error_fold}" in str(e.value)
 
-    @pytest.mark.parametrize("return_train_score", (True, False))
+    @pytest.mark.parametrize("return_train_score", [True, False])
     def test_cross_validate_train_error(self, return_train_score):
         """Test that a different error message is used, if the error occurs during evaluating the train set.
 

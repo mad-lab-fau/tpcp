@@ -1,4 +1,5 @@
 """tpcp - Tiny Pipelines for Complicated Problems."""
+
 from tpcp._algorithm import Algorithm
 from tpcp._algorithm_utils import (
     get_action_method,

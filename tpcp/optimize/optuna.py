@@ -390,7 +390,9 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         and then use `eval_str_paras` to evaluate the stringified version to the actual tuple.
 
         >>> def search_space(trial):
-        ...     trial.suggest_categorical("axis", ["('x',)", "('y',)", "('z',)", "('x', 'y')"])
+        ...     trial.suggest_categorical(
+        ...         "axis", ["('x',)", "('y',)", "('z',)", "('x', 'y')"]
+        ...     )
         >>> optuna_opt = CustomOptunaOptimize(pipeline, ..., eval_str_paras=["axis"])
 
         Note, that in your custom subclass, you need to wrap the trial params in `self.sanitize_params` to make sure
@@ -471,7 +473,9 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     ...     def create_objective(self):
     ...         def objective(trial: Trial, pipeline: Pipeline, dataset: Dataset):
     ...             trial.suggest_float("my_pipeline_para", 0, 3)
-    ...             mean_score, _ = Scorer(lambda pipe, dp: pipe.score(dp))(pipeline, dataset)
+    ...             mean_score, _ = Scorer(lambda pipe, dp: pipe.score(dp))(
+    ...                 pipeline, dataset
+    ...             )
     ...             return mean_score
     ...
     ...         return objective
@@ -699,7 +703,9 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         and then use `eval_str_paras` to evaluate the stringified version to the actual tuple.
 
         >>> def search_space(trial):
-        ...     trial.suggest_categorical("axis", ["('x',)", "('y',)", "('z',)", "('x', 'y')"])
+        ...     trial.suggest_categorical(
+        ...         "axis", ["('x',)", "('y',)", "('z',)", "('x', 'y')"]
+        ...     )
         >>> optuna_opt = OptunaSearch(pipeline, ..., eval_str_paras=["axis"])
 
     show_progress_bar

@@ -9,7 +9,7 @@ from tpcp._hash import custom_hash
 from tpcp.validate import FloatAggregator
 
 
-@pytest.fixture()
+@pytest.fixture
 def joblib_cache():
     memory = joblib.Memory(location=".cache", verbose=0)
     yield memory

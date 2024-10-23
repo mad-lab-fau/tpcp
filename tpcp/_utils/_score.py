@@ -108,7 +108,7 @@ def _score(
         start_time = time.time()
         agg_scores, single_scores = scorer(pipeline, dataset)
         score_time = time.time() - start_time
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise TestError(
             f"Testing the algorithm on the dataset failed with the error above.\n{error_info or ''}\n\n"
             f"The test-set is:\n{[d.group_labels for d in dataset]}"
@@ -183,7 +183,7 @@ def _optimize_and_score(
             optimizer, train_set, hyperparameters, pure_parameters, memory, optimize_params_clean
         )
         optimize_time = time.time() - start_time
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise OptimizationError(
             f"The optimization on the trainset failed with the error above.\n{error_info or ''}\n\n"
             f"This optimization used the following trainset:\n{train_set}"
@@ -201,7 +201,7 @@ def _optimize_and_score(
     try:
         agg_scores, single_scores = scorer(optimizer.optimized_pipeline_, test_set)
         score_time = time.time() - optimize_time - start_time
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise TestError(
             f"Testing the optimized algorithm on the test-set failed with the error above.\n{error_info or ''}\n\n"
             f"The test-set is:\n{test_set}"
@@ -214,7 +214,7 @@ def _optimize_and_score(
     if return_train_score:
         try:
             train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise TestError(
                 "Running the optimized algorithm on the train-set to calculate the train error failed with the error "
                 f"above.\n{error_info or ''}\n\n"

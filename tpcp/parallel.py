@@ -10,6 +10,7 @@ This means you can not forward custom callbacks through scikit-learn Parallel ca
 The same way, by default tpcp will not forward sklearn global configs through tpcp Parallel calls.
 However, you can likely configure the callbacks in tpcp to make that work.
 """
+
 import functools
 import multiprocessing
 from typing import Callable, TypeVar
@@ -137,7 +138,8 @@ def register_global_parallel_callback(callback: Callable[[], tuple[T, Callable[[
 def remove_global_parallel_callback(name: str):
     """Remove a registered callback.
 
-    This can be used to remove a callback that was registered using :func:`~tpcp.parallel.register_global_parallel_callback`.
+    This can be used to remove a callback that was registered using
+    :func:`~tpcp.parallel.register_global_parallel_callback`.
 
     Parameters
     ----------

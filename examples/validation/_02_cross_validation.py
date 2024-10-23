@@ -21,6 +21,7 @@ evaluation via cross-validation.
 If you want to have more information on how the dataset and pipeline is built, head over to this example.
 Here we will just copy the code over.
 """
+
 # %%
 # Dataset
 from pathlib import Path
@@ -37,9 +38,11 @@ example_data = ECGExampleData(data_path)
 # %%
 # Pipeline
 import pandas as pd
-
-from examples.algorithms.algorithms_qrs_detection_final import OptimizableQrsDetector
 from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf
+
+from examples.algorithms.algorithms_qrs_detection_final import (
+    OptimizableQrsDetector,
+)
 
 
 class MyPipeline(OptimizablePipeline):
@@ -48,7 +51,9 @@ class MyPipeline(OptimizablePipeline):
 
     r_peak_positions_: pd.Series
 
-    def __init__(self, algorithm: OptimizableQrsDetector = cf(OptimizableQrsDetector())):
+    def __init__(
+        self, algorithm: OptimizableQrsDetector = cf(OptimizableQrsDetector())
+    ):
         self.algorithm = algorithm
 
     def self_optimize(self, dataset: ECGExampleData, **kwargs):
@@ -56,7 +61,9 @@ class MyPipeline(OptimizablePipeline):
         r_peaks = [d.r_peak_positions_["r_peak_position"] for d in dataset]
         # Note: We need to clone the algorithm instance, to make sure we don't leak any data between runs.
         algo = self.algorithm.clone()
-        self.algorithm = algo.self_optimize(ecg_data, r_peaks, dataset.sampling_rate_hz)
+        self.algorithm = algo.self_optimize(
+            ecg_data, r_peaks, dataset.sampling_rate_hz
+        )
         return self
 
     def run(self, datapoint: ECGExampleData):
@@ -73,7 +80,10 @@ class MyPipeline(OptimizablePipeline):
 # ----------
 # The scorer is identical to the scoring function used in the other examples.
 # The F1-score is still the most important parameter for our comparison.
-from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference, precision_recall_f1_score
+from examples.algorithms.algorithms_qrs_detection_final import (
+    match_events_with_reference,
+    precision_recall_f1_score,
+)
 
 
 def score(pipeline: MyPipeline, datapoint: ECGExampleData):
@@ -117,7 +127,12 @@ pipe = MyPipeline()
 optimizable_pipe = Optimize(pipe)
 
 results = cross_validate(
-    optimizable_pipe, example_data, scoring=score, cv=cv, return_optimizer=True, return_train_score=True
+    optimizable_pipe,
+    example_data,
+    scoring=score,
+    cv=cv,
+    return_optimizer=True,
+    return_train_score=True,
 )
 result_df = pd.DataFrame(results)
 result_df

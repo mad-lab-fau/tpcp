@@ -63,7 +63,7 @@ def test_hash_model():
     model = create_model()
     first = custom_hash(model)
     second = custom_hash(create_model())
-    cloned = custom_hash(clone(model))
+    custom_hash(clone(model))
 
     different_model = create_model(input_shape=(4,))
 
@@ -95,7 +95,7 @@ def test_hash_tensor():
     assert first == cloned
 
 
-@pytest.mark.parametrize("c", (list, tuple))
+@pytest.mark.parametrize("c", [list, tuple])
 def test_container_tensor(tensorflow_objects, c):
     tmp = c([tensorflow_objects])
     assert custom_hash(tmp) == custom_hash(clone(tmp))

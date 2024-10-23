@@ -1,4 +1,5 @@
 """Helper for testing of algorithms and pipelines implemented in tpcp."""
+
 import pytest
 
 pytest.register_assert_rewrite("tpcp.testing._algorithm_test_mixin")

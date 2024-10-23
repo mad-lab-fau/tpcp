@@ -77,10 +77,10 @@ from pathlib import Path
 from typing import Any, Callable, Optional, Union
 
 import pandas as pd
+from tpcp import Parameter, Pipeline, cf
 
 from examples.algorithms.algorithms_qrs_detection_final import QRSDetector
 from examples.datasets.datasets_final_ecg import ECGExampleData
-from tpcp import Parameter, Pipeline, cf
 
 try:
     HERE = Path(__file__).parent
@@ -132,7 +132,10 @@ pipe = MyPipeline()
 # We could still calculate and return multiple other scores, but this would complicate the implementation of our
 # Optimizer and hence, is kept as exercise for the reader ;) .
 
-from examples.algorithms.algorithms_qrs_detection_final import match_events_with_reference, precision_recall_f1_score
+from examples.algorithms.algorithms_qrs_detection_final import (
+    match_events_with_reference,
+    precision_recall_f1_score,
+)
 
 
 def f1_score(pipeline: MyPipeline, datapoint: ECGExampleData) -> float:
@@ -197,22 +200,28 @@ from dataclasses import dataclass
 from typing import Generic
 
 from optuna import Trial
-
 from tpcp.optimize.optuna import CustomOptunaOptimize
 from tpcp.types import DatasetT, PipelineT
 from tpcp.validate import Scorer
 
 
 @dataclass(repr=False)
-class OptunaSearch(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT], Generic[PipelineT, DatasetT]):
+class OptunaSearch(
+    CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT],
+    Generic[PipelineT, DatasetT],
+):
     # We need to provide default values in Python <3.10, as we can not use the keyword-only syntax for dataclasses.
     create_search_space: Optional[Callable[[Trial], None]] = None
     score_function: Optional[Callable[[PipelineT, DatasetT], float]] = None
 
-    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
+    def create_objective(
+        self,
+    ) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
         # Here we define our objective function
 
-        def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
+        def objective(
+            trial: Trial, pipeline: PipelineT, dataset: DatasetT
+        ) -> float:
             # First we need to select parameters for the current trial
             if self.create_search_space is None:
                 raise ValueError("No valid search space parameter.")
@@ -284,8 +293,12 @@ def get_study_params(seed):
 
 
 def create_search_space(trial: Trial):
-    trial.suggest_float("algorithm__min_r_peak_height_over_baseline", 0.1, 2, step=0.1)
-    trial.suggest_float("algorithm__high_pass_filter_cutoff_hz", 0.1, 2, step=0.1)
+    trial.suggest_float(
+        "algorithm__min_r_peak_height_over_baseline", 0.1, 2, step=0.1
+    )
+    trial.suggest_float(
+        "algorithm__high_pass_filter_cutoff_hz", 0.1, 2, step=0.1
+    )
 
 
 # %%
@@ -385,13 +398,20 @@ from optuna import TrialPruned
 
 
 @dataclass(repr=False)
-class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT], Generic[PipelineT, DatasetT]):
+class OptunaSearchEarlyStopping(
+    CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT],
+    Generic[PipelineT, DatasetT],
+):
     # We need to provide default values in Python <3.10, as we can not use the keyword-only syntax for dataclasses.
     create_search_space: Optional[Callable[[Trial], None]] = None
     score_function: Optional[Callable[[PipelineT, DatasetT], float]] = None
 
-    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
-        def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
+    def create_objective(
+        self,
+    ) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
+        def objective(
+            trial: Trial, pipeline: PipelineT, dataset: DatasetT
+        ) -> float:
             # First, we need to select parameters for the current trial
             if self.create_search_space is None:
                 raise ValueError("No valid search space parameter.")
@@ -401,7 +421,13 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, D
             # the literal eval transform, if specified in the params.
             pipeline = pipeline.set_params(**self.sanitize_params(trial.params))
 
-            def single_score_callback(*, step: int, dataset: DatasetT, scores: tuple[float, ...], **_: Any):
+            def single_score_callback(
+                *,
+                step: int,
+                dataset: DatasetT,
+                scores: tuple[float, ...],
+                **_: Any,
+            ):
                 # We need to report the new score value.
                 # This will call the pruner internally and then tell us if we should stop
                 trial.report(float(scores[step]), step)
@@ -409,10 +435,13 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, D
                     # Apparently, our last value was bad, and we should abort.
                     # However, before we do so, we will save the scores so far as debug information
                     trial.set_user_attr("single_scores", scores)
-                    trial.set_user_attr("data_labels", dataset[: step + 1].group_labels)
+                    trial.set_user_attr(
+                        "data_labels", dataset[: step + 1].group_labels
+                    )
                     # And, finally, we abort the trial
                     raise TrialPruned(
-                        f"Pruned at datapoint {step} ({dataset[step].group_labels[0]}) with value " f"{scores[step]}."
+                        f"Pruned at datapoint {step} ({dataset[step].group_labels[0]}) with value "
+                        f"{scores[step]}."
                     )
 
             # We wrap the score function with a Scorer object to avoid writing our own for-loop to aggregate the
@@ -420,7 +449,9 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, D
             # accessed from within our callback.
             if self.score_function is None:
                 raise ValueError("No valid score function.")
-            scorer = Scorer(self.score_function, single_score_callback=single_score_callback)
+            scorer = Scorer(
+                self.score_function, single_score_callback=single_score_callback
+            )
 
             # Calculate the results per datapoint.
             average_score, single_scores = scorer(pipeline, dataset)
@@ -440,7 +471,11 @@ class OptunaSearchEarlyStopping(CustomOptunaOptimize.as_dataclass()[PipelineT, D
 # We only need to add an instance of our pruner to the study.
 def get_study_params(seed):
     sampler = samplers.RandomSampler(seed=seed)
-    return {"direction": "maximize", "sampler": sampler, "pruner": MinDatapointPerformancePruner(0.3)}
+    return {
+        "direction": "maximize",
+        "sampler": sampler,
+        "pruner": MinDatapointPerformancePruner(0.3),
+    }
 
 
 opti_early_stop = OptunaSearchEarlyStopping[MyPipeline, ECGExampleData](
