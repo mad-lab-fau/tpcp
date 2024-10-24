@@ -46,14 +46,15 @@ class TestScorerCalls:
         mock_final_agg = Mock()
         scorer = Scorer(mock_score_func, final_aggregator=mock_final_agg)
         pipe = DummyOptimizablePipeline()
-        scorer(pipeline=pipe, dataset=DummyDataset())
+        ds = DummyDataset()
+        scorer(pipeline=pipe, dataset=ds)
 
         assert mock_final_agg.call_count == 1
         # final aggregator gets called with the previous agg values, the single values, the pipeline and the dataset
         assert mock_final_agg.call_args[0][0] == 1
         assert mock_final_agg.call_args[0][1] == [1] * len(DummyDataset())
         assert mock_final_agg.call_args[0][2] == pipe
-        assert mock_final_agg.call_args[0][3] == DummyDataset()
+        assert mock_final_agg.call_args[0][3] == ds
 
 
 class TestScorer:

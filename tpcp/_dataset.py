@@ -354,6 +354,10 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
     def __eq__(self, other):
         if not isinstance(other, type(self)):
             return False
+        # Note: This fails, if you compare a dataset, for which the index was already generated with an identical one
+        #       for which `index` was not called yet.
+        #       This might be a bit unexpected, but I consider this correct behaviour and I don't want to trigger the
+        #       index creation here, as this might be costly.
         return custom_hash(self.get_params()) == custom_hash(other.get_params())
 
     def _repr_html_(self) -> str:
