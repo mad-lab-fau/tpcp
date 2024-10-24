@@ -116,6 +116,7 @@ def test_dataclasses():
 
 def test_custom_scorer():
     from examples.validation._03_custom_scorer import (
+        agg_final_agg,
         all_median_results_agg,
         complicated_agg,
         complicated_single_no_raw,
@@ -141,6 +142,8 @@ def test_custom_scorer():
         assert f"f1_score__group_{i}" in macro_agg
 
     assert "per_sample" not in complicated_single_no_raw
+
+    assert complicated_agg == agg_final_agg
 
 
 def test_composite_objects():
