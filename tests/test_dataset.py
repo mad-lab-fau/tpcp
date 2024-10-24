@@ -171,6 +171,16 @@ class TestDataset:
             right=Dataset(subset_index=_create_valid_index()).get_subset(group_labels=group_labels).index,
         )
 
+    def test_equals(self):
+        ds = Dataset(subset_index=_create_valid_index())
+        ds2 = Dataset(subset_index=_create_valid_index())
+        assert ds == ds2
+        assert ds == ds
+        assert ds != Dataset(subset_index=_create_valid_index(), groupby_cols="patients")
+        # But only prams are considered
+        ds2.random_params = 2
+        assert ds == ds2
+
     @pytest.mark.parametrize(
         ("group_labels", "what_to_expect"),
         [
