@@ -351,6 +351,11 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
         repr_index = str(repr_index).replace("\n", "\n   ")
         return f"{self.__class__.__name__} [{self.shape[0]} groups/rows]\n\n   {repr_index}\n\n   "[:-5]
 
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return False
+        return custom_hash(self.get_params()) == custom_hash(other.get_params())
+
     def _repr_html_(self) -> str:
         """Return html representation of the dataset object."""
         repr_index = self.index if self.groupby_cols is None else self.grouped_index

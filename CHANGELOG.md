@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an anti-pattern, or if it is exactly the other way around.
   We need to experiment in a couple of real-life applications to figure this out.
   (https://github.com/mad-lab-fau/tpcp/pull/120)
+- Dataset classes now have a proper `__equals__` implementation.
+  (https://github.com/mad-lab-fau/tpcp/pull/120)
 
 ### Changed
 
