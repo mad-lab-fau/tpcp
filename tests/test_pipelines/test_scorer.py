@@ -40,6 +40,21 @@ class TestScorerCalls:
             # Check that the pipeline was cloned before calling
             assert id(pipe) != id(call[0][0])
 
+    def test_scorer_calls_final_agg(self):
+        """Test that the final aggregator is called once."""
+        mock_score_func = Mock(return_value=1)
+        mock_final_agg = Mock()
+        scorer = Scorer(mock_score_func, final_aggregator=mock_final_agg)
+        pipe = DummyOptimizablePipeline()
+        scorer(pipeline=pipe, dataset=DummyDataset())
+
+        assert mock_final_agg.call_count == 1
+        # final aggregator gets called with the previous agg values, the single values, the pipeline and the dataset
+        assert mock_final_agg.call_args[0][0] == 1
+        assert mock_final_agg.call_args[0][1] == [1] * len(DummyDataset())
+        assert mock_final_agg.call_args[0][2] == pipe
+        assert mock_final_agg.call_args[0][3] == DummyDataset()
+
 
 class TestScorer:
     def test_score_return_val_single_score(self):
