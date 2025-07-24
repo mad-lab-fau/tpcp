@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 
+
+### Changed
+
+- (Potential Breaking): We now check explicitly, if classes follow the "rules of tpcp" and simply forward or set parameters
+  without modifying them. Before, we just "hoped" that this is the case.
+  If you had classes that did not follow these rules, you will now get an error.
+
+### Added
+
+- The `DatasetSplitter` now auto selects a proper splitter based on inputs and attempts to validate if the passed 
+  splitter supports the features needed.
+
+
 ## [2.0.0] - 2024-10-24
 
 ### Added

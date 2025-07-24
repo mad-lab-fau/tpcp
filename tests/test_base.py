@@ -48,7 +48,12 @@ def create_test_class(
 
     # Set the signature to conform to the expected conventions
     sig = signature(test_class.__init__)
-    sig = sig.replace(parameters=(Parameter(k, Parameter.KEYWORD_ONLY, default=v) for k, v in params.items()))
+    sig = sig.replace(
+        parameters=(
+            Parameter("self", Parameter.POSITIONAL_OR_KEYWORD),
+            *(Parameter(k, Parameter.KEYWORD_ONLY, default=v) for k, v in user_set_params.items()),
+        )
+    )
     test_class.__init__.__signature__ = sig
     class_dict = {**class_dict, "__init__": test_class.__init__}
     # Recreate the class with the correct init
@@ -116,7 +121,7 @@ def test_get_results(example_test_class_after_action):
 def test_get_parameter(example_test_class_after_action):
     instance, test_parameters = example_test_class_after_action
 
-    assert instance.get_params() == test_parameters["params"]
+    assert instance.get_params() == {**test_parameters["params"], **test_parameters["private_params"]}
 
 
 def test_get_action_params(example_test_class_after_action):
@@ -589,12 +594,12 @@ def test_subclass_with_wrong_super_call_order():
             self.foo = foo
 
     class Bar(Foo):
-        def __init__(self, foo=cf("foo"), bar=cf("bar")):
+        def __init__(self, foo=cf("foo2"), bar="bar"):
             super().__init__(foo)
             self.bar = bar
 
     bar = Bar()
-    assert bar.get_params() == {"foo": "foo", "bar": "bar"}
+    assert bar.get_params() == {"foo": "foo2", "bar": "bar"}
 
 
 def test_validate_all_parent_params_implemented():
@@ -630,3 +635,55 @@ def test_validate_called_recursively():
         Child(2, 1).get_params()
 
     assert "Parent" in str(e.value)
+
+
+def test_validate_not_setting_all_parameters():
+    class Test(Algorithm):
+        def __init__(self, a, b):
+            self.a = a
+
+    with pytest.raises(RuntimeError) as e:
+        Test(a=1, b=2)
+
+    assert "`b`" in str(e.value)
+
+
+def test_validate_modifing_parameters():
+    class Test(Algorithm):
+        def __init__(self, a):
+            self.a = a + 1
+
+    with pytest.raises(RuntimeError) as e:
+        Test(a=1)
+
+    assert "`a`" in str(e.value)
+
+
+def test_validation_triggered_with_child_class():
+    class Parent(Algorithm):
+        def __init__(self, a):
+            self.a = a + 1
+
+    class Child(Parent):
+        def __init__(self, a, b):
+            self.b = b
+            super().__init__(a)
+
+    with pytest.raises(RuntimeError) as e:
+        Child(a=1, b=2)
+
+    assert "`a`" in str(e.value)
+
+
+def test_validation_triggered_with_child_class_without_init():
+    class Parent(Algorithm):
+        def __init__(self, a):
+            self.a = a + 1
+
+    class Child(Parent):
+        pass
+
+    with pytest.raises(RuntimeError) as e:
+        Child(a=1)
+
+    assert "`a`" in str(e.value)
