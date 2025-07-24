@@ -77,15 +77,15 @@ class DatasetSplitter(BaseTpcpObject):
 
         # The checks below might be redundant, but it makes the code structure easier to follow.
         msg = None
-        if self.groupby and "Group" not in self.base_splitter.__class__.__name__:
+        if self.groupby and "Group" not in cv.__class__.__name__:
             msg = (
-                "You specified groupby columns for the splitter, but it looks like you did not selected any of the "
+                "You specified groupby columns for the splitter, but it looks like you did not selecte any of the "
                 "typical sklearn splitters that do support grouping. "
                 "Splitters that don't support grouping will silently ignore the grouping information.",
             )
-        if self.stratify and "Stratified" not in self.base_splitter.__class__.__name__:
+        if self.stratify and "Stratified" not in cv.__class__.__name__:
             msg = (
-                "You specified stratify columns for the splitter, but it looks like you did not selected any of the "
+                "You specified stratify columns for the splitter, but it looks like you did not select any of the "
                 "typical sklearn splitters that do support stratification. "
                 "Splitters that don't support stratification will silently ignore the stratification information.",
             )
@@ -97,7 +97,7 @@ class DatasetSplitter(BaseTpcpObject):
                     "For a list of available splitters see "
                     "https://scikit-learn.org/stable/api/sklearn.model_selection.html "
                     "\nIf you provided a custom splitter, and you know what you are doing, you can disable this "
-                    "warning, by setting the `ignore_potentially_invalid_splitter_warning=False` when creating the "
+                    "warning, by setting the `ignore_potentially_invalid_splitter_warning=True` when creating the "
                     "DatasetSplitter object."
                 ),
                 UserWarning,
