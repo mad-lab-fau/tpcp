@@ -104,6 +104,31 @@ def _get_init_defaults(cls: type[_BaseTpcpObject]) -> dict[str, inspect.Paramete
     return defaults
 
 
+_init_implementation_hint = (
+    "All classes in using tpcp must set all parameters passed to the init as parameter "
+    "without any modification.\n\n"
+    "A typical `__init__` method should look like this:\n\n"
+    ">>> def __init__(self, para_1, para_2):\n"
+    ">>>     self.para_1 = para_1\n"
+    ">>>     self.para_2 = para_2\n"
+    "\nAny additional logic to validate parameters or set complicated defaults should be "
+    "done at the start of the action method, not in the init.\n"
+    "The reason for this is that you can modify parameters after the init has run. "
+    "In case relevant logic is contained in the `__init__` method, this logic would be "
+    "skipped, if parameters are modified after the init using `set_params`."
+)
+
+
+def _is_latest_init_in_mro(cls, instance):
+    """Check if cls.__init__ is the first __init__ in the MRO of instance."""
+    mro = type(instance).__mro__
+
+    # Find the first class in MRO that defines its own __init__
+    first_with_init = next((c for c in mro if "__init__" in c.__dict__), None)
+
+    return first_with_init is cls
+
+
 def _replace_defaults_wrapper(
     cls: type[_BaseTpcpObjectT], old_init: Callable[Concatenate[_BaseTpcpObjectT, P], T]
 ) -> Callable[Concatenate[_BaseTpcpObjectT, P], T]:
@@ -116,18 +141,47 @@ def _replace_defaults_wrapper(
     # super().__init__ is called before all parameters of the child object are set.
     # This way, the param checks only concern the parameters of the current class.
     params = get_param_names(cls)
+    defaults = {k: v.default for k, v in _get_init_defaults(cls).items()}
 
     @wraps(old_init)
     def new_init(self: _BaseTpcpObjectT, *args: P.args, **kwargs: P.kwargs) -> None:
         # call the old init.
         old_init(self, *args, **kwargs)
+        # We check if we have been run via super or if the init was called directly.
+        # This is required, as we can perform all the checks that follow only after the full "callstacK" of inits
+        # has been run.
+        # This means, we only want to run the checks, if the init was called directly, i.e. not via super.
+        if not _is_latest_init_in_mro(cls, self):
+            return
 
-        # Check if any of the initial values has a "default parameter flag".
-        # If yes we replace it with a clone (in case of a tpcp object) or a deepcopy in case of other objects.
+        # After the old init ran, we can check that the parameters have been set correctly.
+        # Tpcp classes should not modify any parameters in their init and set them to exactly the values using
+        # attributes with the same name.
+        # We get all params passed to the init, by manually binding them to the signature of the old init.
+        # We check that all parameters are set and the values are identical
+        #
+        # At the same time, we check if any parameter is wrapped by a base factory.
+        # And replace the value accordingly.
         # This is handled by the factory `get_value` method.
+        passed_params = {**defaults, **inspect.signature(old_init).bind(self, *args, **kwargs).arguments}
+        sentinal = object()  # We use a unique object to check if the value was set.
         for p in params:
-            if isinstance(val := getattr(self, p), BaseFactory):
-                setattr(self, p, val.get_value())
+            passed_value = passed_params[p]
+            set_value = getattr(self, p, sentinal)
+            if set_value is sentinal:
+                raise RuntimeError(
+                    f"The class `{cls.__name__}`  did not set the parameter `{p}` in its init.\n\n"
+                    f"{_init_implementation_hint}"
+                )
+            if set_value is not passed_value:
+                raise RuntimeError(
+                    f"The class `{cls.__name__}` or one of its parent classes modified the parameter `{p}` in its "
+                    "init. "
+                    f"The value available as {cls.__name__}.{p} is not identical to the value passed to the init with "
+                    f"the same name.\n\n{_init_implementation_hint}"
+                )
+            if isinstance(set_value, BaseFactory):
+                setattr(self, p, set_value.get_value())
 
     # This is just for introspection, in case we want to know if we have a modified init.
     new_init.__tpcp_wrapped__ = True
@@ -627,7 +681,8 @@ def _has_dangerous_mutable_default(fields: dict[str, inspect.Parameter], cls: ty
             "\n"
             "Note, that we do not check for all cases of mutable objects. "
             f"At the moment, we check only for {_get_dangerous_mutable_types()}. "
-            "To learn more about this topic, check TODO: LINK."
+            "To learn more about this topic, check "
+            "https://tpcp.readthedocs.io/en/latest/guides/general_concepts.html#mutable-defaults ."
         )
 
 
