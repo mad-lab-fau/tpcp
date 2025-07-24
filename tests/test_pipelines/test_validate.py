@@ -3,7 +3,7 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import pytest
-from sklearn.model_selection import GroupKFold, KFold, StratifiedKFold
+from sklearn.model_selection import GroupKFold, KFold, StratifiedGroupKFold, StratifiedKFold
 
 from tests.test_pipelines.conftest import (
     DummyDataset,
@@ -309,13 +309,17 @@ class TestTpcpSplitter:
             assert train_expected.tolist() == train.tolist()
             assert test_expected.tolist() == test.tolist()
 
-    def test_normal_k_fold_with_groupby_ignored(self):
+    @pytest.mark.parametrize("provide", ["groupby", "stratify"])
+    def test_normal_k_fold_with_groupby_and_stratified_ignored(self, provide):
         ds = DummyGroupedDataset()
-        splitter = DatasetSplitter(base_splitter=KFold(n_splits=5), groupby="v1")
-        # This should be identical to just calling the splitter directly
-        splits_expected = list(KFold(n_splits=5).split(ds))
+        paras = {provide: "v1"}
+        expected_string = "grouping" if provide == "groupby" else "stratification"
+        splitter = DatasetSplitter(base_splitter=KFold(n_splits=5), **paras)
+        # This should be identical to just calling the splitter directly, but should give a warning
+        with pytest.warns(UserWarning, match=f"sklearn splitters that do support {expected_string}."):
+            splits = list(splitter.split(ds))
 
-        splits = list(splitter.split(ds))
+        splits_expected = list(KFold(n_splits=5).split(ds))
 
         for (train_expected, test_expected), (train, test) in zip(splits_expected, splits):
             assert train_expected.tolist() == train.tolist()
@@ -344,3 +348,27 @@ class TestTpcpSplitter:
         for (train_expected, test_expected), (train, test) in zip(splits_expected, splits):
             assert train_expected.tolist() == train.tolist()
             assert test_expected.tolist() == test.tolist()
+
+    def test_auto_selection_group_k_fold(self):
+        splitter = DatasetSplitter(base_splitter=None, groupby="v1")
+        inner_splitter = splitter._get_splitter()
+        assert isinstance(inner_splitter, GroupKFold)
+        assert inner_splitter.n_splits == 5
+
+    def test_auto_selection_stratified_k_fold(self):
+        splitter = DatasetSplitter(base_splitter=None, stratify="v1")
+        inner_splitter = splitter._get_splitter()
+        assert isinstance(inner_splitter, StratifiedKFold)
+        assert inner_splitter.n_splits == 5
+
+    def test_auto_selection_k_fold(self):
+        splitter = DatasetSplitter(base_splitter=None)
+        inner_splitter = splitter._get_splitter()
+        assert isinstance(inner_splitter, KFold)
+        assert inner_splitter.n_splits == 5
+
+    def test_auto_selection_group_k_fold_with_stratified(self):
+        splitter = DatasetSplitter(base_splitter=None, groupby="v1", stratify="v2")
+        inner_splitter = splitter._get_splitter()
+        assert isinstance(inner_splitter, StratifiedGroupKFold)
+        assert inner_splitter.n_splits == 5

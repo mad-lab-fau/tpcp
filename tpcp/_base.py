@@ -195,7 +195,7 @@ def _retry_eval_with_missing_locals(
     return val
 
 
-def _custom_get_type_hints(cls: type[_BaseTpcpObject]) -> dict[str, Any]:
+def _custom_get_type_hints(cls: type) -> dict[str, Any]:
     """Extract type hints while avoiding issues with forward references.
 
     We automatically skip all douple-underscore methods.
