@@ -164,11 +164,12 @@ def _replace_defaults_wrapper(
         # And replace the value accordingly.
         # This is handled by the factory `get_value` method.
         passed_params = {**defaults, **inspect.signature(old_init).bind(self, *args, **kwargs).arguments}
-        sentinal = object()  # We use a unique object to check if the value was set.
+        sentinel = object()  # We use a unique object to check if the value was set. We can not use NOTHING here, as
+                             # NOTHING can be a valid input parameter value.
         for p in params:
             passed_value = passed_params[p]
-            set_value = getattr(self, p, sentinal)
-            if set_value is sentinal:
+            set_value = getattr(self, p, sentinel)
+            if set_value is sentinel:
                 raise RuntimeError(
                     f"The class `{cls.__name__}`  did not set the parameter `{p}` in its init.\n\n"
                     f"{_init_implementation_hint}"
