@@ -164,8 +164,9 @@ def _replace_defaults_wrapper(
         # And replace the value accordingly.
         # This is handled by the factory `get_value` method.
         passed_params = {**defaults, **inspect.signature(old_init).bind(self, *args, **kwargs).arguments}
-        sentinel = object()  # We use a unique object to check if the value was set. We can not use NOTHING here, as
-                             # NOTHING can be a valid input parameter value.
+        # We use a unique object to check if the value was set. We can not use NOTHING here, as
+        # NOTHING can be a valid input parameter value.
+        sentinel = object()
         for p in params:
             passed_value = passed_params[p]
             set_value = getattr(self, p, sentinel)
