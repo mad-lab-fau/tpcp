@@ -79,7 +79,7 @@ class DatasetSplitter(BaseTpcpObject):
         msg = None
         if self.groupby and "Group" not in cv.__class__.__name__:
             msg = (
-                "You specified groupby columns for the splitter, but it looks like you did not selecte any of the "
+                "You specified groupby columns for the splitter, but it looks like you did not select any of the "
                 "typical sklearn splitters that do support grouping. "
                 "Splitters that don't support grouping will silently ignore the grouping information.",
             )
