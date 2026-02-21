@@ -438,4 +438,4 @@ class TestOptunaSearch:
             copied_search = optuna_search.clone()
             copied_search.optimize(DummyDataset())
 
-            assert optuna_search.best_params_ != copied_search.best_params_
+            assert optuna_search.study_.study_name != copied_search.study_.study_name
