@@ -1,3 +1,4 @@
+import warnings
 from tempfile import TemporaryDirectory
 from typing import Union
 from unittest.mock import patch
@@ -8,6 +9,7 @@ import pandas as pd
 import pytest
 from sklearn.model_selection import ParameterGrid, PredefinedSplit
 
+from tests.conftest import warns_or_none
 from tests.test_pipelines.conftest import (
     DummyDataset,
     DummyOptimizablePipeline,
@@ -147,7 +149,7 @@ class TestGridSearchCommon:
         if isinstance(return_optimized, str) and not return_optimized.endswith("score"):
             warning = UserWarning
 
-        with pytest.warns(warning) as w:
+        with warns_or_none(warning) as w:
             gs.optimize(DummyDataset())
 
         if isinstance(return_optimized, str) and not return_optimized.endswith("score"):
@@ -760,7 +762,7 @@ class TestOptimize:
         with patch.object(DummyOptimizablePipelineUnsafe, "self_optimize", return_value=optimized_pipe) as mock:
             mock.__name__ = "self_optimize"
             warning = PotentialUserErrorWarning if use_safe else None
-            with pytest.warns(warning) as w:
+            with warns_or_none(warning) as w:
                 Optimize(DummyOptimizablePipelineUnsafe(), safe_optimize=use_safe).optimize(ds)
 
             if use_safe:
@@ -818,16 +820,18 @@ class TestDummyOptimize:
 
         assert len(w.list) == 1
 
-        with pytest.warns(None) as w:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             DummyOptimize(DummyPipeline()).optimize(dataset=None)
 
-        assert len(w.list) == 0
+        assert len(w) == 0
 
     def test_warning_suppression(self):
-        with pytest.warns(None) as w:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             DummyOptimize(DummyOptimizablePipeline(), ignore_potential_user_error_warning=True).optimize(dataset=None)
 
-        assert len(w.list) == 0
+        assert len(w) == 0
 
 
 class TestOptimizeBase:

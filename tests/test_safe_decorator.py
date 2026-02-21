@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
+from tests.conftest import warns_or_none
 from tests.test_pipelines.conftest import DummyDataset
 from tpcp import (
     Dataset,
@@ -90,7 +91,7 @@ class TestSafeAction:
         ds = DummyDataset()
 
         warning = PotentialUserErrorWarning if warn else None
-        with pytest.warns(warning) as w:
+        with warns_or_none(warning) as w:
             make_action_safe(test_func)(DummyActionPipelineUnsafe(), ds)
 
         if warn:
@@ -148,7 +149,7 @@ class TestSafeOptimize:
         ds = DummyDataset()
 
         warning = PotentialUserErrorWarning if warn else None
-        with pytest.warns(warning) as w:
+        with warns_or_none(warning) as w:
             make_optimize_safe(test_func)(DummyOptimizablePipelineUnsafe(), ds)
 
         if warn:
@@ -166,7 +167,7 @@ class TestSafeOptimize:
                 DummyOptimizablePipelineUnsafe.self_optimize
             )
             warning = PotentialUserErrorWarning if warn else None
-            with pytest.warns(warning) as w:
+            with warns_or_none(warning) as w:
                 DummyOptimizablePipelineUnsafe().self_optimize(ds)
 
             if len(w) > 0:

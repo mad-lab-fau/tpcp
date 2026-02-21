@@ -106,7 +106,8 @@ class TestGlobalCache:
             getattr(example, action_name)(2)
         assert example.result_1_ == 5 * multiplier
 
-        with pytest.warns(None) as w:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             getattr(example, action_name)(3)
         assert example.result_1_ == 6 * multiplier
         assert not w
@@ -126,7 +127,8 @@ class TestGlobalCache:
         assert example.result_1_ == 5 * multiplier
 
         example = example_class(1, 2)
-        with pytest.warns(None) as w:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             getattr(example, action_name)(3)
         assert example.result_1_ == 6 * multiplier
         assert not w
@@ -165,7 +167,8 @@ class TestGlobalCache:
         example = example.clone()
 
         # Now in the cached version
-        with pytest.warns(None) as w:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             getattr(example, action_name)(2)
         assert not w
         assert example.result_1_ == 5 * multiplier
@@ -197,7 +200,8 @@ class TestGlobalCache:
             if self.cache_method_name == "disk" and restore_in_parallel_process is True:
                 # Disk cache can work across processes. This means, already on the first call in the new process,
                 # we should get the cached result.
-                with pytest.warns(None) as w:
+                with warnings.catch_warnings(record=True) as w:
+                    warnings.simplefilter("always")
                     pipe.action(1)
                 assert not w
             else:
@@ -207,7 +211,8 @@ class TestGlobalCache:
 
             if restore_in_parallel_process is True:
                 # Id we set the restore option to True, the second call should be correctly cached
-                with pytest.warns(None) as w:
+                with warnings.catch_warnings(record=True) as w:
+                    warnings.simplefilter("always")
                     pipe.action(1)
                 assert not w
             else:
@@ -255,7 +260,8 @@ class TestHybridCache:
 
         assert r == 3
 
-        with pytest.warns(None) as w:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             r = cached_func(1, 2)
 
         assert r == 3
@@ -269,7 +275,8 @@ class TestHybridCache:
 
         assert r == 3
 
-        with pytest.warns(None) as w:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             r = cached_func(1, 2)
 
         assert r == 3
@@ -288,7 +295,8 @@ class TestHybridCache:
 
         assert r == 3
 
-        with pytest.warns(None) as w:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             r = cached_func(1, 2)
 
         # This should not hit the joblib cache, as the lru cache should have been used
@@ -317,7 +325,8 @@ class TestHybridCache:
 
         cached_func_new = hybrid_cache(joblib_cache_verbose, 2)(example_func)
 
-        with pytest.warns(None) as w:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             r = cached_func_new(1, 2)
 
         # This time this should hit the joblib cache, as the lru cache should have been cleared
@@ -330,7 +339,8 @@ class TestHybridCache:
         assert not w
 
         # And now the lru cache should be used again
-        with pytest.warns(None) as w:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             r = cached_func_new(1, 2)
 
         # This time this should hit the joblib cache, as the lru cache should have been cleared
