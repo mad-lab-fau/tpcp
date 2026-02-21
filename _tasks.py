@@ -47,7 +47,7 @@ def _get_current_version_via_uv():
 def update_version(*args):
     subprocess.run(["uv", "version", *args], shell=False, check=True)
     new_version = _get_current_version_via_uv()
-    update_version_strings(HERE.joinpath("tpcp/__init__.py"), new_version)
+    update_version_strings(HERE.joinpath("src/tpcp/__init__.py"), new_version)
 
 
 def task_update_version():

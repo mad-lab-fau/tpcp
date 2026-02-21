@@ -72,8 +72,8 @@ _auto_fix = "ruff check . --fix-only --show-fixes --exit-zero"
 _auto_fix_unsafe = "ruff check . --fix-only --show-fixes --exit-zero --unsafe-fixes"
 format = ["_auto_fix", "_format"]
 format_unsafe = ["_auto_fix_unsafe", "_format"]
-lint = { cmd = "ruff check tpcp --fix", help = "Lint all files with ruff." }
-_lint_ci = "ruff check tpcp --output-format=github"
+lint = { cmd = "ruff check src/tpcp --fix", help = "Lint all files with ruff." }
+_lint_ci = "ruff check src/tpcp --output-format=github"
 _check_format = "ruff format . --check"
 ci_check = { sequence = ["_check_format", "_lint_ci"], help = "Check all potential format and linting issues." }
 test = { cmd = "pytest ./tests --cov=tpcp --cov-report=term-missing --cov-report=xml", help = "Run Pytest with coverage." }
@@ -86,5 +86,5 @@ version = { "script" = "_tasks:task_update_version()" }
 pythonVersion = "3.9"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.10.4,<0.11.0"]
+build-backend = "uv_build"

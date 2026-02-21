@@ -23,7 +23,7 @@ from sphinx_gallery.sorting import ExplicitOrder, FileNameSortKey
 HERE = Path(__file__)
 
 sys.path.insert(0, str(HERE.parent))
-sys.path.insert(0, str(HERE.parent.parent))
+sys.path.insert(0, str(HERE.parent.parent / "src"))
 
 from sphinxext.githublink import make_linkcode_resolve
 
@@ -197,5 +197,5 @@ sphinx_gallery_conf = {
 
 linkcode_resolve = make_linkcode_resolve(
     "tpcp",
-    "https://github.com/mad-lab-fau/tpcp/blob/{revision}/{package}/{path}#L{lineno}",
+    "https://github.com/mad-lab-fau/tpcp/blob/{revision}/src/{package}/{path}#L{lineno}",
 )
