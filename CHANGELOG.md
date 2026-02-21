@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.2] - 2026-02-21
+
+### Fixed
+
+- Fixed the docs build path setup after the `src/` layout migration by adding the repository root to Sphinx's import path, allowing gallery examples to import from the `examples` package again.
+
 ## [2.1.1] - 2026-02-21
 
 ### Fixed
