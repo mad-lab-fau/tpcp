@@ -570,12 +570,12 @@ hybrid_cache.__cache_registry__ = _GLOBAL_CACHE_REGISTRY
 
 
 __all__ = [
+    "UniversalHashableWrapper",
+    "get_ram_cache_obj",
     "global_disk_cache",
     "global_ram_cache",
-    "UniversalHashableWrapper",
+    "hybrid_cache",
+    "remove_any_cache",
     "remove_disk_cache",
     "remove_ram_cache",
-    "remove_any_cache",
-    "get_ram_cache_obj",
-    "hybrid_cache",
 ]

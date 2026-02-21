@@ -644,7 +644,7 @@ This release drops Python 3.7 support!
 
 ## [0.6.2] - 2022-04-21
 
-- The poetry lockfiles are now committed to the repository.
+- The lockfiles are now committed to the repository.
 - Some dependencies are updated
 
 

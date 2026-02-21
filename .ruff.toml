@@ -87,24 +87,26 @@ ignore = [
     "RET504",
     # Abstract raise into inner function
     "TRY301",
-    # df as varaible name
-    "PD901",
     # melt over stack
     "PD013",
     # No Any annotations
     "ANN401",
-    # Self annotation
-    "ANN101",
     # To many arguments
     "PLR0913",
     # Class attribute shadows builtin
     "A003",
-    # No typing for `cls`
-    "ANN102",
     # Ignore because of formatting
     "ISC001",
     # Syntax not supported in Python 3.9
-    "UP007"
+    "UP007",
+    # Not supported by Python 3.9 typing syntax
+    "UP045",
+    # Imports intentionally local in a few callsites
+    "PLC0415",
+    # Hashable protocol false-positive for this codebase
+    "PLW1641",
+    # Keep runtime import placement as-is
+    "TC001"
 ]
 
 

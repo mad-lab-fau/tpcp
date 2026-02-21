@@ -74,7 +74,7 @@ def get_action_methods_names(instance_or_cls: Union[type[Algorithm], Algorithm])
         method_names = (method_names,)
     if not isinstance(method_names, tuple) and len(method_names) == 0:
         if isclass(instance_or_cls):
-            instance_or_cls = cast(type[Algorithm], instance_or_cls)
+            instance_or_cls = cast("type[Algorithm]", instance_or_cls)
             name = instance_or_cls.__name__
         else:
             name = type(instance_or_cls).__name__
@@ -226,7 +226,7 @@ def make_action_safe(action_method: Callable[P, T]) -> Callable[P, T]:
         return _check_safe_run(self, action_method, *args[1:], **kwargs)
 
     setattr(safe_wrapped, ACTION_METHOD_INDICATOR, True)
-    return cast(Callable[P, T], safe_wrapped)
+    return cast("Callable[P, T]", safe_wrapped)
 
 
 def _get_nested_opti_paras(
@@ -420,4 +420,4 @@ def make_optimize_safe(self_optimize_method: Callable[P, T]) -> Callable[P, T]:
             ) from e
 
     setattr(safe_wrapped, OPTIMIZE_METHOD_INDICATOR, True)
-    return cast(Callable[P, T], safe_wrapped)
+    return cast("Callable[P, T]", safe_wrapped)

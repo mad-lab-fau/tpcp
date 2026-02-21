@@ -35,16 +35,20 @@ def update_version_strings(file_path, new_version):
         f.truncate()
 
 
-def update_version(version):
-    subprocess.run(["poetry", "version", version], shell=False, check=True)
-    new_version = (
-        subprocess.run(["poetry", "version"], shell=False, check=True, capture_output=True)
+def _get_current_version_via_uv():
+    return (
+        subprocess.run(["uv", "version"], shell=False, check=True, capture_output=True)
         .stdout.decode()
         .strip()
         .split(" ", 1)[1]
     )
+
+
+def update_version(*args):
+    subprocess.run(["uv", "version", *args], shell=False, check=True)
+    new_version = _get_current_version_via_uv()
     update_version_strings(HERE.joinpath("tpcp/__init__.py"), new_version)
 
 
 def task_update_version():
-    update_version(sys.argv[1])
+    update_version(*sys.argv[1:])

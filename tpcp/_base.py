@@ -188,7 +188,7 @@ def _replace_defaults_wrapper(
     # This is just for introspection, in case we want to know if we have a modified init.
     new_init.__tpcp_wrapped__ = True
 
-    return cast(Callable[Concatenate[_BaseTpcpObjectT, P], T], new_init)
+    return cast("Callable[Concatenate[_BaseTpcpObjectT, P], T]", new_init)
 
 
 def _retry_eval_with_missing_locals(
@@ -259,7 +259,10 @@ def _custom_get_type_hints(cls: type) -> dict[str, Any]:
     hints = {}
     for base in reversed(cls.__mro__):
         base_globals = sys.modules[base.__module__].__dict__
-        ann = base.__dict__.get("__annotations__", {})
+        if sys.version_info >= (3, 10):
+            ann = getattr(base, "__annotations__", {})
+        else:
+            ann = base.__dict__.get("__annotations__", {})
         for name, value in ann.items():
             if name.startswith("__"):
                 continue

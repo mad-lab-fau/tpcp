@@ -15,13 +15,13 @@ from tpcp.validate._scorer import (
 )
 
 __all__ = [
-    "BaseTpcpObjectT",
-    "PipelineT",
-    "OptimizablePipelineT",
-    "DatasetT",
-    "AlgorithmT",
     "AggReturnType",
-    "ScoreFuncSingle",
-    "ScoreFuncMultiple",
+    "AlgorithmT",
+    "BaseTpcpObjectT",
+    "DatasetT",
+    "OptimizablePipelineT",
+    "PipelineT",
     "ScoreFunc",
+    "ScoreFuncMultiple",
+    "ScoreFuncSingle",
 ]

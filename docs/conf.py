@@ -31,11 +31,11 @@ URL = "https://github.com/mad-lab-fau/tpcp"
 
 # -- Project information -----------------------------------------------------
 
-# Info from poetry config:
-info = toml.load("../pyproject.toml")["tool"]["poetry"]
+# Info from project config:
+info = toml.load("../pyproject.toml")["project"]
 
 project = info["name"]
-author = ", ".join(info["authors"])
+author = ", ".join(f"{author['name']} <{author['email']}>" for author in info["authors"])
 release = info["version"]
 
 copyright = f"2021 - {datetime.now().year}, MaD Lab, FAU, Digital Health and Gait Analysis Group"

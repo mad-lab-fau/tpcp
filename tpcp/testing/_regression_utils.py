@@ -233,17 +233,26 @@ class PyTestSnapshotTest:
         datetime_cols = sanitized_df.select_dtypes(include=datetime_types).columns
         # remove timezone information to prevent this read-write issue:
         # https://github.com/pandas-dev/pandas/issues/53473
-        sanitized_df.loc[:, datetime_cols] = sanitized_df.loc[:, datetime_cols].apply(lambda x: x.dt.tz_localize(None))
+        for col in datetime_cols:
+            col_values = sanitized_df[col]
+            if isinstance(col_values.dtype, pd.DatetimeTZDtype):
+                col_values = col_values.dt.tz_localize(None)
+            sanitized_df[col] = col_values.astype("datetime64[ns]")
         # check index
-        for level in range(sanitized_df.index.nlevels):
-            if sanitized_df.index.get_level_values(level).inferred_type in datetime_types:
-                # check if index is a multiindex
-                if sanitized_df.index.nlevels > 1:
-                    sanitized_df.index.set_levels(
-                        sanitized_df.index.get_level_values(level).tz_localize(None), level=level, inplace=True
+        if sanitized_df.index.nlevels > 1:
+            for level in range(sanitized_df.index.nlevels):
+                level_values = sanitized_df.index.levels[level]
+                if level_values.inferred_type in datetime_types:
+                    if isinstance(level_values.dtype, pd.DatetimeTZDtype):
+                        level_values = level_values.tz_localize(None)
+                    sanitized_df.index = sanitized_df.index.set_levels(
+                        level_values.astype("datetime64[ns]"), level=level
                     )
-                else:
-                    sanitized_df.index = sanitized_df.index.tz_localize(None)
+        elif sanitized_df.index.inferred_type in datetime_types:
+            index_values = sanitized_df.index
+            if isinstance(index_values.dtype, pd.DatetimeTZDtype):
+                index_values = index_values.tz_localize(None)
+            sanitized_df.index = index_values.astype("datetime64[ns]")
         return sanitized_df
 
 

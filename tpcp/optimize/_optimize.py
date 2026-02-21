@@ -464,7 +464,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
         for c, _v in single_scores_dict.items():
             # Because of custom aggregators, it can be that single scores dicts have different keys than the aggregated
             # scores.
-            results[c] = single_scores_dict[c]
+            results[c] = _v
 
         results["data_labels"] = out["data_labels"]
         results["debug__score_time"] = out["debug__score_time"]

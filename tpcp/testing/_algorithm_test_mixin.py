@@ -58,7 +58,7 @@ class TestAlgorithmMixin(Generic[BaseTpcpObjectT]):
     _IGNORED_NAMES = ()
 
     @pytest.fixture
-    def after_action_instance(self, **kwargs) -> BaseTpcpObjectT:  # noqa: PT004
+    def after_action_instance(self, **kwargs) -> BaseTpcpObjectT:
         """Return an instance of the algorithm class AFTER the action is performed.
 
         This needs to be implemented by every testclass.

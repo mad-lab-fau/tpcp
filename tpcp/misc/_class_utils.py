@@ -120,7 +120,7 @@ def set_defaults(**defaults: Unpack[dict[str, Any]]) -> Callable[[Callable[P, R]
             new_sig = sig.replace(parameters=new_paras)
         except ValueError as e:
             raise ValueError(
-                f"Could not set defaults for {func.__name__}. " "Check the error above for more information."
+                f"Could not set defaults for {func.__name__}. Check the error above for more information."
             ) from e
 
         # Check that we don't overwrite existing default values

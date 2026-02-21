@@ -18,7 +18,7 @@ class TestSnapshot:
         df.index = pd.MultiIndex.from_tuples([(1, 2), ("a", "b")], names=["index_level_a", "index_level_b"])
         snapshot.assert_match(df, "dummy_df_multiindex")
 
-    @pytest.mark.parametrize("freq", ["s", "h", "t", "d", "ms", "us", "ns"])
+    @pytest.mark.parametrize("freq", ["s", "h", "min", "D", "ms", "us", "ns"])
     def test_snapshot_df_timeseries_without_tz(self, freq, snapshot):
         df_len = 10
         df = pd.DataFrame(
@@ -30,7 +30,7 @@ class TestSnapshot:
         ).set_index("dummy_index")
         snapshot.assert_match(df, "dummy_df_with_timeseries")
 
-    @pytest.mark.parametrize("freq", ["s", "h", "t", "d", "ms", "us", "ns"])
+    @pytest.mark.parametrize("freq", ["s", "h", "min", "D", "ms", "us", "ns"])
     def test_snapshot_df_timeseries_with_tz(self, freq, snapshot):
         # TODO
         df_len = 10

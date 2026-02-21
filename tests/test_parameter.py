@@ -1,8 +1,9 @@
+import sys
 from typing import Annotated
 
 import pytest
 
-from tpcp import BaseTpcpObject, HyperPara, Para
+from tpcp import BaseTpcpObject, HyperPara, OptiPara, Para
 from tpcp._parameters import _ParaTypes
 
 
@@ -98,3 +99,16 @@ def test_annotation_inherting():
         "hyper": _ParaTypes.HYPER,
         "nested_hyper__nested_para": _ParaTypes.HYPER,
     }
+
+
+def test_opti_annotation_detection_python_314_regression():
+    class Test(BaseTpcpObject):
+        opti: OptiPara[int]
+
+        def __init__(self, opti: int = 1):
+            self.opti = opti
+
+    if sys.version_info >= (3, 14):
+        assert "__annotations__" not in Test.__dict__
+
+    assert Test().__field_annotations__ == {"opti": _ParaTypes.OPTI}

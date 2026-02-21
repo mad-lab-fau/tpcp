@@ -15,6 +15,6 @@ build:
     python: "3.10"
   jobs:
     post_create_environment:
-      - pip install poetry
+      - pip install uv
     post_install:
-      - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH poetry install --all-extras
+      - UV_PROJECT_ENVIRONMENT=$READTHEDOCS_VIRTUALENV_PATH uv sync --all-extras --group dev

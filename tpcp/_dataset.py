@@ -166,8 +166,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
     def groups(self) -> list[GroupLabelT]:
         """Get the current group labels. Deprecated, use `group_labels` instead."""
         warnings.warn(
-            "The attribute `groups` is deprecated and will be removed in a future version. "
-            "Use `group_labels` instead.",
+            "The attribute `groups` is deprecated and will be removed in a future version. Use `group_labels` instead.",
             DeprecationWarning,
             stacklevel=1,
         )
@@ -191,8 +190,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
     def group(self) -> GroupLabelT:
         """Get the current group label. Deprecated, use `group_label` instead."""
         warnings.warn(
-            "The attribute `group` is deprecated and will be removed in a future version. "
-            "Use `group_label` instead.",
+            "The attribute `group` is deprecated and will be removed in a future version. Use `group_label` instead.",
             DeprecationWarning,
             stacklevel=1,
         )
@@ -327,7 +325,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
             return self.clone().set_params(subset_index=self.index[bool_map].reset_index(drop=True))
 
         if len(kwargs) > 0:
-            cleaned_kwargs = cast(dict[str, list[str]], {k: _ensure_is_list(v) for k, v in kwargs.items()})
+            cleaned_kwargs = cast("dict[str, list[str]]", {k: _ensure_is_list(v) for k, v in kwargs.items()})
 
             # Check if all values are actually in their respective columns.
             # This is not strictly required, but avoids user error

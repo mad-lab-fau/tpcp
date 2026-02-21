@@ -8,4 +8,4 @@ pytest.register_assert_rewrite("tpcp.testing._regression_utils")
 from tpcp.testing._algorithm_test_mixin import TestAlgorithmMixin  # noqa: E402
 from tpcp.testing._regression_utils import PyTestSnapshotTest  # noqa: E402
 
-__all__ = ["TestAlgorithmMixin", "PyTestSnapshotTest"]
+__all__ = ["PyTestSnapshotTest", "TestAlgorithmMixin"]

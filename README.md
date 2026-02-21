@@ -17,9 +17,9 @@ Easily install `tpcp` via pip:
 pip install tpcp
 ```
 
-Or add it to your project with [poetry](https://python-poetry.org/):
+Or add it to your project with [uv](https://docs.astral.sh/uv/):
 ```bash
-poetry add tpcp
+uv add tpcp
 ```
 
 ## Why?
@@ -134,7 +134,7 @@ reach out to us by [opening a new issue](https://github.com/mad-lab-fau/tpcp/iss
 
 ## Dev Setup
 
-We are using [poetry](https://python-poetry.org/) to manage dependencies and 
+We are using [uv](https://docs.astral.sh/uv/) to manage dependencies and
 [poethepoet](https://github.com/nat-n/poethepoet) to run and manage dev tasks.
 
 To set up the dev environment *including* the required dependencies for using and developing on `tpcp` run the following
@@ -142,7 +142,7 @@ commands:
 ```bash
 git clone https://github.com/mad-lab-fau/tpcp
 cd tpcp
-poetry install --all-extras
+uv sync --all-extras --group dev
 ```
 
 Afterward, you can start to develop and change things.
@@ -164,7 +164,7 @@ CONFIGURED TASKS
 by calling
 
 ```bash
-poetry run poe <command name>
-````
+uv run poe <command name>
+```
 
-If you installed `poethepoet` globally, you can skip the `poetry run` part at the beginning.
+If you installed `poethepoet` globally, you can skip the `uv run` part at the beginning.
