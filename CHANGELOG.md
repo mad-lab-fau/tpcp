@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed parameter annotation detection on Python 3.14 for `OptiPara` and other parameter marker types.
 - Fixed snapshot datetime sanitization to stay compatible with recent pandas behavior and Python 3.14 test runs.
+- Fixed test assertions around warning checks to be compatible with pytest 8.
 
 ### Changed
 
