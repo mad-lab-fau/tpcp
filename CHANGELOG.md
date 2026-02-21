@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2026-02-21
+
+### Fixed
+
+- Fixed parameter annotation detection on Python 3.14 for `OptiPara` and other parameter marker types.
+- Fixed snapshot datetime sanitization to stay compatible with recent pandas behavior and Python 3.14 test runs.
+
+### Changed
+
+- Migrated project tooling from Poetry to uv (locking, CI, docs build, publishing, and developer commands).
+- Added Python 3.14 to the CI test matrix.
+- Moved the package to `src/tpcp` and switched the build backend to `uv_build`.
+
 ## [2.1.0] - 2025-07-24
 
 ### Changed
