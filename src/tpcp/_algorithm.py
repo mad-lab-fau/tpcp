@@ -14,8 +14,15 @@ class Algorithm(BaseTpcpObject):
 
     All type-specific algorithm classes should inherit from this class and need to
 
-    1. overwrite `_action_method` with the name of the actual action method of this class type
+    1. overwrite `_action_methods` with the name of the actual action method of this class type
     2. implement a stub for the action method
+
+    Example
+    -------
+    >>> class MyAlgorithm(Algorithm):
+    ...     _action_methods = "detect"
+    ...     def detect(self, data):
+    ...         return self
 
     If you want to create an optimizable algorithm, add a `self_optimize` or (`self_optimize_with_info`) method to your
     class.

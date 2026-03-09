@@ -17,6 +17,7 @@ class Pipeline(Algorithm, Generic[DatasetT]):
     """Baseclass for all custom pipelines.
 
     To create your own custom pipeline, subclass this class and implement `run`.
+    The `run` method is expected to operate on exactly one dataset datapoint/group.
     """
 
     _action_methods: ClassVar[tuple[str, str]] = ("safe_run", "run")
@@ -30,6 +31,10 @@ class Pipeline(Algorithm, Generic[DatasetT]):
         .. note::
             It is usually preferred to use `safe_run` on custom pipelines instead of `run`, as `safe_run` can
             catch certain implementation errors of the run method.
+            However, neither `run` nor `safe_run` verify that `datapoint` actually represents only a single
+            datapoint/group.
+            Pipeline implementations should enforce this through dataset accessors and/or explicit
+            `assert_is_single(...)`/`assert_is_single_group(...)` checks.
 
         Parameters
         ----------
@@ -50,6 +55,7 @@ class Pipeline(Algorithm, Generic[DatasetT]):
 
         It is preferred to use this method over `run`, as it can catch some simple implementation errors of custom
         pipelines.
+        It does not validate that the provided dataset instance contains only a single datapoint/group.
 
         The following things are checked:
 
@@ -81,7 +87,7 @@ class OptimizablePipeline(Pipeline[DatasetT]):
 
     OptimizablePipelines are expected to implement a concrete way to train internal models or optimize parameters.
     This should not be a reimplementation of GridSearch or similar methods.
-    For this :class:`tpcp.pipelines.GridSearch` should be used directly.
+    For this :class:`tpcp.optimize.GridSearch` should be used directly.
 
     It is important that `self_optimize` only modifies input parameters of the pipeline that are marked as
     `OptimizableParameter`.
