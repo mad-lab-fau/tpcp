@@ -86,6 +86,8 @@ A couple of things you should keep in mind:
   Note that the `mock_labels` will really only be used for the CV splitter and not for the actual evaluation of the
   algorithm.
 
+If you use multiprocessing via `n_jobs`, also review :ref:`multiprocessing_caveats`.
+
 Custom Scoring
 --------------
 In tpcp we assume that your problem is likely complex enough to require a custom scoring function.
