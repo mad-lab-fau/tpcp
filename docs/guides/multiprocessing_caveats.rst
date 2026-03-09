@@ -1,6 +1,7 @@
+.. _multiprocessing_caveats:
+
 Multiprocessing Caveats
 =======================
-.. _multiprocessing_caveats:
 
 `tpcp` uses `joblib <https://joblib.readthedocs.io/>`_ for multiprocessing in validation and optimization helpers.
 This page is intended to be the durable documentation version of the multiprocessing notes that were previously tracked
@@ -43,7 +44,7 @@ For example, scikit-learn has its own workaround for some of its internal `Paral
 automatically apply to arbitrary user-defined multiprocessing or to tpcp-specific wrappers.
 
 tpcp workaround: ``tpcp.parallel``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 `tpcp` provides :mod:`tpcp.parallel` as a workaround for this class of problem.
 Its :func:`~tpcp.parallel.delayed` wrapper captures registered state in the parent process and restores it in workers.

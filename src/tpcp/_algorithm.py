@@ -17,8 +17,8 @@ class Algorithm(BaseTpcpObject):
     1. overwrite `_action_methods` with the name of the actual action method of this class type
     2. implement a stub for the action method
 
-    Example
-    -------
+    Examples
+    --------
     >>> class MyAlgorithm(Algorithm):
     ...     _action_methods = "detect"
     ...     def detect(self, data):
