@@ -1,6 +1,9 @@
 tpcp.parallel: Helper for global settings during parallel execution
 ===================================================================
 
+For practical caveats around joblib-based multiprocessing, worker state, serialization, and import costs, see
+:ref:`multiprocessing_caveats`.
+
 .. automodule:: tpcp.parallel
     :no-members:
     :no-inherited-members:

@@ -138,5 +138,7 @@ timings
 # `n_jobs` parameter in the :func:`~tpcp.validate.validate` to the number of parallel workers you want to use.
 # Furthermore, you can configure the verbosity level and the number of pre-dispatched batches using the `verbose` and
 # `pre_dispatch` parameter, respectively.
+# If parallel execution behaves strangely, have a look at the :ref:`multiprocessing caveats
+# <multiprocessing_caveats>` guide as well.
 # For more details, check the documentation of the utilized
 # `joblib.Parallel <https://joblib.readthedocs.io/en/latest/generated/joblib.Parallel.html>` class.

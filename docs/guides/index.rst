@@ -29,4 +29,4 @@ Other Information
     :maxdepth: 1
 
     sklearn_differences
-
+    multiprocessing_caveats
