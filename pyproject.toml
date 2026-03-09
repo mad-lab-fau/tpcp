@@ -29,6 +29,9 @@ attrs = ["attrs>=22.1.0"]
 Homepage = "https://github.com/mad-lab-fau/tpcp"
 Repository = "https://github.com/mad-lab-fau/tpcp"
 
+[project.scripts]
+tpcp = "tpcp._cli:main"
+
 [project.entry-points.pytest11]
 tpcp_snapshots = "tpcp.testing._regression_utils"
 
@@ -52,6 +55,9 @@ dev = [
 
 [tool.uv]
 default-groups = "all"
+
+[tool.uv.build-backend]
+data = { data = "skills" }
 
 [tool.uv.sources]
 torch = { index = "torch_cpu" }
