@@ -474,7 +474,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
 
     def create_group_labels(self, label_cols: Union[str, list[str]]) -> list[str]:
         warnings.warn(
-            "The method `create_string_group_labels` is deprecated and will be removed in a future version. "
+            "The method `create_group_labels` is deprecated and will be removed in a future version. "
             "Use `create_string_group_labels` instead.",
             DeprecationWarning,
             stacklevel=1,
