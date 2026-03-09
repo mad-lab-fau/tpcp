@@ -1,6 +1,6 @@
 [project]
 name = "tpcp"
-version = "2.1.2"
+version = "2.2.0"
 description = "Pipeline and Dataset helpers for complex algorithm evaluation."
 authors = [
     { name = "Arne Küderle", email = "arne.kuederle@fau.de" },

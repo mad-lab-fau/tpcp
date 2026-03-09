@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-03-09
+
+### Added
+
+- Added distributable tpcp agent skills under `skills/tpcp` together with the `tpcp install-skills` CLI command to
+  install them into a project's `.agent` folder.
+  (https://github.com/mad-lab-fau/tpcp/pull/126)
+- Added a dedicated multiprocessing caveats guide covering process-local state, worker reuse, serialization issues,
+  and practical debugging advice.
+  (https://github.com/mad-lab-fau/tpcp/pull/126)
+
+### Fixed
+
+- Fixed multiple API docs/docstrings around `Algorithm`, `Pipeline`, and `Dataset` behavior to better reflect the
+  actual tpcp interfaces and caveats.
+  (https://github.com/mad-lab-fau/tpcp/pull/126)
+
 ## [2.1.2] - 2026-02-21
 
 ### Fixed
