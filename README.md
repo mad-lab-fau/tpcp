@@ -22,6 +22,11 @@ Or add it to your project with [uv](https://docs.astral.sh/uv/):
 uv add tpcp
 ```
 
+If you want to install the bundled tpcp agent skills into the current project's `.agent` folder, run:
+```bash
+tpcp install-skills
+```
+
 ## Why?
 
 Evaluating Algorithms - in particular when they contain machine learning - is hard.
