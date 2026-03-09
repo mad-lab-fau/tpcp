@@ -21,6 +21,7 @@ class Algorithm(BaseTpcpObject):
     --------
     >>> class MyAlgorithm(Algorithm):
     ...     _action_methods = "detect"
+    ...
     ...     def detect(self, data):
     ...         return self
 
