@@ -4,6 +4,7 @@ This is inspired by github.com/syrusakbary/snapshottest.
 Note that it can not be used in combination with this module!
 """
 
+import difflib
 import re
 from pathlib import Path
 from typing import Optional, Union
@@ -15,6 +16,10 @@ from pandas.testing import assert_frame_equal
 
 
 class SnapshotNotFoundError(Exception):
+    pass
+
+
+class SnapshotAssertionError(AssertionError):
     pass
 
 
@@ -82,6 +87,15 @@ class PyTestSnapshotTest:
     def _file_name_txt(self):
         return self._snapshot_folder / f"{self._test_name}.txt"
 
+    def _snapshot_file(self, dtype):
+        if dtype is pd.DataFrame:
+            return self._file_name_json
+        if dtype is np.ndarray:
+            return self._file_name_csv
+        if dtype is str:
+            return self._file_name_txt
+        raise ValueError(f"The dtype {dtype} is not supported for snapshot testing")
+
     @property
     def _test_name(self):
         cls_name = getattr(self.request.node.cls, "__name__", "")
@@ -143,6 +157,50 @@ class PyTestSnapshotTest:
             return value
         raise ValueError(f"The dtype {dtype} is not supported for snapshot testing")
 
+    @staticmethod
+    def _format_string_difference(value: str, prev_snapshot: str) -> str:
+        diff = "".join(
+            difflib.unified_diff(
+                prev_snapshot.splitlines(keepends=True),
+                value.splitlines(keepends=True),
+                fromfile="stored",
+                tofile="current",
+            )
+        )
+        if diff:
+            return diff
+        return f"stored={prev_snapshot!r}\ncurrent={value!r}"
+
+    def _format_mismatch(self, dtype, value, prev_snapshot, error: Optional[AssertionError] = None) -> str:
+        if dtype is str:
+            details = self._format_string_difference(value, prev_snapshot)
+        else:
+            details = str(error) if error else "The snapshot content does not match the current value."
+
+        return (
+            f"Snapshot mismatch for '{self._test_name}'.\n"
+            f"Snapshot file: {self._snapshot_file(dtype)}\n\n"
+            f"{details}\n\n"
+            "Run pytest with --snapshot-update to accept the new snapshot."
+        )
+
+    def _compare(self, value, prev_snapshot, value_dtype, **kwargs):
+        __tracebackhide__ = True
+
+        if isinstance(value, pd.DataFrame):
+            # convert datetime columns to match with the stored format
+            value = self._sanitize_datetime_entries(value)
+            assert_frame_equal(value, prev_snapshot, **kwargs)
+            return
+        if isinstance(value, np.ndarray):
+            np.testing.assert_array_almost_equal(value, prev_snapshot, **kwargs)
+            return
+        if isinstance(value, str):
+            if value != prev_snapshot:
+                raise SnapshotAssertionError(self._format_mismatch(value_dtype, value, prev_snapshot))
+            return
+        raise TypeError(f"The dtype {value_dtype} is not supported for snapshot testing")
+
     def assert_match(self, value: Union[str, pd.DataFrame, np.ndarray], name: Optional[str] = None, **kwargs):
         """Assert that the value matches the snapshot.
 
@@ -171,6 +229,7 @@ class PyTestSnapshotTest:
             There they will be passed to `assert_frame_equal` and `assert_array_almost_equal` respectively.
 
         """
+        __tracebackhide__ = True
         self.curr_snapshot = name or str(self.curr_snapshot_number)
         if self._update:
             self._store(value)
@@ -189,21 +248,12 @@ class PyTestSnapshotTest:
             except:
                 raise
             else:
-                if isinstance(value, pd.DataFrame):
-                    # convert datetime columns to match with the stored format
-                    value = self._sanitize_datetime_entries(value)
-                    assert_frame_equal(value, prev_snapshot, **kwargs)
-                elif isinstance(value, np.ndarray):
-                    np.testing.assert_array_almost_equal(value, prev_snapshot, **kwargs)
-                elif isinstance(value, str):
-                    # Display the string diff line by line as part of error message using difflib
-                    import difflib
-
-                    diff = difflib.ndiff(value.splitlines(keepends=True), prev_snapshot.splitlines(keepends=True))
-                    diff = "".join(diff)
-                    assert value == prev_snapshot, diff
-                else:
-                    raise TypeError(f"The dtype {value_dtype} is not supported for snapshot testing")
+                try:
+                    self._compare(value, prev_snapshot, value_dtype, **kwargs)
+                except SnapshotAssertionError:
+                    raise
+                except AssertionError as e:
+                    raise SnapshotAssertionError(self._format_mismatch(value_dtype, value, prev_snapshot, e)) from None
 
         self.curr_snapshot_number += 1
 
