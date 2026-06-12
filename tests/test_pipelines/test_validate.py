@@ -112,6 +112,18 @@ class TestValidate:
         assert isinstance(scorer, Scorer)
         assert all(scorer.get_params()[arg] == val for arg, val in multiprocess_args.items())
 
+    @patch("tpcp.validate._validate._score", autospec=True)
+    def test_explicit_scorer_keeps_configured_multiprocessing_parameters(self, mock_score):
+        """Check if validate preserves multiprocessing arguments configured on an explicit scorer."""
+        multiprocess_args = {"n_jobs": 6, "verbose": 10, "pre_dispatch": 3, "progress_bar": False}
+        scorer = Scorer(dummy_single_score_func, **multiprocess_args)
+
+        validate(DummyPipeline(), DummyDataset(), scoring=scorer)
+
+        assert mock_score.call_args is not None  # _score function was called
+        used_scorer = mock_score.call_args.args[2]
+        assert {arg: used_scorer.get_params()[arg] for arg in multiprocess_args} == multiprocess_args
+
 
 class TestCrossValidate:
     @pytest.mark.filterwarnings("ignore::tpcp.exceptions.PotentialUserErrorWarning")
