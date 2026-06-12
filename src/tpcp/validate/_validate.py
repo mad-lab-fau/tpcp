@@ -195,25 +195,23 @@ def validate(
         True/False to enable/disable a `tqdm` progress bar.
     """
     scoring_args = {"n_jobs": n_jobs, "verbose": verbose, "pre_dispatch": pre_dispatch, "progress_bar": progress_bar}
-    # iterate over args that will be passed to Scorer
-    for arg, value in scoring_args.items():
-        # when a Scorer instance is provided, the respective arguments were already set
-        if isinstance(scoring, Scorer) and not isinstance(value, _Default):
-            raise ValueError(  # noqa: TRY004
+    if isinstance(scoring, Scorer):
+        for arg, value in scoring_args.items():
+            if isinstance(value, _Default):
+                continue
+            raise ValueError(
                 "You passed a explicit Scorer object for the scoring parameter. In this case, we expect "
                 f"multiprocessing parameters ({list(scoring_args.keys())}) to be configured directly on the "
                 f"Scorer instance. However, you specified {arg}={value} by passing it directly "
                 "to the validate function. Instead, pass multiprocessing parameters to your Scorer during "
                 "initialization or by using `set_params`."
             )
-
-        # extract the value from _Default instances
-        if isinstance(value, _Default):
-            scoring_args[arg] = value.get_value()
-
-    scoring = _validate_scorer(scoring)
-
-    scoring.set_params(**scoring_args)
+        scoring = _validate_scorer(scoring)
+    else:
+        scoring = _validate_scorer(scoring)
+        scoring.set_params(
+            **{arg: value.get_value() if isinstance(value, _Default) else value for arg, value in scoring_args.items()}
+        )
 
     results = _score(
         pipeline.clone(),
