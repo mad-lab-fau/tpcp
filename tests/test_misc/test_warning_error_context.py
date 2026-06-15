@@ -8,6 +8,12 @@ import pytest
 from tpcp.misc import warning_error_context
 
 
+class _CustomWarning(UserWarning):
+    def __init__(self, message, detail):
+        super().__init__(message)
+        self.detail = detail
+
+
 def _emit_warning():
     warnings.warn("low level warning", UserWarning, stacklevel=1)
 
@@ -74,3 +80,17 @@ def test_sibling_contexts_do_not_leak_into_each_other():
             _emit_warning()
 
     assert "first" not in str(warning[0].message)
+
+
+def test_warning_instances_keep_their_type_and_data():
+    """Context metadata does not replace warning instances with plain strings."""
+    with (
+        warning_error_context("datapoint", group="patient-1"),
+        pytest.warns(
+            _CustomWarning,
+            match=re.escape("[datapoint: group='patient-1'] custom warning"),
+        ) as warning,
+    ):
+        warnings.warn(_CustomWarning("custom warning", detail="kept"), stacklevel=1)
+
+    assert warning[0].message.detail == "kept"
