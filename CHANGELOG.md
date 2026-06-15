@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `validate` overwriting multiprocessing parameters configured on explicit `Scorer` instances.
+  (https://github.com/mad-lab-fau/tpcp/pull/129)
 - Improved snapshot test mismatch reporting to include the snapshot file path and detailed comparator output for
   DataFrame, NumPy array, and string snapshot failures.
 
