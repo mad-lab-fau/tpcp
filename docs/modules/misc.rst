@@ -27,4 +27,4 @@ Functions
     custom_hash
     classproperty
     set_defaults
-
+    warning_error_context

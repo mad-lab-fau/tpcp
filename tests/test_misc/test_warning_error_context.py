@@ -1,0 +1,52 @@
+"""Tests for warning and exception context metadata."""
+
+import re
+import warnings
+
+import pytest
+
+from tpcp.misc import warning_error_context
+
+
+def _emit_warning():
+    warnings.warn("low level warning", UserWarning, stacklevel=1)
+
+
+def test_nested_contexts_are_added_to_warnings():
+    """Nested contexts are rendered in emitted warning messages."""
+    with (
+        warning_error_context("datapoint", group="patient-1"),
+        warning_error_context("region", start=10, end=20),
+        pytest.warns(
+            UserWarning,
+            match=re.escape("[datapoint: group='patient-1' > region: start=10, end=20] low level warning"),
+        ),
+    ):
+        _emit_warning()
+
+
+def test_nested_contexts_are_added_to_exception_notes():
+    """Nested contexts are attached as exception notes without changing the exception."""
+    with (
+        pytest.raises(ValueError, match="failed") as error,
+        warning_error_context("datapoint", group="patient-1"),
+        warning_error_context("region", start=10, end=20),
+    ):
+        raise ValueError("failed")
+
+    assert error.value.args == ("failed",)
+    assert error.value.__notes__ == [
+        "Context: region: start=10, end=20",
+        "Context: datapoint: group='patient-1'",
+    ]
+
+
+def test_context_is_cleaned_up_after_exception():
+    """Contexts do not leak after an exception leaves the context manager."""
+    with pytest.raises(ValueError, match="failed"), warning_error_context("datapoint", group="patient-1"):
+        raise ValueError("failed")
+
+    with pytest.warns(UserWarning, match="low level warning") as warning:
+        _emit_warning()
+
+    assert str(warning[0].message) == "low level warning"
