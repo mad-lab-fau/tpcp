@@ -50,3 +50,27 @@ def test_context_is_cleaned_up_after_exception():
         _emit_warning()
 
     assert str(warning[0].message) == "low level warning"
+
+
+def test_sibling_contexts_do_not_leak_into_each_other():
+    """Sibling contexts under the same parent are pushed and popped independently."""
+    with warning_error_context("parent", item="recording-1"):
+        with (
+            warning_error_context("child", item="first"),
+            pytest.warns(
+                UserWarning,
+                match=re.escape("[parent: item='recording-1' > child: item='first'] low level warning"),
+            ),
+        ):
+            _emit_warning()
+
+        with (
+            warning_error_context("child", item="second"),
+            pytest.warns(
+                UserWarning,
+                match=re.escape("[parent: item='recording-1' > child: item='second'] low level warning"),
+            ) as warning,
+        ):
+            _emit_warning()
+
+    assert "first" not in str(warning[0].message)
