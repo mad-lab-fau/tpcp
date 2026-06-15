@@ -406,9 +406,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
                             return_parameters=True,
                             return_data_labels=True,
                             return_times=True,
-                            context=(
-                                ("parameter_candidate", {"index": candidate_index, "parameters": paras}),
-                            ),
+                            context=(("parameter_candidate", {"index": candidate_index, "parameters": paras}),),
                         )
                         for candidate_index, paras in enumerate(self.parameter_grid)
                     )
