@@ -160,6 +160,9 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
             The result object is a dataclass instance of the type defined in ``self.data_type``.
             All values of the result object are set to ``TypedIterator.NULL_VALUE`` by default.
 
+            Warnings emitted by the loop body include the active iteration context. Exceptions raised by the loop body
+            happen outside the generator boundary and can not be annotated here.
+
         """
         if not is_dataclass(self.data_type):
             raise TypeError(f"Expected a dataclass as data_type, got {self.data_type}")
