@@ -176,13 +176,83 @@ class TestScorer:
         scorer = Scorer(score_func)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
-        with pytest.raises(ScorerFailedError, match=re.escape("Scorer failed while scoring a datapoint.")) as e:
+        with pytest.raises(
+            ScorerFailedError,
+            match=re.escape("Scorer failed while scoring datapoint 0 (DummyDatasetGroupLabel(value=0))."),
+        ) as e:
             scorer(pipe, data)
 
         assert isinstance(e.value.__cause__, RuntimeError)
         assert e.value.__cause__.__notes__ == [
             "Context: datapoint: index=0, group_label=DummyDatasetGroupLabel(value=0)"
         ]
+
+    def test_group_label_error_is_wrapped_without_reading_the_label_again(self):
+        """A failing context value cannot mask the scorer's public wrapper error."""
+
+        class BrokenGroupLabelDataset(DummyDataset):
+            @property
+            def group_label(self):
+                raise RuntimeError("group label failed")
+
+        scorer = Scorer(lambda _pipeline, _data_point: 1)
+
+        with pytest.raises(
+            ScorerFailedError, match=re.escape("Scorer failed while scoring datapoint 0 (<unavailable>).")
+        ) as error:
+            scorer(DummyOptimizablePipeline(), BrokenGroupLabelDataset()[0])
+
+        assert isinstance(error.value.__cause__, RuntimeError)
+        assert str(error.value.__cause__) == "group label failed"
+
+    def test_unrenderable_group_label_cannot_mask_a_scoring_error(self):
+        """Wrapper diagnostics tolerate labels whose string conversion fails."""
+
+        class BrokenRenderLabel:
+            def __str__(self):
+                raise RuntimeError("label str failed")
+
+            def __repr__(self):
+                raise RuntimeError("label repr failed")
+
+        class BrokenRenderLabelDataset(DummyDataset):
+            @property
+            def group_label(self):
+                return BrokenRenderLabel()
+
+        def score_func(_pipeline, _data_point):
+            raise RuntimeError("score failed")
+
+        with pytest.raises(
+            ScorerFailedError,
+            match=re.escape("Scorer failed while scoring datapoint 0 (<unrenderable BrokenRenderLabel>)."),
+        ) as error:
+            Scorer(score_func)(DummyOptimizablePipeline(), BrokenRenderLabelDataset()[0])
+
+        assert isinstance(error.value.__cause__, RuntimeError)
+        assert str(error.value.__cause__) == "score failed"
+
+    def test_group_label_is_not_rendered_during_successful_scoring(self):
+        """Successful datapoints do not invoke diagnostic label rendering."""
+        render_calls = []
+
+        class LabelThatMustNotBeRendered:
+            def __str__(self):
+                render_calls.append("str")
+                return "label"
+
+        class UnrenderedLabelDataset(DummyDataset):
+            @property
+            def group_label(self):
+                return LabelThatMustNotBeRendered()
+
+        aggregated, raw = Scorer(lambda _pipeline, _data_point: 1)(
+            DummyOptimizablePipeline(), UnrenderedLabelDataset()[0]
+        )
+
+        assert aggregated == 1
+        assert raw == [1]
+        assert render_calls == []
 
     def test_score_func_warning_contains_datapoint_context(self):
         """Score-function warnings include the active datapoint context."""

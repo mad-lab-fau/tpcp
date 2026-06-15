@@ -408,13 +408,23 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
 
     def _score(self, pipeline: PipelineT, dataset: DatasetT):
         def per_datapoint(i, d):
+            group_label = None
+            group_label_available = False
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
-                with warning_error_context("datapoint", index=i, group_label=d.group_label):
+                group_label = d.group_label
+                group_label_available = True
+                with warning_error_context("datapoint", index=i, group_label=group_label):
                     score = self.score_func(pipeline.clone(), d)
             except Exception as e:
+                group_label_display = "<unavailable>"
+                if group_label_available:
+                    try:
+                        group_label_display = str(group_label)
+                    except BaseException:  # noqa: BLE001 - diagnostics must not replace the scoring error
+                        group_label_display = f"<unrenderable {type(group_label).__name__}>"
                 raise ScorerFailedError(
-                    "Scorer failed while scoring a datapoint. "
+                    f"Scorer failed while scoring datapoint {i} ({group_label_display}). "
                     "Handle expected error cases inside the scoring function."
                 ) from e
             return i, score
