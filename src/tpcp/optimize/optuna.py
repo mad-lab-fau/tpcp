@@ -26,6 +26,7 @@ from tpcp import OptimizablePipeline, clone
 from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
 from tpcp._pipeline import PipelineT
+from tpcp.misc import warning_error_context
 from tpcp.optimize import Optimize
 from tpcp.parallel import delayed
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
@@ -286,7 +287,8 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
 
         def objective(trial: Trial):
             inner_pipe = clone(pipeline)
-            return inner_objective(trial, inner_pipe, dataset)
+            with warning_error_context("optuna_trial", number=trial.number, params=trial.params):
+                return inner_objective(trial, inner_pipe, dataset)
 
         return objective
 

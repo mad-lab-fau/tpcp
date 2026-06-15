@@ -355,10 +355,12 @@ class TestGridSearch:
             CustomErrorPipeline(error_para=error_para), ParameterGrid({"para": [1, 2]}), scoring=simple_scorer
         )
 
-        with pytest.raises(TestError) as e:
+        with pytest.raises(TestError, match="Testing failed") as e:
             gs.optimize(DummyDataset())
 
-        assert f"This error occurred for the following parameter:\n\n{{'para': {error_para}}}" in str(e.value)
+        assert e.value.__notes__ == [
+            f"Context: parameter_candidate: index={error_para - 1}, parameters={{'para': {error_para}}}"
+        ]
 
 
 class TestGridSearchCV:
@@ -705,10 +707,14 @@ class TestGridSearchCV:
             scoring=simple_scorer,
         )
 
-        with pytest.raises(OptimizationError) as e:
+        with pytest.raises(OptimizationError, match="Optimization failed") as e:
             gs.optimize(DummyDataset())
 
-        assert f"This error occurred in fold {error_fold} with parameters candidate {error_para - 1}." in str(e.value)
+        assert e.value.__notes__ == [
+            f"Context: cv_fold: index={error_fold}",
+            f"Context: parameter_candidate: index={error_para - 1}, parameters={{'para': {error_para}}}",
+        ]
+        assert e.value.__cause__.__notes__[0].startswith("Context: optimize:")
 
 
 class TestOptimize:
