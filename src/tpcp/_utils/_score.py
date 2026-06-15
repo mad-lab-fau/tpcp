@@ -18,7 +18,7 @@ from tpcp._base import clone
 from tpcp._hash import custom_hash
 from tpcp._utils._general import _get_nested_paras
 from tpcp.exceptions import OptimizationError, TestError
-from tpcp.misc import warning_error_context
+from tpcp.misc._warning_error_context import _render_contexts, warning_error_context
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -63,6 +63,15 @@ def _contextualize(context: Optional[Sequence[tuple[str, dict[str, Any]]]]) -> E
     for name, metadata in context or ():
         stack.enter_context(warning_error_context(name, **metadata))
     return stack
+
+
+def _contextualized_error_message(
+    message: str,
+    context: Optional[Sequence[tuple[str, dict[str, Any]]]],
+    phase: str,
+    **phase_metadata: Any,
+) -> str:
+    return f"{message}\nContext: {_render_contexts([*(context or ()), (phase, phase_metadata)])}"
 
 
 def _score(
@@ -122,7 +131,9 @@ def _score(
                 agg_scores, single_scores = scorer(pipeline, dataset)
             score_time = time.time() - start_time
         except Exception as e:
-            raise TestError("Testing failed.") from e
+            raise TestError(
+                _contextualized_error_message("Testing failed.", context, "score", data_labels=dataset.group_labels)
+            ) from e
 
     result: _ScoreResults = {
         "scores": agg_scores,
@@ -196,7 +207,11 @@ def _optimize_and_score(
                 )
             optimize_time = time.time() - start_time
         except Exception as e:
-            raise OptimizationError("Optimization failed.") from e
+            raise OptimizationError(
+                _contextualized_error_message(
+                    "Optimization failed.", context, "optimize", data_labels=train_set.group_labels
+                )
+            ) from e
 
         # Now we set the remaining paras.
         # Because, we need to set the parameters on the optimized pipeline and not the input pipeline we strip the
@@ -212,7 +227,11 @@ def _optimize_and_score(
                 agg_scores, single_scores = scorer(optimizer.optimized_pipeline_, test_set)
             score_time = time.time() - optimize_time - start_time
         except Exception as e:
-            raise TestError("Testing failed.") from e
+            raise TestError(
+                _contextualized_error_message(
+                    "Testing failed.", context, "test_score", data_labels=test_set.group_labels
+                )
+            ) from e
 
         result: _OptimizeScoreResults = {
             "test__scores": agg_scores,
@@ -223,7 +242,11 @@ def _optimize_and_score(
                 with warning_error_context("train_score", data_labels=train_set.group_labels):
                     train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set)
             except Exception as e:
-                raise TestError("Testing failed.") from e
+                raise TestError(
+                    _contextualized_error_message(
+                        "Testing failed.", context, "train_score", data_labels=train_set.group_labels
+                    )
+                ) from e
             result["train__scores"] = train_agg_scores
             result["train__single__scores"] = train_single_scores
         if return_times:

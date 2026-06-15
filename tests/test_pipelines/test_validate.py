@@ -249,6 +249,7 @@ class TestCrossValidate:
                 cv=5,
             )
 
+        assert f"Context: cv_fold: index={error_fold} > optimize:" in str(e.value)
         assert e.value.__notes__ == [f"Context: cv_fold: index={error_fold}"]
 
     @pytest.mark.parametrize("error_fold", [0, 2])
@@ -265,6 +266,7 @@ class TestCrossValidate:
                 cv=5,
             )
 
+        assert f"Context: cv_fold: index={error_fold} > test_score:" in str(e.value)
         assert e.value.__notes__ == [f"Context: cv_fold: index={error_fold}"]
         assert e.value.__cause__.__notes__[0].startswith("Context: test_score:")
         assert e.value.__cause__.__cause__.__notes__ == [
@@ -293,9 +295,11 @@ class TestCrossValidate:
             )
 
         if return_train_score:
+            assert "Context: cv_fold: index=0 > train_score:" in str(e.value)
             assert e.value.__notes__ == ["Context: cv_fold: index=0"]
             assert e.value.__cause__.__notes__[0].startswith("Context: train_score:")
         else:
+            assert "Context: cv_fold: index=1 > test_score:" in str(e.value)
             assert e.value.__notes__ == ["Context: cv_fold: index=1"]
             assert e.value.__cause__.__notes__[0].startswith("Context: test_score:")
 
