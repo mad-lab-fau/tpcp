@@ -46,7 +46,7 @@ def _warn_with_context(
 ) -> None:
     context = _render_context_stack()
     if not context:
-        _warn(message, category=category, stacklevel=stacklevel, source=source, **kwargs)
+        _warn(message, category=category, stacklevel=stacklevel + 1, source=source, **kwargs)
         return
 
     if isinstance(message, Warning):

@@ -241,7 +241,7 @@ class TestCrossValidate:
 
     @pytest.mark.parametrize("error_fold", [0, 2])
     def test_cross_validate_opti_error(self, error_fold):
-        with pytest.raises(OptimizationError) as e:
+        with pytest.raises(OptimizationError, match="Optimization failed") as e:
             cross_validate(
                 Optimize(CustomOptimizablePipelineWithOptiError(error_fold=error_fold)),
                 DummyDataset(),
@@ -249,7 +249,7 @@ class TestCrossValidate:
                 cv=5,
             )
 
-        assert f"This error occurred in fold {error_fold}" in str(e.value)
+        assert e.value.__notes__ == [f"Context: cv_fold: index={error_fold}"]
 
     @pytest.mark.parametrize("error_fold", [0, 2])
     def test_cross_validate_test_error(self, error_fold):
@@ -257,7 +257,7 @@ class TestCrossValidate:
             pipeline.run(data_point)
             return data_point.group_labels[0]
 
-        with pytest.raises(TestError) as e:
+        with pytest.raises(TestError, match="Testing failed") as e:
             cross_validate(
                 DummyOptimize(CustomOptimizablePipelineWithRunError(error_fold=error_fold)),
                 DummyDataset(),
@@ -265,7 +265,11 @@ class TestCrossValidate:
                 cv=5,
             )
 
-        assert f"This error occurred in fold {error_fold}" in str(e.value)
+        assert e.value.__notes__ == [f"Context: cv_fold: index={error_fold}"]
+        assert e.value.__cause__.__notes__[0].startswith("Context: test_score:")
+        assert e.value.__cause__.__cause__.__notes__ == [
+            f"Context: datapoint: index=0, group_label=DummyDatasetGroupLabel(value={error_fold})"
+        ]
 
     @pytest.mark.parametrize("return_train_score", [True, False])
     def test_cross_validate_train_error(self, return_train_score):
@@ -278,7 +282,7 @@ class TestCrossValidate:
             pipeline.run(data_point)
             return data_point.group_labels[0]
 
-        with pytest.raises(TestError) as e:
+        with pytest.raises(TestError, match="Testing failed") as e:
             cross_validate(
                 # We need to select any fold other than 0 as error fold to get the error triggered during training
                 DummyOptimize(CustomOptimizablePipelineWithRunError(error_fold=1)),
@@ -289,11 +293,11 @@ class TestCrossValidate:
             )
 
         if return_train_score:
-            assert "This error occurred in fold 0" in str(e.value)
-            assert "train-set" in str(e.value)
+            assert e.value.__notes__ == ["Context: cv_fold: index=0"]
+            assert e.value.__cause__.__notes__[0].startswith("Context: train_score:")
         else:
-            assert "This error occurred in fold 1" in str(e.value)
-            assert "test-set" in str(e.value)
+            assert e.value.__notes__ == ["Context: cv_fold: index=1"]
+            assert e.value.__cause__.__notes__[0].startswith("Context: test_score:")
 
     def test_cross_validate_optimizer_are_cloned(self):
         results = cross_validate(

@@ -1,4 +1,6 @@
+import re
 import tempfile
+import warnings
 from collections.abc import Sequence
 from typing import Callable, Optional, Union
 from unittest.mock import Mock, patch
@@ -143,6 +145,26 @@ class TestCustomOptunaOptimize:
         assert mock_objective.call_args[0][1] is not pipe
 
         assert isinstance(mock_objective.call_args[0][0], Trial)
+
+    def test_objective_warning_contains_trial_context(self):
+        def objective(_trial, _pipeline, _dataset):
+            warnings.warn("objective warning", UserWarning, stacklevel=1)
+            return 3
+
+        with pytest.warns(
+            UserWarning,
+            match=re.escape("[optuna_trial: number=0, params={}] objective warning"),
+        ):
+            DummyOptunaOptimizer(
+                DummyOptimizablePipeline(),
+                _get_study_params,
+                scoring=dummy_single_score_func,
+                create_search_space=dummy_search_space,
+                n_trials=1,
+                timeout=None,
+                mock_objective=objective,
+                return_optimized=False,
+            ).optimize(DummyDataset())
 
     @pytest.mark.parametrize("return_optimize", [True, False])
     def test_return_optimized(self, return_optimize):

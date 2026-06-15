@@ -1,5 +1,6 @@
 """Tests for warning and exception context metadata."""
 
+import inspect
 import re
 import warnings
 
@@ -16,6 +17,12 @@ class _CustomWarning(UserWarning):
 
 def _emit_warning():
     warnings.warn("low level warning", UserWarning, stacklevel=1)
+
+
+def _emit_warning_with_line():
+    lineno = inspect.currentframe().f_lineno + 1
+    warnings.warn("location warning", UserWarning, stacklevel=1)
+    return lineno
 
 
 def test_nested_contexts_are_added_to_warnings():
@@ -94,3 +101,12 @@ def test_warning_instances_keep_their_type_and_data():
         warnings.warn(_CustomWarning("custom warning", detail="kept"), stacklevel=1)
 
     assert warning[0].message.detail == "kept"
+
+
+def test_warning_location_is_preserved_without_context():
+    """The global warning wrapper does not change locations for unrelated warnings."""
+    with pytest.warns(UserWarning, match="location warning") as warning:
+        lineno = _emit_warning_with_line()
+
+    assert warning[0].filename == __file__
+    assert warning[0].lineno == lineno
