@@ -16,6 +16,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (https://github.com/mad-lab-fau/tpcp/pull/137)
 - Added an advanced recipe showing how to expose predefined parameters and pretrained models for algorithms.
   (https://github.com/mad-lab-fau/tpcp/pull/133)
+- Added `tpcp.misc.warning_error_context`, a stackable context manager for enriching warnings and exceptions with
+  structured context metadata.
+  This is now used by validation, cross-validation, grid search, scorer datapoint loops, typed iterator warning
+  contexts, and Optuna trial evaluation to make failures and warnings identify the active fold, parameter candidate,
+  datapoint, trial, or iterator item.
+  (https://github.com/mad-lab-fau/tpcp/pull/131)
+
+### Changed
+
+- **Breaking:** Error and warning text from `validate`, `cross_validate`, `GridSearch`, `GridSearchCV`, `Scorer`,
+  `TypedIterator`, and Optuna optimization now includes structured context metadata instead of the previous ad-hoc
+  error strings.
+  Code or tests that match exact warning or exception messages need to be updated.
+  (https://github.com/mad-lab-fau/tpcp/pull/131)
+- **Breaking:** The private `_score` and `_optimize_and_score` helpers no longer accept `error_info`; callers must pass
+  structured context entries instead.
+  (https://github.com/mad-lab-fau/tpcp/pull/131)
 
 ## [2.2.1] - 2026-06-15
 
