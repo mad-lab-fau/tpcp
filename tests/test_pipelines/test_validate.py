@@ -47,6 +47,12 @@ class CustomOptimizablePipelineWithRunError(OptimizablePipeline):
         return self
 
 
+class BrokenGroupLabelsDataset(DummyDataset):
+    @property
+    def group_labels(self):
+        raise RuntimeError("group labels failed")
+
+
 class TestValidate:
     @pytest.mark.parametrize(
         "kwargs",
@@ -79,6 +85,13 @@ class TestValidate:
         all_ids = np.array(ds.group_labels).flatten()
         assert all(np.array(result_row["data_labels"]).flatten() == np.array(result_row["single__score"]))
         assert result_row["agg__score"] == np.mean(all_ids)
+
+    def test_validate_wraps_group_label_context_error(self):
+        with pytest.raises(TestError, match="Testing failed") as e:
+            validate(DummyPipeline(), BrokenGroupLabelsDataset(), scoring=dummy_single_score_func)
+
+        assert str(e.value) == "Testing failed.\nContext: score"
+        assert isinstance(e.value.__cause__, RuntimeError)
 
     @pytest.mark.parametrize(
         "multiprocess_args",
