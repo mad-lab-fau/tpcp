@@ -72,7 +72,7 @@ def _add_note(exc: BaseException, note: str) -> None:
 
     notes = getattr(exc, "__notes__", [])
     notes.append(note)
-    exc.__notes__ = notes
+    setattr(exc, "__notes__", notes)
 
 
 @contextmanager
