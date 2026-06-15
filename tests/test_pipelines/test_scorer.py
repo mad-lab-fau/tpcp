@@ -176,7 +176,10 @@ class TestScorer:
         scorer = Scorer(score_func)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
-        with pytest.raises(ScorerFailedError, match=re.escape("Scorer failed while scoring a datapoint.")) as e:
+        with pytest.raises(
+            ScorerFailedError,
+            match=re.escape("Scorer failed while scoring datapoint 0 (DummyDatasetGroupLabel(value=0))."),
+        ) as e:
             scorer(pipe, data)
 
         assert isinstance(e.value.__cause__, RuntimeError)
