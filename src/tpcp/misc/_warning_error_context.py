@@ -30,22 +30,31 @@ def _render_context_stack() -> str:
     return " > ".join(frame.render() for frame in _context_stack.get())
 
 
+def _warning_with_context(message: Warning, context: str) -> Warning:
+    contextualized_warning = type(message).__new__(type(message))
+    contextualized_warning.__dict__.update(getattr(message, "__dict__", {}))
+    contextualized_warning.args = (f"[{context}] {message}", *message.args[1:])
+    return contextualized_warning
+
+
 def _warn_with_context(
     message: Union[Warning, str],
     category: Optional[type[Warning]] = None,
     stacklevel: int = 1,
     source: Any = None,
+    **kwargs: Any,
 ) -> None:
     context = _render_context_stack()
     if not context:
-        _warn(message, category=category, stacklevel=stacklevel, source=source)
+        _warn(message, category=category, stacklevel=stacklevel, source=source, **kwargs)
         return
 
     if isinstance(message, Warning):
-        category = category or type(message)
-        message = str(message)
+        message_with_context = _warning_with_context(message, context)
+    else:
+        message_with_context = f"[{context}] {message}"
 
-    _warn(f"[{context}] {message}", category=category, stacklevel=stacklevel + 1, source=source)
+    _warn(message_with_context, category=category, stacklevel=stacklevel + 1, source=source, **kwargs)
 
 
 warnings.warn = _warn_with_context
