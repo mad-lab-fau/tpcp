@@ -358,6 +358,10 @@ class TestGridSearch:
         with pytest.raises(TestError, match="Testing failed") as e:
             gs.optimize(DummyDataset())
 
+        assert (
+            f"Context: parameter_candidate: index={error_para - 1}, parameters={{'para': {error_para}}} > score:"
+            in str(e.value)
+        )
         assert e.value.__notes__ == [
             f"Context: parameter_candidate: index={error_para - 1}, parameters={{'para': {error_para}}}"
         ]
@@ -736,6 +740,10 @@ class TestGridSearchCV:
         with pytest.raises(OptimizationError, match="Optimization failed") as e:
             gs.optimize(DummyDataset())
 
+        assert (
+            f"Context: parameter_candidate: index={error_para - 1}, parameters={{'para': {error_para}}} "
+            f"> cv_fold: index={error_fold} > optimize:" in str(e.value)
+        )
         assert e.value.__notes__ == [
             f"Context: cv_fold: index={error_fold}",
             f"Context: parameter_candidate: index={error_para - 1}, parameters={{'para': {error_para}}}",

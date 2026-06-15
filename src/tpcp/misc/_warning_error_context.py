@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Generator, Sequence
 
 
 @dataclass(frozen=True)
@@ -28,6 +28,10 @@ _warn = warnings.warn
 
 def _render_context_stack() -> str:
     return " > ".join(frame.render() for frame in _context_stack.get())
+
+
+def _render_contexts(contexts: Sequence[tuple[str, dict[str, Any]]]) -> str:
+    return " > ".join(_ContextFrame(name=name, metadata=metadata).render() for name, metadata in contexts)
 
 
 def _warning_with_context(message: Warning, context: str) -> Warning:
