@@ -125,15 +125,15 @@ def _score(
 
             pipeline = pipeline.set_params(**parameters)
 
+        score_context: dict[str, Any] = {}
         try:
             start_time = time.time()
-            with warning_error_context("score", data_labels=dataset.group_labels):
+            score_context = {"data_labels": dataset.group_labels}
+            with warning_error_context("score", **score_context):
                 agg_scores, single_scores = scorer(pipeline, dataset)
             score_time = time.time() - start_time
         except Exception as e:
-            raise TestError(
-                _contextualized_error_message("Testing failed.", context, "score", data_labels=dataset.group_labels)
-            ) from e
+            raise TestError(_contextualized_error_message("Testing failed.", context, "score", **score_context)) from e
 
     result: _ScoreResults = {
         "scores": agg_scores,
@@ -199,18 +199,18 @@ def _optimize_and_score(
 
         optimize_params_clean: dict = optimize_params or {}
 
+        optimize_context: dict[str, Any] = {}
         try:
             start_time = time.time()
-            with warning_error_context("optimize", data_labels=train_set.group_labels):
+            optimize_context = {"data_labels": train_set.group_labels}
+            with warning_error_context("optimize", **optimize_context):
                 optimizer = _cached_optimize(
                     optimizer, train_set, hyperparameters, pure_parameters, memory, optimize_params_clean
                 )
             optimize_time = time.time() - start_time
         except Exception as e:
             raise OptimizationError(
-                _contextualized_error_message(
-                    "Optimization failed.", context, "optimize", data_labels=train_set.group_labels
-                )
+                _contextualized_error_message("Optimization failed.", context, "optimize", **optimize_context)
             ) from e
 
         # Now we set the remaining paras.
@@ -222,15 +222,15 @@ def _optimize_and_score(
         # beginning.
         optimizer = optimizer.set_params(**pure_parameters)
 
+        test_score_context: dict[str, Any] = {}
         try:
-            with warning_error_context("test_score", data_labels=test_set.group_labels):
+            test_score_context = {"data_labels": test_set.group_labels}
+            with warning_error_context("test_score", **test_score_context):
                 agg_scores, single_scores = scorer(optimizer.optimized_pipeline_, test_set)
             score_time = time.time() - optimize_time - start_time
         except Exception as e:
             raise TestError(
-                _contextualized_error_message(
-                    "Testing failed.", context, "test_score", data_labels=test_set.group_labels
-                )
+                _contextualized_error_message("Testing failed.", context, "test_score", **test_score_context)
             ) from e
 
         result: _OptimizeScoreResults = {
@@ -238,14 +238,14 @@ def _optimize_and_score(
             "test__single__scores": single_scores,
         }
         if return_train_score:
+            train_score_context: dict[str, Any] = {}
             try:
-                with warning_error_context("train_score", data_labels=train_set.group_labels):
+                train_score_context = {"data_labels": train_set.group_labels}
+                with warning_error_context("train_score", **train_score_context):
                     train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set)
             except Exception as e:
                 raise TestError(
-                    _contextualized_error_message(
-                        "Testing failed.", context, "train_score", data_labels=train_set.group_labels
-                    )
+                    _contextualized_error_message("Testing failed.", context, "train_score", **train_score_context)
                 ) from e
             result["train__scores"] = train_agg_scores
             result["train__single__scores"] = train_single_scores
