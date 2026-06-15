@@ -414,7 +414,7 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
                     score = self.score_func(pipeline.clone(), d)
             except Exception as e:
                 raise ScorerFailedError(
-                    "Scorer failed while scoring a datapoint. "
+                    f"Scorer failed while scoring datapoint {i} ({d.group_label}). "
                     "Handle expected error cases inside the scoring function."
                 ) from e
             return i, score
