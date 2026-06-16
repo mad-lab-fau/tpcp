@@ -184,3 +184,11 @@ def test_typed_iterator_example():
 
     assert len(custom_iterator.results_.n_samples) == 2
     assert len(custom_iterator.raw_results_) == 2
+
+
+def test_pretrained_models_example():
+    # Dummy test to make sure that the example is executed as part of the test
+    # suite. This does not test any specific functionality.
+    from examples.recipies._06_pretrained_models import algo_with_clean_lab_model
+
+    assert algo_with_clean_lab_model.model == "model_clean_lab_data"
