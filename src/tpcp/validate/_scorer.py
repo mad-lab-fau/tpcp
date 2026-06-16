@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import traceback
 from collections import defaultdict
 from functools import partial
 from typing import (
@@ -28,6 +27,7 @@ from tpcp._hash import custom_hash
 from tpcp._pipeline import PipelineT
 from tpcp._utils._general import _passthrough
 from tpcp.exceptions import ScorerFailedError, ValidationError
+from tpcp.misc import warning_error_context
 from tpcp.parallel import delayed
 
 if TYPE_CHECKING:
@@ -410,15 +410,12 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
         def per_datapoint(i, d):
             try:
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
-                score = self.score_func(pipeline.clone(), d)
+                with warning_error_context("datapoint", index=i, group_label=d.group_label):
+                    score = self.score_func(pipeline.clone(), d)
             except Exception as e:
                 raise ScorerFailedError(
-                    f"Scorer raised an exception while scoring data point {i} ({d.group_label}). "
-                    "Tpcp does not support that (compared to sklearn) and you need to handle error cases yourself "
-                    "within the scoring function."
-                    "\n\n"
-                    "The original exception was:\n\n"
-                    f"{traceback.format_exc()}"
+                    f"Scorer failed while scoring datapoint {i} ({d.group_label}). "
+                    "Handle expected error cases inside the scoring function."
                 ) from e
             return i, score
 

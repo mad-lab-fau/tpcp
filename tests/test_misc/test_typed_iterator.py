@@ -1,3 +1,5 @@
+import re
+import warnings
 from dataclasses import fields, make_dataclass
 
 import pytest
@@ -79,6 +81,21 @@ def test_warning_incomplete_iterate():
         partial_results = iterator.results_.result_1
 
     assert partial_results == [TypedIterator.NULL_VALUE]
+
+
+def test_iterator_body_warning_contains_iteration_context():
+    rt = make_dataclass("ResultType", ["result"])
+    iterator = TypedIterator(rt)
+
+    with pytest.warns(
+        UserWarning,
+        match=re.escape(
+            "[typed_iterator_iteration: iteration_name='__main__', input=1, iteration_context={}] iteration warning"
+        ),
+    ):
+        for _, result in iterator.iterate([1]):
+            warnings.warn("iteration warning", UserWarning, stacklevel=1)
+            result.result = 1
 
 
 def test_additional_aggregations():

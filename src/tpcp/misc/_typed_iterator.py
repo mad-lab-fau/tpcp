@@ -6,6 +6,7 @@ from typing import Any, Callable, Generic, Optional, TypeVar
 from typing_extensions import NamedTuple, TypeAlias
 
 from tpcp import Algorithm, cf
+from tpcp.misc._warning_error_context import warning_error_context
 
 DataclassT = TypeVar("DataclassT")
 InputTypeT = TypeVar("InputTypeT")
@@ -159,6 +160,9 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
             The result object is a dataclass instance of the type defined in ``self.data_type``.
             All values of the result object are set to ``TypedIterator.NULL_VALUE`` by default.
 
+            Warnings emitted by the loop body include the active iteration context. Exceptions raised by the loop body
+            happen outside the generator boundary and can not be annotated here.
+
         """
         if not is_dataclass(self.data_type):
             raise TypeError(f"Expected a dataclass as data_type, got {self.data_type}")
@@ -175,9 +179,16 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
         self.done_[iteration_name] = False
         for d in iterable:
             result_object = self._get_new_empty_object()
-            result_tuple = TypedIteratorResultTuple(iteration_name, d, result_object, iteration_context or {})
+            iteration_context = iteration_context or {}
+            result_tuple = TypedIteratorResultTuple(iteration_name, d, result_object, iteration_context)
             self._report_new_result(result_tuple)
-            yield d, result_object
+            with warning_error_context(
+                "typed_iterator_iteration",
+                iteration_name=iteration_name,
+                input=d,
+                iteration_context=iteration_context,
+            ):
+                yield d, result_object
         self.done_[iteration_name] = True
 
     def _get_new_empty_object(self) -> DataclassT:

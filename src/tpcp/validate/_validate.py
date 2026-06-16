@@ -140,7 +140,7 @@ def cross_validate(
                         return_times=True,
                         return_data_labels=True,
                         return_optimizer=return_optimizer,
-                        error_info=f"This error occurred in fold {i}.",
+                        context=(("cv_fold", {"index": i}),),
                     )
                     for i, (train, test) in enumerate(splits)
                 )

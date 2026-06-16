@@ -1,3 +1,5 @@
+import re
+import warnings
 from collections.abc import Sequence
 from itertools import cycle
 from unittest import mock
@@ -166,16 +168,40 @@ class TestScorer:
         assert "are: ('val1', 'val2')" in str(e)
 
     def test_score_func_raises_exception(self):
-        def score_func(x, y):
-            raise Exception("test")
+        """Score-function exceptions keep datapoint context on the original error."""
+
+        def score_func(_pipeline, _data_point):
+            raise RuntimeError("test")
 
         scorer = Scorer(score_func)
         pipe = DummyOptimizablePipeline()
         data = DummyDataset()
-        with pytest.raises(ScorerFailedError) as e:
+        with pytest.raises(
+            ScorerFailedError,
+            match=re.escape("Scorer failed while scoring datapoint 0 (DummyDatasetGroupLabel(value=0))."),
+        ) as e:
             scorer(pipe, data)
 
-        assert 'Exception("test")' in str(e)
+        assert isinstance(e.value.__cause__, RuntimeError)
+        assert e.value.__cause__.__notes__ == [
+            "Context: datapoint: index=0, group_label=DummyDatasetGroupLabel(value=0)"
+        ]
+
+    def test_score_func_warning_contains_datapoint_context(self):
+        """Score-function warnings include the active datapoint context."""
+
+        def score_func(_pipeline, _data_point):
+            warnings.warn("scorer warning", UserWarning, stacklevel=1)
+            return 1
+
+        scorer = Scorer(score_func)
+        pipe = DummyOptimizablePipeline()
+
+        with pytest.warns(
+            UserWarning,
+            match=re.escape("[datapoint: index=0, group_label=DummyDatasetGroupLabel(value=0)] scorer warning"),
+        ):
+            scorer(pipe, DummyDataset()[0])
 
 
 def _dummy_func(x):
