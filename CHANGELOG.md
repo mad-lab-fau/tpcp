@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added an advanced recipe showing how to expose predefined parameters and pretrained models for algorithms.
+  (https://github.com/mad-lab-fau/tpcp/pull/133)
+
 ## [2.2.1] - 2026-06-15
 
 ### Fixed
