@@ -190,6 +190,7 @@ sphinx_gallery_conf = {
             "../examples/validation",
             "../examples/integrations",
             "../examples/recipies",
+            "../examples/dev_guides",
         ]
     ),
     "within_subsection_order": FileNameSortKey,
