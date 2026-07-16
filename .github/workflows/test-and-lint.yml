@@ -6,32 +6,88 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  test_and_lint:
+  test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.14"]
+        include:
+        - python-version: "3.9"
+          all-extras: true
+          coverage: false
+        - python-version: "3.10"
+          all-extras: false
+          coverage: false
+        - python-version: "3.11"
+          all-extras: true
+          coverage: true
+        - python-version: "3.12"
+          all-extras: false
+          coverage: false
+        - python-version: "3.13"
+          all-extras: false
+          coverage: false
+        - python-version: "3.14"
+          all-extras: true
+          coverage: false
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
     - name: Install uv and python
-      uses: astral-sh/setup-uv@v5
+      uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
       with:
         enable-cache: true
-        cache-dependency-glob: "uv.lock"
+        cache-dependency-glob: uv.lock
         python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: uv sync --locked --all-extras --group dev
-    - name: Testing
-      run: |
-        uv run poe test
-    - name: Linting
-      if: ${{ matrix.python-version == '3.11' }}
-      run: |
-        uv run poe ci_check
-    - name: "Upload coverage to Codecov"
-      if: ${{ matrix.python-version == '3.11' }}
-      uses: codecov/codecov-action@v3
+    - name: Install test dependencies
+      if: matrix.all-extras == false
+      run: uv sync --locked --no-default-groups --group test
+    - name: Install test dependencies with optional integrations
+      if: matrix.all-extras == true && matrix.coverage == false
+      run: uv sync --locked --no-default-groups --group test --all-extras
+    - name: Install test and coverage dependencies
+      if: matrix.coverage == true
+      run: uv sync --locked --no-default-groups --group test --group coverage --all-extras
+    - name: Test without coverage
+      if: matrix.coverage == false
+      run: uv run --no-sync pytest tests -n 2 --dist=worksteal
+    - name: Test with coverage
+      if: matrix.coverage == true
+      run: uv run --no-sync pytest tests -n 2 --dist=worksteal --cov=tpcp --cov-report=xml
+    - name: Upload coverage to Codecov
+      if: matrix.coverage == true
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./coverage.xml
+        disable_search: true
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
+    - name: Install uv and python
+      uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      with:
+        enable-cache: true
+        cache-dependency-glob: uv.lock
+        python-version: "3.11"
+    - name: Install lint dependencies
+      run: uv sync --locked --no-default-groups --no-install-project --group lint
+    - name: Lint
+      run: uv run --no-sync ruff check src/tpcp --output-format=github
+    - name: Check formatting
+      run: uv run --no-sync ruff format . --check
