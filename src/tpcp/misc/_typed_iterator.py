@@ -199,7 +199,7 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
     def warning_error_context(
         self,
         name: str,
-        context: dict[str, Any],
+        context: Optional[dict[str, Any]] = None,
         /,
         *,
         context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
@@ -212,6 +212,7 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
         from the iterator or its current item. Enter the returned context manager
         inside the iteration body and pass all other relevant context explicitly.
         """
+        context = {} if context is None else context
         if "i" in context:
             raise ValueError("The context key 'i' is reserved by TypedIterator.")
         try:

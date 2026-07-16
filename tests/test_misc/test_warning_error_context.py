@@ -106,13 +106,13 @@ def test_iter_with_warning_error_context_injects_a_stable_iteration_index():
             with make_context("item", {"value": item}):
                 warnings.warn("item warning", UserWarning, stacklevel=1)
 
-        with factories[0]("saved", {}):
+        with factories[0]("saved", context_provider=lambda: {"dynamic": True}):
             warnings.warn("saved warning", UserWarning, stacklevel=1)
 
     assert [str(warning.message) for warning in caught] == [
         "[item: i=0, value='first'] item warning",
         "[item: i=1, value='second'] item warning",
-        "[saved: i=0] saved warning",
+        "[saved: i=0, dynamic=True] saved warning",
     ]
 
 
@@ -148,6 +148,17 @@ def test_context_provider_is_resolved_for_each_warning():
         "[iteration: fixed='value', step=1] first",
         "[iteration: fixed='value', step=2] second",
     ]
+
+
+def test_context_provider_can_be_used_without_fixed_context():
+    """A dynamic provider does not require an empty context dictionary."""
+    with (
+        warning_error_context("iteration", context_provider=lambda: {"step": 1}),
+        pytest.warns(UserWarning) as caught,
+    ):
+        warnings.warn("provider-only warning", UserWarning, stacklevel=1)
+
+    assert str(caught[0].message) == "[iteration: step=1] provider-only warning"
 
 
 def test_context_provider_is_resolved_when_exception_leaves_context():

@@ -174,16 +174,17 @@ def _add_note(exc: BaseException, note: str) -> None:
 @contextmanager
 def warning_error_context(
     name: str,
-    context: dict[str, Any],
+    context: Optional[dict[str, Any]] = None,
     /,
     *,
     context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
 ) -> Generator[None, None, None]:
     """Add structured context information to warnings and exceptions raised in the context.
 
-    ``context`` is copied when the context is entered. ``context_provider`` is
-    evaluated whenever context is rendered, allowing diagnostics to include state
-    that changes while the context is active. The provider must return a mapping and
+    If provided, ``context`` is copied when the context is entered.
+    ``context_provider`` is evaluated whenever context is rendered, allowing
+    diagnostics to include state that changes while the context is active. It can be
+    used without a fixed context dictionary. The provider must return a mapping and
     must not repeat fixed context keys.
 
     A failing provider is represented in the rendered context instead of masking the
@@ -193,7 +194,9 @@ def warning_error_context(
     displayed by Python's standard traceback renderer. Traceback renderers that
     support exception notes, such as Rich, display this context on those versions.
     """
-    frame = _ContextFrame(name=name, context=dict(context), context_provider=context_provider)
+    frame = _ContextFrame(
+        name=name, context=dict({} if context is None else context), context_provider=context_provider
+    )
     token = _context_stack.set((*_context_stack.get(), frame))
     try:
         yield
@@ -207,11 +210,12 @@ def warning_error_context(
 def _make_iteration_context_factory(i: int) -> _WarningErrorContextFactory:
     def make_context(
         name: str,
-        context: dict[str, Any],
+        context: Optional[dict[str, Any]] = None,
         /,
         *,
         context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
     ) -> AbstractContextManager[None]:
+        context = {} if context is None else context
         if "i" in context:
             raise ValueError("The context key 'i' is reserved by iter_with_warning_error_context.")
         return warning_error_context(name, {"i": i, **context}, context_provider=context_provider)
