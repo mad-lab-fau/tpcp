@@ -36,11 +36,22 @@ tpcp = "tpcp._cli:main"
 tpcp_snapshots = "tpcp.testing._regression_utils"
 
 [dependency-groups]
-dev = [
-    "pydata-sphinx-theme>=0.14.1,<0.15",
+test = [
+    "attrs>=22.1.0",
+    "matplotlib>=3.4.3,<4",
+    "numpydoc>=1.4.0,<2",
+    "optuna>=2.10",
     "pytest>=8.4.2,<9",
+    "pytest-xdist>=3.8.0,<4",
+]
+coverage = [
     "pytest-cov>=7.0.0,<8",
-    "poethepoet>=0.10.0,<0.11",
+]
+lint = [
+    "ruff>=0.14.0,<0.15",
+]
+docs = [
+    "pydata-sphinx-theme>=0.14.1,<0.15",
     "pyright>=1.1.230,<2",
     "numpydoc>=1.4.0,<2",
     "sphinx-gallery>=0.14.0,<0.15",
@@ -49,8 +60,13 @@ dev = [
     "matplotlib>=3.4.3,<4",
     "toml>=0.10.2,<0.11",
     "Sphinx>=7.2.6,<8",
-    "ruff>=0.14.0,<0.15",
-    "tensorflow-cpu>=2.18.0rc2,<3; python_full_version < '3.14'",
+]
+dev = [
+    { include-group = "test" },
+    { include-group = "coverage" },
+    { include-group = "lint" },
+    { include-group = "docs" },
+    "poethepoet>=0.10.0,<0.11",
 ]
 
 [tool.uv]
@@ -82,7 +98,7 @@ lint = { cmd = "ruff check src/tpcp --fix", help = "Lint all files with ruff." }
 _lint_ci = "ruff check src/tpcp --output-format=github"
 _check_format = "ruff format . --check"
 ci_check = { sequence = ["_check_format", "_lint_ci"], help = "Check all potential format and linting issues." }
-test = { cmd = "pytest ./tests --cov=tpcp --cov-report=term-missing --cov-report=xml", help = "Run Pytest with coverage." }
+test = { cmd = "pytest ./tests -n 2 --dist=worksteal --cov=tpcp --cov-report=term-missing --cov-report=xml", help = "Run Pytest with coverage." }
 docs = { "script" = "_tasks:task_docs()",  help = "Build the html docs using Sphinx." }
 docs_clean = { "script" = "_tasks:task_docs(clean=True)",  help = "Remove all old build files and build a clean version of the docs." }
 docs_preview = { cmd = "python -m http.server --directory docs/_build/html", help = "Preview the built html docs." }
