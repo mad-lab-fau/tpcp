@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import copy
@@ -15,12 +16,33 @@ if TYPE_CHECKING:
 class _ContextFrame:
     name: str
     metadata: dict[str, Any]
+    metadata_provider: Optional[Callable[[], Mapping[str, Any]]] = None
+
+    def _render_metadata(self) -> str:
+        metadata = self.metadata
+        if self.metadata_provider is not None:
+            try:
+                provided_metadata = self.metadata_provider()
+                if not isinstance(provided_metadata, Mapping):
+                    raise TypeError("metadata_provider must return a mapping")
+                duplicate_keys = metadata.keys() & provided_metadata.keys()
+                if duplicate_keys:
+                    duplicates = ", ".join(sorted(duplicate_keys))
+                    raise ValueError(f"metadata_provider returned duplicate keys: {duplicates}")
+                metadata = {**metadata, **provided_metadata}
+            except BaseException as exc:  # noqa: BLE001 - context rendering must not mask the original event
+                provider_error = f"{type(exc).__name__}: {exc}"
+                rendered_metadata = ", ".join(f"{key}={value!r}" for key, value in metadata.items())
+                rendered_error = f"metadata_provider_error={provider_error!r}"
+                return ", ".join(filter(None, (rendered_metadata, rendered_error)))
+
+        return ", ".join(f"{key}={value!r}" for key, value in metadata.items())
 
     def render(self) -> str:
-        if not self.metadata:
+        rendered_metadata = self._render_metadata()
+        if not rendered_metadata:
             return self.name
-        metadata = ", ".join(f"{key}={value!r}" for key, value in self.metadata.items())
-        return f"{self.name}: {metadata}"
+        return f"{self.name}: {rendered_metadata}"
 
 
 _context_stack: ContextVar[tuple[_ContextFrame, ...]] = ContextVar("tpcp_warning_error_context", default=())
@@ -128,9 +150,24 @@ def _add_note(exc: BaseException, note: str) -> None:
 
 
 @contextmanager
-def warning_error_context(name: str, /, **metadata: Any) -> Generator[None, None, None]:
-    """Add structured context information to warnings and exceptions raised in the context."""
-    frame = _ContextFrame(name=name, metadata=metadata)
+def warning_error_context(
+    name: str,
+    /,
+    *,
+    metadata_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
+    **metadata: Any,
+) -> Generator[None, None, None]:
+    """Add structured context information to warnings and exceptions raised in the context.
+
+    ``metadata`` values are fixed when the context is entered. ``metadata_provider``
+    is evaluated whenever context is rendered, allowing diagnostics to include state
+    that changes while the context is active. The provider must return a mapping and
+    must not repeat fixed metadata keys.
+
+    A failing provider is represented in the rendered context instead of masking the
+    warning or exception that caused context rendering.
+    """
+    frame = _ContextFrame(name=name, metadata=metadata, metadata_provider=metadata_provider)
     token = _context_stack.set((*_context_stack.get(), frame))
     try:
         yield

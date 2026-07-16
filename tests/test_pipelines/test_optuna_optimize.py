@@ -147,13 +147,14 @@ class TestCustomOptunaOptimize:
         assert isinstance(mock_objective.call_args[0][0], Trial)
 
     def test_objective_warning_contains_trial_context(self):
-        def objective(_trial, _pipeline, _dataset):
+        def objective(trial, _pipeline, _dataset):
+            trial.suggest_categorical("selected_param", ["selected_value"])
             warnings.warn("objective warning", UserWarning, stacklevel=1)
             return 3
 
         with pytest.warns(
             UserWarning,
-            match=re.escape("[optuna_trial: number=0, params={}] objective warning"),
+            match=re.escape("[optuna_trial: number=0, params={'selected_param': 'selected_value'}] objective warning"),
         ):
             DummyOptunaOptimizer(
                 DummyOptimizablePipeline(),
