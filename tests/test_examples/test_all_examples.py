@@ -192,3 +192,8 @@ def test_pretrained_models_example():
     from examples.recipies._06_pretrained_models import algo_with_clean_lab_model
 
     assert algo_with_clean_lab_model.model == "model_clean_lab_data"
+
+
+def test_warning_error_context_example():
+    # Import the gallery example to ensure that it executes without errors.
+    import examples.recipies._07_warning_error_context  # noqa: F401
