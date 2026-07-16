@@ -74,6 +74,81 @@ def test_nested_contexts_are_added_to_exception_notes():
     ]
 
 
+def test_metadata_provider_is_resolved_for_each_warning():
+    """Dynamic metadata reflects state at the time each warning is rendered."""
+    state = {"step": 1}
+
+    with (
+        warning_error_context(
+            "iteration",
+            fixed="value",
+            metadata_provider=lambda: {"step": state["step"]},
+        ),
+        warnings.catch_warnings(record=True) as caught,
+    ):
+        warnings.simplefilter("always")
+        warnings.warn("first", UserWarning, stacklevel=1)
+        state["step"] = 2
+        warnings.warn("second", UserWarning, stacklevel=1)
+
+    assert [str(warning.message) for warning in caught] == [
+        "[iteration: fixed='value', step=1] first",
+        "[iteration: fixed='value', step=2] second",
+    ]
+
+
+def test_metadata_provider_is_resolved_when_exception_leaves_context():
+    """Exception notes contain dynamic metadata from the point of failure."""
+    state = {"step": 1}
+
+    def fail_after_state_change():
+        state["step"] = 2
+        raise ValueError("failed")
+
+    with (
+        pytest.raises(ValueError, match="failed") as error,
+        warning_error_context("iteration", metadata_provider=lambda: {"step": state["step"]}),
+    ):
+        fail_after_state_change()
+
+    assert error.value.__notes__ == ["Context: iteration: step=2"]
+
+
+@pytest.mark.parametrize(
+    ("metadata_provider", "error_text"),
+    [
+        (lambda: 1, "TypeError: metadata_provider must return a mapping"),
+        (lambda: {"fixed": "dynamic"}, "ValueError: metadata_provider returned duplicate keys: fixed"),
+        (lambda: 1 / 0, "ZeroDivisionError: division by zero"),
+    ],
+    ids=["not-a-mapping", "duplicate-key", "provider-raises"],
+)
+def test_metadata_provider_failure_does_not_mask_warning(metadata_provider, error_text):
+    """Invalid dynamic metadata is reported without replacing the warning."""
+    with (
+        warning_error_context("iteration", fixed="value", metadata_provider=metadata_provider),
+        pytest.warns(UserWarning, match="original warning") as caught,
+    ):
+        warnings.warn("original warning", UserWarning, stacklevel=1)
+
+    assert str(caught[0].message) == (
+        f"[iteration: fixed='value', metadata_provider_error={error_text!r}] original warning"
+    )
+
+
+def test_metadata_provider_failure_does_not_mask_exception():
+    """A provider failure is diagnostic context on the original exception."""
+    with (
+        pytest.raises(RuntimeError, match="original error") as error,
+        warning_error_context("iteration", metadata_provider=lambda: 1 / 0),
+    ):
+        raise RuntimeError("original error")
+
+    assert error.value.__notes__ == [
+        "Context: iteration: metadata_provider_error='ZeroDivisionError: division by zero'"
+    ]
+
+
 def test_context_is_cleaned_up_after_exception():
     """Contexts do not leak after an exception leaves the context manager."""
     with pytest.raises(ValueError, match="failed"), warning_error_context("datapoint", group="patient-1"):
