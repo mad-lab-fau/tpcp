@@ -87,15 +87,40 @@ def test_iterator_body_warning_contains_iteration_context():
     rt = make_dataclass("ResultType", ["result"])
     iterator = TypedIterator(rt)
 
+    def emit_iteration_warning():
+        for data_point, result in iterator.iterate([1]):
+            with iterator.warning_error_context(
+                "typed_iterator_iteration",
+                iteration_name="__main__",
+                input=data_point,
+                iteration_context={},
+            ):
+                warnings.warn("iteration warning", UserWarning, stacklevel=1)
+                result.result = 1
+
     with pytest.warns(
         UserWarning,
         match=re.escape(
             "[typed_iterator_iteration: iteration_name='__main__', input=1, iteration_context={}] iteration warning"
         ),
     ):
-        for _, result in iterator.iterate([1]):
-            warnings.warn("iteration warning", UserWarning, stacklevel=1)
-            result.result = 1
+        emit_iteration_warning()
+
+
+def test_iterator_body_exception_contains_explicit_context():
+    """The explicit iterator context annotates errors raised by the loop body."""
+    rt = make_dataclass("ResultType", ["result"])
+    iterator = TypedIterator(rt)
+
+    def raise_iteration_error():
+        for data_point, _ in iterator.iterate([1]):
+            with iterator.warning_error_context("typed_iterator", input=data_point, stage="processing"):
+                raise ValueError("iteration error")
+
+    with pytest.raises(ValueError, match="iteration error") as error:
+        raise_iteration_error()
+
+    assert error.value.__notes__ == ["Context: typed_iterator: input=1, stage='processing'"]
 
 
 def test_additional_aggregations():

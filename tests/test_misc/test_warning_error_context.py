@@ -13,7 +13,10 @@ from joblib.externals import cloudpickle
 
 _warn_alias_imported_before_tpcp = warnings.warn
 
-from tpcp.misc import warning_error_context  # noqa: E402  (import must happen after capturing warnings.warn)
+from tpcp.misc import (  # noqa: E402  (import must happen after capturing warnings.warn)
+    iter_with_warning_error_context,
+    warning_error_context,
+)
 
 
 class _CustomWarning(UserWarning):
@@ -71,6 +74,25 @@ def test_nested_contexts_are_added_to_exception_notes():
     assert error.value.__notes__ == [
         "Context: region: start=10, end=20",
         "Context: datapoint: group='patient-1'",
+    ]
+
+
+def test_iter_with_warning_error_context_scopes_nested_loop_bodies():
+    """Iterator contexts nest explicitly and do not leak after a loop body."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for make_outer_context, outer_item in iter_with_warning_error_context([1]):
+            with make_outer_context("outer", item=outer_item):
+                for make_inner_context, inner_item in iter_with_warning_error_context([2]):
+                    with make_inner_context("inner", item=inner_item):
+                        warnings.warn("inner warning", UserWarning, stacklevel=1)
+                warnings.warn("outer warning", UserWarning, stacklevel=1)
+        warnings.warn("unscoped warning", UserWarning, stacklevel=1)
+
+    assert [str(warning.message) for warning in caught] == [
+        "[outer: item=1 > inner: item=2] inner warning",
+        "[outer: item=1] outer warning",
+        "unscoped warning",
     ]
 
 

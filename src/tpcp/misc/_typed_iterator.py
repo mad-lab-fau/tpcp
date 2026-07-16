@@ -1,12 +1,13 @@
 import warnings
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import fields, is_dataclass
-from typing import Any, Callable, Generic, Optional, TypeVar
+from typing import Any, Generic, Optional, TypeVar
 
 from typing_extensions import NamedTuple, TypeAlias
 
 from tpcp import Algorithm, cf
-from tpcp.misc._warning_error_context import warning_error_context
+from tpcp.misc._warning_error_context import warning_error_context as _warning_error_context
 
 DataclassT = TypeVar("DataclassT")
 InputTypeT = TypeVar("InputTypeT")
@@ -160,8 +161,9 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
             The result object is a dataclass instance of the type defined in ``self.data_type``.
             All values of the result object are set to ``TypedIterator.NULL_VALUE`` by default.
 
-            Warnings emitted by the loop body include the active iteration context. Exceptions raised by the loop body
-            happen outside the generator boundary and can not be annotated here.
+            To add context to warnings and exceptions from the loop body, explicitly enter
+            :meth:`warning_error_context` inside the loop. Context must not remain active across this generator's
+            ``yield`` boundary.
 
         """
         if not is_dataclass(self.data_type):
@@ -182,14 +184,25 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
             iteration_context = iteration_context or {}
             result_tuple = TypedIteratorResultTuple(iteration_name, d, result_object, iteration_context)
             self._report_new_result(result_tuple)
-            with warning_error_context(
-                "typed_iterator_iteration",
-                iteration_name=iteration_name,
-                input=d,
-                iteration_context=iteration_context,
-            ):
-                yield d, result_object
+            yield d, result_object
         self.done_[iteration_name] = True
+
+    def warning_error_context(
+        self,
+        name: str,
+        /,
+        *,
+        metadata_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
+        **metadata: Any,
+    ) -> AbstractContextManager[None]:
+        """Create explicit warning/error context for an iteration body.
+
+        This convenience method has the same interface as
+        :func:`~tpcp.misc.warning_error_context`. It deliberately does not infer
+        metadata from the iterator or its current item. Enter the returned context
+        manager inside the iteration body and pass all relevant metadata explicitly.
+        """
+        return _warning_error_context(name, metadata_provider=metadata_provider, **metadata)
 
     def _get_new_empty_object(self) -> DataclassT:
         init_dict = {k.name: self.NULL_VALUE for k in fields(self.data_type)}
