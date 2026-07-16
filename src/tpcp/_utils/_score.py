@@ -61,7 +61,7 @@ class _OptimizeScoreResults(TypedDict, total=False):
 def _contextualize(context: Optional[Sequence[tuple[str, dict[str, Any]]]]) -> ExitStack:
     stack = ExitStack()
     for name, metadata in context or ():
-        stack.enter_context(warning_error_context(name, **metadata))
+        stack.enter_context(warning_error_context(name, metadata))
     return stack
 
 
@@ -129,7 +129,7 @@ def _score(
         try:
             start_time = time.time()
             score_context = {"data_labels": dataset.group_labels}
-            with warning_error_context("score", **score_context):
+            with warning_error_context("score", score_context):
                 agg_scores, single_scores = scorer(pipeline, dataset)
             score_time = time.time() - start_time
         except Exception as e:
@@ -203,7 +203,7 @@ def _optimize_and_score(
         try:
             start_time = time.time()
             optimize_context = {"data_labels": train_set.group_labels}
-            with warning_error_context("optimize", **optimize_context):
+            with warning_error_context("optimize", optimize_context):
                 optimizer = _cached_optimize(
                     optimizer, train_set, hyperparameters, pure_parameters, memory, optimize_params_clean
                 )
@@ -225,7 +225,7 @@ def _optimize_and_score(
         test_score_context: dict[str, Any] = {}
         try:
             test_score_context = {"data_labels": test_set.group_labels}
-            with warning_error_context("test_score", **test_score_context):
+            with warning_error_context("test_score", test_score_context):
                 agg_scores, single_scores = scorer(optimizer.optimized_pipeline_, test_set)
             score_time = time.time() - optimize_time - start_time
         except Exception as e:
@@ -241,7 +241,7 @@ def _optimize_and_score(
             train_score_context: dict[str, Any] = {}
             try:
                 train_score_context = {"data_labels": train_set.group_labels}
-                with warning_error_context("train_score", **train_score_context):
+                with warning_error_context("train_score", train_score_context):
                     train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set)
             except Exception as e:
                 raise TestError(

@@ -414,7 +414,7 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
                 # We need to clone here again, to make sure that the run for each data point is truly independent.
                 group_label = d.group_label
                 group_label_available = True
-                with warning_error_context("datapoint", index=i, group_label=group_label):
+                with warning_error_context("datapoint", {"index": i, "group_label": group_label}):
                     score = self.score_func(pipeline.clone(), d)
             except Exception as e:
                 group_label_display = "<unavailable>"
