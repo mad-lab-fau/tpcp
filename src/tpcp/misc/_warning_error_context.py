@@ -3,6 +3,7 @@ from __future__ import annotations
 import warnings
 from contextlib import contextmanager
 from contextvars import ContextVar
+from copy import copy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, Union
 
@@ -23,7 +24,6 @@ class _ContextFrame:
 
 
 _context_stack: ContextVar[tuple[_ContextFrame, ...]] = ContextVar("tpcp_warning_error_context", default=())
-_warn = warnings.warn
 
 
 def _render_context_stack() -> str:
@@ -35,33 +35,85 @@ def _render_contexts(contexts: Sequence[tuple[str, dict[str, Any]]]) -> str:
 
 
 def _warning_with_context(message: Warning, context: str) -> Warning:
-    contextualized_warning = type(message).__new__(type(message))
+    # Calling the concrete type's constructor is not safe: warning subclasses can
+    # require extra arguments in __new__. BaseException can allocate every Warning
+    # subtype without invoking the subtype's constructor.
+    contextualized_warning = BaseException.__new__(type(message))
     contextualized_warning.__dict__.update(getattr(message, "__dict__", {}))
+    for base_class in type(message).__mro__:
+        slots = base_class.__dict__.get("__slots__", ())
+        if isinstance(slots, str):
+            slots = (slots,)
+        for slot_name in slots:
+            if slot_name in {"__dict__", "__weakref__"}:
+                continue
+            actual_slot_name = slot_name
+            if slot_name.startswith("__") and not slot_name.endswith("__"):
+                actual_slot_name = f"_{base_class.__name__.lstrip('_')}{slot_name}"
+            slot_descriptor = base_class.__dict__[actual_slot_name]
+            try:
+                slot_value = slot_descriptor.__get__(message, type(message))
+            except AttributeError:
+                continue
+            slot_descriptor.__set__(contextualized_warning, slot_value)
     contextualized_warning.args = (f"[{context}] {message}", *message.args[1:])
     return contextualized_warning
 
 
-def _warn_with_context(
-    message: Union[Warning, str],
-    category: Optional[type[Warning]] = None,
-    stacklevel: int = 1,
-    source: Any = None,
-    **kwargs: Any,
-) -> None:
+def _contextualize_warning(message: Union[Warning, str]) -> Union[Warning, str]:
     context = _render_context_stack()
     if not context:
-        _warn(message, category=category, stacklevel=stacklevel + 1, source=source, **kwargs)
-        return
-
-    if isinstance(message, Warning):
-        message_with_context = _warning_with_context(message, context)
-    else:
-        message_with_context = f"[{context}] {message}"
-
-    _warn(message_with_context, category=category, stacklevel=stacklevel + 1, source=source, **kwargs)
+        return message
+    if isinstance(message, str):
+        return f"[{context}] {message}"
+    return _warning_with_context(message, context)
 
 
-warnings.warn = _warn_with_context
+_TPCP_DISPATCHER_MARKER = "_tpcp_warning_context_dispatcher"
+_TPCP_ORIGINAL_DISPATCHER = "_tpcp_warning_context_original_dispatcher"
+
+_installed_showwarnmsg = getattr(warnings, "_showwarnmsg", None)
+if getattr(_installed_showwarnmsg, _TPCP_DISPATCHER_MARKER, False):
+    # Module reloads must unwrap our existing dispatcher instead of chaining it
+    # again. Otherwise the old function resolves reloaded module globals and recurses.
+    _original_showwarnmsg = getattr(_installed_showwarnmsg, _TPCP_ORIGINAL_DISPATCHER)
+else:
+    _original_showwarnmsg = _installed_showwarnmsg
+_original_showwarning = warnings.showwarning
+
+
+def _showwarnmsg_with_context(message: warnings.WarningMessage) -> None:
+    """Add active context before forwarding a warning to Python's dispatcher."""
+    if _context_stack.get():
+        message = copy(message)
+        message.message = _contextualize_warning(message.message)
+
+    # Patch this private dispatcher intentionally: warnings.warn misses aliases
+    # imported earlier, warn_explicit, and C warnings, while showwarning is bypassed
+    # by catch_warnings(record=True) and pytest.warns. Forwarding the WarningMessage
+    # exactly once avoids re-filtering, recursion, and distorted source locations.
+    original_showwarnmsg = getattr(_showwarnmsg_with_context, _TPCP_ORIGINAL_DISPATCHER)
+    original_showwarnmsg(message)
+
+
+if callable(_original_showwarnmsg):
+    setattr(_showwarnmsg_with_context, _TPCP_DISPATCHER_MARKER, True)
+    setattr(_showwarnmsg_with_context, _TPCP_ORIGINAL_DISPATCHER, _original_showwarnmsg)
+    setattr(warnings, "_showwarnmsg", _showwarnmsg_with_context)
+else:
+
+    def _showwarning_with_context(
+        message: Warning,
+        category: type[Warning],
+        filename: str,
+        lineno: int,
+        file: Any = None,
+        line: Optional[str] = None,
+    ) -> None:
+        """Fallback for Python implementations without warnings._showwarnmsg."""
+        _original_showwarning(_contextualize_warning(message), category, filename, lineno, file, line)
+
+    warnings.showwarning = _showwarning_with_context
 
 
 def _add_note(exc: BaseException, note: str) -> None:
