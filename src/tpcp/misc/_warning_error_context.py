@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import warnings
-from collections.abc import Callable, Mapping
-from contextlib import contextmanager
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
 from copy import copy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Sequence
+
+T = TypeVar("T")
+_WarningErrorContextFactory = Callable[..., AbstractContextManager[None]]
 
 
 @dataclass(frozen=True)
@@ -166,6 +169,10 @@ def warning_error_context(
 
     A failing provider is represented in the rendered context instead of masking the
     warning or exception that caused context rendering.
+
+    On Python 3.9 and 3.10, exception context is stored in ``__notes__`` but is not
+    displayed by Python's standard traceback renderer. Traceback renderers that
+    support exception notes, such as Rich, display this context on those versions.
     """
     frame = _ContextFrame(name=name, metadata=metadata, metadata_provider=metadata_provider)
     token = _context_stack.set((*_context_stack.get(), frame))
@@ -176,3 +183,16 @@ def warning_error_context(
         raise
     finally:
         _context_stack.reset(token)
+
+
+def iter_with_warning_error_context(
+    iterable: Iterable[T],
+) -> Iterator[tuple[_WarningErrorContextFactory, T]]:
+    """Pair every item with a warning/error context creator.
+
+    The creator has the same interface as :func:`warning_error_context` and does
+    not infer metadata from the item. Enter it explicitly in the loop body so the
+    context is closed before advancing or suspending the iterator.
+    """
+    for item in iterable:
+        yield warning_error_context, item
