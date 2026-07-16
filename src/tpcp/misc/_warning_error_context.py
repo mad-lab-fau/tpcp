@@ -15,37 +15,56 @@ T = TypeVar("T")
 _WarningErrorContextFactory = Callable[..., AbstractContextManager[None]]
 
 
+def _safe_repr(value: Any) -> str:
+    try:
+        return repr(value)
+    except BaseException as exc:  # noqa: BLE001 - diagnostic rendering must never replace the original event
+        return f"<repr failed: {type(exc).__name__}>"
+
+
+def _render_context_values(context: Mapping[str, Any]) -> str:
+    return ", ".join(f"{key}={_safe_repr(value)}" for key, value in context.items())
+
+
+def _safe_exception_description(exc: BaseException) -> str:
+    try:
+        message = str(exc)
+    except BaseException as render_exc:  # noqa: BLE001 - diagnostic rendering must never replace the original event
+        message = f"<str failed: {type(render_exc).__name__}>"
+    return f"{type(exc).__name__}: {message}"
+
+
 @dataclass(frozen=True)
 class _ContextFrame:
     name: str
-    metadata: dict[str, Any]
-    metadata_provider: Optional[Callable[[], Mapping[str, Any]]] = None
+    context: dict[str, Any]
+    context_provider: Optional[Callable[[], Mapping[str, Any]]] = None
 
-    def _render_metadata(self) -> str:
-        metadata = self.metadata
-        if self.metadata_provider is not None:
+    def _render_context(self) -> str:
+        context = self.context
+        if self.context_provider is not None:
             try:
-                provided_metadata = self.metadata_provider()
-                if not isinstance(provided_metadata, Mapping):
-                    raise TypeError("metadata_provider must return a mapping")
-                duplicate_keys = metadata.keys() & provided_metadata.keys()
+                provided_context = self.context_provider()
+                if not isinstance(provided_context, Mapping):
+                    raise TypeError("context_provider must return a mapping")
+                duplicate_keys = context.keys() & provided_context.keys()
                 if duplicate_keys:
                     duplicates = ", ".join(sorted(duplicate_keys))
-                    raise ValueError(f"metadata_provider returned duplicate keys: {duplicates}")
-                metadata = {**metadata, **provided_metadata}
+                    raise ValueError(f"context_provider returned duplicate keys: {duplicates}")
+                context = {**context, **provided_context}
             except BaseException as exc:  # noqa: BLE001 - context rendering must not mask the original event
-                provider_error = f"{type(exc).__name__}: {exc}"
-                rendered_metadata = ", ".join(f"{key}={value!r}" for key, value in metadata.items())
-                rendered_error = f"metadata_provider_error={provider_error!r}"
-                return ", ".join(filter(None, (rendered_metadata, rendered_error)))
+                provider_error = _safe_exception_description(exc)
+                rendered_context = _render_context_values(context)
+                rendered_error = f"context_provider_error={provider_error!r}"
+                return ", ".join(filter(None, (rendered_context, rendered_error)))
 
-        return ", ".join(f"{key}={value!r}" for key, value in metadata.items())
+        return _render_context_values(context)
 
     def render(self) -> str:
-        rendered_metadata = self._render_metadata()
-        if not rendered_metadata:
+        rendered_context = self._render_context()
+        if not rendered_context:
             return self.name
-        return f"{self.name}: {rendered_metadata}"
+        return f"{self.name}: {rendered_context}"
 
 
 _context_stack: ContextVar[tuple[_ContextFrame, ...]] = ContextVar("tpcp_warning_error_context", default=())
@@ -56,7 +75,7 @@ def _render_context_stack() -> str:
 
 
 def _render_contexts(contexts: Sequence[tuple[str, dict[str, Any]]]) -> str:
-    return " > ".join(_ContextFrame(name=name, metadata=metadata).render() for name, metadata in contexts)
+    return " > ".join(_ContextFrame(name=name, context=context).render() for name, context in contexts)
 
 
 def _warning_with_context(message: Warning, context: str) -> Warning:
@@ -155,17 +174,17 @@ def _add_note(exc: BaseException, note: str) -> None:
 @contextmanager
 def warning_error_context(
     name: str,
+    context: dict[str, Any],
     /,
     *,
-    metadata_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
-    **metadata: Any,
+    context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
 ) -> Generator[None, None, None]:
     """Add structured context information to warnings and exceptions raised in the context.
 
-    ``metadata`` values are fixed when the context is entered. ``metadata_provider``
-    is evaluated whenever context is rendered, allowing diagnostics to include state
+    ``context`` is copied when the context is entered. ``context_provider`` is
+    evaluated whenever context is rendered, allowing diagnostics to include state
     that changes while the context is active. The provider must return a mapping and
-    must not repeat fixed metadata keys.
+    must not repeat fixed context keys.
 
     A failing provider is represented in the rendered context instead of masking the
     warning or exception that caused context rendering.
@@ -174,7 +193,7 @@ def warning_error_context(
     displayed by Python's standard traceback renderer. Traceback renderers that
     support exception notes, such as Rich, display this context on those versions.
     """
-    frame = _ContextFrame(name=name, metadata=metadata, metadata_provider=metadata_provider)
+    frame = _ContextFrame(name=name, context=dict(context), context_provider=context_provider)
     token = _context_stack.set((*_context_stack.get(), frame))
     try:
         yield
@@ -185,14 +204,30 @@ def warning_error_context(
         _context_stack.reset(token)
 
 
+def _make_iteration_context_factory(i: int) -> _WarningErrorContextFactory:
+    def make_context(
+        name: str,
+        context: dict[str, Any],
+        /,
+        *,
+        context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
+    ) -> AbstractContextManager[None]:
+        if "i" in context:
+            raise ValueError("The context key 'i' is reserved by iter_with_warning_error_context.")
+        return warning_error_context(name, {"i": i, **context}, context_provider=context_provider)
+
+    return make_context
+
+
 def iter_with_warning_error_context(
     iterable: Iterable[T],
 ) -> Iterator[tuple[_WarningErrorContextFactory, T]]:
     """Pair every item with a warning/error context creator.
 
-    The creator has the same interface as :func:`warning_error_context` and does
-    not infer metadata from the item. Enter it explicitly in the loop body so the
-    context is closed before advancing or suspending the iterator.
+    The creator has the same interface as :func:`warning_error_context`, with the
+    zero-based iteration index added as ``i``. It does not infer any other context
+    from the item. Enter it explicitly in the loop body so the context is closed
+    before advancing or suspending the iterator.
     """
-    for item in iterable:
-        yield warning_error_context, item
+    for i, item in enumerate(iterable):
+        yield _make_iteration_context_factory(i), item

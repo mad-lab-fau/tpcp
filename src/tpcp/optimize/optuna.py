@@ -289,10 +289,10 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
             inner_pipe = clone(pipeline)
             with warning_error_context(
                 "optuna_trial",
-                number=trial.number,
+                {"number": trial.number},
                 # Optuna returns a snapshot here, and only populates it as the objective calls suggest_*.
                 # Resolve it when a warning or exception occurs so the context reflects the parameters known then.
-                metadata_provider=lambda: {"params": trial.params},
+                context_provider=lambda: {"params": trial.params},
             ):
                 return inner_objective(trial, inner_pipe, dataset)
 

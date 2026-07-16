@@ -28,6 +28,7 @@ class _NotSet:
 
 
 _NULL_VALUE = _NotSet()
+_NO_PREVIOUS_ITERATION_INDEX = object()
 
 
 class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
@@ -179,30 +180,47 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
             self._raw_results = []
 
         self.done_[iteration_name] = False
-        for d in iterable:
+        for i, d in enumerate(iterable):
             result_object = self._get_new_empty_object()
             iteration_context = iteration_context or {}
             result_tuple = TypedIteratorResultTuple(iteration_name, d, result_object, iteration_context)
             self._report_new_result(result_tuple)
-            yield d, result_object
+            previous_i = getattr(self, "_warning_error_context_i", _NO_PREVIOUS_ITERATION_INDEX)
+            self._warning_error_context_i = i
+            try:
+                yield d, result_object
+            finally:
+                if previous_i is _NO_PREVIOUS_ITERATION_INDEX:
+                    del self._warning_error_context_i
+                else:
+                    self._warning_error_context_i = previous_i
         self.done_[iteration_name] = True
 
     def warning_error_context(
         self,
         name: str,
+        context: dict[str, Any],
         /,
         *,
-        metadata_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
-        **metadata: Any,
+        context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
     ) -> AbstractContextManager[None]:
         """Create explicit warning/error context for an iteration body.
 
         This convenience method has the same interface as
-        :func:`~tpcp.misc.warning_error_context`. It deliberately does not infer
-        metadata from the iterator or its current item. Enter the returned context
-        manager inside the iteration body and pass all relevant metadata explicitly.
+        :func:`~tpcp.misc.warning_error_context` and adds the current zero-based
+        iteration index as ``i``. It deliberately does not infer any other context
+        from the iterator or its current item. Enter the returned context manager
+        inside the iteration body and pass all other relevant context explicitly.
         """
-        return _warning_error_context(name, metadata_provider=metadata_provider, **metadata)
+        if "i" in context:
+            raise ValueError("The context key 'i' is reserved by TypedIterator.")
+        try:
+            i = self._warning_error_context_i
+        except AttributeError as exc:
+            raise RuntimeError(
+                "warning_error_context must be called inside an active TypedIterator loop body."
+            ) from exc
+        return _warning_error_context(name, {"i": i, **context}, context_provider=context_provider)
 
     def _get_new_empty_object(self) -> DataclassT:
         init_dict = {k.name: self.NULL_VALUE for k in fields(self.data_type)}

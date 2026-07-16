@@ -51,8 +51,8 @@ def _emit_warning_with_line():
 def test_nested_contexts_are_added_to_warnings():
     """Nested contexts are rendered in emitted warning messages."""
     with (
-        warning_error_context("datapoint", group="patient-1"),
-        warning_error_context("region", start=10, end=20),
+        warning_error_context("datapoint", {"group": "patient-1"}),
+        warning_error_context("region", {"start": 10, "end": 20}),
         pytest.warns(
             UserWarning,
             match=re.escape("[datapoint: group='patient-1' > region: start=10, end=20] low level warning"),
@@ -65,8 +65,8 @@ def test_nested_contexts_are_added_to_exception_notes():
     """Nested contexts are attached as exception notes without changing the exception."""
     with (
         pytest.raises(ValueError, match="failed") as error,
-        warning_error_context("datapoint", group="patient-1"),
-        warning_error_context("region", start=10, end=20),
+        warning_error_context("datapoint", {"group": "patient-1"}),
+        warning_error_context("region", {"start": 10, "end": 20}),
     ):
         raise ValueError("failed")
 
@@ -82,29 +82,60 @@ def test_iter_with_warning_error_context_scopes_nested_loop_bodies():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         for make_outer_context, outer_item in iter_with_warning_error_context([1]):
-            with make_outer_context("outer", item=outer_item):
+            with make_outer_context("outer", {"item": outer_item}):
                 for make_inner_context, inner_item in iter_with_warning_error_context([2]):
-                    with make_inner_context("inner", item=inner_item):
+                    with make_inner_context("inner", {"item": inner_item}):
                         warnings.warn("inner warning", UserWarning, stacklevel=1)
                 warnings.warn("outer warning", UserWarning, stacklevel=1)
         warnings.warn("unscoped warning", UserWarning, stacklevel=1)
 
     assert [str(warning.message) for warning in caught] == [
-        "[outer: item=1 > inner: item=2] inner warning",
-        "[outer: item=1] outer warning",
+        "[outer: i=0, item=1 > inner: i=0, item=2] inner warning",
+        "[outer: i=0, item=1] outer warning",
         "unscoped warning",
     ]
 
 
-def test_metadata_provider_is_resolved_for_each_warning():
+def test_iter_with_warning_error_context_injects_a_stable_iteration_index():
+    """Every yielded creator retains its own zero-based index."""
+    factories = []
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for make_context, item in iter_with_warning_error_context(["first", "second"]):
+            factories.append(make_context)
+            with make_context("item", {"value": item}):
+                warnings.warn("item warning", UserWarning, stacklevel=1)
+
+        with factories[0]("saved", {}):
+            warnings.warn("saved warning", UserWarning, stacklevel=1)
+
+    assert [str(warning.message) for warning in caught] == [
+        "[item: i=0, value='first'] item warning",
+        "[item: i=1, value='second'] item warning",
+        "[saved: i=0] saved warning",
+    ]
+
+
+def test_warning_error_context_copies_the_explicit_context_dict():
+    """Mutating the input dictionary does not change an active fixed context."""
+    context = {"value": "initial"}
+    with warning_error_context("copy", context), warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        context["value"] = "changed"
+        warnings.warn("copied warning", UserWarning, stacklevel=1)
+
+    assert str(caught[0].message) == "[copy: value='initial'] copied warning"
+
+
+def test_context_provider_is_resolved_for_each_warning():
     """Dynamic metadata reflects state at the time each warning is rendered."""
     state = {"step": 1}
 
     with (
         warning_error_context(
             "iteration",
-            fixed="value",
-            metadata_provider=lambda: {"step": state["step"]},
+            {"fixed": "value"},
+            context_provider=lambda: {"step": state["step"]},
         ),
         warnings.catch_warnings(record=True) as caught,
     ):
@@ -119,7 +150,7 @@ def test_metadata_provider_is_resolved_for_each_warning():
     ]
 
 
-def test_metadata_provider_is_resolved_when_exception_leaves_context():
+def test_context_provider_is_resolved_when_exception_leaves_context():
     """Exception notes contain dynamic metadata from the point of failure."""
     state = {"step": 1}
 
@@ -129,7 +160,7 @@ def test_metadata_provider_is_resolved_when_exception_leaves_context():
 
     with (
         pytest.raises(ValueError, match="failed") as error,
-        warning_error_context("iteration", metadata_provider=lambda: {"step": state["step"]}),
+        warning_error_context("iteration", {}, context_provider=lambda: {"step": state["step"]}),
     ):
         fail_after_state_change()
 
@@ -137,43 +168,78 @@ def test_metadata_provider_is_resolved_when_exception_leaves_context():
 
 
 @pytest.mark.parametrize(
-    ("metadata_provider", "error_text"),
+    ("context_provider", "error_text"),
     [
-        (lambda: 1, "TypeError: metadata_provider must return a mapping"),
-        (lambda: {"fixed": "dynamic"}, "ValueError: metadata_provider returned duplicate keys: fixed"),
+        (lambda: 1, "TypeError: context_provider must return a mapping"),
+        (lambda: {"fixed": "dynamic"}, "ValueError: context_provider returned duplicate keys: fixed"),
         (lambda: 1 / 0, "ZeroDivisionError: division by zero"),
     ],
     ids=["not-a-mapping", "duplicate-key", "provider-raises"],
 )
-def test_metadata_provider_failure_does_not_mask_warning(metadata_provider, error_text):
+def test_context_provider_failure_does_not_mask_warning(context_provider, error_text):
     """Invalid dynamic metadata is reported without replacing the warning."""
     with (
-        warning_error_context("iteration", fixed="value", metadata_provider=metadata_provider),
+        warning_error_context("iteration", {"fixed": "value"}, context_provider=context_provider),
         pytest.warns(UserWarning, match="original warning") as caught,
     ):
         warnings.warn("original warning", UserWarning, stacklevel=1)
 
     assert str(caught[0].message) == (
-        f"[iteration: fixed='value', metadata_provider_error={error_text!r}] original warning"
+        f"[iteration: fixed='value', context_provider_error={error_text!r}] original warning"
     )
 
 
-def test_metadata_provider_failure_does_not_mask_exception():
+def test_context_provider_failure_does_not_mask_exception():
     """A provider failure is diagnostic context on the original exception."""
     with (
         pytest.raises(RuntimeError, match="original error") as error,
-        warning_error_context("iteration", metadata_provider=lambda: 1 / 0),
+        warning_error_context("iteration", {}, context_provider=lambda: 1 / 0),
     ):
         raise RuntimeError("original error")
 
-    assert error.value.__notes__ == [
-        "Context: iteration: metadata_provider_error='ZeroDivisionError: division by zero'"
-    ]
+    assert error.value.__notes__ == ["Context: iteration: context_provider_error='ZeroDivisionError: division by zero'"]
+
+
+def test_context_value_repr_failure_does_not_mask_warning():
+    """An unrenderable context value does not replace the original warning."""
+
+    class BrokenRepr:
+        def __repr__(self):
+            raise RuntimeError("repr failed")
+
+    with (
+        warning_error_context("iteration", {"value": BrokenRepr()}),
+        pytest.warns(UserWarning, match="original warning") as caught,
+    ):
+        warnings.warn("original warning", UserWarning, stacklevel=1)
+
+    assert str(caught[0].message) == "[iteration: value=<repr failed: RuntimeError>] original warning"
+
+
+def test_context_provider_error_str_failure_does_not_mask_warning():
+    """An unrenderable provider error does not replace the original warning."""
+
+    class BrokenStrError(RuntimeError):
+        def __str__(self):
+            raise RuntimeError("str failed")
+
+    def broken_provider():
+        raise BrokenStrError
+
+    with (
+        warning_error_context("iteration", context_provider=broken_provider),
+        pytest.warns(UserWarning, match="original warning") as caught,
+    ):
+        warnings.warn("original warning", UserWarning, stacklevel=1)
+
+    assert str(caught[0].message) == (
+        "[iteration: context_provider_error='BrokenStrError: <str failed: RuntimeError>'] original warning"
+    )
 
 
 def test_context_is_cleaned_up_after_exception():
     """Contexts do not leak after an exception leaves the context manager."""
-    with pytest.raises(ValueError, match="failed"), warning_error_context("datapoint", group="patient-1"):
+    with pytest.raises(ValueError, match="failed"), warning_error_context("datapoint", {"group": "patient-1"}):
         raise ValueError("failed")
 
     with pytest.warns(UserWarning, match="low level warning") as warning:
@@ -184,9 +250,9 @@ def test_context_is_cleaned_up_after_exception():
 
 def test_sibling_contexts_do_not_leak_into_each_other():
     """Sibling contexts under the same parent are pushed and popped independently."""
-    with warning_error_context("parent", item="recording-1"):
+    with warning_error_context("parent", {"item": "recording-1"}):
         with (
-            warning_error_context("child", item="first"),
+            warning_error_context("child", {"item": "first"}),
             pytest.warns(
                 UserWarning,
                 match=re.escape("[parent: item='recording-1' > child: item='first'] low level warning"),
@@ -195,7 +261,7 @@ def test_sibling_contexts_do_not_leak_into_each_other():
             _emit_warning()
 
         with (
-            warning_error_context("child", item="second"),
+            warning_error_context("child", {"item": "second"}),
             pytest.warns(
                 UserWarning,
                 match=re.escape("[parent: item='recording-1' > child: item='second'] low level warning"),
@@ -209,7 +275,7 @@ def test_sibling_contexts_do_not_leak_into_each_other():
 def test_warning_instances_keep_their_type_and_data():
     """Context metadata does not replace warning instances with plain strings."""
     with (
-        warning_error_context("datapoint", group="patient-1"),
+        warning_error_context("datapoint", {"group": "patient-1"}),
         pytest.warns(
             _CustomWarning,
             match=re.escape("[datapoint: group='patient-1'] custom warning"),
@@ -225,7 +291,7 @@ def test_warning_instances_with_required_new_arguments_and_slots_keep_their_type
     original_warning = _RequiredNewSlotWarning("custom warning", detail="kept")
 
     with (
-        warning_error_context("datapoint", group="patient-1"),
+        warning_error_context("datapoint", {"group": "patient-1"}),
         pytest.warns(
             _RequiredNewSlotWarning,
             match=re.escape("[datapoint: group='patient-1'] custom warning"),
@@ -252,7 +318,7 @@ def test_warning_instances_with_required_new_arguments_and_slots_keep_their_type
 )
 def test_context_is_added_for_all_warning_emitters(emit_warning):
     """The dispatcher sees warning sources that do not call the current warnings.warn binding."""
-    with warning_error_context("datapoint", item=3), warnings.catch_warnings(record=True) as caught:
+    with warning_error_context("datapoint", {"item": 3}), warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         emit_warning()
 
@@ -263,7 +329,7 @@ def test_context_is_added_for_all_warning_emitters(emit_warning):
 
 def test_warn_explicit_location_is_preserved():
     """Contextualizing an explicit warning keeps its synthetic location."""
-    with warning_error_context("datapoint", item=3), warnings.catch_warnings(record=True) as caught:
+    with warning_error_context("datapoint", {"item": 3}), warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         warnings.warn_explicit("explicit warning", UserWarning, "synthetic_warning_source.py", 123)
 
@@ -277,7 +343,7 @@ def test_warning_message_is_forwarded_exactly_once(monkeypatch):
     forwarded_messages = []
     monkeypatch.setattr(warnings, "_showwarnmsg_impl", forwarded_messages.append)
 
-    with warning_error_context("datapoint", item=3):
+    with warning_error_context("datapoint", {"item": 3}):
         warnings.warn_explicit("explicit warning", UserWarning, "synthetic_warning_source.py", 123)
 
     assert len(forwarded_messages) == 1
@@ -300,7 +366,7 @@ def test_warning_hook_installation_is_reload_safe():
                 module = importlib.import_module("tpcp.misc._warning_error_context")
                 reloaded_module = importlib.reload(module)
                 with (
-                    reloaded_module.warning_error_context("reload", attempt=1),
+                    reloaded_module.warning_error_context("reload", {"attempt": 1}),
                     warnings.catch_warnings(record=True) as caught,
                 ):
                     warnings.simplefilter("always")
@@ -345,7 +411,7 @@ def test_warning_hook_chains_to_preexisting_dispatcher_on_reload():
                 warnings._showwarnmsg = third_party_dispatcher
                 reloaded_module = importlib.reload(module)
                 with (
-                    reloaded_module.warning_error_context("third-party"),
+                    reloaded_module.warning_error_context("third-party", {}),
                     warnings.catch_warnings(record=True) as caught,
                 ):
                     warnings.simplefilter("always")
@@ -377,7 +443,10 @@ def test_warning_dispatcher_is_cloudpickleable():
 
 def test_warning_location_is_preserved_with_context():
     """Adding context does not change a stacklevel-derived warning location."""
-    with warning_error_context("datapoint", item=3), pytest.warns(UserWarning, match="location warning") as warning:
+    with (
+        warning_error_context("datapoint", {"item": 3}),
+        pytest.warns(UserWarning, match="location warning") as warning,
+    ):
         lineno = _emit_warning_with_line()
 
     assert warning[0].filename == __file__

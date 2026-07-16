@@ -91,9 +91,7 @@ def test_iterator_body_warning_contains_iteration_context():
         for data_point, result in iterator.iterate([1]):
             with iterator.warning_error_context(
                 "typed_iterator_iteration",
-                iteration_name="__main__",
-                input=data_point,
-                iteration_context={},
+                {"iteration_name": "__main__", "input": data_point, "iteration_context": {}},
             ):
                 warnings.warn("iteration warning", UserWarning, stacklevel=1)
                 result.result = 1
@@ -101,7 +99,8 @@ def test_iterator_body_warning_contains_iteration_context():
     with pytest.warns(
         UserWarning,
         match=re.escape(
-            "[typed_iterator_iteration: iteration_name='__main__', input=1, iteration_context={}] iteration warning"
+            "[typed_iterator_iteration: i=0, iteration_name='__main__', input=1, iteration_context={}] "
+            "iteration warning"
         ),
     ):
         emit_iteration_warning()
@@ -114,13 +113,53 @@ def test_iterator_body_exception_contains_explicit_context():
 
     def raise_iteration_error():
         for data_point, _ in iterator.iterate([1]):
-            with iterator.warning_error_context("typed_iterator", input=data_point, stage="processing"):
+            with iterator.warning_error_context("typed_iterator", {"input": data_point, "stage": "processing"}):
                 raise ValueError("iteration error")
 
     with pytest.raises(ValueError, match="iteration error") as error:
         raise_iteration_error()
 
-    assert error.value.__notes__ == ["Context: typed_iterator: input=1, stage='processing'"]
+    assert error.value.__notes__ == ["Context: typed_iterator: i=0, input=1, stage='processing'"]
+
+
+def test_iterator_context_injects_and_restores_nested_iteration_indices():
+    """Nested TypedIterator loops receive their respective current indices."""
+    rt = make_dataclass("ResultType", ["result"])
+    iterator = TypedIterator(rt)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for outer_data, _ in iterator.iterate([10]):
+            with iterator.warning_error_context("outer", {"input": outer_data}):
+                warnings.warn("outer before", UserWarning, stacklevel=1)
+            for inner_data, _ in iterator._iterate([20, 21], iteration_name="inner"):
+                with iterator.warning_error_context("inner", {"input": inner_data}):
+                    warnings.warn("inner", UserWarning, stacklevel=1)
+            with iterator.warning_error_context("outer", {"input": outer_data}):
+                warnings.warn("outer after", UserWarning, stacklevel=1)
+
+    assert [str(warning.message) for warning in caught] == [
+        "[outer: i=0, input=10] outer before",
+        "[inner: i=0, input=20] inner",
+        "[inner: i=1, input=21] inner",
+        "[outer: i=0, input=10] outer after",
+    ]
+
+
+def test_iterator_context_is_only_available_in_an_active_loop_body():
+    """The injected index is scoped to the currently yielded iteration."""
+    rt = make_dataclass("ResultType", ["result"])
+    iterator = TypedIterator(rt)
+
+    with pytest.raises(RuntimeError, match="inside an active TypedIterator loop body"):
+        iterator.warning_error_context("outside", {})
+
+    for _, _ in iterator.iterate([1]):
+        with iterator.warning_error_context("inside", {}):
+            pass
+
+    with pytest.raises(RuntimeError, match="inside an active TypedIterator loop body"):
+        iterator.warning_error_context("outside", {})
 
 
 def test_additional_aggregations():
