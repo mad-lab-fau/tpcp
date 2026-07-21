@@ -1,0 +1,4 @@
+# Project-specific review guidelines
+review_guidelines = """
+Backwards compatibility is mandatory for all public interfaces and supported behavior; flag and reject unapproved breaking changes. Internal refactors may proceed when every in-repository consumer is updated and public behavior remains stable. A public breaking change is permitted only as an explicitly approved, scoped exception with a migration path and prominent communication in code review, changelogs, and delivery reports.
+"""
