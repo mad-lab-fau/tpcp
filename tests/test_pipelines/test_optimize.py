@@ -578,6 +578,32 @@ class TestGridSearchCV:
         # Final optimize was called with all the data.
         assert len(mock.call_args_list[-1][0][1]) == 5
 
+    def test_train_dataset_transform_is_applied_after_each_split_and_for_final_optimization(self):
+        optimized_pipe = DummyOptimizablePipeline(optimized=True)
+        dataset = DummyDataset()
+
+        def subsample_for_smoke_test(train_dataset):
+            return train_dataset[:1]
+
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
+            mock.__name__ = "self_optimize"
+            result = GridSearchCV(
+                DummyOptimizablePipeline(),
+                ParameterGrid({"para_1": [1, 2]}),
+                scoring=dummy_single_score_func,
+                cv=2,
+                return_optimized=True,
+                return_train_score=True,
+                train_dataset_transform=subsample_for_smoke_test,
+                safe_optimize=False,
+            ).optimize(dataset)
+
+        # Two candidates in two folds, followed by optimization of the best candidate on all data.
+        assert [len(call.args[0]) for call in mock.call_args_list] == [1, 1, 1, 1, 1]
+        assert all(len(labels) == 2 for labels in result.cv_results_["split0__train__data_labels"])
+        assert all(len(labels) == 3 for labels in result.cv_results_["split1__train__data_labels"])
+        assert len(dataset) == 5
+
     @pytest.mark.parametrize(("pure_paras", "call_count"), [(False, 6 * 2), (True, 2 * 2), (["para_1"], 2 * 2)])
     def test_pure_parameters(self, pure_paras, call_count):
         optimized_pipe = DummyOptimizablePipeline()
@@ -732,6 +758,28 @@ class TestOptimize:
         assert result.optimized_pipeline_.get_params() == optimized_pipe.get_params()
         # The id must been different, indicating that `optimize` correctly called clone on the output
         assert id(result.optimized_pipeline_) != id(optimized_pipe)
+
+    def test_train_dataset_transform_changes_only_the_dataset_used_for_optimization(self):
+        optimized_pipe = DummyOptimizablePipeline(optimized=True)
+        dataset = DummyDataset()
+
+        def subsample_for_smoke_test(train_dataset):
+            return train_dataset.set_params(subset_index=train_dataset.index.iloc[:2].reset_index(drop=True))
+
+        with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=optimized_pipe) as mock:
+            mock.__name__ = "self_optimize"
+            result = Optimize(
+                DummyOptimizablePipeline(),
+                train_dataset_transform=subsample_for_smoke_test,
+                safe_optimize=False,
+            ).optimize(dataset)
+
+        transformed_dataset = mock.call_args.args[0]
+        assert len(transformed_dataset) == 2
+        assert len(dataset) == 5
+        assert result.dataset is dataset
+        assert result.transformed_dataset_ is transformed_dataset
+        assert transformed_dataset is not dataset
 
     def test_mutable_inputs(self):
         """Test how mutable inputs are handled.

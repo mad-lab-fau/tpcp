@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Generic,
     Literal,
     Optional,
@@ -145,6 +146,26 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
     ----------
     pipeline
         The pipeline to optimize. The pipeline must implement `self_optimize` to optimize its own input parameters.
+    train_dataset_transform
+        An optional callable that transforms the dataset immediately before it is passed to the pipeline's
+        `self_optimize` method. The callable must return a dataset implementing the same interface as its input.
+        This can be used for operations such as data augmentation or subsampling. The callable receives a clone so
+        that in-place transformations cannot modify the original dataset.
+
+        For example, this transform restricts optimization to the first ten datapoints::
+
+            def first_ten(dataset):
+                return dataset[:10]
+
+
+            optimizer = Optimize(
+                pipeline,
+                train_dataset_transform=first_ten,
+            )
+            optimizer.optimize(dataset)
+
+        See :ref:`sphx_glr_auto_examples_validation__05_train_dataset_transform.py` for complete augmentation and
+        subsampling examples.
     safe_optimize
         If True, we add additional checks to make sure the `self_optimize` method of the pipeline is correctly
         implemented.
@@ -167,24 +188,31 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
     optimization_info_
         If the optimized pipeline implements a `self_optimize_with_info` method, this parameter contains the
         additional information provided as second return value from this method.
+    transformed_dataset_
+        The dataset used for optimization after applying `train_dataset_transform`. If no transform was supplied,
+        this is the original dataset.
 
     """
 
     pipeline: Parameter[OptimizablePipelineT]
+    train_dataset_transform: Optional[Callable[[DatasetT], DatasetT]]
     safe_optimize: bool
     optimize_with_info: bool
 
     optimized_pipeline_: OptimizablePipelineT
     optimization_info_: Any
+    transformed_dataset_: DatasetT
 
     def __init__(
         self,
         pipeline: OptimizablePipelineT,
         *,
+        train_dataset_transform: Optional[Callable[[DatasetT], DatasetT]] = None,
         safe_optimize: bool = True,
         optimize_with_info: bool = True,
     ) -> None:
         self.pipeline = pipeline
+        self.train_dataset_transform = train_dataset_transform
         self.safe_optimize = safe_optimize
         self.optimize_with_info = optimize_with_info
 
@@ -210,6 +238,10 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
 
         """
         self.dataset = dataset
+        transformed_dataset = (
+            self.train_dataset_transform(dataset.clone()) if self.train_dataset_transform is not None else dataset
+        )
+        self.transformed_dataset_ = transformed_dataset
         if not hasattr(self.pipeline, "self_optimize"):
             raise ValueError(
                 "To use `Optimize` with a pipeline, the pipeline needs to implement a `self_optimize` method."
@@ -220,13 +252,13 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
         if self.safe_optimize is True:
             # We check here, if the pipeline already has the safe decorator and if yes just call it.
             if getattr(method, OPTIMIZE_METHOD_INDICATOR, False) is True:
-                optimized_pipeline, other_info = _split_returns(method(dataset, **optimize_params))
+                optimized_pipeline, other_info = _split_returns(method(transformed_dataset, **optimize_params))
             else:
                 optimized_pipeline, other_info = _split_returns(
-                    _check_safe_optimize(pipeline, method, dataset, **optimize_params)
+                    _check_safe_optimize(pipeline, method, transformed_dataset, **optimize_params)
                 )
         else:
-            optimized_pipeline, other_info = _split_returns(method(dataset, **optimize_params))
+            optimized_pipeline, other_info = _split_returns(method(transformed_dataset, **optimize_params))
         # We clone again, just to be sure
         self.optimized_pipeline_ = optimized_pipeline.clone()
         if self.optimize_with_info and other_info is not NOTHING:
@@ -540,6 +572,28 @@ class GridSearchCV(
         <https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_validate.html>`_.
 
         For more complex usecases like grouping or stratification, the :class:`~tpcp.TpcpSplitter` can be used.
+    train_dataset_transform
+        An optional callable that transforms each training dataset after splitting and immediately before
+        `self_optimize` is called. The callable must return a dataset implementing the same interface as its input.
+        Validation datasets remain unchanged. The transform is also applied before the final optimization on all data.
+
+        For example, this applies a smoke-test subsample independently to every training fold::
+
+            def first_ten(dataset):
+                return dataset[:10]
+
+
+            search = GridSearchCV(
+                pipeline,
+                parameter_grid,
+                scoring=scorer,
+                cv=5,
+                train_dataset_transform=first_ten,
+            )
+            search.optimize(dataset)
+
+        See :ref:`sphx_glr_auto_examples_validation__05_train_dataset_transform.py` for complete augmentation and
+        subsampling examples.
     pure_parameters
         .. warning::
             Do not use this option unless you fully understand it!
@@ -658,6 +712,7 @@ class GridSearchCV(
     scoring: ScorerTypes[OptimizablePipelineT, DatasetT]
     return_optimized: Union[bool, str]
     cv: Optional[Union[DatasetSplitter, int, BaseCrossValidator, Iterator]]
+    train_dataset_transform: Optional[Callable[[DatasetT], DatasetT]]
     pure_parameters: Union[bool, list[str]]
     return_train_score: bool
     verbose: int
@@ -682,6 +737,7 @@ class GridSearchCV(
         scoring: ScorerTypes[OptimizablePipelineT, DatasetT],
         return_optimized: Union[bool, str] = True,
         cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
+        train_dataset_transform: Optional[Callable[[DatasetT], DatasetT]] = None,
         pure_parameters: Union[bool, list[str]] = False,
         return_train_score: bool = False,
         verbose: int = 0,
@@ -696,6 +752,7 @@ class GridSearchCV(
         self.scoring = scoring
         self.return_optimized = return_optimized
         self.cv = cv
+        self.train_dataset_transform = train_dataset_transform
         self.pure_parameters = pure_parameters
         self.return_train_score = return_train_score
         self.verbose = verbose
@@ -819,6 +876,7 @@ class GridSearchCV(
             # We clone twice, in case one of the params was itself an algorithm.
             best_optimizer = Optimize(
                 self.pipeline.clone().set_params(**self.best_params_).clone(),
+                train_dataset_transform=self.train_dataset_transform,
                 safe_optimize=self.safe_optimize,
             )
             final_optimize_start_time = time.time()
@@ -833,6 +891,7 @@ class GridSearchCV(
         # In the future we might be able to allow objects with optimizer Interface as input directly.
         optimizer = Optimize(
             self.pipeline,
+            train_dataset_transform=self.train_dataset_transform,
             safe_optimize=self.safe_optimize,
             optimize_with_info=self.optimize_with_info,
         )
