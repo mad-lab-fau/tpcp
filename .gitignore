@@ -311,3 +311,5 @@ _debug_test
 # joss paper compile output
 paper/paper.pdf
 paper/paper.jats
+# roborev snapshots
+/.roborev/
