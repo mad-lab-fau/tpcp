@@ -80,6 +80,43 @@ def test_advanced_cross_validate(snapshot):
     )
 
 
+def test_train_dataset_transform():
+    from examples.validation._05_train_dataset_transform import (
+        AugmentedImageDataset,
+        ImageDataset,
+        augmentation_results,
+        augmentation_training_sizes,
+        augmented_dataset,
+        raw_dataset,
+        rotate_training_images,
+        smoke_test_results,
+        smoke_test_training_sizes,
+    )
+
+    assert isinstance(raw_dataset, ImageDataset)
+    assert isinstance(augmented_dataset, AugmentedImageDataset)
+    assert augmented_dataset.original_dataset is raw_dataset
+    assert_array_equal(raw_dataset[0].image, [[1, 0, 0], [1, 1, 0], [1, 0, 0]])
+    rotated_datapoint = augmented_dataset.get_subset(sample_id=0, rotation_deg=90)
+    assert rotated_datapoint.label == raw_dataset[0].label
+    assert_array_equal(
+        rotated_datapoint.image,
+        [[0, 0, 0], [0, 1, 0], [1, 1, 1]],
+    )
+
+    grouped_dataset = raw_dataset.groupby("sample_id")
+    grouped_augmented_dataset = rotate_training_images(grouped_dataset)
+    assert grouped_augmented_dataset.groupby_cols == ["sample_id", "rotation_deg"]
+    assert len(grouped_augmented_dataset) == 24
+    assert grouped_augmented_dataset[0].label == grouped_dataset[0].label
+    assert_array_equal(grouped_augmented_dataset[0].image, grouped_dataset[0].image)
+
+    assert augmentation_training_sizes == [16, 16, 16]
+    assert smoke_test_training_sizes == [2, 2, 2]
+    assert all(len(labels) == 2 for labels in augmentation_results["test__data_labels"])
+    assert all(len(labels) == 2 for labels in smoke_test_results["test__data_labels"])
+
+
 def test_optuna():
     from examples.parameter_optimization._04_custom_optuna_optimizer import opti, opti_early_stop
 
