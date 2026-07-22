@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `Scorer` now adds structured iteration context to warnings and errors raised by custom score aggregators and
+  single-score callbacks.
+  (https://github.com/mad-lab-fau/tpcp/pull/138)
 - **Breaking:** Error and warning text from `validate`, `cross_validate`, `GridSearch`, `GridSearchCV`, `Scorer`,
   `TypedIterator`, and Optuna optimization now includes structured context metadata instead of the previous ad-hoc
   error strings.
