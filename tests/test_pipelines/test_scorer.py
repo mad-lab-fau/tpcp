@@ -108,6 +108,32 @@ class TestScorer:
             scorer(pipe, data)
         assert "Aggregator for score 'val' raised an exception" in str(e.value)
 
+    def test_aggregation_warning_and_error_contain_score_iteration_context(self):
+        """Custom-aggregator diagnostics identify the internally iterated score."""
+
+        def failing_aggregation(_values):
+            warnings.warn("aggregation warning", UserWarning, stacklevel=1)
+            raise RuntimeError("aggregation failed")
+
+        valid_aggregator = FloatAggregator(np.mean)
+        failing_aggregator = FloatAggregator(failing_aggregation)
+
+        def score_func(_pipeline, _datapoint):
+            return {
+                "valid": valid_aggregator(1.0),
+                "failing": failing_aggregator(2.0),
+            }
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with pytest.raises(ValidationError, match="Aggregator for score 'failing'") as error:
+                Scorer(score_func)(DummyOptimizablePipeline(), DummyDataset())
+
+        expected_context = "score_aggregation: i=1, score_name='failing'"
+        assert str(caught[0].message) == f"aggregation warning\n[{expected_context}] aggregation warning"
+        assert error.value.__notes__ == [f"Context: {expected_context}"]
+        assert isinstance(error.value.__cause__, RuntimeError)
+
     def test_callback_called(self):
         mock_score_func = Mock(return_value=1)
         mock_callback = Mock()
