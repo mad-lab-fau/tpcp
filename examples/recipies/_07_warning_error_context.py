@@ -9,8 +9,9 @@ useful when a low-level warning or error does not know which dataset item,
 optimization trial, or iteration triggered it.
 
 This example covers fixed and dynamic context, nested contexts, retained event
-records, contextual prints, quiet record-only execution, arbitrary iterators,
-:class:`~tpcp.misc.TypedIterator`, and typed sub-iterations.
+records, contextual prints, manual lifecycle control, quiet record-only
+execution, arbitrary iterators, :class:`~tpcp.misc.TypedIterator`, and typed
+sub-iterations.
 
 Simple and dynamic context
 --------------------------
@@ -80,6 +81,28 @@ try:
 except ValueError as error:
     print(f"Caught error: {error}")
     print(f"Context: {getattr(error, '__notes__', [])}")
+
+# %%
+# Manual lifecycle
+# ----------------
+# For a long top-level script, the object returned by
+# :func:`~tpcp.misc.warning_error_context` can be started and stopped explicitly
+# to avoid indenting the entire guarded section.
+manual_context = warning_error_context("script", {"phase": "processing"})
+manual_context.start()
+warnings.warn("manual warning", UserWarning, stacklevel=1)
+print_with_context("Manual context is active")
+manual_context.stop()
+
+print([record.type for record in manual_context.records])
+
+# %%
+# Manual lifecycle control has an important exception caveat. ``stop()`` does
+# not receive an active exception, so it cannot record or annotate one. If an
+# exception prevents ``stop()`` from running, the context also remains active.
+# A ``try``/``finally`` can guarantee cleanup, but the bare ``stop()`` call
+# still cannot add exception context. Use the ``with`` form whenever exceptions
+# must be recorded, annotated, or cleanly unwind the context.
 
 # %%
 # Recording events and contextual prints
