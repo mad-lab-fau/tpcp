@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added an optional `train_dataset_transform` callable to `Optimize` and `GridSearchCV` for fold-local training-data
   augmentation and subsampling.
   (https://github.com/mad-lab-fau/tpcp/pull/137)
+- Added `DatasetWrapperMixin` to implement datasets that lazily transform another dataset while preserving a shared
+  domain-specific dataset interface.
+  (https://github.com/mad-lab-fau/tpcp/pull/137)
 - Added an advanced recipe showing how to expose predefined parameters and pretrained models for algorithms.
   (https://github.com/mad-lab-fau/tpcp/pull/133)
 

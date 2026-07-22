@@ -70,6 +70,19 @@ like :func:`~tpcp.validate.cross_validate`.
    It is up to the user to add additional methods and properties to a dataset that represent the actual data that can
    be used by an algorithm.
 
+Datasets that lazily transform or augment another dataset can reuse :class:`~tpcp.DatasetWrapperMixin`. Such a wrapper
+inherits from both the mixin and the shared domain-specific dataset base, allowing original and transformed datapoints
+to expose the same properties to a Pipeline.
+
+.. important::
+   For a wrapped dataset, always list :class:`~tpcp.DatasetWrapperMixin` **before** the domain-specific dataset base::
+
+       class AugmentedDataset(DatasetWrapperMixin[DomainDataset], DomainDataset):
+           ...
+
+   This order is required by Python's method resolution order. Reversing the bases would select the dataset base's
+   index implementation instead of the wrapper implementation and is rejected with a :class:`TypeError`.
+
 
 
 Pipelines
