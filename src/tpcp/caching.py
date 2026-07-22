@@ -14,7 +14,7 @@ from joblib import Memory
 
 from tpcp import Algorithm, get_action_methods_names, get_results, make_action_safe
 from tpcp._hash import custom_hash
-from tpcp.parallel import register_global_parallel_callback, remove_global_parallel_callback
+from tpcp.parallel import _register_tpcp_global_parallel_callback, _remove_tpcp_global_parallel_callback
 
 _ALREADY_WARNED = False
 
@@ -130,7 +130,7 @@ def _register_global_parallel_callback(func, name):
     def _callback():
         return None, wrapper
 
-    register_global_parallel_callback(_callback, name=name)
+    _register_tpcp_global_parallel_callback(name, _callback)
 
 
 def global_disk_cache(  # noqa: C901
@@ -313,7 +313,9 @@ def remove_disk_cache(algorithm_object: type[Algorithm]):
         if getattr(action_method, "__wrapped__", None) is not None:
             setattr(algorithm_object, action_name, action_method.__wrapped__)
             with contextlib.suppress(KeyError):
-                remove_global_parallel_callback(f"global_disk_cache__{algorithm_object.__qualname__}__{action_name}")
+                _remove_tpcp_global_parallel_callback(
+                    f"global_disk_cache__{algorithm_object.__qualname__}__{action_name}"
+                )
     return algorithm_object
 
 
@@ -453,7 +455,7 @@ def remove_ram_cache(algorithm_object: type[Algorithm]):
         if getattr(action_method, "__wrapped__", None) is not None:
             setattr(algorithm_object, action_method_name, action_method.__wrapped__)
             with contextlib.suppress(KeyError):
-                remove_global_parallel_callback(
+                _remove_tpcp_global_parallel_callback(
                     f"global_ram_cache__{algorithm_object.__qualname__}__{action_method_name}"
                 )
 

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `tpcp.parallel.Parallel` and public parallel side-channel registration. Together with
+  `tpcp.parallel.delayed`, this restores per-task state and returns side-channel data from successful workers
+  without changing task return values.
+  (https://github.com/mad-lab-fau/tpcp/pull/138)
 - Added an optional `train_dataset_transform` callable to `Optimize` and `GridSearchCV` for fold-local training-data
   augmentation and subsampling.
   (https://github.com/mad-lab-fau/tpcp/pull/137)
@@ -28,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** Names beginning with `__tpcp_internal__.` are now reserved for TPCP parallel callbacks and side
+  channels. `register_global_parallel_callback`, `remove_global_parallel_callback`, and the new side-channel
+  registration functions reject names using this prefix. Existing user registrations with this prefix must be
+  renamed.
+  (https://github.com/mad-lab-fau/tpcp/pull/138)
 - `Scorer` now adds structured iteration context to warnings and errors raised by custom score aggregators and
   single-score callbacks.
   (https://github.com/mad-lab-fau/tpcp/pull/138)

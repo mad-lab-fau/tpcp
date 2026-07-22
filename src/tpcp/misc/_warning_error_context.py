@@ -8,8 +8,10 @@ from copy import copy
 from dataclasses import dataclass
 from io import StringIO
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Optional, TypeVar, Union
+from uuid import uuid4
+from weakref import WeakValueDictionary
 
-from tpcp.parallel import _register_parallel_context
+from tpcp.parallel import _register_tpcp_parallel_side_channel
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -67,6 +69,7 @@ class WarningErrorContext(AbstractContextManager["WarningErrorContext"]):
         self._frame: Optional[_ContextFrame] = None
         self._token: Optional[Token] = None
         self._started = False
+        self._parallel_target_id: Optional[str] = None
 
     def start(self) -> WarningErrorContext:
         """Activate the context and return this object.
@@ -197,6 +200,7 @@ class _ParallelContextFrame:
     context: dict[str, Any]
     context_provider: Optional[Callable[[], Mapping[str, Any]]]
     record_only: bool
+    target_id: str
 
     def render(self) -> str:
         rendered_context = _render_context_with_provider(self.context, self.context_provider)
@@ -205,6 +209,7 @@ class _ParallelContextFrame:
 
 _context_stack: ContextVar[tuple[_ContextFrame, ...]] = ContextVar("tpcp_warning_error_context", default=())
 _recorded_error: ContextVar[Optional[BaseException]] = ContextVar("tpcp_warning_error_recorded_error", default=None)
+_parallel_context_targets: WeakValueDictionary[str, WarningErrorContext] = WeakValueDictionary()
 
 
 def _render_context_stack() -> str:
@@ -215,23 +220,59 @@ def _capture_parallel_context() -> Optional[tuple[_ParallelContextFrame, ...]]:
     stack = _context_stack.get()
     if not stack:
         return None
-    return tuple(
-        _ParallelContextFrame(
-            name=frame.name,
-            context=dict(frame.context),
-            context_provider=frame.context_provider,
-            record_only=frame.record_only,
+    captured_frames = []
+    for frame in stack:
+        target_id = frame.result._parallel_target_id
+        if target_id is None:
+            target_id = uuid4().hex
+            frame.result._parallel_target_id = target_id
+        _parallel_context_targets[target_id] = frame.result
+        captured_frames.append(
+            _ParallelContextFrame(
+                name=frame.name,
+                context=dict(frame.context),
+                context_provider=frame.context_provider,
+                record_only=frame.record_only,
+                target_id=target_id,
+            )
         )
-        for frame in stack
-    )
+    return tuple(captured_frames)
+
+
+class _ParallelContextSideChannelData(NamedTuple):
+    target_ids: tuple[str, ...]
+    records: tuple[WarningErrorContextRecord, ...]
 
 
 @contextmanager
-def _restore_parallel_context(context: tuple[_ParallelContextFrame, ...]) -> Iterator[None]:
+def _restore_parallel_context(
+    context: tuple[_ParallelContextFrame, ...],
+) -> Iterator[Callable[[], _ParallelContextSideChannelData]]:
+    active_target_ids = tuple(frame.result._parallel_target_id for frame in _context_stack.get())
+    captured_target_ids = tuple(frame.target_id for frame in context)
+    if active_target_ids == captured_target_ids:
+        yield lambda: _ParallelContextSideChannelData((), ())
+        return
+
     with ExitStack() as stack:
+        restored_contexts = []
         for frame in context:
-            stack.enter_context(warning_error_context(frame.render(), record_only=frame.record_only))
-        yield
+            restored_contexts.append(
+                stack.enter_context(warning_error_context(frame.render(), record_only=frame.record_only))
+            )
+
+        def collect_side_channel_data() -> _ParallelContextSideChannelData:
+            records = () if not restored_contexts else tuple(restored_contexts[0].records)
+            return _ParallelContextSideChannelData(tuple(frame.target_id for frame in context), records)
+
+        yield collect_side_channel_data
+
+
+def _merge_parallel_context_side_channel_data(side_channel_data: _ParallelContextSideChannelData) -> None:
+    for target_id in side_channel_data.target_ids:
+        target = _parallel_context_targets.get(target_id)
+        if target is not None:
+            target.records.extend(side_channel_data.records)
 
 
 def _record_event(
@@ -395,7 +436,12 @@ def warning_error_context(
     that task. A propagated ``context_provider`` is evaluated once when the worker
     task enters the restored context, so all events in that task use the same
     snapshot. Context providers created inside the worker retain their normal dynamic
-    behavior.
+    behavior. When :class:`tpcp.parallel.Parallel` is paired with
+    :func:`tpcp.parallel.delayed`, records from successful tasks are merged back into
+    the original context. Records from a task that raises are not recovered from a
+    separate worker. With ``n_jobs=1``, execution remains inline: providers retain
+    their normal dynamic behavior, and the active parent context directly records
+    exceptions that escape the task.
 
     The context manager yields a :class:`WarningErrorContext` whose ``records`` list
     remains available after the context exits. It contains warnings that reached
@@ -497,8 +543,9 @@ def iter_with_warning_error_context(
         yield _make_iteration_context_factory(i), item
 
 
-_register_parallel_context(
+_register_tpcp_parallel_side_channel(
     "warning_error_context",
     _capture_parallel_context,
     _restore_parallel_context,
+    _merge_parallel_context_side_channel_data,
 )
