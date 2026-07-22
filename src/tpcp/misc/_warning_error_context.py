@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from contextlib import AbstractContextManager
+from contextlib import AbstractContextManager, ExitStack, contextmanager
 from contextvars import ContextVar, Token
 from copy import copy
 from dataclasses import dataclass
 from io import StringIO
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Optional, TypeVar, Union
+
+from tpcp.parallel import _register_parallel_context
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -151,6 +153,28 @@ def _safe_exception_description(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {message}"
 
 
+def _render_context_with_provider(
+    context: dict[str, Any], context_provider: Optional[Callable[[], Mapping[str, Any]]]
+) -> str:
+    if context_provider is not None:
+        try:
+            provided_context = context_provider()
+            if not isinstance(provided_context, Mapping):
+                raise TypeError("context_provider must return a mapping")
+            duplicate_keys = context.keys() & provided_context.keys()
+            if duplicate_keys:
+                duplicates = ", ".join(sorted(duplicate_keys))
+                raise ValueError(f"context_provider returned duplicate keys: {duplicates}")
+            context = {**context, **provided_context}
+        except BaseException as exc:  # noqa: BLE001 - context rendering must not mask the original event
+            provider_error = _safe_exception_description(exc)
+            rendered_context = _render_context_values(context)
+            rendered_error = f"context_provider_error={provider_error!r}"
+            return ", ".join(filter(None, (rendered_context, rendered_error)))
+
+    return _render_context_values(context)
+
+
 @dataclass(frozen=True)
 class _ContextFrame:
     name: str
@@ -160,27 +184,22 @@ class _ContextFrame:
     record_only: bool = False
 
     def _render_context(self) -> str:
-        context = self.context
-        if self.context_provider is not None:
-            try:
-                provided_context = self.context_provider()
-                if not isinstance(provided_context, Mapping):
-                    raise TypeError("context_provider must return a mapping")
-                duplicate_keys = context.keys() & provided_context.keys()
-                if duplicate_keys:
-                    duplicates = ", ".join(sorted(duplicate_keys))
-                    raise ValueError(f"context_provider returned duplicate keys: {duplicates}")
-                context = {**context, **provided_context}
-            except BaseException as exc:  # noqa: BLE001 - context rendering must not mask the original event
-                provider_error = _safe_exception_description(exc)
-                rendered_context = _render_context_values(context)
-                rendered_error = f"context_provider_error={provider_error!r}"
-                return ", ".join(filter(None, (rendered_context, rendered_error)))
-
-        return _render_context_values(context)
+        return _render_context_with_provider(self.context, self.context_provider)
 
     def render(self) -> str:
         rendered_context = self._render_context()
+        return self.name if not rendered_context else f"{self.name}: {rendered_context}"
+
+
+@dataclass(frozen=True)
+class _ParallelContextFrame:
+    name: str
+    context: dict[str, Any]
+    context_provider: Optional[Callable[[], Mapping[str, Any]]]
+    record_only: bool
+
+    def render(self) -> str:
+        rendered_context = _render_context_with_provider(self.context, self.context_provider)
         return self.name if not rendered_context else f"{self.name}: {rendered_context}"
 
 
@@ -190,6 +209,29 @@ _recorded_error: ContextVar[Optional[BaseException]] = ContextVar("tpcp_warning_
 
 def _render_context_stack() -> str:
     return " > ".join(frame.render() for frame in _context_stack.get())
+
+
+def _capture_parallel_context() -> Optional[tuple[_ParallelContextFrame, ...]]:
+    stack = _context_stack.get()
+    if not stack:
+        return None
+    return tuple(
+        _ParallelContextFrame(
+            name=frame.name,
+            context=dict(frame.context),
+            context_provider=frame.context_provider,
+            record_only=frame.record_only,
+        )
+        for frame in stack
+    )
+
+
+@contextmanager
+def _restore_parallel_context(context: tuple[_ParallelContextFrame, ...]) -> Iterator[None]:
+    with ExitStack() as stack:
+        for frame in context:
+            stack.enter_context(warning_error_context(frame.render(), record_only=frame.record_only))
+        yield
 
 
 def _record_event(
@@ -348,6 +390,13 @@ def warning_error_context(
     recorded, use an appropriate warning filter such as
     ``warnings.simplefilter("always")``.
 
+    When :func:`tpcp.parallel.delayed` captures an active context for execution in a
+    worker process, its fixed metadata and ``record_only`` setting are restored for
+    that task. A propagated ``context_provider`` is evaluated once when the worker
+    task enters the restored context, so all events in that task use the same
+    snapshot. Context providers created inside the worker retain their normal dynamic
+    behavior.
+
     The context manager yields a :class:`WarningErrorContext` whose ``records`` list
     remains available after the context exits. It contains warnings that reached
     Python's warning dispatcher and exceptions that escaped the context. Original
@@ -446,3 +495,10 @@ def iter_with_warning_error_context(
     """
     for i, item in enumerate(iterable):
         yield _make_iteration_context_factory(i), item
+
+
+_register_parallel_context(
+    "warning_error_context",
+    _capture_parallel_context,
+    _restore_parallel_context,
+)
