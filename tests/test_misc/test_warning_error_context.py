@@ -131,6 +131,33 @@ def test_context_records_warnings_and_errors_with_their_final_context():
     assert item_context.records == expected_records
 
 
+def test_context_can_be_started_and_stopped_without_with():
+    """A context can be activated manually without indenting the guarded code."""
+    original_warning = UserWarning("signal is short")
+    output = io.StringIO()
+    context = warning_error_context("script", {"phase": "processing"})
+
+    assert context.start() is context
+    with warnings.catch_warnings(record=True) as emitted_warnings:
+        warnings.simplefilter("always")
+        warnings.warn(original_warning, stacklevel=1)
+        print_with_context("processed", file=output)
+    context.stop()
+
+    with warnings.catch_warnings(record=True) as warnings_after_stop:
+        warnings.simplefilter("always")
+        warnings.warn("outside context", UserWarning, stacklevel=1)
+
+    expected_context = "script: phase='processing'"
+    assert str(emitted_warnings[0].message) == f"signal is short\n[{expected_context}] signal is short"
+    assert output.getvalue() == f"[{expected_context}] processed\n"
+    assert context.records == [
+        WarningErrorContextRecord("warning", expected_context, original_warning),
+        WarningErrorContextRecord("print", expected_context, "processed"),
+    ]
+    assert str(warnings_after_stop[0].message) == "outside context"
+
+
 def test_print_with_context_prints_and_records_like_print():
     """Contextual prints retain normal value, separator, terminator, and file handling."""
     output = io.StringIO()

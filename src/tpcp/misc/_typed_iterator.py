@@ -1,6 +1,5 @@
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from contextlib import AbstractContextManager
 from dataclasses import fields, is_dataclass
 from typing import Any, Generic, Optional, TypeVar
 
@@ -205,7 +204,7 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
         *,
         context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
         record_only: bool = False,
-    ) -> AbstractContextManager[WarningErrorContext]:
+    ) -> WarningErrorContext:
         """Create explicit warning/error context for an iteration body.
 
         This convenience method has the same interface as
