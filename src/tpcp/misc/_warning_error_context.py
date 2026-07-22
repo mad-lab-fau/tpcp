@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from contextlib import AbstractContextManager, contextmanager
-from contextvars import ContextVar
+from contextlib import AbstractContextManager
+from contextvars import ContextVar, Token
 from copy import copy
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from io import StringIO
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Optional, TypeVar, Union
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Sequence
+    from collections.abc import Sequence
 
 T = TypeVar("T")
 
@@ -38,9 +38,8 @@ class WarningErrorContextRecord(NamedTuple):
     message: Union[Warning, BaseException, str]
 
 
-@dataclass
-class WarningErrorContext:
-    """The persistent result returned by :func:`warning_error_context`.
+class WarningErrorContext(AbstractContextManager["WarningErrorContext"]):
+    """A warning/error context and its persistent event records.
 
     Attributes
     ----------
@@ -50,10 +49,80 @@ class WarningErrorContext:
 
     """
 
-    records: list[WarningErrorContextRecord] = field(default_factory=list, init=False)
+    def __init__(
+        self,
+        name: str,
+        context: Optional[dict[str, Any]] = None,
+        *,
+        context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
+        record_only: bool = False,
+    ) -> None:
+        self.records: list[WarningErrorContextRecord] = []
+        self._name = name
+        self._context = context
+        self._context_provider = context_provider
+        self._record_only = record_only
+        self._frame: Optional[_ContextFrame] = None
+        self._token: Optional[Token] = None
+        self._started = False
+
+    def start(self) -> WarningErrorContext:
+        """Activate the context and return this object.
+
+        Use the context-manager form when exceptions must be recorded and
+        annotated reliably.
+        """
+        if self._frame is not None:
+            raise RuntimeError("The warning/error context is already active.")
+        if self._started:
+            raise RuntimeError("The warning/error context cannot be restarted.")
+
+        frame = _ContextFrame(
+            name=self._name,
+            context=dict({} if self._context is None else self._context),
+            context_provider=self._context_provider,
+            result=self,
+            record_only=self._record_only,
+        )
+        self._token = _context_stack.set((*_context_stack.get(), frame))
+        self._frame = frame
+        self._started = True
+        return self
+
+    def stop(self) -> None:
+        """Deactivate the context without recording an exception."""
+        if self._frame is None or self._token is None:
+            raise RuntimeError("The warning/error context is not active.")
+        stack = _context_stack.get()
+        if not stack or stack[-1] is not self._frame:
+            raise RuntimeError("Nested warning/error contexts must be stopped in reverse order.")
+
+        is_outermost_context = len(stack) == 1
+        _context_stack.reset(self._token)
+        self._frame = None
+        self._token = None
+        if is_outermost_context:
+            _recorded_error.set(None)
+
+    def __enter__(self) -> WarningErrorContext:
+        return self.start()
+
+    def __exit__(self, _exc_type: Any, exc: Optional[BaseException], _traceback: Any) -> Optional[bool]:
+        frame = self._frame
+        if frame is None:
+            raise RuntimeError("The warning/error context is not active.")
+        try:
+            if exc is not None:
+                if _recorded_error.get() is not exc:
+                    _record_event("error", _render_context_stack(), exc)
+                    _recorded_error.set(exc)
+                _add_note(exc, f"Context: {frame.render()}")
+        finally:
+            self.stop()
+        return None
 
 
-_WarningErrorContextFactory = Callable[..., AbstractContextManager[WarningErrorContext]]
+_WarningErrorContextFactory = Callable[..., WarningErrorContext]
 
 
 def _safe_repr(value: Any) -> str:
@@ -65,6 +134,13 @@ def _safe_repr(value: Any) -> str:
 
 def _render_context_values(context: Mapping[str, Any]) -> str:
     return ", ".join(f"{key}={_safe_repr(value)}" for key, value in context.items())
+
+
+def _render_named_context(name: str, context: Mapping[str, Any]) -> str:
+    rendered_context = _render_context_values(context)
+    if not rendered_context:
+        return name
+    return f"{name}: {rendered_context}"
 
 
 def _safe_exception_description(exc: BaseException) -> str:
@@ -79,8 +155,8 @@ def _safe_exception_description(exc: BaseException) -> str:
 class _ContextFrame:
     name: str
     context: dict[str, Any]
+    result: WarningErrorContext
     context_provider: Optional[Callable[[], Mapping[str, Any]]] = None
-    result: WarningErrorContext = field(default_factory=WarningErrorContext)
     record_only: bool = False
 
     def _render_context(self) -> str:
@@ -105,9 +181,7 @@ class _ContextFrame:
 
     def render(self) -> str:
         rendered_context = self._render_context()
-        if not rendered_context:
-            return self.name
-        return f"{self.name}: {rendered_context}"
+        return self.name if not rendered_context else f"{self.name}: {rendered_context}"
 
 
 _context_stack: ContextVar[tuple[_ContextFrame, ...]] = ContextVar("tpcp_warning_error_context", default=())
@@ -133,7 +207,7 @@ def _is_record_only() -> bool:
 
 
 def _render_contexts(contexts: Sequence[tuple[str, dict[str, Any]]]) -> str:
-    return " > ".join(_ContextFrame(name=name, context=context).render() for name, context in contexts)
+    return " > ".join(_render_named_context(name, context) for name, context in contexts)
 
 
 def _warning_message_with_context(message: str, context: str) -> str:
@@ -249,7 +323,6 @@ def _add_note(exc: BaseException, note: str) -> None:
         pass
 
 
-@contextmanager
 def warning_error_context(
     name: str,
     context: Optional[dict[str, Any]] = None,
@@ -257,7 +330,7 @@ def warning_error_context(
     *,
     context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
     record_only: bool = False,
-) -> Generator[WarningErrorContext, None, None]:
+) -> WarningErrorContext:
     """Add structured context information to warnings and exceptions raised in the context.
 
     If provided, ``context`` is copied when the context is entered.
@@ -291,28 +364,12 @@ def warning_error_context(
     displayed by Python's standard traceback renderer. Traceback renderers that
     support exception notes, such as Rich, display this context on those versions.
     """
-    result = WarningErrorContext()
-    frame = _ContextFrame(
-        name=name,
-        context=dict({} if context is None else context),
+    return WarningErrorContext(
+        name,
+        context,
         context_provider=context_provider,
-        result=result,
         record_only=record_only,
     )
-    token = _context_stack.set((*_context_stack.get(), frame))
-    try:
-        yield result
-    except BaseException as exc:
-        if _recorded_error.get() is not exc:
-            _record_event("error", _render_context_stack(), exc)
-            _recorded_error.set(exc)
-        _add_note(exc, f"Context: {frame.render()}")
-        raise
-    finally:
-        is_outermost_context = len(_context_stack.get()) == 1
-        _context_stack.reset(token)
-        if is_outermost_context:
-            _recorded_error.set(None)
 
 
 def print_with_context(
@@ -356,7 +413,7 @@ def _make_iteration_context_factory(i: int) -> _WarningErrorContextFactory:
         *,
         context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
         record_only: bool = False,
-    ) -> AbstractContextManager[WarningErrorContext]:
+    ) -> WarningErrorContext:
         context = {} if context is None else context
         if "i" in context:
             raise ValueError("The context key 'i' is reserved by iter_with_warning_error_context.")
