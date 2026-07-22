@@ -65,6 +65,24 @@ def _create_random_bool_map(n, seed):
 
 
 class TestDataset:
+    def test_grouping_materialized_during_index_creation_applies_immediately(self):
+        class LazyGroupedDataset(Dataset):
+            def create_index(self) -> pd.DataFrame:
+                self.groupby_cols = "patient"
+                return pd.DataFrame(
+                    {
+                        "patient": ["patient_1", "patient_1", "patient_2"],
+                        "recording": ["recording_1", "recording_2", "recording_1"],
+                    }
+                )
+
+        dataset = LazyGroupedDataset()
+
+        assert dataset.groupby_cols is None
+        assert len(dataset) == 2
+        assert dataset.groupby_cols == "patient"
+        assert len(dataset) == 2
+
     @pytest.mark.parametrize(
         ("groupby", "length"),
         [

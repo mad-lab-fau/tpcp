@@ -234,9 +234,11 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
             ) from e
 
     def _get_groupby_columns(self) -> list[str]:
-        """Get the groupby columns."""
+        """Get the groupby columns after materializing the dataset index."""
+        # `create_index` may establish the grouping based on the materialized index.
+        index = self.index
         if self.groupby_cols is None:
-            return self.index.columns.to_list()
+            return index.columns.to_list()
         return _ensure_is_list(self.groupby_cols)
 
     def _get_unique_groups(self) -> Union[pd.MultiIndex, pd.Index]:
