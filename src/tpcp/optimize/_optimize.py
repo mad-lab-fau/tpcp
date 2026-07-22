@@ -6,7 +6,6 @@ from collections import defaultdict
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, nullcontext
 from functools import partial
-from itertools import product
 from tempfile import TemporaryDirectory
 from typing import (
     TYPE_CHECKING,
@@ -46,6 +45,7 @@ from tpcp._utils._general import (
 )
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
+from tpcp.misc import iter_with_warning_error_context
 from tpcp.parallel import Parallel, delayed
 from tpcp.validate import DatasetSplitter
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
@@ -424,26 +424,25 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
         else:
             pbar = _passthrough
 
+        def tasks():
+            for make_context, paras in iter_with_warning_error_context(self.parameter_grid):
+                with make_context("parameter_candidate", {"parameters": paras}):
+                    # delayed snapshots the active context; yield only after it has closed.
+                    task = delayed(_score)(
+                        self.pipeline.clone(),
+                        dataset,
+                        scoring,
+                        paras,
+                        return_parameters=True,
+                        return_data_labels=True,
+                        return_times=True,
+                    )
+                yield task
+
         parallel = Parallel(n_jobs=self.n_jobs, pre_dispatch=self.pre_dispatch, return_as="generator")
         with parallel:
             # Evaluate each parameter combination
-            results = list(
-                pbar(
-                    parallel(
-                        delayed(_score)(
-                            self.pipeline.clone(),
-                            dataset,
-                            scoring,
-                            paras,
-                            return_parameters=True,
-                            return_data_labels=True,
-                            return_times=True,
-                            context=(("parameter_candidate", {"index": candidate_index, "parameters": paras}),),
-                        )
-                        for candidate_index, paras in enumerate(self.parameter_grid)
-                    )
-                )
-            )
+            results = list(pbar(parallel(tasks())))
         assert results is not None  # For the typechecker
         # We check here if all results are dicts. We only check the dtype of the first value, as the scorer should
         # have handled issues with non-uniform cases already.
@@ -798,14 +797,10 @@ class GridSearchCV(
         parameters = list(self.parameter_grid)
         split_parameters = _split_hyper_and_pure_parameters(parameters, pure_parameters)
         parameter_prefix = "pipeline__"
-        combinations = list(
-            product(
-                enumerate(split_parameters),
-                enumerate(cv.split(dataset)),
-            )
-        )
+        splits = list(cv.split(dataset))
 
-        pbar = partial(tqdm, total=len(combinations), desc="Split-Para Combos") if self.progress_bar else _passthrough
+        n_combinations = len(split_parameters) * len(splits)
+        pbar = partial(tqdm, total=n_combinations, desc="Split-Para Combos") if self.progress_bar else _passthrough
 
         # To enable the pure parameter performance improvement, we need to create a joblib cache in a temp dir that
         # is deleted after the run.
@@ -817,18 +812,17 @@ class GridSearchCV(
             tmp_dir_context = TemporaryDirectory("joblib_tpcp_cache")
         with tmp_dir_context as cachedir:
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None
-            parallel = Parallel(
-                n_jobs=self.n_jobs,
-                pre_dispatch=self.pre_dispatch,
-                return_as="generator",
-            )
-            # We use a similar structure to sklearn's GridSearchCV here (see GridSearch for more info).
-            with parallel:
-                # Evaluate each parameter combination
-                out = list(
-                    pbar(
-                        parallel(
-                            delayed(_optimize_and_score)(
+
+            def tasks():
+                parameter_iterations = iter_with_warning_error_context(zip(split_parameters, parameters))
+                for make_candidate_context, ((hyper_paras, pure_paras), parameter) in parameter_iterations:
+                    for make_fold_context, (train, test) in iter_with_warning_error_context(splits):
+                        with (
+                            make_candidate_context("parameter_candidate", {"parameters": parameter}),
+                            make_fold_context("cv_fold"),
+                        ):
+                            # delayed snapshots both contexts; yield only after they have closed.
+                            task = delayed(_optimize_and_score)(
                                 optimizer.clone(),
                                 scoring,
                                 dataset[train],
@@ -841,21 +835,18 @@ class GridSearchCV(
                                 return_data_labels=True,
                                 return_times=True,
                                 memory=tmp_cache,
-                                context=(
-                                    (
-                                        "parameter_candidate",
-                                        {"index": cand_idx, "parameters": parameters[cand_idx]},
-                                    ),
-                                    ("cv_fold", {"index": split_idx}),
-                                ),
                             )
-                            for (cand_idx, (hyper_paras, pure_paras)), (
-                                split_idx,
-                                (train, test),
-                            ) in combinations
-                        )
-                    )
-                )
+                        yield task
+
+            parallel = Parallel(
+                n_jobs=self.n_jobs,
+                pre_dispatch=self.pre_dispatch,
+                return_as="generator",
+            )
+            # We use a similar structure to sklearn's GridSearchCV here (see GridSearch for more info).
+            with parallel:
+                # Evaluate each parameter combination
+                out = list(pbar(parallel(tasks())))
         assert out is not None  # For the type checker
         results = self._format_results(parameters, n_splits, out)
         self.cv_results_ = results

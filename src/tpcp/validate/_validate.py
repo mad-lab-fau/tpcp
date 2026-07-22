@@ -13,6 +13,7 @@ from tpcp._optimize import BaseOptimize
 from tpcp._pipeline import PipelineT
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results, _passthrough, _prefix_para_dict
 from tpcp._utils._score import _optimize_and_score, _score
+from tpcp.misc import iter_with_warning_error_context
 from tpcp.parallel import Parallel, delayed
 from tpcp.validate._cross_val_helper import DatasetSplitter
 from tpcp.validate._scorer import ScoreFunc, Scorer, ScorerTypes, _validate_scorer
@@ -120,31 +121,30 @@ def cross_validate(
 
     pbar = partial(tqdm, total=len(splits), desc="CV Folds") if progress_bar else _passthrough
 
+    def tasks():
+        for make_context, (train, test) in iter_with_warning_error_context(splits):
+            with make_context("cv_fold"):
+                # delayed snapshots the active context; yield only after it has closed.
+                task = delayed(_optimize_and_score)(
+                    # We clone the estimator to make sure that all the folds are
+                    # independent, and that it is pickle-able.
+                    optimizable.clone(),
+                    scoring,
+                    dataset[train],
+                    dataset[test],
+                    optimize_params=optimize_params,
+                    hyperparameters=None,
+                    pure_parameters=None,
+                    return_train_score=return_train_score,
+                    return_times=True,
+                    return_data_labels=True,
+                    return_optimizer=return_optimizer,
+                )
+            yield task
+
     parallel = Parallel(n_jobs=n_jobs, verbose=verbose, pre_dispatch=pre_dispatch, return_as="generator")
     with parallel:
-        results = list(
-            pbar(
-                parallel(
-                    delayed(_optimize_and_score)(
-                        # We clone the estimator to make sure that all the folds are
-                        # independent, and that it is pickle-able.
-                        optimizable.clone(),
-                        scoring,
-                        dataset[train],
-                        dataset[test],
-                        optimize_params=optimize_params,
-                        hyperparameters=None,
-                        pure_parameters=None,
-                        return_train_score=return_train_score,
-                        return_times=True,
-                        return_data_labels=True,
-                        return_optimizer=return_optimizer,
-                        context=(("cv_fold", {"index": i}),),
-                    )
-                    for i, (train, test) in enumerate(splits)
-                )
-            )
-        )
+        results = list(pbar(parallel(tasks())))
     assert results is not None  # For the typechecker
     results = _aggregate_final_results(results)
 

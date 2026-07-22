@@ -8,7 +8,6 @@ The original code is licenced under BSD-3: https://github.com/scikit-learn/sciki
 from __future__ import annotations
 
 import time
-from contextlib import ExitStack
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from joblib import Memory
@@ -18,11 +17,9 @@ from tpcp._base import clone
 from tpcp._hash import custom_hash
 from tpcp._utils._general import _get_nested_paras
 from tpcp.exceptions import OptimizationError, TestError
-from tpcp.misc._warning_error_context import _render_contexts, warning_error_context
+from tpcp.misc import warning_error_context
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from tpcp._dataset import Dataset
     from tpcp._optimize import BaseOptimize
     from tpcp._pipeline import Pipeline
@@ -58,22 +55,6 @@ class _OptimizeScoreResults(TypedDict, total=False):
     optimizer: BaseOptimize
 
 
-def _contextualize(context: Optional[Sequence[tuple[str, dict[str, Any]]]]) -> ExitStack:
-    stack = ExitStack()
-    for name, metadata in context or ():
-        stack.enter_context(warning_error_context(name, metadata))
-    return stack
-
-
-def _contextualized_error_message(
-    message: str,
-    context: Optional[Sequence[tuple[str, dict[str, Any]]]],
-    phase: str,
-    **phase_metadata: Any,
-) -> str:
-    return f"{message}\nContext: {_render_contexts([*(context or ()), (phase, phase_metadata)])}"
-
-
 def _score(
     pipeline: Pipeline,
     dataset: Dataset,
@@ -82,7 +63,6 @@ def _score(
     return_parameters=False,
     return_data_labels=False,
     return_times=False,
-    context: Optional[Sequence[tuple[str, dict[str, Any]]]] = None,
 ) -> _ScoreResults:
     """Set parameters and return score.
 
@@ -118,22 +98,21 @@ def _score(
             The parameters that have been evaluated.
 
     """
-    with _contextualize(context):
-        if parameters is not None:
-            # clone after setting parameters in case any parameters are estimators (like pipeline steps).
-            parameters = _clone_parameter_dict(parameters)
+    if parameters is not None:
+        # clone after setting parameters in case any parameters are estimators (like pipeline steps).
+        parameters = _clone_parameter_dict(parameters)
 
-            pipeline = pipeline.set_params(**parameters)
+        pipeline = pipeline.set_params(**parameters)
 
-        score_context: dict[str, Any] = {}
+    score_context: dict[str, Any] = {}
+    with warning_error_context("score", context_provider=lambda: score_context):
         try:
             start_time = time.time()
             score_context = {"data_labels": dataset.group_labels}
-            with warning_error_context("score", score_context):
-                agg_scores, single_scores = scorer(pipeline, dataset)
+            agg_scores, single_scores = scorer(pipeline, dataset)
             score_time = time.time() - start_time
         except Exception as e:
-            raise TestError(_contextualized_error_message("Testing failed.", context, "score", **score_context)) from e
+            raise TestError("Testing failed.") from e
 
     result: _ScoreResults = {
         "scores": agg_scores,
@@ -163,7 +142,6 @@ def _optimize_and_score(
     return_data_labels=False,
     return_times=False,
     memory: Optional[Memory] = None,
-    context: Optional[Sequence[tuple[str, dict[str, Any]]]] = None,
 ) -> _OptimizeScoreResults:
     """Optimize and score the optimized pipeline on the train and test data, respectively.
 
@@ -190,80 +168,73 @@ def _optimize_and_score(
     Let's better be safe and reduce the surface for bugs even further here.
 
     """
-    with _contextualize(context):
-        if memory is None:
-            memory = Memory(None)
-        # clone after setting parameters in case any parameters are estimators (like pipeline steps).
-        hyperparameters = _clone_parameter_dict(hyperparameters)
-        pure_parameters = _clone_parameter_dict(pure_parameters)
+    if memory is None:
+        memory = Memory(None)
+    # clone after setting parameters in case any parameters are estimators (like pipeline steps).
+    hyperparameters = _clone_parameter_dict(hyperparameters)
+    pure_parameters = _clone_parameter_dict(pure_parameters)
 
-        optimize_params_clean: dict = optimize_params or {}
+    optimize_params_clean: dict = optimize_params or {}
 
-        optimize_context: dict[str, Any] = {}
+    optimize_context: dict[str, Any] = {}
+    with warning_error_context("optimize", context_provider=lambda: optimize_context):
         try:
             start_time = time.time()
             optimize_context = {"data_labels": train_set.group_labels}
-            with warning_error_context("optimize", optimize_context):
-                optimizer = _cached_optimize(
-                    optimizer, train_set, hyperparameters, pure_parameters, memory, optimize_params_clean
-                )
+            optimizer = _cached_optimize(
+                optimizer, train_set, hyperparameters, pure_parameters, memory, optimize_params_clean
+            )
             optimize_time = time.time() - start_time
         except Exception as e:
-            raise OptimizationError(
-                _contextualized_error_message("Optimization failed.", context, "optimize", **optimize_context)
-            ) from e
+            raise OptimizationError("Optimization failed.") from e
 
-        # Now we set the remaining paras.
-        # Because, we need to set the parameters on the optimized pipeline and not the input pipeline we strip the
-        # naming prefix.
-        striped_paras = _get_nested_paras(pure_parameters, "pipeline")
-        optimizer.optimized_pipeline_.set_params(**striped_paras)
-        # We also set the parameters of the input pipeline to make it seem that all parameters were set from the
-        # beginning.
-        optimizer = optimizer.set_params(**pure_parameters)
+    # Now we set the remaining paras.
+    # Because, we need to set the parameters on the optimized pipeline and not the input pipeline we strip the
+    # naming prefix.
+    striped_paras = _get_nested_paras(pure_parameters, "pipeline")
+    optimizer.optimized_pipeline_.set_params(**striped_paras)
+    # We also set the parameters of the input pipeline to make it seem that all parameters were set from the
+    # beginning.
+    optimizer = optimizer.set_params(**pure_parameters)
 
-        test_score_context: dict[str, Any] = {}
+    test_score_context: dict[str, Any] = {}
+    with warning_error_context("test_score", context_provider=lambda: test_score_context):
         try:
             test_score_context = {"data_labels": test_set.group_labels}
-            with warning_error_context("test_score", test_score_context):
-                agg_scores, single_scores = scorer(optimizer.optimized_pipeline_, test_set)
+            agg_scores, single_scores = scorer(optimizer.optimized_pipeline_, test_set)
             score_time = time.time() - optimize_time - start_time
         except Exception as e:
-            raise TestError(
-                _contextualized_error_message("Testing failed.", context, "test_score", **test_score_context)
-            ) from e
+            raise TestError("Testing failed.") from e
 
-        result: _OptimizeScoreResults = {
-            "test__scores": agg_scores,
-            "test__single__scores": single_scores,
-        }
-        if return_train_score:
-            train_score_context: dict[str, Any] = {}
+    result: _OptimizeScoreResults = {
+        "test__scores": agg_scores,
+        "test__single__scores": single_scores,
+    }
+    if return_train_score:
+        train_score_context: dict[str, Any] = {}
+        with warning_error_context("train_score", context_provider=lambda: train_score_context):
             try:
                 train_score_context = {"data_labels": train_set.group_labels}
-                with warning_error_context("train_score", train_score_context):
-                    train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set)
+                train_agg_scores, train_single_scores = scorer(optimizer.optimized_pipeline_, train_set)
             except Exception as e:
-                raise TestError(
-                    _contextualized_error_message("Testing failed.", context, "train_score", **train_score_context)
-                ) from e
-            result["train__scores"] = train_agg_scores
-            result["train__single__scores"] = train_single_scores
-        if return_times:
-            result["debug__score_time"] = score_time
-            result["debug__optimize_time"] = optimize_time
-        if return_data_labels:
-            # Note we always return the train data attribute as it is interesting information independent of the train
-            # score and has 0 runtime impact.
-            result["train__data_labels"] = train_set.group_labels
-            result["test__data_labels"] = test_set.group_labels
-        if return_optimizer:
-            # This is the actual trained optimizer. This means that `optimizer.optimized_pipeline_` contains the actual
-            # instance of the trained pipeline.
-            result["optimizer"] = optimizer
-        if return_parameters:
-            result["parameters"] = {**hyperparameters, **pure_parameters}
-        return result
+                raise TestError("Testing failed.") from e
+        result["train__scores"] = train_agg_scores
+        result["train__single__scores"] = train_single_scores
+    if return_times:
+        result["debug__score_time"] = score_time
+        result["debug__optimize_time"] = optimize_time
+    if return_data_labels:
+        # Note we always return the train data attribute as it is interesting information independent of the train
+        # score and has 0 runtime impact.
+        result["train__data_labels"] = train_set.group_labels
+        result["test__data_labels"] = test_set.group_labels
+    if return_optimizer:
+        # This is the actual trained optimizer. This means that `optimizer.optimized_pipeline_` contains the actual
+        # instance of the trained pipeline.
+        result["optimizer"] = optimizer
+    if return_parameters:
+        result["parameters"] = {**hyperparameters, **pure_parameters}
+    return result
 
 
 def _cached_optimize(

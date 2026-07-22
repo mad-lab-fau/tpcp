@@ -90,7 +90,8 @@ class TestValidate:
         with pytest.raises(TestError, match="Testing failed") as e:
             validate(DummyPipeline(), BrokenGroupLabelsDataset(), scoring=dummy_single_score_func)
 
-        assert str(e.value) == "Testing failed.\nContext: score"
+        assert str(e.value) == "Testing failed."
+        assert e.value.__notes__ == ["Context: score"]
         assert isinstance(e.value.__cause__, RuntimeError)
 
     @pytest.mark.parametrize(
@@ -253,17 +254,20 @@ class TestCrossValidate:
             assert o is not optimizer
 
     @pytest.mark.parametrize("error_fold", [0, 2])
-    def test_cross_validate_opti_error(self, error_fold):
+    @pytest.mark.parametrize("n_jobs", [1, 2])
+    def test_cross_validate_opti_error(self, error_fold, n_jobs):
         with pytest.raises(OptimizationError, match="Optimization failed") as e:
             cross_validate(
                 Optimize(CustomOptimizablePipelineWithOptiError(error_fold=error_fold)),
                 DummyDataset(),
                 scoring=dummy_single_score_func,
                 cv=5,
+                n_jobs=n_jobs,
             )
 
-        assert f"Context: cv_fold: index={error_fold} > optimize:" in str(e.value)
-        assert e.value.__notes__ == [f"Context: cv_fold: index={error_fold}"]
+        assert str(e.value) == "Optimization failed."
+        assert e.value.__notes__[0].startswith("Context: optimize:")
+        assert e.value.__notes__[1] == f"Context: cv_fold: i={error_fold}"
 
     @pytest.mark.parametrize("error_fold", [0, 2])
     def test_cross_validate_test_error(self, error_fold):
@@ -279,9 +283,9 @@ class TestCrossValidate:
                 cv=5,
             )
 
-        assert f"Context: cv_fold: index={error_fold} > test_score:" in str(e.value)
-        assert e.value.__notes__ == [f"Context: cv_fold: index={error_fold}"]
-        assert e.value.__cause__.__notes__[0].startswith("Context: test_score:")
+        assert str(e.value) == "Testing failed."
+        assert e.value.__notes__[0].startswith("Context: test_score:")
+        assert e.value.__notes__[1] == f"Context: cv_fold: i={error_fold}"
         assert e.value.__cause__.__cause__.__notes__ == [
             f"Context: datapoint: index=0, group_label=DummyDatasetGroupLabel(value={error_fold})"
         ]
@@ -308,13 +312,13 @@ class TestCrossValidate:
             )
 
         if return_train_score:
-            assert "Context: cv_fold: index=0 > train_score:" in str(e.value)
-            assert e.value.__notes__ == ["Context: cv_fold: index=0"]
-            assert e.value.__cause__.__notes__[0].startswith("Context: train_score:")
+            assert str(e.value) == "Testing failed."
+            assert e.value.__notes__[0].startswith("Context: train_score:")
+            assert e.value.__notes__[1] == "Context: cv_fold: i=0"
         else:
-            assert "Context: cv_fold: index=1 > test_score:" in str(e.value)
-            assert e.value.__notes__ == ["Context: cv_fold: index=1"]
-            assert e.value.__cause__.__notes__[0].startswith("Context: test_score:")
+            assert str(e.value) == "Testing failed."
+            assert e.value.__notes__[0].startswith("Context: test_score:")
+            assert e.value.__notes__[1] == "Context: cv_fold: i=1"
 
     def test_cross_validate_optimizer_are_cloned(self):
         results = cross_validate(

@@ -358,13 +358,11 @@ class TestGridSearch:
         with pytest.raises(TestError, match="Testing failed") as e:
             gs.optimize(DummyDataset())
 
-        assert (
-            f"Context: parameter_candidate: index={error_para - 1}, parameters={{'para': {error_para}}} > score:"
-            in str(e.value)
+        assert str(e.value) == "Testing failed."
+        assert e.value.__notes__[0].startswith("Context: score:")
+        assert e.value.__notes__[1] == (
+            f"Context: parameter_candidate: i={error_para - 1}, parameters={{'para': {error_para}}}"
         )
-        assert e.value.__notes__ == [
-            f"Context: parameter_candidate: index={error_para - 1}, parameters={{'para': {error_para}}}"
-        ]
 
 
 class TestGridSearchCV:
@@ -740,15 +738,12 @@ class TestGridSearchCV:
         with pytest.raises(OptimizationError, match="Optimization failed") as e:
             gs.optimize(DummyDataset())
 
-        assert (
-            f"Context: parameter_candidate: index={error_para - 1}, parameters={{'para': {error_para}}} "
-            f"> cv_fold: index={error_fold} > optimize:" in str(e.value)
-        )
-        assert e.value.__notes__ == [
-            f"Context: cv_fold: index={error_fold}",
-            f"Context: parameter_candidate: index={error_para - 1}, parameters={{'para': {error_para}}}",
+        assert str(e.value) == "Optimization failed."
+        assert e.value.__notes__[0].startswith("Context: optimize:")
+        assert e.value.__notes__[1:] == [
+            f"Context: cv_fold: i={error_fold}",
+            f"Context: parameter_candidate: i={error_para - 1}, parameters={{'para': {error_para}}}",
         ]
-        assert e.value.__cause__.__notes__[0].startswith("Context: optimize:")
 
 
 class TestOptimize:
