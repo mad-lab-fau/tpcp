@@ -153,6 +153,29 @@ class TestScorer:
             assert kwargs.pop("step") == i
             assert kwargs == {}
 
+    def test_callback_warning_and_error_contain_result_iteration_context(self):
+        """Callback diagnostics identify the internally consumed scoring result."""
+
+        def callback(*, step, **_):
+            if step == 1:
+                warnings.warn("callback warning", UserWarning, stacklevel=1)
+                raise RuntimeError("callback failed")
+
+        scorer = Scorer(
+            lambda _pipeline, _datapoint: 1,
+            single_score_callback=callback,
+            progress_bar=False,
+        )
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with pytest.raises(RuntimeError, match="callback failed") as error:
+                scorer(DummyOptimizablePipeline(), DummyDataset())
+
+        expected_context = "single_score_callback: i=1"
+        assert str(caught[0].message) == f"callback warning\n[{expected_context}] callback warning"
+        assert error.value.__notes__ == [f"Context: {expected_context}"]
+
     def test_documented_callback_signature_valid(self):
         def callback(*, step: int, scores: Sequence[float], **_):
             assert isinstance(step, int)

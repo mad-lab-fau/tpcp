@@ -437,16 +437,18 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
             n_jobs=self.n_jobs, verbose=self.verbose, pre_dispatch=self.pre_dispatch, return_as="generator"
         )
         with parallel:
-            for i, r in pbar(parallel(delayed(per_datapoint)(i, d) for i, d in enumerate(dataset))):
+            score_results = pbar(parallel(delayed(per_datapoint)(i, d) for i, d in enumerate(dataset)))
+            for make_context, (i, r) in iter_with_warning_error_context(score_results):
                 scores.append(r)
                 if self.single_score_callback:
-                    self.single_score_callback(
-                        step=i,
-                        scores=tuple(scores),
-                        scorer=self,
-                        pipeline=pipeline,
-                        dataset=dataset,
-                    )
+                    with make_context("single_score_callback"):
+                        self.single_score_callback(
+                            step=i,
+                            scores=tuple(scores),
+                            scorer=self,
+                            pipeline=pipeline,
+                            dataset=dataset,
+                        )
 
         agg_scores, raw_scores = self._aggregate(
             _check_and_invert_score_dict(scores, self.default_aggregator), list(dataset)
