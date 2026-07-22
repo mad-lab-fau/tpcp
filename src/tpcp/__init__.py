@@ -11,7 +11,7 @@ from tpcp._algorithm_utils import (
     make_optimize_safe,
 )
 from tpcp._base import NOTHING, BaseFactory, BaseTpcpObject, CloneFactory, cf, clone, get_param_names
-from tpcp._dataset import Dataset
+from tpcp._dataset import Dataset, DatasetWrapperMixin
 from tpcp._parameters import (
     HyperPara,
     HyperParameter,
@@ -34,6 +34,7 @@ __all__ = [
     "BaseTpcpObject",
     "CloneFactory",
     "Dataset",
+    "DatasetWrapperMixin",
     "HyperPara",
     "HyperParameter",
     "OptiPara",
