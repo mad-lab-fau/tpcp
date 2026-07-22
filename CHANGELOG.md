@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `tpcp.misc.warning_error_context`, a stackable context manager for enriching warnings and exceptions with
   structured context metadata.
   Contexts retain warning, error, and `print_with_context` records for later inspection, and an outer record-only mode
-  can collect contextual diagnostics without emitting warning or progress output.
+  can collect contextual diagnostics without emitting warning or progress output. Contexts can also be started and
+  stopped explicitly when a long script should not be indented under a `with` statement.
   This is now used by validation, cross-validation, grid search, scorer datapoint loops, typed iterator warning
   contexts, and Optuna trial evaluation to make failures and warnings identify the active fold, parameter candidate,
   datapoint, trial, or iterator item.

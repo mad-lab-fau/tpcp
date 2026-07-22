@@ -354,6 +354,13 @@ def warning_error_context(
     warning and exception objects are retained so callers can inspect their concrete
     types and custom attributes.
 
+    The returned object can also be activated with :meth:`WarningErrorContext.start`
+    and deactivated with :meth:`WarningErrorContext.stop`, which avoids indenting a
+    long script. Manual use cannot automatically record or annotate an exception:
+    ``stop()`` does not receive exception information, and an exception that skips
+    the call leaves the context active. Use the ``with`` form whenever exception-safe
+    cleanup or contextualized exceptions are required.
+
     Setting ``record_only=True`` on an outer context suppresses warning forwarding
     and :func:`print_with_context` output throughout its nested contexts while still
     recording those events. It does not suppress exceptions or ordinary
