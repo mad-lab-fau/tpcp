@@ -14,8 +14,8 @@ iterators, :class:`~tpcp.misc.TypedIterator`, and typed sub-iterations.
 Simple and dynamic context
 --------------------------
 Pass fixed values as a dictionary. Warning messages retain their original
-warning type and source location, with the active context prepended to the
-message.
+warning type and source location. The original message is followed by a
+contextual copy on a separate line.
 """
 
 import warnings
@@ -86,10 +86,34 @@ except ValueError as error:
 # context creator. Enter the returned context explicitly inside the loop body.
 # The creator automatically adds the zero-based iteration index as ``i``; all
 # other values remain explicit.
+#
+# Python normally suppresses repeated warnings from the same source line. This
+# filtering happens before context is attached, so different context values do
+# not make the warnings distinct. Applications that need every contextual
+# occurrence can enable an appropriate warning filter. Here, ``catch_warnings``
+# only scopes that filter; warnings still emit normally for Sphinx-Gallery.
+with warnings.catch_warnings():
+    warnings.simplefilter("always")
+    for make_context, item in iter_with_warning_error_context(
+        ["left", "right"]
+    ):
+        with make_context("item", {"value": item}):
+            warnings.warn("iterator warning", UserWarning, stacklevel=1)
 
-for make_context, item in iter_with_warning_error_context(["left", "right"]):
-    with make_context("item", {"value": item}):
-        warnings.warn("iterator warning", UserWarning, stacklevel=1)
+# %%
+# Combining regular and iterator contexts
+# ---------------------------------------
+# An iterator context composes with any regular context that is already active.
+# The regular context is rendered first, followed by the per-iteration context
+# and its automatically injected ``i``.
+with warnings.catch_warnings():
+    warnings.simplefilter("always")
+    with warning_error_context("dataset", {"name": "validation"}):
+        for make_context, item in iter_with_warning_error_context(
+            ["left", "right"]
+        ):
+            with make_context("item", {"value": item}):
+                warnings.warn("stacked warning", UserWarning, stacklevel=1)
 
 # %%
 # TypedIterator
@@ -109,10 +133,12 @@ class Result:
 
 typed_iterator = TypedIterator[int, Result](Result)
 
-for item, result in typed_iterator.iterate([2, 4]):
-    with typed_iterator.warning_error_context("item", {"value": item}):
-        warnings.warn("typed warning", UserWarning, stacklevel=1)
-        result.doubled = item * 2
+with warnings.catch_warnings():
+    warnings.simplefilter("always")
+    for item, result in typed_iterator.iterate([2, 4]):
+        with typed_iterator.warning_error_context("item", {"value": item}):
+            warnings.warn("typed warning", UserWarning, stacklevel=1)
+            result.doubled = item * 2
 
 print(typed_iterator.results_.doubled)
 
@@ -141,23 +167,25 @@ class NestedIterator(BaseTypedIterator[int, Result]):
 
 nested_iterator = NestedIterator(Result)
 
-for outer, outer_result in nested_iterator.iterate([10]):
-    with nested_iterator.warning_error_context("outer", {"value": outer}):
-        warnings.warn("outer before", UserWarning, stacklevel=1)
+with warnings.catch_warnings():
+    warnings.simplefilter("always")
+    for outer, outer_result in nested_iterator.iterate([10]):
+        with nested_iterator.warning_error_context("outer", {"value": outer}):
+            warnings.warn("outer before", UserWarning, stacklevel=1)
 
-    for inner, inner_result in nested_iterator.iterate_subitems([20, 21]):
-        with nested_iterator.warning_error_context(
-            "inner",
-            context_provider=lambda inner=inner: {"value": inner},
-        ):
-            warnings.warn("inner", UserWarning, stacklevel=1)
-            inner_result.doubled = inner * 2
+        for inner, inner_result in nested_iterator.iterate_subitems([20, 21]):
+            with nested_iterator.warning_error_context(
+                "inner",
+                context_provider=lambda inner=inner: {"value": inner},
+            ):
+                warnings.warn("inner", UserWarning, stacklevel=1)
+                inner_result.doubled = inner * 2
 
-    # No fixed dictionary is required. This context contains only the restored
-    # outer ``i``.
-    with nested_iterator.warning_error_context("outer_after"):
-        warnings.warn("outer after", UserWarning, stacklevel=1)
-        outer_result.doubled = outer * 2
+        # No fixed dictionary is required. This context contains only the
+        # restored outer ``i``.
+        with nested_iterator.warning_error_context("outer_after"):
+            warnings.warn("outer after", UserWarning, stacklevel=1)
+            outer_result.doubled = outer * 2
 
 # %%
 # In all iterator variants, the context manager is created and entered inside

@@ -137,7 +137,7 @@ def test_iterator_context_provider_does_not_require_fixed_context():
     with pytest.warns(UserWarning) as caught:
         emit_warning()
 
-    assert str(caught[0].message) == "[typed_iterator: i=0, input=1] provider-only warning"
+    assert str(caught[0].message) == "provider-only warning\n[typed_iterator: i=0, input=1] provider-only warning"
 
 
 def test_additional_aggregations():

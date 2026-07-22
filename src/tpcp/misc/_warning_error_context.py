@@ -78,6 +78,10 @@ def _render_contexts(contexts: Sequence[tuple[str, dict[str, Any]]]) -> str:
     return " > ".join(_ContextFrame(name=name, context=context).render() for name, context in contexts)
 
 
+def _warning_message_with_context(message: str, context: str) -> str:
+    return f"{message}\n[{context}] {message}"
+
+
 def _warning_with_context(message: Warning, context: str) -> Warning:
     # Calling the concrete type's constructor is not safe: warning subclasses can
     # require extra arguments in __new__. BaseException can allocate every Warning
@@ -100,7 +104,7 @@ def _warning_with_context(message: Warning, context: str) -> Warning:
             except AttributeError:
                 continue
             slot_descriptor.__set__(contextualized_warning, slot_value)
-    contextualized_warning.args = (f"[{context}] {message}", *message.args[1:])
+    contextualized_warning.args = (_warning_message_with_context(str(message), context), *message.args[1:])
     return contextualized_warning
 
 
@@ -109,7 +113,7 @@ def _contextualize_warning(message: Union[Warning, str]) -> Union[Warning, str]:
     if not context:
         return message
     if isinstance(message, str):
-        return f"[{context}] {message}"
+        return _warning_message_with_context(message, context)
     return _warning_with_context(message, context)
 
 
@@ -189,6 +193,11 @@ def warning_error_context(
 
     A failing provider is represented in the rendered context instead of masking the
     warning or exception that caused context rendering.
+
+    Python applies warning filters before this context manager attaches its metadata.
+    Consequently, different context values do not make otherwise identical warnings
+    count as distinct occurrences. If every contextual occurrence must be shown, use
+    an appropriate warning filter such as ``warnings.simplefilter("always")``.
 
     On Python 3.9 and 3.10, exception context is stored in ``__notes__`` but is not
     displayed by Python's standard traceback renderer. Traceback renderers that
