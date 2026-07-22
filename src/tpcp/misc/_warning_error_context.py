@@ -165,14 +165,21 @@ else:
 
 
 def _add_note(exc: BaseException, note: str) -> None:
-    add_note = getattr(exc, "add_note", None)
-    if add_note is not None:
-        add_note(note)
-        return
+    try:
+        add_note = getattr(exc, "add_note", None)
+        if callable(add_note):
+            add_note(note)
+            return
+    except BaseException:  # noqa: BLE001 - diagnostic context must never replace the original exception
+        pass
 
-    notes = getattr(exc, "__notes__", [])
-    notes.append(note)
-    setattr(exc, "__notes__", notes)
+    try:
+        notes = list(getattr(exc, "__notes__", []))
+        if not notes or notes[-1] != note:
+            notes.append(note)
+        setattr(exc, "__notes__", notes)
+    except BaseException:  # noqa: BLE001 - re-raising the original exception is more important than its note
+        pass
 
 
 @contextmanager
