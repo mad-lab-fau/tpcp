@@ -91,6 +91,24 @@ def test_nested_contexts_are_added_to_exception_notes():
     ]
 
 
+def test_failing_add_note_does_not_mask_exception():
+    """A custom exception cannot replace itself while context is attached."""
+
+    class FailingAddNoteError(RuntimeError):
+        def add_note(self, _note):
+            raise RuntimeError("cannot add note")
+
+    original_error = FailingAddNoteError("original error")
+    with (
+        pytest.raises(FailingAddNoteError, match="original error") as caught,
+        warning_error_context("datapoint", {"item": 3}),
+    ):
+        raise original_error
+
+    assert caught.value is original_error
+    assert caught.value.__notes__ == ["Context: datapoint: item=3"]
+
+
 def test_iter_with_warning_error_context_scopes_nested_loop_bodies():
     """Iterator contexts nest explicitly and do not leak after a loop body."""
     with warnings.catch_warnings(record=True) as caught:
