@@ -14,6 +14,7 @@ from joblib.externals import cloudpickle
 _warn_alias_imported_before_tpcp = warnings.warn
 
 from tpcp.misc import (  # noqa: E402  (import must happen after capturing warnings.warn)
+    WarningErrorContextRecord,
     iter_with_warning_error_context,
     warning_error_context,
 )
@@ -89,6 +90,43 @@ def test_nested_contexts_are_added_to_exception_notes():
         "Context: region: start=10, end=20",
         "Context: datapoint: group='patient-1'",
     ]
+
+
+def test_context_records_warnings_and_errors_with_their_final_context():
+    """Active contexts retain original diagnostics with the fully resolved stack."""
+    original_warning = UserWarning("signal is short")
+    original_error = ValueError("invalid signal")
+    state = {"step": 1}
+
+    try:
+        with (
+            warning_error_context("dataset", {"name": "validation"}) as dataset_context,
+            warning_error_context("item", context_provider=lambda: {"step": state["step"]}) as item_context,
+            warnings.catch_warnings(record=True),
+        ):
+            warnings.simplefilter("always")
+            warnings.warn(original_warning, stacklevel=1)
+            state["step"] = 2
+            raise original_error
+    except ValueError:
+        pass
+    else:
+        pytest.fail("The original error was not re-raised.")
+
+    expected_records = [
+        WarningErrorContextRecord(
+            "warning",
+            "dataset: name='validation' > item: step=1",
+            original_warning,
+        ),
+        WarningErrorContextRecord(
+            "error",
+            "dataset: name='validation' > item: step=2",
+            original_error,
+        ),
+    ]
+    assert dataset_context.records == expected_records
+    assert item_context.records == expected_records
 
 
 def test_failing_add_note_does_not_mask_exception():

@@ -7,6 +7,7 @@ from typing import Any, Generic, Optional, TypeVar
 from typing_extensions import NamedTuple, TypeAlias
 
 from tpcp import Algorithm, cf
+from tpcp.misc._warning_error_context import WarningErrorContext
 from tpcp.misc._warning_error_context import warning_error_context as _warning_error_context
 
 DataclassT = TypeVar("DataclassT")
@@ -203,7 +204,7 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
         /,
         *,
         context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
-    ) -> AbstractContextManager[None]:
+    ) -> AbstractContextManager[WarningErrorContext]:
         """Create explicit warning/error context for an iteration body.
 
         This convenience method has the same interface as
