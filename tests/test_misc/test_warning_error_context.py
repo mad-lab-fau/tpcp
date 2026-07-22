@@ -61,6 +61,20 @@ def test_nested_contexts_are_added_to_warnings():
         _emit_warning()
 
 
+def test_formatted_warning_starts_context_on_a_new_line():
+    """Context is visually separated from the warning location and category."""
+    with warning_error_context("datapoint", {"item": 3}), warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        warnings.warn("low level warning", UserWarning, stacklevel=1)
+
+    filename = "/a/deliberately/long/path/to/the/module/emitting/the/warning.py"
+    formatted_warning = warnings.formatwarning(caught[0].message, caught[0].category, filename, 123)
+
+    assert formatted_warning == (
+        f"{filename}:123: UserWarning: low level warning\n[datapoint: item=3] low level warning\n"
+    )
+
+
 def test_nested_contexts_are_added_to_exception_notes():
     """Nested contexts are attached as exception notes without changing the exception."""
     with (
@@ -90,8 +104,8 @@ def test_iter_with_warning_error_context_scopes_nested_loop_bodies():
         warnings.warn("unscoped warning", UserWarning, stacklevel=1)
 
     assert [str(warning.message) for warning in caught] == [
-        "[outer: i=0, item=1 > inner: i=0, item=2] inner warning",
-        "[outer: i=0, item=1] outer warning",
+        "inner warning\n[outer: i=0, item=1 > inner: i=0, item=2] inner warning",
+        "outer warning\n[outer: i=0, item=1] outer warning",
         "unscoped warning",
     ]
 
@@ -110,9 +124,9 @@ def test_iter_with_warning_error_context_injects_a_stable_iteration_index():
             warnings.warn("saved warning", UserWarning, stacklevel=1)
 
     assert [str(warning.message) for warning in caught] == [
-        "[item: i=0, value='first'] item warning",
-        "[item: i=1, value='second'] item warning",
-        "[saved: i=0, dynamic=True] saved warning",
+        "item warning\n[item: i=0, value='first'] item warning",
+        "item warning\n[item: i=1, value='second'] item warning",
+        "saved warning\n[saved: i=0, dynamic=True] saved warning",
     ]
 
 
@@ -124,7 +138,7 @@ def test_warning_error_context_copies_the_explicit_context_dict():
         context["value"] = "changed"
         warnings.warn("copied warning", UserWarning, stacklevel=1)
 
-    assert str(caught[0].message) == "[copy: value='initial'] copied warning"
+    assert str(caught[0].message) == "copied warning\n[copy: value='initial'] copied warning"
 
 
 def test_context_provider_is_resolved_for_each_warning():
@@ -145,8 +159,8 @@ def test_context_provider_is_resolved_for_each_warning():
         warnings.warn("second", UserWarning, stacklevel=1)
 
     assert [str(warning.message) for warning in caught] == [
-        "[iteration: fixed='value', step=1] first",
-        "[iteration: fixed='value', step=2] second",
+        "first\n[iteration: fixed='value', step=1] first",
+        "second\n[iteration: fixed='value', step=2] second",
     ]
 
 
@@ -158,7 +172,7 @@ def test_context_provider_can_be_used_without_fixed_context():
     ):
         warnings.warn("provider-only warning", UserWarning, stacklevel=1)
 
-    assert str(caught[0].message) == "[iteration: step=1] provider-only warning"
+    assert str(caught[0].message) == "provider-only warning\n[iteration: step=1] provider-only warning"
 
 
 def test_context_provider_is_resolved_when_exception_leaves_context():
@@ -196,7 +210,7 @@ def test_context_provider_failure_does_not_mask_warning(context_provider, error_
         warnings.warn("original warning", UserWarning, stacklevel=1)
 
     assert str(caught[0].message) == (
-        f"[iteration: fixed='value', context_provider_error={error_text!r}] original warning"
+        f"original warning\n[iteration: fixed='value', context_provider_error={error_text!r}] original warning"
     )
 
 
@@ -224,7 +238,9 @@ def test_context_value_repr_failure_does_not_mask_warning():
     ):
         warnings.warn("original warning", UserWarning, stacklevel=1)
 
-    assert str(caught[0].message) == "[iteration: value=<repr failed: RuntimeError>] original warning"
+    assert str(caught[0].message) == (
+        "original warning\n[iteration: value=<repr failed: RuntimeError>] original warning"
+    )
 
 
 def test_context_provider_error_str_failure_does_not_mask_warning():
@@ -244,6 +260,7 @@ def test_context_provider_error_str_failure_does_not_mask_warning():
         warnings.warn("original warning", UserWarning, stacklevel=1)
 
     assert str(caught[0].message) == (
+        "original warning\n"
         "[iteration: context_provider_error='BrokenStrError: <str failed: RuntimeError>'] original warning"
     )
 
@@ -334,7 +351,7 @@ def test_context_is_added_for_all_warning_emitters(emit_warning):
         emit_warning()
 
     assert len(caught) == 1
-    assert str(caught[0].message).startswith("[datapoint: item=3] ")
+    assert "\n[datapoint: item=3] " in str(caught[0].message)
     assert caught[0].category is UserWarning
 
 
@@ -358,7 +375,7 @@ def test_warning_message_is_forwarded_exactly_once(monkeypatch):
         warnings.warn_explicit("explicit warning", UserWarning, "synthetic_warning_source.py", 123)
 
     assert len(forwarded_messages) == 1
-    assert str(forwarded_messages[0].message) == "[datapoint: item=3] explicit warning"
+    assert str(forwarded_messages[0].message) == "explicit warning\n[datapoint: item=3] explicit warning"
     assert forwarded_messages[0].filename == "synthetic_warning_source.py"
     assert forwarded_messages[0].lineno == 123
 
@@ -384,7 +401,7 @@ def test_warning_hook_installation_is_reload_safe():
                     warnings.warn("reloaded warning", UserWarning, stacklevel=1)
 
                 assert len(caught) == 1
-                assert str(caught[0].message) == "[reload: attempt=1] reloaded warning"
+                assert str(caught[0].message) == "reloaded warning\\n[reload: attempt=1] reloaded warning"
                 assert warnings._showwarnmsg is reloaded_module._showwarnmsg_with_context
                 """
             ),
@@ -429,7 +446,7 @@ def test_warning_hook_chains_to_preexisting_dispatcher_on_reload():
                     warnings.warn("chained warning", UserWarning, stacklevel=1)
 
                 assert len(third_party_messages) == 1
-                assert str(third_party_messages[0].message) == "[third-party] chained warning"
+                assert str(third_party_messages[0].message) == "chained warning\\n[third-party] chained warning"
                 assert len(caught) == 1
                 """
             ),
