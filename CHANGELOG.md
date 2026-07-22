@@ -37,17 +37,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   registration functions reject names using this prefix. Existing user registrations with this prefix must be
   renamed.
   (https://github.com/mad-lab-fau/tpcp/pull/138)
+- All parallel execution inside TPCP now uses the context-aware `tpcp.parallel.Parallel`. Python warning filters,
+  warning/error contexts, and global cache setup are restored automatically in workers; successful side-channel data
+  is recovered in the parent process.
+  (https://github.com/mad-lab-fau/tpcp/pull/138)
 - `Scorer` now adds structured iteration context to warnings and errors raised by custom score aggregators and
   single-score callbacks.
   (https://github.com/mad-lab-fau/tpcp/pull/138)
-- **Breaking:** Error and warning text from `validate`, `cross_validate`, `GridSearch`, `GridSearchCV`, `Scorer`,
-  `TypedIterator`, and Optuna optimization now includes structured context metadata instead of the previous ad-hoc
-  error strings.
+- **Breaking:** Warnings and errors from `validate`, `cross_validate`, `GridSearch`, `GridSearchCV`, `Scorer`,
+  `TypedIterator`, and Optuna optimization now use contextualized warning text and exception notes instead of the
+  previous ad-hoc error strings.
   Code or tests that match exact warning or exception messages need to be updated.
-  (https://github.com/mad-lab-fau/tpcp/pull/131)
-- **Breaking:** The private `_score` and `_optimize_and_score` helpers no longer accept `error_info`; callers must pass
-  structured context entries instead.
-  (https://github.com/mad-lab-fau/tpcp/pull/131)
+  (https://github.com/mad-lab-fau/tpcp/pull/131, https://github.com/mad-lab-fau/tpcp/pull/138)
+- **Breaking:** The private `_score` and `_optimize_and_score` helpers no longer accept `error_info` or `context`.
+  Callers that need diagnostic context must activate `warning_error_context` while constructing the delayed task.
+  (https://github.com/mad-lab-fau/tpcp/pull/131, https://github.com/mad-lab-fau/tpcp/pull/138)
 
 ## [2.2.1] - 2026-06-15
 
