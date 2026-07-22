@@ -8,8 +8,9 @@ warnings and exceptions without changing the code that emits them. This is
 useful when a low-level warning or error does not know which dataset item,
 optimization trial, or iteration triggered it.
 
-This example covers fixed and dynamic context, nested contexts, arbitrary
-iterators, :class:`~tpcp.misc.TypedIterator`, and typed sub-iterations.
+This example covers fixed and dynamic context, nested contexts, retained event
+records, contextual prints, quiet record-only execution, arbitrary iterators,
+:class:`~tpcp.misc.TypedIterator`, and typed sub-iterations.
 
 Simple and dynamic context
 --------------------------
@@ -26,6 +27,7 @@ from tpcp.misc import (
     BaseTypedIterator,
     TypedIterator,
     iter_with_warning_error_context,
+    print_with_context,
     warning_error_context,
 )
 
@@ -78,6 +80,72 @@ try:
 except ValueError as error:
     print(f"Caught error: {error}")
     print(f"Context: {getattr(error, '__notes__', [])}")
+
+# %%
+# Recording events and contextual prints
+# ---------------------------------------
+# Every context manager yields a persistent result whose ``records`` list can
+# be inspected after the context exits. Each named-tuple record contains the
+# event type (``"warning"``, ``"error"``, or ``"print"``), the fully resolved
+# context stack, and the original warning/exception object or print message.
+# Nested events are included in every active context result.
+#
+# :func:`~tpcp.misc.print_with_context` accepts the normal ``print`` arguments.
+# With an active context, it prepends the rendered context and adds a record.
+# Without an active context, it behaves like a normal ``print``.
+items = ["ok", "short", "invalid"]
+
+with warnings.catch_warnings():
+    # Warning filters run before tpcp can record a warning. Use ``always`` when
+    # every repeated occurrence is relevant to the later analysis.
+    warnings.simplefilter("always")
+    with warning_error_context(
+        "dataset", {"name": "validation"}
+    ) as dataset_context:
+        for make_context, item in iter_with_warning_error_context(items):
+            try:
+                with make_context("datapoint", {"value": item}):
+                    print_with_context("Processing", item)
+                    if item != "ok":
+                        warnings.warn(
+                            "signal quality issue", UserWarning, stacklevel=1
+                        )
+                    if item == "invalid":
+                        raise ValueError("invalid signal")
+            except ValueError:
+                # Errors are recorded when they leave a context. They still
+                # propagate normally and can be handled by the application.
+                pass
+
+print([record.type for record in dataset_context.records])
+
+warning_contexts = [
+    record.context
+    for record in dataset_context.records
+    if record.type == "warning" and isinstance(record.message, UserWarning)
+]
+print(warning_contexts)
+
+# %%
+# Quiet record-only mode
+# ----------------------
+# A high-level ``record_only=True`` context suppresses contextual warning and
+# ``print_with_context`` output from all nested contexts while retaining the
+# same records. It does not suppress errors or ordinary ``print`` calls. This is
+# useful for wrapping a long-running program and printing only a final summary.
+with warnings.catch_warnings():
+    warnings.simplefilter("always")
+    with warning_error_context(
+        "program", {"mode": "batch"}, record_only=True
+    ) as program_context:
+        for make_context, item in iter_with_warning_error_context(
+            ["left", "right"]
+        ):
+            with make_context("datapoint", {"value": item}):
+                warnings.warn("quiet warning", UserWarning, stacklevel=1)
+                print_with_context("Processed", item)
+
+print([record.type for record in program_context.records])
 
 # %%
 # Arbitrary iterators
