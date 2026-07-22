@@ -27,7 +27,7 @@ from tpcp._hash import custom_hash
 from tpcp._pipeline import PipelineT
 from tpcp._utils._general import _passthrough
 from tpcp.exceptions import ScorerFailedError, ValidationError
-from tpcp.misc import warning_error_context
+from tpcp.misc import iter_with_warning_error_context, warning_error_context
 from tpcp.parallel import delayed
 
 if TYPE_CHECKING:
@@ -374,25 +374,26 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
 
         raw_scores: dict[str, list] = {}
         agg_scores: dict[str, float] = {}
-        for name, (aggregator, raw_score) in scores.items():
-            if aggregator.return_raw_scores is True:
-                raw_scores[name] = list(raw_score)
-            try:
-                agg_score = aggregator.aggregate(values=raw_score, datapoints=datapoints)
-            except Exception as e:
-                raise ValidationError(
-                    f"Aggregator for score '{name}' raised an exception while aggregating scores. "
-                    "Scroll up to see the original exception."
-                ) from e
-            if agg_score is NOTHING or isinstance(agg_score, _Nothing):
-                # This is the case with the NoAgg Scorer
-                continue
-            if isinstance(agg_score, dict):
-                # If the aggregator returned multiple values, we merge them prefixing the original name
-                for key, value in agg_score.items():
-                    agg_scores[key if is_single else f"{name}__{key}"] = value
-            else:
-                agg_scores[name] = agg_score
+        for make_context, (name, (aggregator, raw_score)) in iter_with_warning_error_context(scores.items()):
+            with make_context("score_aggregation", {"score_name": name}):
+                if aggregator.return_raw_scores is True:
+                    raw_scores[name] = list(raw_score)
+                try:
+                    agg_score = aggregator.aggregate(values=raw_score, datapoints=datapoints)
+                except Exception as e:
+                    raise ValidationError(
+                        f"Aggregator for score '{name}' raised an exception while aggregating scores. "
+                        "Scroll up to see the original exception."
+                    ) from e
+                if agg_score is NOTHING or isinstance(agg_score, _Nothing):
+                    # This is the case with the NoAgg Scorer
+                    continue
+                if isinstance(agg_score, dict):
+                    # If the aggregator returned multiple values, we merge them prefixing the original name
+                    for key, value in agg_score.items():
+                        agg_scores[key if is_single else f"{name}__{key}"] = value
+                else:
+                    agg_scores[name] = agg_score
         # Finally we check that all aggregates values are floats
         if not all(isinstance(score, (int, float)) for score in agg_scores.values()):
             raise ValidationError(
