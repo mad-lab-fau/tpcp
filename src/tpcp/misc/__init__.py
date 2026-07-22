@@ -7,6 +7,7 @@ from tpcp.misc._warning_error_context import (
     WarningErrorContext,
     WarningErrorContextRecord,
     iter_with_warning_error_context,
+    print_with_context,
     warning_error_context,
 )
 
@@ -19,6 +20,7 @@ __all__ = [
     "classproperty",
     "custom_hash",
     "iter_with_warning_error_context",
+    "print_with_context",
     "set_defaults",
     "warning_error_context",
 ]

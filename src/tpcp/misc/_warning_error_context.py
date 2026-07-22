@@ -6,6 +6,7 @@ from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
 from copy import copy
 from dataclasses import dataclass, field
+from io import StringIO
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Optional, TypeVar, Union
 
 if TYPE_CHECKING:
@@ -80,6 +81,7 @@ class _ContextFrame:
     context: dict[str, Any]
     context_provider: Optional[Callable[[], Mapping[str, Any]]] = None
     result: WarningErrorContext = field(default_factory=WarningErrorContext)
+    record_only: bool = False
 
     def _render_context(self) -> str:
         context = self.context
@@ -124,6 +126,10 @@ def _record_event(
     record = WarningErrorContextRecord(event_type, context, message)
     for frame in _context_stack.get():
         frame.result.records.append(record)
+
+
+def _is_record_only() -> bool:
+    return any(frame.record_only for frame in _context_stack.get())
 
 
 def _render_contexts(contexts: Sequence[tuple[str, dict[str, Any]]]) -> str:
@@ -187,6 +193,8 @@ def _showwarnmsg_with_context(message: warnings.WarningMessage) -> None:
     if _context_stack.get():
         context = _render_context_stack()
         _record_event("warning", context, message.message)
+        if _is_record_only():
+            return
         message = copy(message)
         message.message = _contextualize_warning(message.message, context)
 
@@ -216,6 +224,8 @@ else:
         context = _render_context_stack()
         if context:
             _record_event("warning", context, message)
+            if _is_record_only():
+                return
         _original_showwarning(_contextualize_warning(message, context), category, filename, lineno, file, line)
 
     warnings.showwarning = _showwarning_with_context
@@ -246,6 +256,7 @@ def warning_error_context(
     /,
     *,
     context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
+    record_only: bool = False,
 ) -> Generator[WarningErrorContext, None, None]:
     """Add structured context information to warnings and exceptions raised in the context.
 
@@ -260,14 +271,21 @@ def warning_error_context(
 
     Python applies warning filters before this context manager attaches its metadata.
     Consequently, different context values do not make otherwise identical warnings
-    count as distinct occurrences. If every contextual occurrence must be shown, use
-    an appropriate warning filter such as ``warnings.simplefilter("always")``.
+    count as distinct occurrences. If every contextual occurrence must be shown or
+    recorded, use an appropriate warning filter such as
+    ``warnings.simplefilter("always")``.
 
     The context manager yields a :class:`WarningErrorContext` whose ``records`` list
     remains available after the context exits. It contains warnings that reached
     Python's warning dispatcher and exceptions that escaped the context. Original
     warning and exception objects are retained so callers can inspect their concrete
     types and custom attributes.
+
+    Setting ``record_only=True`` on an outer context suppresses warning forwarding
+    and :func:`print_with_context` output throughout its nested contexts while still
+    recording those events. It does not suppress exceptions or ordinary
+    :func:`print` calls. Warning filters still run before recording, including in
+    record-only mode.
 
     On Python 3.9 and 3.10, exception context is stored in ``__notes__`` but is not
     displayed by Python's standard traceback renderer. Traceback renderers that
@@ -279,6 +297,7 @@ def warning_error_context(
         context=dict({} if context is None else context),
         context_provider=context_provider,
         result=result,
+        record_only=record_only,
     )
     token = _context_stack.set((*_context_stack.get(), frame))
     try:
@@ -296,6 +315,39 @@ def warning_error_context(
             _recorded_error.set(None)
 
 
+def print_with_context(
+    *values: Any,
+    sep: Optional[str] = " ",
+    end: Optional[str] = "\n",
+    file: Any = None,
+    flush: bool = False,
+) -> None:
+    """Print values with the active context and retain the original message.
+
+    Without an active :func:`warning_error_context`, this behaves exactly like
+    :func:`print`. With an active context, the rendered context stack is prepended
+    to the output and a ``"print"`` record is added to every active context result.
+    Output is suppressed when any active context uses ``record_only=True``.
+    """
+    if not _context_stack.get():
+        print(*values, sep=sep, end=end, file=file, flush=flush)
+        return
+
+    if sep is not None and not isinstance(sep, str):
+        raise TypeError(f"sep must be None or a string, not {type(sep).__name__}")
+    if end is not None and not isinstance(end, str):
+        raise TypeError(f"end must be None or a string, not {type(end).__name__}")
+
+    message_buffer = StringIO()
+    print(*values, sep=sep, end="", file=message_buffer)
+    message = message_buffer.getvalue()
+    context = _render_context_stack()
+    _record_event("print", context, message)
+    if _is_record_only():
+        return
+    print(f"[{context}] {message}", end=end, file=file, flush=flush)
+
+
 def _make_iteration_context_factory(i: int) -> _WarningErrorContextFactory:
     def make_context(
         name: str,
@@ -303,11 +355,17 @@ def _make_iteration_context_factory(i: int) -> _WarningErrorContextFactory:
         /,
         *,
         context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
+        record_only: bool = False,
     ) -> AbstractContextManager[WarningErrorContext]:
         context = {} if context is None else context
         if "i" in context:
             raise ValueError("The context key 'i' is reserved by iter_with_warning_error_context.")
-        return warning_error_context(name, {"i": i, **context}, context_provider=context_provider)
+        return warning_error_context(
+            name,
+            {"i": i, **context},
+            context_provider=context_provider,
+            record_only=record_only,
+        )
 
     return make_context
 

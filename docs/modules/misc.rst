@@ -29,5 +29,6 @@ Functions
     custom_hash
     classproperty
     iter_with_warning_error_context
+    print_with_context
     set_defaults
     warning_error_context

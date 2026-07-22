@@ -2,6 +2,7 @@
 
 import _warnings
 import inspect
+import io
 import re
 import subprocess
 import sys
@@ -16,6 +17,7 @@ _warn_alias_imported_before_tpcp = warnings.warn
 from tpcp.misc import (  # noqa: E402  (import must happen after capturing warnings.warn)
     WarningErrorContextRecord,
     iter_with_warning_error_context,
+    print_with_context,
     warning_error_context,
 )
 
@@ -127,6 +129,81 @@ def test_context_records_warnings_and_errors_with_their_final_context():
     ]
     assert dataset_context.records == expected_records
     assert item_context.records == expected_records
+
+
+def test_print_with_context_prints_and_records_like_print():
+    """Contextual prints retain normal value, separator, terminator, and file handling."""
+    output = io.StringIO()
+
+    with warning_error_context("item", {"i": 3}) as context:
+        print_with_context("value", 5, sep="=", end="!", file=output, flush=True)
+
+    assert output.getvalue() == "[item: i=3] value=5!"
+    assert context.records == [WarningErrorContextRecord("print", "item: i=3", "value=5")]
+
+
+def test_print_with_context_without_active_context_is_a_normal_print():
+    """The print helper remains useful when no diagnostic context is active."""
+    output = io.StringIO()
+
+    print_with_context("plain", "output", file=output)
+
+    assert output.getvalue() == "plain output\n"
+
+
+def test_record_only_context_suppresses_contextual_output_but_records_all_events(capsys):
+    """A highest-level record-only context provides a quiet diagnostic event log."""
+    original_warning = UserWarning("signal is short")
+    original_error = ValueError("invalid signal")
+
+    try:
+        with (
+            warnings.catch_warnings(record=True) as emitted_warnings,
+            warning_error_context("program", {"run": 1}, record_only=True) as program_context,
+            warning_error_context("item", {"i": 3}) as item_context,
+        ):
+            warnings.simplefilter("always")
+            warnings.warn(original_warning, stacklevel=1)
+            print_with_context("processed", 3)
+            print("ordinary output")
+            raise original_error
+    except ValueError:
+        pass
+    else:
+        pytest.fail("The original error was not re-raised.")
+
+    expected_context = "program: run=1 > item: i=3"
+    expected_records = [
+        WarningErrorContextRecord("warning", expected_context, original_warning),
+        WarningErrorContextRecord("print", expected_context, "processed 3"),
+        WarningErrorContextRecord("error", expected_context, original_error),
+    ]
+    assert emitted_warnings == []
+    assert capsys.readouterr().out == "ordinary output\n"
+    assert program_context.records == expected_records
+    assert item_context.records == expected_records
+
+
+def test_record_only_print_rejects_an_invalid_end_value():
+    """Quiet contextual printing retains normal print argument validation."""
+    with (
+        warning_error_context("program", record_only=True) as program_context,
+        pytest.raises(TypeError, match="end must be None or a string"),
+    ):
+        print_with_context("message", end=1)
+
+    assert program_context.records == []
+
+
+def test_record_only_print_validates_sep_before_end():
+    """Contextual printing matches normal print validation order."""
+    with (
+        warning_error_context("program", record_only=True) as program_context,
+        pytest.raises(TypeError, match="sep must be None or a string"),
+    ):
+        print_with_context("message", sep=1, end=1)
+
+    assert program_context.records == []
 
 
 def test_failing_add_note_does_not_mask_exception():
