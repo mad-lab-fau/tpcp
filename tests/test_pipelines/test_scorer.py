@@ -17,6 +17,7 @@ from tests.test_pipelines.conftest import (
 )
 from tpcp import Pipeline
 from tpcp.exceptions import ScorerFailedError, ValidationError
+from tpcp.misc import warning_error_context
 from tpcp.validate import Scorer
 from tpcp.validate._scorer import Aggregator, FloatAggregator, _validate_scorer, no_agg
 
@@ -175,6 +176,24 @@ class TestScorer:
         expected_context = "single_score_callback: i=1"
         assert str(caught[0].message) == f"callback warning\n[{expected_context}] callback warning"
         assert error.value.__notes__ == [f"Context: {expected_context}"]
+
+    def test_parallel_worker_records_are_recovered(self):
+        def score_func(_pipeline, datapoint):
+            value = datapoint.group_label.value
+            warnings.warn(f"worker warning {value}", UserWarning, stacklevel=1)
+            return value
+
+        with warnings.catch_warnings(), warning_error_context("program", record_only=True) as context:
+            warnings.simplefilter("always")
+            agg_score, single_scores = Scorer(score_func, n_jobs=2, progress_bar=False)(
+                DummyOptimizablePipeline(), DummyDataset()
+            )
+
+        assert agg_score == np.mean(single_scores)
+        assert [str(record.message) for record in context.records] == [
+            f"worker warning {i}" for i in range(len(DummyDataset()))
+        ]
+        assert all(record.context.startswith("program > datapoint: index=") for record in context.records)
 
     def test_documented_callback_signature_valid(self):
         def callback(*, step: int, scores: Sequence[float], **_):

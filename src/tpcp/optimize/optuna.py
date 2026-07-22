@@ -15,7 +15,6 @@ from collections.abc import Sequence
 from typing import Any, Callable, Optional, TypedDict, TypeVar, Union
 
 import numpy as np
-from joblib import Parallel
 from optuna import Study
 from optuna.study import StudyDirection
 from optuna.study.study import ObjectiveFuncType
@@ -28,7 +27,7 @@ from tpcp._optimize import BaseOptimize
 from tpcp._pipeline import PipelineT
 from tpcp.misc import warning_error_context
 from tpcp.optimize import Optimize
-from tpcp.parallel import delayed
+from tpcp.parallel import Parallel, delayed
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
 
 __all__ = ["CustomOptunaOptimize", "CustomOptunaOptimizeT", "OptunaSearch"]

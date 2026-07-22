@@ -1,10 +1,10 @@
 """Helpers for restoring TPCP runtime context in joblib workers.
 
 The worker-state helpers are required as long as https://github.com/joblib/joblib/issues/1071 is not resolved.
-:func:`delayed` restores registered state for each worker task. :class:`Parallel`
-additionally recovers side-channel data from successful tasks without changing their
-return values. Applications can add their own round-trip state with
-:func:`register_parallel_side_channel`.
+The :func:`delayed` wrapper restores registered global state, Python warning filters,
+and active warning/error contexts for each worker task. :class:`Parallel` additionally
+recovers side-channel data from successful tasks without changing their return values.
+Applications can add their own round-trip state with :func:`register_parallel_side_channel`.
 
 The provided workarounds are similar to the ones done in scikit-learn
 (https://github.com/scikit-learn/scikit-learn/pull/25363).

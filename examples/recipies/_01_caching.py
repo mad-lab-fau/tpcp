@@ -220,7 +220,8 @@ cache.clear()
 #    of multiprocessing.
 #    Make sure to double-check that everything works as expected.
 #    If not, you might be able to use :func:`~tpcp.parallel.register_global_parallel_callback` to fix the issue.
-#    (at least in the context of joblib based multiprocessing).
+#    Use :func:`~tpcp.parallel.delayed` for custom joblib tasks and pair it with
+#    :class:`~tpcp.parallel.Parallel` when warning-context records should be recovered from successful workers.
 #
 # Below we demonstrate how to apply the decorator to a class after the fact.
 from tpcp.caching import global_disk_cache, remove_any_cache
