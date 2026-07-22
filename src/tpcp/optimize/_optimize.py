@@ -20,7 +20,7 @@ from typing import (
 )
 
 import numpy as np
-from joblib import Memory, Parallel
+from joblib import Memory
 from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 from sklearn.model_selection import BaseCrossValidator, ParameterGrid
@@ -46,7 +46,7 @@ from tpcp._utils._general import (
 )
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
-from tpcp.parallel import delayed
+from tpcp.parallel import Parallel, delayed
 from tpcp.validate import DatasetSplitter
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
 

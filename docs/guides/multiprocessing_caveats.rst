@@ -47,7 +47,10 @@ tpcp workaround: ``tpcp.parallel``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 `tpcp` provides :mod:`tpcp.parallel` as a workaround for this class of problem.
-Its :func:`~tpcp.parallel.delayed` wrapper captures registered state in the parent process and restores it in workers.
+Its :func:`~tpcp.parallel.delayed` wrapper captures registered state, Python warning filters, and active
+:func:`~tpcp.misc.warning_error_context` instances in the parent process and restores them for each worker task.
+Its :class:`~tpcp.parallel.Parallel` subclass can additionally return contextual warning and print records to the
+original parent context without exposing an internal wrapper around task results.
 
 The workflow is:
 
@@ -136,6 +139,12 @@ Related background:
     The workaround is only applied when `tpcp.parallel.delayed` is used.
     If your own code uses `joblib.delayed` directly, registered callbacks will not run.
 
+.. note::
+    :func:`tpcp.parallel.delayed` remains compatible with :class:`joblib.Parallel`, which restores worker state but
+    does not recover side-channel data. Pair it with :class:`tpcp.parallel.Parallel` when data from successful worker
+    tasks should be merged into parent-process state. A task that raises does not return its side-channel data; its
+    original exception is propagated with any worker-side warning/error context.
+
 Custom side channels
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -154,6 +163,36 @@ A side channel has three operations:
 The second half of the example collects application-defined worker events without adding them to each task result.
 The registration must remain active until all results, including generator results, have been consumed. Names with
 the ``__tpcp_internal__.`` prefix are reserved for built-in TPCP side channels.
+
+Warning and error contexts
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Warning/error contexts need no explicit callback registration. The active context stack and warning filters are
+captured automatically when :func:`tpcp.parallel.delayed` creates a task. Restored contexts are limited to that task,
+so reused joblib workers do not retain context or filters from earlier work.
+
+A propagated ``context_provider`` is evaluated once when each worker task starts. All events in that task use this
+snapshot. If metadata must change while worker code is running, create a nested context with its own provider inside
+the worker function.
+
+Use :class:`tpcp.parallel.Parallel` to recover records from successful workers:
+
+.. code-block:: python
+
+    import warnings
+
+    from tpcp.misc import warning_error_context
+    from tpcp.parallel import Parallel, delayed
+
+    def worker_func(value):
+        warnings.warn(f"processing {value}", UserWarning, stacklevel=1)
+        return value * 2
+
+    with warning_error_context("program", record_only=True) as context:
+        results = Parallel(n_jobs=2)(delayed(worker_func)(value) for value in range(4))
+
+    assert results == [0, 2, 4, 6]
+    assert len(context.records) == 4
 
 .. warning::
     Different libraries may implement their own worker-state restoration logic.
@@ -298,6 +337,7 @@ tpcp-specific takeaways
 - If global configuration is missing in workers, use :mod:`tpcp.parallel`.
 - If you use custom parallel code together with `tpcp` worker-state restoration, make sure you use
   :func:`~tpcp.parallel.delayed`, not `joblib.delayed`.
+- Use :class:`~tpcp.parallel.Parallel` as well when successful worker tasks should return contextual records.
 - If tests depend on clean workers, explicitly shut down the reusable `loky` executor.
 - If a pickle error mentions `__main__`, move the relevant object to a normal module first.
 - If runtime-created objects are difficult to serialize, pass configuration into workers and build the object there.
@@ -307,6 +347,7 @@ Related APIs
 ------------
 
 - :mod:`tpcp.parallel`
+- :class:`tpcp.parallel.Parallel`
 - :func:`tpcp.parallel.delayed`
 - :func:`tpcp.parallel.register_global_parallel_callback`
 - :func:`tpcp.parallel.register_parallel_side_channel`

@@ -1,5 +1,5 @@
-tpcp.parallel: Helper for global settings during parallel execution
-===================================================================
+tpcp.parallel: Context-aware parallel execution
+================================================
 
 For practical caveats around joblib-based multiprocessing, worker state, serialization, and import costs, see
 :ref:`multiprocessing_caveats`.
@@ -22,3 +22,12 @@ Functions
     register_parallel_side_channel
     remove_global_parallel_callback
     remove_parallel_side_channel
+
+Classes
+-------
+
+.. autosummary::
+    :toctree: generated/parallel
+    :template: class.rst
+
+    Parallel

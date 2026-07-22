@@ -16,7 +16,6 @@ from typing import (
 
 import numpy as np
 import pandas as pd
-from joblib import Parallel
 from tqdm.auto import tqdm
 from typing_extensions import Protocol, Self
 
@@ -28,7 +27,7 @@ from tpcp._pipeline import PipelineT
 from tpcp._utils._general import _passthrough
 from tpcp.exceptions import ScorerFailedError, ValidationError
 from tpcp.misc import iter_with_warning_error_context, warning_error_context
-from tpcp.parallel import delayed
+from tpcp.parallel import Parallel, delayed
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
