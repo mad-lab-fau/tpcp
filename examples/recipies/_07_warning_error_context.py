@@ -10,8 +10,8 @@ optimization trial, or iteration triggered it.
 
 This example covers fixed and dynamic context, nested contexts, retained event
 records, contextual prints, manual lifecycle control, quiet record-only
-execution, arbitrary iterators, :class:`~tpcp.misc.TypedIterator`, and typed
-sub-iterations.
+execution, restoration in parallel workers, arbitrary iterators,
+:class:`~tpcp.misc.TypedIterator`, and typed sub-iterations.
 
 Simple and dynamic context
 --------------------------
@@ -31,6 +31,7 @@ from tpcp.misc import (
     print_with_context,
     warning_error_context,
 )
+from tpcp.parallel import Parallel, delayed
 
 with warning_error_context("record", {"participant": "p1"}):
     warnings.warn("signal is short", UserWarning, stacklevel=1)
@@ -169,6 +170,50 @@ with warnings.catch_warnings():
                 print_with_context("Processed", item)
 
 print([record.type for record in program_context.records])
+
+
+# %%
+# Parallel workers
+# ----------------
+# :func:`tpcp.parallel.delayed` captures the active context when a task is
+# created and restores it around that task in a process worker. Contexts opened
+# inside the worker stack on top of the restored context. Pairing ``delayed``
+# with :class:`tpcp.parallel.Parallel` also merges warning and contextual-print
+# records from successful tasks back into the original parent context.
+#
+# Both TPCP helpers are required for this complete round trip:
+# :func:`tpcp.parallel.delayed` restores the context in the worker, while
+# :class:`tpcp.parallel.Parallel` recovers its records in the parent. The
+# corresponding :mod:`joblib` helpers do not provide both parts automatically.
+def run_parallel_example():
+    """Run the example without making the worker import this gallery module."""
+
+    def process_in_worker(item: str) -> str:
+        with warning_error_context("worker", {"item": item}):
+            warnings.warn("worker warning", UserWarning, stacklevel=1)
+            print_with_context("Worker processed", item)
+        return item.upper()
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("always")
+        with warning_error_context(
+            "parent", {"run": "validation"}, record_only=True
+        ) as parallel_context:
+            parallel_results = Parallel(n_jobs=2)(
+                delayed(process_in_worker)(item) for item in ["left", "right"]
+            )
+    return parallel_results, parallel_context.records
+
+
+parallel_results, parallel_records = run_parallel_example()
+
+print(parallel_results)
+print(
+    [
+        (record.type, record.context, str(record.message))
+        for record in parallel_records
+    ]
+)
 
 # %%
 # Arbitrary iterators
