@@ -13,13 +13,34 @@ However, you can likely configure the callbacks in tpcp to make that work.
 
 import functools
 import multiprocessing
-from typing import Callable, TypeVar
+import warnings
+from contextlib import AbstractContextManager, ExitStack
+from dataclasses import dataclass
+from typing import Any, Callable, TypeVar
 
 import joblib
 
 T = TypeVar("T")
 CalbackReturnType = tuple[T, Callable[[T], None]]
 _PARALLEL_CONTEXT_CALLBACKS: dict[str, [Callable[[], CalbackReturnType]]] = {}
+
+
+@dataclass(frozen=True)
+class _ParallelContextHooks:
+    capture: Callable[[], Any]
+    restore: Callable[[Any], AbstractContextManager[Any]]
+
+
+_PARALLEL_CONTEXT_HOOKS: dict[str, _ParallelContextHooks] = {}
+
+
+def _register_parallel_context(
+    name: str,
+    capture: Callable[[], Any],
+    restore: Callable[[Any], AbstractContextManager[Any]],
+) -> None:
+    """Register an internal context that is scoped to a single worker task."""
+    _PARALLEL_CONTEXT_HOOKS[name] = _ParallelContextHooks(capture, restore)
 
 
 def delayed(func):
@@ -77,18 +98,35 @@ def delayed(func):
     Setters might be called multiple times in the same process, if the process pool is reused by multiple jobs.
     The callbacks should be robust against this and not break.
 
+    Active :func:`~tpcp.misc.warning_error_context` instances are restored automatically for each worker task.
+    Their worker-side lifetime is limited to that task, even when joblib reuses the process.
+    The Python warning filters active when the delayed task is created are restored in process workers.
+    Thread workers share process-global warning filters and therefore use the filters active when the task executes.
+
     """
     _parallel_setter = []
     for g in _PARALLEL_CONTEXT_CALLBACKS.values():
         _parallel_setter.append(g())
+    warning_filters = list(warnings.filters)
+    parallel_contexts = []
+    for hooks in _PARALLEL_CONTEXT_HOOKS.values():
+        captured_context = hooks.capture()
+        if captured_context is not None:
+            parallel_contexts.append((captured_context, hooks.restore))
 
     @functools.wraps(func)
     def inner(*args, **kwargs):
         # When the function is called in the main process, we just call the function
         # Otherwise we actually run our setters.
         if multiprocessing.parent_process() is not None:
-            for value, setter in _parallel_setter:
-                setter(value)
+            with warnings.catch_warnings(), ExitStack() as stack:
+                warnings.filters[:] = warning_filters
+                warnings._filters_mutated()
+                for value, setter in _parallel_setter:
+                    setter(value)
+                for captured_context, restore in parallel_contexts:
+                    stack.enter_context(restore(captured_context))
+                return func(*args, **kwargs)
         return func(*args, **kwargs)
 
     return joblib.delayed(inner)
