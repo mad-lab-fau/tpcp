@@ -95,7 +95,7 @@ def test_train_dataset_transform():
 
     assert isinstance(raw_dataset, ImageDataset)
     assert isinstance(augmented_dataset, AugmentedImageDataset)
-    assert augmented_dataset.original_dataset is raw_dataset
+    assert augmented_dataset.wrapped_dataset is not raw_dataset
     assert_array_equal(raw_dataset[0].image, [[1, 0, 0], [1, 1, 0], [1, 0, 0]])
     rotated_datapoint = augmented_dataset.get_subset(sample_id=0, rotation_deg=90)
     assert rotated_datapoint.label == raw_dataset[0].label
@@ -106,8 +106,8 @@ def test_train_dataset_transform():
 
     grouped_dataset = raw_dataset.groupby("sample_id")
     grouped_augmented_dataset = rotate_training_images(grouped_dataset)
-    assert grouped_augmented_dataset.groupby_cols == ["sample_id", "rotation_deg"]
     assert len(grouped_augmented_dataset) == 24
+    assert grouped_augmented_dataset.groupby_cols == ["sample_id", "rotation_deg"]
     assert grouped_augmented_dataset[0].label == grouped_dataset[0].label
     assert_array_equal(grouped_augmented_dataset[0].image, grouped_dataset[0].image)
 

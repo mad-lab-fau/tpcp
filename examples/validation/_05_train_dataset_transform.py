@@ -24,7 +24,7 @@ from typing import Optional, Union
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from tpcp import Dataset
+from tpcp import Dataset, DatasetWrapperMixin
 
 
 class ImageDataset(Dataset):
@@ -80,55 +80,70 @@ class RawImageDataset(ImageDataset):
         return int(self.index.iloc[0]["label"])
 
 
-class AugmentedImageDataset(ImageDataset):
-    """Dataset wrapping an image dataset and exposing lazily rotated datapoints."""
+# %%
+# A reusable dataset wrapper
+# --------------------------
+# ``DatasetWrapperMixin`` handles the mechanics shared by datasets that wrap other datasets: it derives the initial
+# grouping from the wrapped dataset, materializes the expanded index, and resolves the wrapped datapoint represented by
+# an augmented datapoint.
+#
+# .. important::
+#    The inheritance order is essential: ``DatasetWrapperMixin`` must be listed **before** ``ImageDataset``. Python
+#    resolves methods from left to right, so reversing the bases would select the original ``Dataset.create_index``
+#    instead of the implementation supplied by the mixin. TPCP detects the reversed order when the class is defined and
+#    raises a ``TypeError`` with an explanation.
+class AugmentedImageDataset(
+    DatasetWrapperMixin[ImageDataset],
+    ImageDataset,
+):
+    """Dataset wrapping an image dataset and exposing lazily rotated datapoints.
+
+    ``DatasetWrapperMixin`` must remain the first base class so its index implementation takes precedence.
+    """
+
+    _wrapper_groupby_cols = ("rotation_deg",)
 
     def __init__(
         self,
-        original_dataset: ImageDataset,
+        wrapped_dataset: ImageDataset,
         rotation_degrees: tuple[int, ...] = (0, 90, 180, 270),
         *,
         groupby_cols: Optional[Union[list[str], str]] = None,
         subset_index: Optional[pd.DataFrame] = None,
     ) -> None:
-        self.original_dataset = original_dataset
+        self.wrapped_dataset = wrapped_dataset
         self.rotation_degrees = rotation_degrees
         super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
 
-    def create_index(self) -> pd.DataFrame:
+    def _create_wrapped_index(self, source_index: pd.DataFrame) -> pd.DataFrame:
         """Add an augmentation dimension to the wrapped dataset's index."""
+        rotation_col = self._wrapper_groupby_cols[0]
         return (
             pd.concat(
                 [
-                    self.original_dataset.index.assign(rotation_deg=rotation)
+                    source_index.assign(**{rotation_col: rotation})
                     for rotation in self.rotation_degrees
                 ],
                 ignore_index=True,
             )
-            .sort_values([*self.original_dataset.index.columns, "rotation_deg"])
+            .sort_values([*source_index.columns, rotation_col])
             .reset_index(drop=True)
         )
-
-    @property
-    def _original_datapoint(self) -> ImageDataset:
-        """Resolve the original datapoint represented by a single augmented row."""
-        self.assert_is_single(self.groupby_cols, "_original_datapoint")
-        original_index = self.index.drop(columns="rotation_deg")
-        return self.original_dataset.get_subset(index=original_index)
 
     @property
     def image(self) -> np.ndarray:
         """Proxy the original image and apply the rotation encoded in the index."""
         self.assert_is_single(self.groupby_cols, "image")
-        rotation_degrees = int(self.index.iloc[0]["rotation_deg"])
+        rotation_col = self._wrapper_groupby_cols[0]
+        rotation_degrees = int(self.index.iloc[0][rotation_col])
         return np.rot90(
-            self._original_datapoint.image, k=rotation_degrees // 90
+            self.wrapped_datapoint.image, k=rotation_degrees // 90
         ).copy()
 
     @property
     def label(self) -> int:
         """Proxy the label of the wrapped original datapoint."""
-        return self._original_datapoint.label
+        return self.wrapped_datapoint.label
 
 
 # %%
@@ -153,20 +168,11 @@ raw_dataset = RawImageDataset(images, labels)
 # Real augmentation: rotate images
 # --------------------------------
 # The transform receives only the training subset created for a fold. The augmented dataset stores that subset as its
-# ``original_dataset`` parameter and builds its expanded index from it. Data and reference properties are resolved
+# ``wrapped_dataset`` parameter and builds its expanded index from it. Data and reference properties are resolved
 # through the wrapped subset only when the pipeline accesses an individual datapoint.
 def rotate_training_images(dataset: ImageDataset) -> AugmentedImageDataset:
     """Add 90, 180, and 270 degree rotations of every provided datapoint."""
-    if dataset.groupby_cols is None:
-        augmented_groupby_cols = None
-    else:
-        original_groupby_cols = (
-            [dataset.groupby_cols]
-            if isinstance(dataset.groupby_cols, str)
-            else dataset.groupby_cols
-        )
-        augmented_groupby_cols = [*original_groupby_cols, "rotation_deg"]
-    return AugmentedImageDataset(dataset, groupby_cols=augmented_groupby_cols)
+    return AugmentedImageDataset(dataset.clone())
 
 
 augmented_dataset = rotate_training_images(raw_dataset)
