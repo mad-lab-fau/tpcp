@@ -3,7 +3,7 @@
 import warnings
 from collections.abc import Iterator, Sequence
 from keyword import iskeyword
-from typing import Generic, Optional, TypeVar, Union, cast, get_args, overload
+from typing import ClassVar, Generic, Optional, TypeVar, Union, cast, get_args, get_origin, overload
 
 import numpy as np
 import pandas as pd
@@ -125,7 +125,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
             )
 
         # Get the generic type of the dataset
-        group_label_type = get_args(type(self).__orig_bases__[0])[0]
+        group_label_type = self._get_group_label_type()
         # If group label type is a named tuple, we check that the keys are the same as the index columns
         if (label_fields := getattr(group_label_type, "_fields", None)) and label_fields != (
             index_cols := tuple(index_1.columns)
@@ -155,7 +155,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
 
         For some examples and additional explanation see this :ref:`example <custom_dataset_basics>`.
         """
-        if getattr(group_label_type := get_args(type(self).__orig_bases__[0])[0], "_fields", None):
+        if getattr(group_label_type := self._get_group_label_type(), "_fields", None):
             nd_tuple_name = group_label_type.__name__
         else:
             nd_tuple_name = type(self).__name__ + "GroupLabel"
@@ -198,7 +198,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
 
     def index_as_tuples(self) -> list[GroupLabelT]:
         """Get all datapoint labels of the dataset (i.e. a list of the rows of the index as named tuples)."""
-        if getattr(group_label_type := get_args(type(self).__orig_bases__[0])[0], "_fields", None):
+        if getattr(group_label_type := self._get_group_label_type(), "_fields", None):
             # If a generic is provided, we actually convert the named tuples.
             return [group_label_type(*row) for row in self.index.itertuples(index=False)]
         return list(self.index.itertuples(index=False, name=type(self).__name__ + "GroupLabel"))
@@ -240,6 +240,15 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
         if self.groupby_cols is None:
             return index.columns.to_list()
         return _ensure_is_list(self.groupby_cols)
+
+    def _get_group_label_type(self):
+        """Find the concrete group-label type in the dataset inheritance hierarchy."""
+        for cls in type(self).__mro__:
+            for generic_base in getattr(cls, "__orig_bases__", ()):
+                origin = get_origin(generic_base)
+                if isinstance(origin, type) and issubclass(origin, _Dataset) and (args := get_args(generic_base)):
+                    return args[0]
+        return None
 
     def _get_unique_groups(self) -> Union[pd.MultiIndex, pd.Index]:
         return self.grouped_index.index.unique()
@@ -750,6 +759,81 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
             subset_index: Optional[pd.DataFrame] = None
 
         return DatasetAt
+
+
+WrappedDatasetT = TypeVar("WrappedDatasetT", bound="_Dataset")
+
+
+class DatasetWrapperMixin(Generic[WrappedDatasetT]):
+    """Provide common behavior for datasets that wrap another dataset.
+
+    This mixin expands the index of ``wrapped_dataset`` through
+    :meth:`_create_wrapped_index`, links the wrapper's initial grouping to the
+    wrapped dataset, and resolves the source datapoint represented by a wrapper
+    datapoint through :attr:`wrapped_datapoint`.
+
+    The mixin deliberately does not inherit from :class:`Dataset`. A concrete
+    wrapper must inherit from both this mixin and the domain-specific dataset
+    interface implemented by the wrapped dataset.
+
+    .. important::
+        ``DatasetWrapperMixin`` must be listed **before** the dataset base class.
+        The order controls Python's method resolution order and ensures that this
+        mixin's :meth:`create_index` implementation is used. Reversing the bases
+        raises a :class:`TypeError` when the wrapper class is defined.
+
+    Examples
+    --------
+    The mixin comes first and the shared dataset interface comes second::
+
+        class AugmentedDataset(
+            DatasetWrapperMixin[SourceDataset],
+            SourceDataset,
+        ):
+            _wrapper_groupby_cols = ("augmentation",)
+
+            def _create_wrapped_index(self, source_index): ...
+
+    """
+
+    wrapped_dataset: WrappedDatasetT
+    _wrapper_groupby_cols: ClassVar[tuple[str, ...]]
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        """Validate that the mixin precedes the dataset base in the MRO."""
+        super().__init_subclass__(**kwargs)
+        mro = cls.__mro__
+        if _Dataset in mro and mro.index(DatasetWrapperMixin) > mro.index(_Dataset):
+            raise TypeError(
+                "DatasetWrapperMixin must be listed before the Dataset base class so its create_index method takes "
+                "precedence in the method resolution order."
+            )
+
+    def create_index(self) -> pd.DataFrame:
+        """Create the wrapper index and link its initial grouping to the wrapped dataset."""
+        source_index = self.wrapped_dataset.index.copy()
+        dataset = cast("_Dataset", self)
+
+        if dataset.groupby_cols is None:
+            dataset.groupby_cols = [*self.wrapped_dataset._get_groupby_columns(), *self._wrapper_groupby_cols]
+
+        return self._create_wrapped_index(source_index)
+
+    def _create_wrapped_index(self, source_index: pd.DataFrame) -> pd.DataFrame:
+        """Create the wrapper index from a copy of the wrapped dataset index."""
+        raise NotImplementedError
+
+    @property
+    def wrapped_datapoint(self) -> WrappedDatasetT:
+        """Return the wrapped datapoint represented by the current wrapper group."""
+        dataset = cast("_Dataset", self)
+        dataset.assert_is_single_group("wrapped_datapoint")
+
+        source_columns = self.wrapped_dataset.index.columns.to_list()
+        source_index = pd.DataFrame(dataset.index.loc[:, source_columns]).drop_duplicates().reset_index(drop=True)
+        source_groupby = [column for column in dataset._get_groupby_columns() if column in source_columns]
+
+        return self.wrapped_dataset.get_subset(index=source_index).groupby(source_groupby or None)
 
 
 T = TypeVar("T")
