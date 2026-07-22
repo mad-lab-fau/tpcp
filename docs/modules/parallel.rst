@@ -19,4 +19,6 @@ Functions
 
     delayed
     register_global_parallel_callback
+    register_parallel_side_channel
     remove_global_parallel_callback
+    remove_parallel_side_channel

@@ -62,9 +62,17 @@ Example:
 
 .. code-block:: python
 
-    from joblib import Parallel
+    from contextlib import contextmanager
+
     from sklearn import get_config, set_config
-    from tpcp.parallel import delayed, register_global_parallel_callback, remove_global_parallel_callback
+    from tpcp.parallel import (
+        Parallel,
+        delayed,
+        register_global_parallel_callback,
+        register_parallel_side_channel,
+        remove_global_parallel_callback,
+        remove_parallel_side_channel,
+    )
 
     def callback():
         def setter(config):
@@ -72,11 +80,52 @@ Example:
 
         return get_config(), setter
 
-    name = register_global_parallel_callback(callback)
+    def read_config():
+        return get_config()["assume_finite"]
+
+    set_config(assume_finite=True)
+    callback_name = register_global_parallel_callback(callback)
     try:
-        Parallel(n_jobs=2)(delayed(worker_func)() for _ in range(2))
+        worker_configs = Parallel(n_jobs=2)(delayed(read_config)() for _ in range(2))
     finally:
-        remove_global_parallel_callback(name)
+        remove_global_parallel_callback(callback_name)
+
+    assert worker_configs == [True, True]
+
+    # A side channel can additionally return data from successful worker tasks.
+    worker_events = []
+    collected_events = []
+
+    @contextmanager
+    def restore_events(run_name):
+        global worker_events
+        worker_events = []
+        try:
+            yield lambda: tuple((run_name, event) for event in worker_events)
+        finally:
+            worker_events = []
+
+    def worker_func(value):
+        worker_events.append(f"processed {value}")
+        return value * 2
+
+    side_channel_name = register_parallel_side_channel(
+        lambda: "experiment-1",
+        restore_events,
+        collected_events.extend,
+    )
+    try:
+        results = Parallel(n_jobs=2)(delayed(worker_func)(value) for value in range(4))
+    finally:
+        remove_parallel_side_channel(side_channel_name)
+
+    assert results == [0, 2, 4, 6]
+    assert collected_events == [
+        ("experiment-1", "processed 0"),
+        ("experiment-1", "processed 1"),
+        ("experiment-1", "processed 2"),
+        ("experiment-1", "processed 3"),
+    ]
 
 Related background:
 
@@ -86,6 +135,25 @@ Related background:
 .. note::
     The workaround is only applied when `tpcp.parallel.delayed` is used.
     If your own code uses `joblib.delayed` directly, registered callbacks will not run.
+
+Custom side channels
+~~~~~~~~~~~~~~~~~~~~
+
+:func:`~tpcp.parallel.register_global_parallel_callback` is sufficient for state that only travels from the parent
+to a worker. For state that should also return from successful worker tasks, register a side channel with
+:func:`~tpcp.parallel.register_parallel_side_channel`.
+
+A side channel has three operations:
+
+1. ``capture`` snapshots state when :func:`~tpcp.parallel.delayed` creates a task. Returning ``None`` disables the
+   side channel for that task.
+2. ``restore`` creates a context manager around that worker task. The context manager yields a callable that collects
+   the worker-side data after the task succeeds.
+3. ``merge`` receives the collected data in the parent as :class:`~tpcp.parallel.Parallel` consumes each result.
+
+The second half of the example collects application-defined worker events without adding them to each task result.
+The registration must remain active until all results, including generator results, have been consumed. Names with
+the ``__tpcp_internal__.`` prefix are reserved for built-in TPCP side channels.
 
 .. warning::
     Different libraries may implement their own worker-state restoration logic.
@@ -241,4 +309,6 @@ Related APIs
 - :mod:`tpcp.parallel`
 - :func:`tpcp.parallel.delayed`
 - :func:`tpcp.parallel.register_global_parallel_callback`
+- :func:`tpcp.parallel.register_parallel_side_channel`
 - :func:`tpcp.parallel.remove_global_parallel_callback`
+- :func:`tpcp.parallel.remove_parallel_side_channel`

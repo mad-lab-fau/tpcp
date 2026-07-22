@@ -5,10 +5,16 @@ import warnings
 import joblib
 import pytest
 
-from tests._config_test import config, set_config
+from tests._config_test import add_to_side_channel, config, restore_side_channel, set_config
 from tpcp import parallel
-from tpcp.misc import warning_error_context
-from tpcp.parallel import delayed, register_global_parallel_callback
+from tpcp.misc import print_with_context, warning_error_context
+from tpcp.parallel import (
+    Parallel,
+    delayed,
+    register_global_parallel_callback,
+    register_parallel_side_channel,
+    remove_parallel_side_channel,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -80,7 +86,8 @@ def test_warning_context_record_only_setting_is_restored_in_worker_process():
     assert result == [0]
 
 
-def test_warning_context_annotates_worker_process_error():
+@pytest.mark.parametrize("parallel_class", [joblib.Parallel, Parallel])
+def test_warning_context_annotates_worker_process_error(parallel_class):
     def fail_in_worker():
         raise RuntimeError("worker failed")
 
@@ -88,7 +95,7 @@ def test_warning_context_annotates_worker_process_error():
         warning_error_context("parent", {"item": 3}),
         pytest.raises(RuntimeError, match="worker failed") as error,
     ):
-        joblib.Parallel(n_jobs=2)(delayed(fail_in_worker)() for _ in range(1))
+        parallel_class(n_jobs=2)(delayed(fail_in_worker)() for _ in range(1))
 
     assert error.value.__notes__ == ["Context: parent: item=3"]
 
@@ -146,6 +153,101 @@ def test_warning_filter_changes_from_callback_setter_do_not_leak():
 
     assert filtered_result == [0, 0]
     assert restored_result == [1, 1]
+
+
+@pytest.mark.parametrize(("n_jobs", "backend"), [(1, None), (2, None), (2, "threading")])
+def test_tpcp_parallel_recovers_worker_context_records(n_jobs, backend):
+    def report_from_worker():
+        warnings.warn("worker warning", UserWarning, stacklevel=1)
+        print_with_context("worker print")
+        return "worker result"
+
+    with warning_error_context("parent", {"run": 1}, record_only=True) as context:
+        result = Parallel(n_jobs=n_jobs, backend=backend)(delayed(report_from_worker)() for _ in range(1))
+
+    assert result == ["worker result"]
+    assert [(record.type, record.context, str(record.message)) for record in context.records] == [
+        ("warning", "parent: run=1", "worker warning"),
+        ("print", "parent: run=1", "worker print"),
+    ]
+    assert isinstance(context.records[0].message, UserWarning)
+
+
+def test_reused_delayed_callable_captures_context_when_each_task_is_created():
+    def report_from_worker(label):
+        print_with_context(label)
+        return label
+
+    task = delayed(report_from_worker)
+    with warning_error_context("first", record_only=True) as first_context:
+        first_task = task("first task")
+    with warning_error_context("second", record_only=True) as second_context:
+        second_task = task("second task")
+
+    assert Parallel(n_jobs=2)([first_task, second_task]) == ["first task", "second task"]
+    assert [(record.context, record.message) for record in first_context.records] == [("first", "first task")]
+    assert [(record.context, record.message) for record in second_context.records] == [("second", "second task")]
+
+
+def test_tpcp_parallel_recovers_records_as_generator_is_consumed():
+    def report_from_worker(i):
+        warnings.warn(f"worker warning {i}", UserWarning, stacklevel=1)
+        return i
+
+    with warning_error_context("parent", record_only=True) as context:
+        results = Parallel(n_jobs=2, return_as="generator")(delayed(report_from_worker)(i) for i in range(5))
+        assert context.records == []
+        assert list(results) == list(range(5))
+
+    assert [str(record.message) for record in context.records] == [f"worker warning {i}" for i in range(5)]
+
+
+def test_joblib_parallel_does_not_expose_or_recover_tpcp_side_channel_data():
+    def report_from_worker():
+        warnings.warn("worker warning", UserWarning, stacklevel=1)
+        return "worker result"
+
+    with warning_error_context("parent", record_only=True) as context:
+        result = joblib.Parallel(n_jobs=2)(delayed(report_from_worker)() for _ in range(1))
+
+    assert result == ["worker result"]
+    assert context.records == []
+
+
+@pytest.mark.parametrize(("n_jobs", "backend"), [(1, None), (2, None), (2, "threading")])
+def test_custom_parallel_side_channel_restores_worker_state_and_collects_results(n_jobs, backend):
+    collected = []
+    name = register_parallel_side_channel(
+        lambda: "captured state",
+        restore_side_channel,
+        collected.extend,
+    )
+    try:
+        results = Parallel(n_jobs=n_jobs, backend=backend)(delayed(add_to_side_channel)(i) for i in range(3))
+    finally:
+        remove_parallel_side_channel(name)
+
+    assert results == [0, 1, 2]
+    assert collected == [("captured state", 0), ("captured state", 1), ("captured state", 2)]
+
+
+@pytest.mark.parametrize(
+    "register",
+    [
+        lambda: register_global_parallel_callback(lambda: (None, lambda _: None), name="__tpcp_internal__.custom"),
+        lambda: register_parallel_side_channel(
+            lambda: None,
+            restore_side_channel,
+            lambda _: None,
+            name="__tpcp_internal__.custom",
+        ),
+        lambda: parallel.remove_global_parallel_callback("__tpcp_internal__.custom"),
+        lambda: remove_parallel_side_channel("__tpcp_internal__.custom"),
+    ],
+)
+def test_tpcp_parallel_prefix_is_reserved(register):
+    with pytest.raises(ValueError, match="reserved for TPCP"):
+        register()
 
 
 def test_doctest():
