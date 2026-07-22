@@ -5,14 +5,54 @@ from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
 from copy import copy
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Optional, TypeVar, Union
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Sequence
 
 T = TypeVar("T")
-_WarningErrorContextFactory = Callable[..., AbstractContextManager[None]]
+
+
+class WarningErrorContextRecord(NamedTuple):
+    """A warning, error, or contextual print captured by an active context.
+
+    The original warning or exception object is retained as ``message`` so its
+    concrete type and custom attributes remain available for later inspection.
+    Contextual prints store their unmodified rendered text.
+
+    Attributes
+    ----------
+    type
+        The kind of captured event.
+    context
+        The fully rendered context stack at the time of the event.
+    message
+        The original warning or exception object, or the rendered print text.
+
+    """
+
+    type: Literal["warning", "error", "print"]
+    context: str
+    message: Union[Warning, BaseException, str]
+
+
+@dataclass
+class WarningErrorContext:
+    """The persistent result returned by :func:`warning_error_context`.
+
+    Attributes
+    ----------
+    records
+        Events observed while the context was active. Events from nested contexts
+        are included with their fully rendered context stack.
+
+    """
+
+    records: list[WarningErrorContextRecord] = field(default_factory=list, init=False)
+
+
+_WarningErrorContextFactory = Callable[..., AbstractContextManager[WarningErrorContext]]
 
 
 def _safe_repr(value: Any) -> str:
@@ -39,6 +79,7 @@ class _ContextFrame:
     name: str
     context: dict[str, Any]
     context_provider: Optional[Callable[[], Mapping[str, Any]]] = None
+    result: WarningErrorContext = field(default_factory=WarningErrorContext)
 
     def _render_context(self) -> str:
         context = self.context
@@ -68,10 +109,21 @@ class _ContextFrame:
 
 
 _context_stack: ContextVar[tuple[_ContextFrame, ...]] = ContextVar("tpcp_warning_error_context", default=())
+_recorded_error: ContextVar[Optional[BaseException]] = ContextVar("tpcp_warning_error_recorded_error", default=None)
 
 
 def _render_context_stack() -> str:
     return " > ".join(frame.render() for frame in _context_stack.get())
+
+
+def _record_event(
+    event_type: Literal["warning", "error", "print"],
+    context: str,
+    message: Union[Warning, BaseException, str],
+) -> None:
+    record = WarningErrorContextRecord(event_type, context, message)
+    for frame in _context_stack.get():
+        frame.result.records.append(record)
 
 
 def _render_contexts(contexts: Sequence[tuple[str, dict[str, Any]]]) -> str:
@@ -108,8 +160,8 @@ def _warning_with_context(message: Warning, context: str) -> Warning:
     return contextualized_warning
 
 
-def _contextualize_warning(message: Union[Warning, str]) -> Union[Warning, str]:
-    context = _render_context_stack()
+def _contextualize_warning(message: Union[Warning, str], context: Optional[str] = None) -> Union[Warning, str]:
+    context = _render_context_stack() if context is None else context
     if not context:
         return message
     if isinstance(message, str):
@@ -133,8 +185,10 @@ _original_showwarning = warnings.showwarning
 def _showwarnmsg_with_context(message: warnings.WarningMessage) -> None:
     """Add active context before forwarding a warning to Python's dispatcher."""
     if _context_stack.get():
+        context = _render_context_stack()
+        _record_event("warning", context, message.message)
         message = copy(message)
-        message.message = _contextualize_warning(message.message)
+        message.message = _contextualize_warning(message.message, context)
 
     # Patch this private dispatcher intentionally: warnings.warn misses aliases
     # imported earlier, warn_explicit, and C warnings, while showwarning is bypassed
@@ -159,7 +213,10 @@ else:
         line: Optional[str] = None,
     ) -> None:
         """Fallback for Python implementations without warnings._showwarnmsg."""
-        _original_showwarning(_contextualize_warning(message), category, filename, lineno, file, line)
+        context = _render_context_stack()
+        if context:
+            _record_event("warning", context, message)
+        _original_showwarning(_contextualize_warning(message, context), category, filename, lineno, file, line)
 
     warnings.showwarning = _showwarning_with_context
 
@@ -189,7 +246,7 @@ def warning_error_context(
     /,
     *,
     context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
-) -> Generator[None, None, None]:
+) -> Generator[WarningErrorContext, None, None]:
     """Add structured context information to warnings and exceptions raised in the context.
 
     If provided, ``context`` is copied when the context is entered.
@@ -206,21 +263,37 @@ def warning_error_context(
     count as distinct occurrences. If every contextual occurrence must be shown, use
     an appropriate warning filter such as ``warnings.simplefilter("always")``.
 
+    The context manager yields a :class:`WarningErrorContext` whose ``records`` list
+    remains available after the context exits. It contains warnings that reached
+    Python's warning dispatcher and exceptions that escaped the context. Original
+    warning and exception objects are retained so callers can inspect their concrete
+    types and custom attributes.
+
     On Python 3.9 and 3.10, exception context is stored in ``__notes__`` but is not
     displayed by Python's standard traceback renderer. Traceback renderers that
     support exception notes, such as Rich, display this context on those versions.
     """
+    result = WarningErrorContext()
     frame = _ContextFrame(
-        name=name, context=dict({} if context is None else context), context_provider=context_provider
+        name=name,
+        context=dict({} if context is None else context),
+        context_provider=context_provider,
+        result=result,
     )
     token = _context_stack.set((*_context_stack.get(), frame))
     try:
-        yield
+        yield result
     except BaseException as exc:
+        if _recorded_error.get() is not exc:
+            _record_event("error", _render_context_stack(), exc)
+            _recorded_error.set(exc)
         _add_note(exc, f"Context: {frame.render()}")
         raise
     finally:
+        is_outermost_context = len(_context_stack.get()) == 1
         _context_stack.reset(token)
+        if is_outermost_context:
+            _recorded_error.set(None)
 
 
 def _make_iteration_context_factory(i: int) -> _WarningErrorContextFactory:
@@ -230,7 +303,7 @@ def _make_iteration_context_factory(i: int) -> _WarningErrorContextFactory:
         /,
         *,
         context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
-    ) -> AbstractContextManager[None]:
+    ) -> AbstractContextManager[WarningErrorContext]:
         context = {} if context is None else context
         if "i" in context:
             raise ValueError("The context key 'i' is reserved by iter_with_warning_error_context.")

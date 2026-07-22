@@ -16,6 +16,8 @@ Classes
 
     BaseTypedIterator
     TypedIterator
+    WarningErrorContext
+    WarningErrorContextRecord
 
 
 Functions
