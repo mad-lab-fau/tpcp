@@ -204,6 +204,7 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
         /,
         *,
         context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
+        record_only: bool = False,
     ) -> AbstractContextManager[WarningErrorContext]:
         """Create explicit warning/error context for an iteration body.
 
@@ -222,7 +223,12 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
             raise RuntimeError(
                 "warning_error_context must be called inside an active TypedIterator loop body."
             ) from exc
-        return _warning_error_context(name, {"i": i, **context}, context_provider=context_provider)
+        return _warning_error_context(
+            name,
+            {"i": i, **context},
+            context_provider=context_provider,
+            record_only=record_only,
+        )
 
     def _get_new_empty_object(self) -> DataclassT:
         init_dict = {k.name: self.NULL_VALUE for k in fields(self.data_type)}
