@@ -25,13 +25,11 @@ from tpcp.validate._scorer import Aggregator, FloatAggregator, _validate_scorer,
 class TestScorerCalls:
     scorer: Scorer
 
-    def test_aggregator_repr_shows_parameters_only(self):
-        aggregator = no_agg("hidden_result")
+    def test_aggregator_repr_shows_wrapped_value_only_when_present(self):
+        aggregator = no_agg("wrapped_value")
 
-        representation = repr(aggregator)
-
-        assert representation == "_NoAgg()"
-        assert "hidden_result" not in representation
+        assert repr(aggregator) == "_NoAgg()('wrapped_value')"
+        assert repr(aggregator.clone()) == "_NoAgg()"
 
     @pytest.fixture(autouse=True)
     def create_scorer(self):
