@@ -140,6 +140,18 @@ class TestDataset:
 
         assert representation.index("  threshold: 0.5") < representation.index("  source: Dataset")
 
+    def test_repr_omits_unchanged_custom_defaults(self):
+        class LabeledDataset(Dataset):
+            def __init__(self, label="all", *, groupby_cols=None, subset_index=None):
+                self.label = label
+                super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
+
+            def create_index(self):
+                return pd.DataFrame({"item": [1]})
+
+        assert "label:" not in repr(LabeledDataset())
+        assert "label: 'chosen'" in repr(LabeledDataset(label="chosen"))
+
     def test_repr_summarizes_dataframes_inside_collection_parameters(self):
         class CollectionDataset(Dataset):
             def __init__(self, sources, *, groupby_cols=None, subset_index=None):

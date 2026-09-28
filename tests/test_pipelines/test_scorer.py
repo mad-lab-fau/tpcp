@@ -30,7 +30,7 @@ class TestScorerCalls:
 
         representation = repr(aggregator)
 
-        assert "return_raw_scores=True" in representation
+        assert representation == "_NoAgg()"
         assert "hidden_result" not in representation
 
     @pytest.fixture(autouse=True)

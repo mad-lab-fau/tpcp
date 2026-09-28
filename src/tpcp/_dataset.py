@@ -391,7 +391,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
             lines.append(f"  groupby_cols: {_repr_limits.repr(self.groupby_cols)}")
         parameters = [
             (name, value, _repr_value(value))
-            for name, value in self.get_params(deep=False).items()
+            for name, value in self._repr_params().items()
             if name not in ("groupby_cols", "subset_index")
         ]
         parameters.sort(key=lambda item: _is_complex_repr_parameter(item[1], item[2]))

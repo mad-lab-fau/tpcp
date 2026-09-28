@@ -41,10 +41,11 @@ This also allows us to set nested parameters if the nested objects support a `se
     >>> my_algo.nested_algo_para.nested_para
     nested_value_new
 
-The plain representation of an algorithm or pipeline shows its constructor parameters. It indents nested tpcp
+The plain representation of an algorithm or pipeline shows required constructor parameters and parameters that differ
+from their defaults. Simple parameters appear before nested objects and other complex values. It indents nested tpcp
 objects and summarizes DataFrames, Series, Indexes, and NumPy arrays by their structure instead of printing their
-values. It does not show results or other instance attributes. Use ``get_params(deep=False)`` to inspect full
-parameter values and access result attributes directly after running the object.
+values. It does not show results or other instance attributes. Use ``get_params(deep=False)`` to inspect every
+parameter and its full value, and access result attributes directly after running the object.
 
 It is important to understand that in `tpcp` everything can/is a parameter.
 This includes simple threshold parameters or entire sklearn/pytorch models.
