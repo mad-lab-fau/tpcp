@@ -81,6 +81,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     eval_str_paras: Sequence[str]
 
     optimized_pipeline_: PipelineT
+    optimization_info_: Any
     random_seed_: int
     study_: Study
 
@@ -146,6 +147,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
             The dataset used for optimization.
 
         """
+        vars(self).pop("optimization_info_", None)
         if self.timeout is None and self.n_trials is None:
             raise ValueError(
                 "You need to set either `timeout` or `n_trials` to a proper value."
@@ -310,7 +312,10 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         # Pipeline that will be passed here is already cloned, so no need to clone again.
         pipeline_with_best_params = pipeline.set_params(**self.sanitize_params(study.best_params))
         if isinstance(pipeline_with_best_params, OptimizablePipeline):
-            return Optimize(pipeline_with_best_params).optimize(dataset).optimized_pipeline_
+            optimizer = Optimize(pipeline_with_best_params).optimize(dataset)
+            if hasattr(optimizer, "optimization_info_"):
+                self.optimization_info_ = optimizer.optimization_info_
+            return optimizer.optimized_pipeline_
         return pipeline_with_best_params
 
 
@@ -456,6 +461,9 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     optimized_pipeline_
         An instance of the input pipeline with the best parameter set.
         This is only available if `return_optimized` is not False.
+    optimization_info_
+        Additional information returned by `self_optimize_with_info` during the default final optimization on all data.
+        Only available if `return_optimized` is enabled and the pipeline returns information.
     best_params_
         The parameter combination identified in the study
     best_score_
