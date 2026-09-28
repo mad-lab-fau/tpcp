@@ -1,6 +1,8 @@
-"""Type only classes that should be used when trying to type tpcp derived classes.
+"""Public type variables and scoring aliases for custom tpcp code.
 
-Note, this module only imports them, but they are defined close to places where they are used.
+The type variables preserve concrete subclasses in generic annotations. The scoring aliases
+describe supported scoring callables and aggregator return values. Definitions live beside the
+interfaces that use them and are re-exported here for application code.
 """
 
 from tpcp._algorithm import AlgorithmT

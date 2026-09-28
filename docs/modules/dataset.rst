@@ -17,6 +17,7 @@ Classes
     Dataset
     DatasetWrapperMixin
 
+Use :data:`tpcp.types.DatasetT` when a typed helper must preserve the concrete dataset subclass.
 
 Wrapping datasets
 -----------------
