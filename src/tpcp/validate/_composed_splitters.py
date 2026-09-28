@@ -12,21 +12,10 @@ DatasetSelector = Callable[[Dataset], Dataset]
 
 
 def _validate_subset(parent: Dataset, selected: Dataset) -> list[GroupLabelT]:
-    """Require a selection of complete groups without changes to their rows."""
-    if not isinstance(selected, Dataset) or list(selected.index.columns) != list(parent.index.columns):
-        raise ValueError("Selector must return a subset with the same index columns as its input dataset.")
-    if selected._get_groupby_columns() != parent._get_groupby_columns():
-        raise ValueError("Selector must return a subset with the same grouping as its input dataset.")
-
+    """Require selected group labels to exist in the input dataset."""
     labels = selected.group_labels
-    parent_labels = set(parent.group_labels)
-    for label in labels:
-        if label not in parent_labels:
-            raise ValueError("Selector returned a subset containing a group outside its input dataset.")
-        selected_rows = selected.get_subset(group_labels=[label]).index
-        parent_rows = parent.get_subset(group_labels=[label]).index
-        if not selected_rows.equals(parent_rows):
-            raise ValueError("Selector must return a subset of complete, unchanged groups.")
+    if not set(labels).issubset(parent.group_labels):
+        raise ValueError("Selector returned a subset containing a group outside its input dataset.")
     return labels
 
 
@@ -49,7 +38,7 @@ class NoSplit(BaseDatasetSplitter):
     n_splits
         A positive integer number of identical folds to yield.
     train, test
-        Optional callables that receive the current dataset and return a subset of complete groups.
+        Optional callables that receive the current dataset and return a dataset with group labels from it.
     """
 
     def __init__(

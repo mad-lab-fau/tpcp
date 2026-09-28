@@ -117,26 +117,43 @@ def test_combined_splitter_rejects_declared_and_actual_count_mismatches():
             list(CombinedSplitter((lambda ds: ds, _WrongCountSplitter(2, actual))).split(dataset))
 
 
-@pytest.mark.parametrize(
-    "selector",
-    [
-        lambda ds: ds.groupby("v2"),
-        lambda ds: ds.get_subset(bool_map=[True] + [False] * 14),
-        lambda ds: ds.get_subset(index=ds.index.rename(columns={"v2": "other"})),
-        lambda ds: ds.get_subset(index=ds.index.iloc[[0, 0, *range(1, 15)]]),
-        lambda ds: ds.get_subset(index=ds.index.assign(v2=99)),
-        lambda ds: ds.get_subset(index=ds.index.iloc[[1, 0, *range(2, 15)]]),
-    ],
-)
-def test_selectors_reject_invalid_group_subsets(selector):
+def test_selectors_reject_unknown_group_labels():
     dataset = DummyGroupedDataset().groupby("v1")
+    selector = lambda ds: ds.get_subset(index=ds.index.assign(v1="z"))
     with pytest.raises(ValueError, match="subset"):
         list(NoSplit(1, train=selector).split(dataset))
     with pytest.raises(ValueError, match="subset"):
         list(CombinedSplitter((selector, NoSplit(1))).split(dataset))
 
 
-def test_valid_empty_selection_and_reordered_whole_groups():
+def test_selectors_use_group_labels_for_partial_or_changed_rows():
+    dataset = DummyGroupedDataset().groupby("v1")
+    partial = lambda ds: ds.get_subset(bool_map=[True] + [False] * 14)
+    changed_rows = lambda ds: ds.get_subset(index=ds.index.rename(columns={"v2": "other"}))
+    assert list(NoSplit(1, train=partial).split(dataset)) == [([("a",)], [])]
+    assert list(CombinedSplitter((partial, NoSplit(1, train=lambda ds: ds))).split(dataset)) == [([("a",)], [])]
+    assert len(dataset.get_subset(group_labels=[("a",)]).index) == 5
+    assert list(NoSplit(1, train=changed_rows).split(dataset)) == [(dataset.group_labels, [])]
+
+
+def test_partial_selector_assigns_the_whole_group_to_validation():
+    dataset = DummyGroupedDataset().groupby("v1")
+    splitter = NoSplit(
+        1,
+        train=lambda ds: ds.get_subset(v1="b"),
+        test=lambda ds: ds.get_subset(bool_map=[True] + [False] * 14),
+    )
+    result = cross_validate(
+        Optimize(DummyOptimizablePipeline()),
+        dataset,
+        cv=splitter,
+        scoring=lambda _pipeline, data_point: len(data_point.index),
+        progress_bar=False,
+    )
+    assert result["test__agg__score"] == [5]
+
+
+def test_valid_empty_selection_and_reordered_group_labels():
     dataset = DummyGroupedDataset().groupby("v1")
     empty = lambda ds: ds.get_subset(bool_map=[False] * len(ds.index))
     reversed_groups = lambda ds: ds.get_subset(group_labels=list(reversed(ds.group_labels)))
