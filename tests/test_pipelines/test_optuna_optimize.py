@@ -14,6 +14,7 @@ from optuna.trial import FrozenTrial
 from tests.test_pipelines.conftest import (
     DummyDataset,
     DummyOptimizablePipeline,
+    DummyOptimizablePipelineWithInfo,
     DummyPipeline,
     dummy_multi_score_func,
     dummy_single_score_func,
@@ -96,7 +97,7 @@ class TestMetaFunctionalityOptuna(TestAlgorithmMixin):
     @pytest.fixture
     def after_action_instance(self) -> DummyOptunaOptimizer:
         gs = DummyOptunaOptimizer(
-            DummyOptimizablePipeline(),
+            DummyOptimizablePipelineWithInfo(),
             _get_study_params,
             scoring=dummy_single_score_func,
             create_search_space=dummy_search_space,
@@ -110,6 +111,36 @@ class TestMetaFunctionalityOptuna(TestAlgorithmMixin):
 
 
 class TestCustomOptunaOptimize:
+    def test_final_optimization_info_cleared_on_repeat(self):
+        optimizer = DummyOptunaOptimizer(
+            DummyOptimizablePipelineWithInfo(),
+            _get_study_params,
+            scoring=dummy_single_score_func,
+            create_search_space=dummy_search_space,
+            n_trials=1,
+        ).optimize(DummyDataset())
+        assert optimizer.optimization_info_ == "info"
+
+        optimizer.set_params(pipeline=DummyOptimizablePipeline())
+        optimizer.optimize(DummyDataset())
+        assert not hasattr(optimizer, "optimization_info_")
+
+    @pytest.mark.parametrize("return_optimized", [True, False])
+    def test_final_optimization_info(self, return_optimized):
+        optimizer = DummyOptunaOptimizer(
+            DummyOptimizablePipelineWithInfo(),
+            _get_study_params,
+            scoring=dummy_single_score_func,
+            create_search_space=dummy_search_space,
+            n_trials=1,
+            return_optimized=return_optimized,
+        ).optimize(DummyDataset())
+
+        if return_optimized:
+            assert optimizer.optimization_info_ == "info"
+        else:
+            assert not hasattr(optimizer, "optimization_info_")
+
     def test_invalid_study_stop(self):
         with pytest.raises(ValueError):
             DummyOptunaOptimizer(
