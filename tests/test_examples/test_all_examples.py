@@ -57,6 +57,17 @@ def test_gridsearchcv():
     assert_almost_equal(results["mean__test__agg__f1_score"], [0.8640027, 0.861629, 0.8655343])
 
 
+def test_pure_parameters():
+    from examples.parameter_optimization._06_pure_parameters import results, training_calls
+
+    assert len(training_calls) == 6
+    scores = results.loc[
+        results["param__algorithm__high_pass_filter_cutoff_hz"] == 0.5,
+        "mean__test__agg__score",
+    ]
+    assert scores.min() < scores.max()
+
+
 def test_validation():
     from examples.validation._01_validation import results
 

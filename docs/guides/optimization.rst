@@ -84,12 +84,13 @@ Have a look at the documentation there to understand which checks are performed.
 To see these parameter annotations in action, check out this :ref:`example <optimize_pipelines>`.
 
 .. note:: One special case of parameter annotations is the `tpcp.PureParameter`.
-          It can be used to annotate a parameter that does **not** influence the `self_optmize` method of a pipeline.
+          It can be used to annotate a parameter that does **not** influence the `self_optimize` method of a pipeline.
           I.e. it is only used and relevant for the action method.
           This can be useful information for parameter search methods like :class:`~tpcp.optimize.GridSearchCV`, as they
           don't need to rerun the optimization when only pure parameters are changed.
           For :class:`~tpcp.optimize.GridSearchCV` such an optimization can be enabled via the `pure_parameters`
           parameter.
+          See :ref:`pure_parameters` for an example that shows how this avoids repeated training.
 
 
 External Optimization vs `self_optimize`
