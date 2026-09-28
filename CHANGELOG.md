@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** `Scorer` now uses `numpy.nanmean` for scores without an explicit aggregator, ignoring NaN scores.
   Pass `default_aggregator=mean_agg` to keep the previous mean behavior.
   (https://github.com/mad-lab-fau/tpcp/pull/145)
+- **Breaking, approved hashing default change:** `tpcp.misc.custom_hash` now uses XXH3-128 by default for
+  fast, best-effort change detection, including algorithm safety checks. Homogeneous numeric DataFrames
+  are hashed by values and ordinary metadata rather than pandas storage layout. All values are read;
+  unusual representation differences may be missed. Default digest values change, so regenerate stored
+  fingerprints or explicitly pass `hash_name="md5"` to retain the previous behavior. Explicit `"sha1"`
+  also retains its legacy behavior. Default `hybrid_cache` hashing remains unchanged.
+  (https://github.com/mad-lab-fau/tpcp/issues/143)
 
 ### Fixed
 

@@ -83,16 +83,24 @@ class UniversalHashableWrapper(Generic[T]):
 
     """
 
+    _hash = staticmethod(functools.partial(custom_hash, hash_name="md5"))
+
     def __init__(self, obj: T) -> None:
         self.obj = obj
 
     def __hash__(self):
         """Hash the object using the pickle based approach."""
-        return int(binascii.hexlify(custom_hash(self.obj).encode("utf-8")), 16)
+        return int(binascii.hexlify(self._hash(self.obj).encode("utf-8")), 16)
 
     def __eq__(self, other):
         """Compare the object using their hash."""
-        return custom_hash(self.obj) == custom_hash(other.obj)
+        return self._hash(self.obj) == self._hash(other.obj)
+
+
+class _LegacyHashableWrapper(UniversalHashableWrapper):
+    """Keep hybrid caching on legacy hashes unless explicitly opted in."""
+
+    _hash = staticmethod(functools.partial(custom_hash, hash_name="md5"))
 
 
 def _is_cached(obj, action_name):
@@ -557,8 +565,8 @@ def hybrid_cache(
 
             @functools.wraps(function)
             def final_wrapped(*args, **kwargs):
-                hash_safe_args = tuple(UniversalHashableWrapper(arg) for arg in args)
-                hash_safe_kwargs = {k: UniversalHashableWrapper(v) for k, v in kwargs.items()}
+                hash_safe_args = tuple(_LegacyHashableWrapper(arg) for arg in args)
+                hash_safe_kwargs = {k: _LegacyHashableWrapper(v) for k, v in kwargs.items()}
                 return final_cached(*hash_safe_args, **hash_safe_kwargs)
 
         _GLOBAL_CACHE_REGISTRY[cache_key] = final_wrapped
