@@ -46,6 +46,8 @@ from their defaults. Simple parameters appear before nested objects and other co
 objects and summarizes DataFrames, Series, Indexes, and NumPy arrays by their structure instead of printing their
 values. It does not show results or other instance attributes. Use ``get_params(deep=False)`` to inspect every
 parameter and its full value, and access result attributes directly after running the object.
+Datasets use the same parameter layout and print their index DataFrame below it. When grouped, they print the grouped
+index DataFrame.
 
 It is important to understand that in `tpcp` everything can/is a parameter.
 This includes simple threshold parameters or entire sklearn/pytorch models.

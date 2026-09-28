@@ -88,20 +88,32 @@ class TestDataset:
 
         representation = repr(dataset)
 
-        assert f"{dataset_type.__name__} [1 row]" in representation
-        assert "index: DataFrame(shape=(1, 1), columns=['item'])" in representation
-        assert "hidden" not in representation
+        assert f"{dataset_type.__name__}()" in representation
+        assert "item" in representation
+        assert "hidden" in representation
 
-    def test_repr_summarizes_index_and_grouping(self):
+    def test_repr_shows_grouped_index_table(self):
         index = pd.DataFrame({"patient": ["private_patient"] * 100, "trial": range(100)})
         dataset = Dataset(subset_index=index, groupby_cols="patient")
 
         representation = repr(dataset)
 
-        assert "Dataset [1 group / 100 rows]" in representation
-        assert "index: DataFrame(shape=(100, 2), columns=['patient', 'trial'])" in representation
-        assert "groupby_cols: 'patient'" in representation
-        assert "private_patient" not in representation
+        assert "Dataset(groupby_cols='patient')" in representation
+        assert "patient  trial" in representation
+        assert "private_patient" in representation
+
+    def test_repr_formats_parameters_like_other_objects_then_shows_index(self):
+        class ConfiguredDataset(Dataset):
+            def __init__(self, threshold=0.5, *, groupby_cols=None, subset_index=None):
+                self.threshold = threshold
+                super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
+
+        dataset = ConfiguredDataset(
+            threshold=0.7,
+            subset_index=pd.DataFrame({"item": ["hidden"]}),
+        )
+
+        assert repr(dataset) == "ConfiguredDataset(threshold=0.7)\n\n        item\n   0  hidden"
 
     def test_repr_shows_nested_dataset_and_summarizes_data_parameters(self):
         class ComposedDataset(Dataset):
@@ -116,12 +128,13 @@ class TestDataset:
 
         representation = repr(dataset)
 
-        assert "ComposedDataset [1 row]" in representation
-        assert "source: Dataset [1 row]" in representation
-        assert "samples: DataFrame(shape=(1000, 1), columns=['signal'])" in representation
-        assert "hidden_index" not in representation
+        assert "ComposedDataset(" in representation
+        assert "source=Dataset()" in representation
+        assert "samples=DataFrame(shape=(1000, 1), columns=['signal'])" in representation
+        assert representation.endswith("   0  outer_index")
+        assert "hidden_index" in representation
         assert "hidden_sample" not in representation
-        assert "outer_index" not in representation
+        assert "outer_index" in representation
 
     def test_repr_puts_simple_custom_parameters_before_nested_ones(self):
         class ComposedDataset(Dataset):
@@ -138,7 +151,7 @@ class TestDataset:
 
         representation = repr(dataset)
 
-        assert representation.index("  threshold: 0.5") < representation.index("  source: Dataset")
+        assert representation.index("  threshold=0.5") < representation.index("  source=Dataset")
 
     def test_repr_omits_unchanged_custom_defaults(self):
         class LabeledDataset(Dataset):
@@ -149,8 +162,8 @@ class TestDataset:
             def create_index(self):
                 return pd.DataFrame({"item": [1]})
 
-        assert "label:" not in repr(LabeledDataset())
-        assert "label: 'chosen'" in repr(LabeledDataset(label="chosen"))
+        assert "label=" not in repr(LabeledDataset())
+        assert "label='chosen'" in repr(LabeledDataset(label="chosen"))
 
     def test_repr_summarizes_dataframes_inside_collection_parameters(self):
         class CollectionDataset(Dataset):
@@ -165,7 +178,7 @@ class TestDataset:
 
         representation = repr(dataset)
 
-        assert "sources: list[1]" in representation
+        assert "sources=list[1]" in representation
         assert "DataFrame(shape=(100, 1), columns=['signal'])" in representation
         assert "hidden_signal" not in representation
 
@@ -183,7 +196,7 @@ class TestDataset:
 
         representation = repr(dataset)
 
-        assert "samples: Series(shape=(1,), name=" in representation
+        assert "samples=Series(shape=(1,), name=" in representation
         assert long_name not in representation
         assert max(map(len, representation.splitlines())) <= 88
 
@@ -204,7 +217,7 @@ class TestDataset:
 
         representation = repr(dataset)
 
-        assert "source: Source(\n    table=DataFrame(shape=(100, 1), columns=['signal'])" in representation
+        assert "source=Source(\n    table=DataFrame(shape=(100, 1), columns=['signal'])" in representation
         assert "hidden_signal" not in representation
 
     def test_grouping_materialized_during_index_creation_applies_immediately(self):

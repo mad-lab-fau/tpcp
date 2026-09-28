@@ -111,7 +111,7 @@ for trial in final_subset.iter_level("recording"):
 # You can see that we get two subsets, one for each recording label.
 # But what, if we want to iterate over the participants and the recordings together?
 # In this case, we need to group our dataset first.
-# The representation shows the grouping columns, the number of groups, and the number of index rows.
+# The representation shows the grouping parameter and the grouped index DataFrame.
 grouped_subset = final_subset.groupby(["participant", "recording"])
 print(f"The dataset contains {len(grouped_subset)} groups.")
 grouped_subset
