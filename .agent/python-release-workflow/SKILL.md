@@ -24,30 +24,33 @@ description: Use when releasing a uv+poe+GitHub Actions+Read the Docs Python pro
 1. **Preflight**
    - `git status -sb` (must be clean or intentionally scoped)
    - `git log -5 --oneline` (message style)
-2. **Local verification (fresh)**
+2. **Documentation accuracy review**
+   - Compare hand-written API pages, guides, and type descriptions with the current public code: exported names, type-variable bounds, alias definitions, signatures, defaults, and examples.
+   - Fix stale descriptions and links before release. A successful docs build checks rendering, not factual accuracy.
+3. **Local verification (fresh)**
    - `uv run poe ci_check`
    - `uv run poe test`
    - `uv build`
    - docs gate (always for this setup): `uv run poe docs_clean`
-3. **Release prep**
+4. **Release prep**
    - Add changelog section for next version.
    - Bump version: `uv run poe version --bump <patch|minor|major>`
    - Verify touched files (typically `pyproject.toml`, `src/<pkg>/__init__.py`, `uv.lock`, `CHANGELOG.md`).
-4. **Commit strategy**
+5. **Commit strategy**
    - Commit fixes first.
    - Commit release prep separately (version + changelog).
-5. **Push + CI gate**
+6. **Push + CI gate**
    - `git push`
    - Wait green for required workflow(s): `gh run watch <run-id>`
    - Must be `conclusion=success` for release commit SHA.
-6. **RTD gate (hard)**
+7. **RTD gate (hard)**
    - Wait latest build for release SHA to finish with `success=true`.
    - Poll API if needed:
      - `curl -s "https://readthedocs.org/api/v3/projects/<project>/builds/?limit=5"`
-7. **Create GitHub release**
+8. **Create GitHub release**
    - Tag format: `vX.Y.Z`
    - `gh release create vX.Y.Z --target <base_ref> --title "vX.Y.Z" --notes "...from changelog..."`
-8. **Post-release checks**
+9. **Post-release checks**
    - Watch publish workflow triggered by release.
    - Confirm publish workflow success.
    - Confirm RTD `stable`/version builds finish green (if configured).
