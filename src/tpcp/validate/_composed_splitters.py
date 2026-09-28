@@ -32,6 +32,8 @@ class NoSplit(BaseDatasetSplitter):
     """Repeat a fixed train/test assignment selected from the current dataset.
 
     Omitted selectors contribute no labels. Each selector is called once per ``split`` iteration.
+    The selected group labels determine the assignment; selecting only some rows of a group
+    assigns the original whole group when a validation consumer selects it by label.
 
     Parameters
     ----------
@@ -77,6 +79,26 @@ class CombinedSplitter(BaseDatasetSplitter, metaclass=_VariadicPairsMeta):
     Construct with one or more ``(selector, splitter)`` pairs. Each selector receives the current
     dataset and returns a subset. A child splitter can be a native tpcp splitter or any input
     accepted by :class:`DatasetSplitter`, including raw sklearn splitters.
+
+    All children must report the same fold count and yield exactly that many folds. Train and test
+    labels are deduplicated separately in first-occurrence order, and overlapping assignments raise
+    ``ValueError``. Selectors receive the current input dataset, including within nested splits,
+    and may return any dataset whose group labels belong to that input.
+
+    For example, cross-validate real recordings and always train on artificial recordings::
+
+        from tpcp.validate import CombinedSplitter, DatasetSplitter, NoSplit
+
+        cv = CombinedSplitter(
+            (
+                lambda ds: ds.get_subset(recording_type="real"),
+                DatasetSplitter(5, groupby="participant"),
+            ),
+            (
+                lambda ds: ds.get_subset(recording_type="artificial"),
+                NoSplit(5, train=lambda ds: ds),
+            ),
+        )
 
     Parameters
     ----------
