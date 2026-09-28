@@ -8,8 +8,6 @@ These are the QRS detection algorithms, that we developed step by step :ref:`cus
 This file can be used as quick reference or to import the class into other examples without side effects.
 """
 
-from typing import Union
-
 import numpy as np
 import pandas as pd
 from scipy import signal
@@ -26,7 +24,7 @@ from tpcp import (
 
 
 def match_events_with_reference(
-    events: np.ndarray, reference: np.ndarray, tolerance: Union[int, float]
+    events: np.ndarray, reference: np.ndarray, tolerance: int | float
 ) -> np.ndarray:
     """Find matches in two lists based on the distance between their vectors.
 
@@ -234,7 +232,7 @@ class OptimizableQrsDetector(QRSDetector):
     ):
         all_labels = []
         all_peak_heights = []
-        for d, p in zip(ecg_data, r_peaks):
+        for d, p in zip(ecg_data, r_peaks, strict=True):
             filtered = self._filter(d.to_numpy().flatten(), sampling_rate_hz)
             # Find all potential peaks without the height threshold
             potential_peaks = self._search_strategy(

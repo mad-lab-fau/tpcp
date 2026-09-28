@@ -14,7 +14,10 @@ Classes
    :toctree: generated/validate
    :template: class_with_private.rst
 
+    BaseDatasetSplitter
+    CombinedSplitter
     DatasetSplitter
+    NoSplit
 
 Scoring
 -------

@@ -1,8 +1,6 @@
 """Base Classes for custom pipelines."""
 
-from typing import Any, ClassVar, Generic, TypeVar
-
-from typing_extensions import Self
+from typing import Any, ClassVar, Generic, Self, TypeVar
 
 from tpcp import NOTHING
 from tpcp._algorithm import Algorithm

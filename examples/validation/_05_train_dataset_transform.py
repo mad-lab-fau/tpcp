@@ -1,5 +1,5 @@
 r"""
-Transforming training datasets
+Transforming training datasets.
 ==============================
 
 Some optimization workflows need a different *set of datapoints* during training without changing the interface
@@ -19,7 +19,6 @@ dataset type and can handle original and transformed datapoints identically.
 # ``ImageDataset``. The augmented dataset wraps the original dataset instead of copying its data. It proxies the
 # label and source image through that wrapped dataset, applying only the rotation itself. Consequently, an augmented
 # datapoint can be passed anywhere an original datapoint can be passed.
-from typing import Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -49,8 +48,8 @@ class RawImageDataset(ImageDataset):
         images: np.ndarray,
         labels: np.ndarray,
         *,
-        groupby_cols: Optional[Union[list[str], str]] = None,
-        subset_index: Optional[pd.DataFrame] = None,
+        groupby_cols: list[str] | str | None = None,
+        subset_index: pd.DataFrame | None = None,
     ) -> None:
         self.images = images
         self.labels = labels
@@ -108,8 +107,8 @@ class AugmentedImageDataset(
         wrapped_dataset: ImageDataset,
         rotation_degrees: tuple[int, ...] = (0, 90, 180, 270),
         *,
-        groupby_cols: Optional[Union[list[str], str]] = None,
-        subset_index: Optional[pd.DataFrame] = None,
+        groupby_cols: list[str] | str | None = None,
+        subset_index: pd.DataFrame | None = None,
     ) -> None:
         self.wrapped_dataset = wrapped_dataset
         self.rotation_degrees = rotation_degrees
@@ -191,7 +190,9 @@ rotations = [
     for angle in (0, 90, 180, 270)
 ]
 fig, axes = plt.subplots(1, 4, figsize=(7, 2))
-for datapoint, angle, axis in zip(rotations, (0, 90, 180, 270), axes):
+for datapoint, angle, axis in zip(
+    rotations, (0, 90, 180, 270), axes, strict=True
+):
     axis.imshow(datapoint.image, cmap="gray", vmin=0, vmax=1)
     axis.set_title(f"{angle}°")
     axis.axis("off")
@@ -208,15 +209,15 @@ from tpcp import OptimizableParameter, OptimizablePipeline
 class ImageClassificationPipeline(OptimizablePipeline[ImageDataset]):
     """A minimal nearest-neighbour image classifier."""
 
-    training_images: OptimizableParameter[Optional[np.ndarray]]
-    training_labels: OptimizableParameter[Optional[np.ndarray]]
+    training_images: OptimizableParameter[np.ndarray | None]
+    training_labels: OptimizableParameter[np.ndarray | None]
 
     prediction_: int
 
     def __init__(
         self,
-        training_images: Optional[np.ndarray] = None,
-        training_labels: Optional[np.ndarray] = None,
+        training_images: np.ndarray | None = None,
+        training_labels: np.ndarray | None = None,
     ) -> None:
         self.training_images = training_images
         self.training_labels = training_labels

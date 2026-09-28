@@ -3,11 +3,10 @@
 import warnings
 from collections.abc import Iterator, Sequence
 from keyword import iskeyword
-from typing import ClassVar, Generic, Optional, TypeVar, Union, cast, get_args, get_origin, overload
+from typing import ClassVar, Generic, Self, TypeVar, cast, get_args, get_origin, overload
 
 import numpy as np
 import pandas as pd
-from typing_extensions import Self
 
 from tpcp._base import BaseTpcpObject, _recursive_validate, get_param_names
 from tpcp._hash import custom_hash
@@ -19,8 +18,8 @@ GroupLabelT = TypeVar("GroupLabelT", bound=tuple[str, ...])
 
 
 class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
-    groupby_cols: Optional[Union[list[str], str]]
-    subset_index: Optional[pd.DataFrame]
+    groupby_cols: list[str] | str | None
+    subset_index: pd.DataFrame | None
 
     @property
     def index(self) -> pd.DataFrame:
@@ -250,10 +249,10 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
                     return args[0]
         return None
 
-    def _get_unique_groups(self) -> Union[pd.MultiIndex, pd.Index]:
+    def _get_unique_groups(self) -> pd.MultiIndex | pd.Index:
         return self.grouped_index.index.unique()
 
-    def __getitem__(self, subscript: Union[int, Sequence[int], np.ndarray, slice]) -> Self:
+    def __getitem__(self, subscript: int | Sequence[int] | np.ndarray | slice) -> Self:
         """Return a dataset object containing only the selected row indices of `self.group_labels`."""
         multi_index = self._get_unique_groups()[subscript]
         if not isinstance(multi_index, pd.Index):
@@ -261,7 +260,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
 
         return self.clone().set_params(subset_index=self.grouped_index.loc[multi_index].reset_index(drop=True))
 
-    def groupby(self, groupby_cols: Optional[Union[list[str], str]]) -> Self:
+    def groupby(self, groupby_cols: list[str] | str | None) -> Self:
         """Return a copy of the dataset grouped by the specified columns.
 
         This does not change the order of the rows of the dataset index.
@@ -282,10 +281,10 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
     def get_subset(
         self,
         *,
-        group_labels: Optional[list[tuple[str, ...]]] = None,
-        index: Optional[pd.DataFrame] = None,
-        bool_map: Optional[Sequence[bool]] = None,
-        **kwargs: Union[list[str], str],
+        group_labels: list[tuple[str, ...]] | None = None,
+        index: pd.DataFrame | None = None,
+        bool_map: Sequence[bool] | None = None,
+        **kwargs: list[str] | str,
     ) -> Self:
         """Get a subset of the dataset.
 
@@ -295,10 +294,11 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
         Parameters
         ----------
         group_labels
-            A valid row locator or slice that can be passed to `self.grouped_index.loc[locator, :]`.
-            This basically needs to be a subset of `self.group_labels`.
-            Note that this is the only indexer that works on the grouped index.
-            All other indexers work on the pure index.
+            A list of group-label tuples with one entry per effective grouping column, such as
+            ``[("alice",)]`` for a one-column dataset. Named tuples from ``self.group_labels`` and
+            an empty list are valid. Scalar labels such as ``["alice"]`` are not accepted.
+            This is the only indexer that works on the grouped index. All other indexers work on
+            the pure index.
         index
             `pd.DataFrame` that is a valid subset of the current dataset index.
         bool_map
@@ -321,7 +321,15 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
             raise ValueError("Only one of `group_labels`, `selected_keys`, `index`, `bool_map` or kwarg can be set!")
 
         if group_labels is not None:
-            return self.clone().set_params(subset_index=self.grouped_index.loc[group_labels, :].reset_index(drop=True))
+            group_arity = len(self._get_groupby_columns())
+            if any(not isinstance(label, tuple) or len(label) != group_arity for label in group_labels):
+                raise ValueError(f"group_labels must contain tuples with {group_arity} entries each.")
+            grouped_index = self.grouped_index
+            # A one-column grouped index is a pandas Index of scalars, while group labels are one-item tuples.
+            locator = (
+                group_labels if isinstance(grouped_index.index, pd.MultiIndex) else [label[0] for label in group_labels]
+            )
+            return self.clone().set_params(subset_index=grouped_index.loc[locator, :].reset_index(drop=True))
 
         if index is not None:
             if len(index) == 0:
@@ -413,7 +421,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
 
         return (self.get_subset(**{level: category}) for category in self.index[level].unique())
 
-    def is_single(self, groupby_cols: Optional[Union[str, list[str]]]) -> bool:
+    def is_single(self, groupby_cols: str | list[str] | None) -> bool:
         """Return True if index contains only one row/group with the given groupby settings.
 
         If `groupby_cols=None` this checks if there is only a single row left.
@@ -431,7 +439,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
         """Return True if index contains only one group."""
         return len(self) == 1
 
-    def assert_is_single(self, groupby_cols: Optional[Union[str, list[str]]], property_name) -> None:
+    def assert_is_single(self, groupby_cols: str | list[str] | None, property_name) -> None:
         """Raise error if index does contain more than one group/row with the given groupby settings.
 
         This should be used when implementing access to data values, which can only be accessed when only a single
@@ -483,7 +491,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
                 f" only a single group left in a data subset. " + group_error_str
             )
 
-    def create_group_labels(self, label_cols: Union[str, list[str]]) -> list[str]:
+    def create_group_labels(self, label_cols: str | list[str]) -> list[str]:
         warnings.warn(
             "The method `create_group_labels` is deprecated and will be removed in a future version. "
             "Use `create_string_group_labels` instead.",
@@ -492,7 +500,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
         )
         return self.create_string_group_labels(label_cols)
 
-    def create_string_group_labels(self, label_cols: Union[str, list[str]]) -> list[str]:
+    def create_string_group_labels(self, label_cols: str | list[str]) -> list[str]:
         """Generate a list of string labels for each group/row in the dataset.
 
         .. note::
@@ -718,8 +726,8 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
     def __init__(
         self,
         *,
-        groupby_cols: Optional[Union[list[str], str]] = None,
-        subset_index: Optional[pd.DataFrame] = None,
+        groupby_cols: list[str] | str | None = None,
+        subset_index: pd.DataFrame | None = None,
     ) -> None:
         self.groupby_cols = groupby_cols
         self.subset_index = subset_index
@@ -736,8 +744,8 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
         class DatasetDc(_Dataset[GroupLabelT], Generic[GroupLabelT]):
             """Dataclass version of Dataset."""
 
-            groupby_cols: Optional[Union[list[str], str]] = None
-            subset_index: Optional[pd.DataFrame] = None
+            groupby_cols: list[str] | str | None = None
+            subset_index: pd.DataFrame | None = None
 
         return DatasetDc
 
@@ -755,8 +763,8 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
         class DatasetAt(_Dataset[GroupLabelT], Generic[GroupLabelT]):
             """Attrs version of Dataset."""
 
-            groupby_cols: Optional[Union[list[str], str]] = None
-            subset_index: Optional[pd.DataFrame] = None
+            groupby_cols: list[str] | str | None = None
+            subset_index: pd.DataFrame | None = None
 
         return DatasetAt
 

@@ -8,10 +8,9 @@ The original code is licenced under BSD-3: https://github.com/scikit-learn/sciki
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from joblib import Memory
-from typing_extensions import TypedDict
 
 from tpcp._base import clone
 from tpcp._hash import custom_hash
@@ -25,9 +24,9 @@ if TYPE_CHECKING:
     from tpcp._pipeline import Pipeline
     from tpcp.validate import Scorer
 
-_SCORE_TYPE = Union[dict[str, float], float]  # pylint: disable=invalid-name
-_AGG_SCORE_TYPE = Union[dict[str, float], float]  # pylint: disable=invalid-name
-_SINGLE_SCORE_TYPE = Union[dict[str, list[float]], Optional[list[float]]]  # pylint: disable=invalid-name
+_SCORE_TYPE = dict[str, float] | float  # pylint: disable=invalid-name
+_AGG_SCORE_TYPE = dict[str, float] | float  # pylint: disable=invalid-name
+_SINGLE_SCORE_TYPE = dict[str, list[float]] | list[float] | None  # pylint: disable=invalid-name
 
 
 class _ScoreResults(TypedDict, total=False):
@@ -36,8 +35,8 @@ class _ScoreResults(TypedDict, total=False):
     scores: _AGG_SCORE_TYPE
     single__scores: _SINGLE_SCORE_TYPE
     debug__score_time: float
-    data_labels: list[Union[str, tuple[str, ...]]]
-    parameters: Optional[dict[str, Any]]
+    data_labels: list[str | tuple[str, ...]]
+    parameters: dict[str, Any] | None
 
 
 class _OptimizeScoreResults(TypedDict, total=False):
@@ -49,9 +48,9 @@ class _OptimizeScoreResults(TypedDict, total=False):
     train__single__scores: _SINGLE_SCORE_TYPE
     debug__score_time: float
     debug__optimize_time: float
-    train__data_labels: list[Union[str, tuple[str, ...]]]
-    test__data_labels: list[Union[str, tuple[str, ...]]]
-    parameters: Optional[dict[str, Any]]
+    train__data_labels: list[str | tuple[str, ...]]
+    test__data_labels: list[str | tuple[str, ...]]
+    parameters: dict[str, Any] | None
     optimizer: BaseOptimize
 
 
@@ -59,7 +58,7 @@ def _score(
     pipeline: Pipeline,
     dataset: Dataset,
     scorer: Scorer,
-    parameters: Optional[dict[str, Any]],
+    parameters: dict[str, Any] | None,
     return_parameters=False,
     return_data_labels=False,
     return_times=False,
@@ -133,15 +132,15 @@ def _optimize_and_score(
     train_set: Dataset,
     test_set: Dataset,
     *,
-    optimize_params: Optional[dict] = None,
-    hyperparameters: Optional[dict] = None,
-    pure_parameters: Optional[dict] = None,
+    optimize_params: dict | None = None,
+    hyperparameters: dict | None = None,
+    pure_parameters: dict | None = None,
     return_train_score=False,
     return_optimizer=False,
     return_parameters=False,
     return_data_labels=False,
     return_times=False,
-    memory: Optional[Memory] = None,
+    memory: Memory | None = None,
 ) -> _OptimizeScoreResults:
     """Optimize and score the optimized pipeline on the train and test data, respectively.
 
@@ -290,7 +289,7 @@ def _cached_optimize(
     return optimizer
 
 
-def _clone_parameter_dict(param_dict: Optional[dict]) -> dict:
+def _clone_parameter_dict(param_dict: dict | None) -> dict:
     cloned_param_dict = {}
     if param_dict is not None:
         for k, v in param_dict.items():

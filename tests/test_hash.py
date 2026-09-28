@@ -2,10 +2,11 @@ import functools
 
 import joblib
 import numpy as np
+import pandas as pd
 import pytest
 
 from tpcp import BaseTpcpObject
-from tpcp._hash import custom_hash
+from tpcp.misc import custom_hash
 from tpcp.validate import FloatAggregator
 
 
@@ -159,3 +160,87 @@ def test_hash_partials_different2():
     obj2 = FloatAggregator(functools.partial(func2, b=1))
 
     assert custom_hash(obj1) != custom_hash(obj2)
+
+
+def test_default_hash_uses_fast_mode_with_explicit_legacy_escape_hatch():
+    values = np.arange(12, dtype=np.float32)
+    assert custom_hash(values) != custom_hash(values, hash_name="md5")
+    # Recorded with the pre-change TPCP hasher. A scalar avoids NumPy/Python
+    # version differences in array serialization while checking legacy digests.
+    assert custom_hash(42, hash_name="md5") == "d922f805b5eead8c40ee21f14329d6c7"
+    assert custom_hash(42, hash_name="sha1") == "c42ff5cf22ebccc4d4cc538db7af4e97f7c7d7e7"
+
+
+@pytest.mark.parametrize(
+    "change", ["value", "shape", "dtype", "columns", "index", "index_name", "column_name", "attrs"]
+)
+def test_numeric_dataframe_hash_detects_changes(change):
+    original = pd.DataFrame(np.arange(12, dtype=np.float32).reshape(4, 3), columns=list("abc"))
+    original_hash = custom_hash({"frame": original})
+    changed = original
+    if change == "value":
+        changed.iloc[-1, -1] += 1
+    elif change == "shape":
+        changed = changed.iloc[:-1]
+    elif change == "dtype":
+        changed = changed.astype(np.float64)
+    elif change == "columns":
+        changed.columns = list("abd")
+    elif change == "index":
+        changed.index = [1, 2, 3, 4]
+    elif change == "index_name":
+        changed.index.name = "time"
+    elif change == "column_name":
+        changed.columns.name = "sensor"
+    else:
+        changed.attrs["unit"] = "g"
+    assert original_hash != custom_hash({"frame": changed})
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        np.arange(12, dtype=np.float32).reshape(4, 3),
+        np.asfortranarray(np.arange(12).reshape(4, 3)),
+        np.arange(24)[::2],
+        np.array(["a", "b"], dtype=object),
+        np.array(42),
+        np.array([(1, 2.0), (3, 4.0)], dtype=[("a", "i4"), ("b", "f8")]),
+    ],
+)
+def test_array_hash_is_repeatable_and_detects_mutation(values):
+    original_hash = custom_hash({"values": values})
+    assert custom_hash({"values": values}) == original_hash
+    values.flat[-1] = 0
+    assert custom_hash({"values": values}) != original_hash
+
+
+def test_array_hash_includes_shape_and_dtype():
+    values = np.arange(12, dtype=np.int32)
+    assert len({custom_hash(values), custom_hash(values.reshape(4, 3)), custom_hash(values.view(np.float32))}) == 3
+
+
+def test_memmap_coercion(tmp_path):
+    values = np.memmap(tmp_path / "array", dtype=np.float32, shape=(4,), mode="w+")
+    values[:] = [1, 2, 3, 4]
+    plain = np.asarray(values)
+    assert custom_hash(values) != custom_hash(plain)
+    assert custom_hash(values, coerce_mmap=True) == custom_hash(plain, coerce_mmap=True)
+
+
+@pytest.mark.parametrize(
+    "frame",
+    [
+        pd.DataFrame({"a": ["one", "two"]}, dtype=object),
+        pd.DataFrame({"a": pd.Series([1, None], dtype="Int64")}),
+        pd.DataFrame({"a": pd.Categorical(["one", "two"])}),
+        pd.DataFrame({"a": [1, 2], "b": [1.0, 2.0]}),
+        pd.DataFrame(),
+        pd.DataFrame({"a": pd.Series([], dtype="float32")}),
+    ],
+)
+def test_dataframe_hash_is_stable_and_detects_metadata_change(frame):
+    original_hash = custom_hash(frame)
+    assert custom_hash(frame) == original_hash
+    frame.attrs["unit"] = "g"
+    assert custom_hash(frame) != original_hash

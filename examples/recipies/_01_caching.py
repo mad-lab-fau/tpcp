@@ -96,7 +96,6 @@ every time we call the data attribute.
 """
 
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -380,7 +379,7 @@ class ConfigurableMemoryCachedDataset(Dataset):
     def __init__(
         self,
         # 0 is equivalent to no caching thanks to our helper function
-        lru_cache_size: Optional[int] = 0,
+        lru_cache_size: int | None = 0,
         *,
         groupby_cols=None,
         subset_index=None,

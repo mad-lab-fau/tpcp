@@ -6,6 +6,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- Python 3.11, pandas 3.0, and NumPy 1.26 are now the minimum supported versions. Upgrade these dependencies
+  before upgrading tpcp. Projects that must remain on older versions should pin to a release published before
+  this change. This support drop requires a major release.
+
+### Added
+
+- Added `hybrid_cache(..., fast_inaccurate_hashing=True)` to opt in to fast, best-effort hashing for
+  RAM and disk lookups. Fast RAM keys are computed once per argument per call, and fast disk keys
+  are isolated from default cache entries. Default hashing and joblib function-code invalidation
+  are retained. Both modes use pickle-based object traversal with different digest algorithms.
+  (https://github.com/mad-lab-fau/tpcp/issues/143)
+- `NoSplit` repeats one selected train/test assignment for a required positive fold count. `CombinedSplitter` applies
+  child splitters to selected dataset parts and combines corresponding folds by group label.
+  (https://github.com/mad-lab-fau/tpcp/pull/148)
+
+### Changed
+
+- **Breaking:** Native tpcp splitters now return train and test lists of dataset group labels from `split(dataset)`.
+  Replace positional access such as `dataset[train]` with `dataset.get_subset(group_labels=train)`. Raw sklearn
+  splitters still work as `cv` arguments to `cross_validate` and `GridSearchCV`.
+  (https://github.com/mad-lab-fau/tpcp/pull/148)
+- **Breaking:** `Dataset.get_subset(group_labels=...)` now requires group-label tuples with the dataset's grouping
+  arity. For one-column datasets, replace scalar labels such as `["alice"]` with `[("alice",)]`.
+  (https://github.com/mad-lab-fau/tpcp/pull/148)
+- **Breaking:** Positional fold assignments supplied as `cv` must be an explicit list. Convert a generator or other
+  iterable with `list(folds)` before passing it to `DatasetSplitter`, `CombinedSplitter`, `cross_validate`, or
+  `GridSearchCV`.
+  (https://github.com/mad-lab-fau/tpcp/pull/148)
+
+- **Breaking:** `Scorer` now uses `numpy.nanmean` for scores without an explicit aggregator, ignoring NaN scores.
+  Pass `default_aggregator=mean_agg` to keep the previous mean behavior.
+  (https://github.com/mad-lab-fau/tpcp/pull/145)
+- **Breaking, approved hashing default change:** `tpcp.misc.custom_hash` now uses XXH3-128 by default for
+  fast, best-effort change detection, including algorithm safety checks. Object traversal and array/
+  DataFrame storage representation are preserved, and all values are read. Default digest values change,
+  so regenerate stored fingerprints or explicitly pass `hash_name="md5"` to retain the previous behavior.
+  Explicit `"sha1"`
+  also retains its legacy behavior. Default `hybrid_cache` hashing remains unchanged.
+  (https://github.com/mad-lab-fau/tpcp/issues/143)
+
+### Fixed
+
+- Fixed `TestAlgorithmMixin` passing the algorithm instance twice when its action method already uses
+  `@make_action_safe`.
+  (https://github.com/mad-lab-fau/tpcp/pull/146)
+
 ## [2.3.0] - 2026-07-22
 
 ### Added

@@ -3,6 +3,8 @@ from functools import partial
 from typing import Callable, Literal
 
 import joblib
+import numpy as np
+import pandas as pd
 import pytest
 from joblib import Memory
 from joblib.externals.loky import get_reusable_executor
@@ -351,3 +353,141 @@ class TestHybridCache:
 
         assert r == 3
         assert not w
+
+
+@pytest.mark.parametrize("disk", [False, True])
+@pytest.mark.parametrize("lru_size", [False, 2])
+def test_fast_hybrid_cache_hits_and_detects_mutation(tmp_path, hybrid_cache_clear, disk, lru_size):
+    calls = []
+
+    def total(data):
+        calls.append(1)
+        return data.to_numpy().sum()
+
+    memory = Memory(tmp_path if disk else None, verbose=0)
+    cached = hybrid_cache(memory, lru_size, fast_inaccurate_hashing=True)(total)
+    values = np.arange(12, dtype=np.float32).reshape(4, 3)
+    frame = pd.DataFrame(values, copy=False)
+    equivalent = pd.DataFrame(values.copy(), copy=False)
+    assert cached(frame) == 66
+    assert cached(equivalent) == 66
+    assert len(calls) == (1 if disk or lru_size else 2)
+    frame.iloc[-1, -1] = 20
+    assert cached(frame) == 75
+    assert len(calls) == (2 if disk or lru_size else 3)
+
+
+def test_fast_hybrid_cache_isolated_from_default_and_joblib(tmp_path, hybrid_cache_clear):
+    calls = []
+
+    def total(data):
+        calls.append(1)
+        return data.sum()
+
+    memory = Memory(tmp_path, verbose=0)
+    legacy = hybrid_cache(memory, 2)(total)
+    fast = hybrid_cache(memory, 2, fast_inaccurate_hashing=True)(total)
+    assert fast is hybrid_cache(memory, 2, fast_inaccurate_hashing=True)(total)
+    assert legacy is hybrid_cache(memory, 2)(total)
+    assert fast is not legacy
+    values = np.arange(4)
+    assert legacy(values) == fast(values) == 6
+    assert len(calls) == 2
+    # An ordinary joblib cache still shares the default disk entries.
+    assert memory.cache(total)(values) == 6
+    assert len(calls) == 2
+    assert legacy(values) == fast(values) == 6
+    assert len(calls) == 2
+
+
+def test_fast_disk_cache_survives_ram_eviction_and_registry_clear(tmp_path, hybrid_cache_clear):
+    calls = []
+
+    def total(data, offset=0):
+        calls.append(1)
+        return data.sum() + offset
+
+    memory = Memory(tmp_path, verbose=0)
+    cached = hybrid_cache(memory, 1, fast_inaccurate_hashing=True)(total)
+    assert cached(np.arange(4)) == 6
+    assert cached(np.arange(4), offset=10) == 16
+    assert cached(np.arange(4)) == 6
+    assert len(calls) == 2
+    hybrid_cache.__cache_registry__.clear()
+    cached = hybrid_cache(memory, 1, fast_inaccurate_hashing=True)(total)
+    # Disk argument binding treats keyword/positional/default arguments alike.
+    assert cached(data=np.arange(4), offset=0) == 6
+    assert len(calls) == 2
+
+
+def test_fast_ram_keys_snapshot_mutable_arguments(hybrid_cache_clear):
+    calls = []
+
+    def total(data):
+        calls.append(1)
+        return data.sum()
+
+    cached = hybrid_cache(Memory(None), 3, fast_inaccurate_hashing=True)(total)
+    values = np.array([1, 2])
+    assert cached(values) == 3
+    values[0] = 10
+    assert cached(values) == 12
+    assert cached(np.array([1, 2])) == 3
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize("fast", [False, True])
+def test_hybrid_disk_cache_invalidates_changed_function(tmp_path, hybrid_cache_clear, fast):
+    def total(data):
+        return data.sum()
+
+    def twice_total(data):
+        return data.sum() * 2
+
+    cached = hybrid_cache(Memory(tmp_path, verbose=0), fast_inaccurate_hashing=fast)(total)
+    assert cached(np.arange(4)) == 6
+    total.__code__ = twice_total.__code__
+    assert cached(np.arange(4)) == 12
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        np.arange(12).reshape(4, 3)[:, ::2],
+        pd.DataFrame({"a": ["one", "two"]}, dtype=object),
+        pd.DataFrame({"a": pd.Series([1, None], dtype="Int64")}),
+        pd.DataFrame({"a": [1, 2], "b": [1.0, 2.0]}),
+    ],
+)
+def test_fast_hybrid_nested_and_fallback_arguments(tmp_path, hybrid_cache_clear, data):
+    calls = []
+
+    def compute(payload):
+        calls.append(1)
+        return len(payload["data"])
+
+    cached = hybrid_cache(Memory(tmp_path, verbose=0), 2, fast_inaccurate_hashing=True)(compute)
+    assert cached({"data": data}) == len(data)
+    assert cached({"data": data}) == len(data)
+    assert len(calls) == 1
+    assert cached({"data": data[:-1]}) == len(data) - 1
+    assert len(calls) == 2
+
+
+def test_fast_disk_cache_preserves_memmap_configuration(tmp_path, hybrid_cache_clear):
+    calls = []
+
+    def twice(data):
+        calls.append(1)
+        return data * 2
+
+    memory = Memory(tmp_path / "cache", mmap_mode="r", verbose=0)
+    cached = hybrid_cache(memory, fast_inaccurate_hashing=True)(twice)
+    data = np.arange(4, dtype=np.float32)
+    result = cached(data)
+    assert isinstance(result, np.memmap)
+    np.testing.assert_array_equal(result, [0, 2, 4, 6])
+    mapped = np.memmap(tmp_path / "input", shape=(4,), dtype=np.float32, mode="w+")
+    mapped[:] = data
+    np.testing.assert_array_equal(cached(mapped), result)
+    assert len(calls) == 1

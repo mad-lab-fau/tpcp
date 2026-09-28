@@ -42,7 +42,7 @@ If you just want the final implementation, without all the explanation, check :r
 # Later we need to include the data of all files into the dataset, but to generate out index, it is sufficient to only
 # list one of the datatypes.
 from pathlib import Path
-from typing import Literal, NamedTuple, Optional, Union
+from typing import Literal, NamedTuple
 
 from tpcp import Dataset
 
@@ -70,7 +70,10 @@ from itertools import cycle
 import pandas as pd
 
 patient_group = [
-    g for g, _ in zip(cycle(("group_1", "group_2", "group_3")), participant_ids)
+    g
+    for g, _ in zip(
+        cycle(("group_1", "group_2", "group_3")), participant_ids, strict=False
+    )
 ]
 
 data_index = pd.DataFrame(
@@ -96,8 +99,8 @@ class ECGExampleData(Dataset):
         self,
         data_path: Path,
         *,
-        groupby_cols: Optional[Union[list[str], str]] = None,
-        subset_index: Optional[pd.DataFrame] = None,
+        groupby_cols: list[str] | str | None = None,
+        subset_index: pd.DataFrame | None = None,
     ):
         self.data_path = data_path
         super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
@@ -110,7 +113,9 @@ class ECGExampleData(Dataset):
         patient_group = [
             g
             for g, _ in zip(
-                cycle(("group_1", "group_2", "group_3")), participant_ids
+                cycle(("group_1", "group_2", "group_3")),
+                participant_ids,
+                strict=False,
             )
         ]
         df = pd.DataFrame(
@@ -155,8 +160,8 @@ class ECGExampleData(Dataset):
         self,
         data_path: Path,
         *,
-        groupby_cols: Optional[Union[list[str], str]] = None,
-        subset_index: Optional[pd.DataFrame] = None,
+        groupby_cols: list[str] | str | None = None,
+        subset_index: pd.DataFrame | None = None,
     ):
         self.data_path = data_path
         super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
@@ -191,7 +196,9 @@ class ECGExampleData(Dataset):
         patient_group = [
             g
             for g, _ in zip(
-                cycle(("group_1", "group_2", "group_3")), participant_ids
+                cycle(("group_1", "group_2", "group_3")),
+                participant_ids,
+                strict=False,
             )
         ]
         df = pd.DataFrame(
@@ -239,8 +246,8 @@ class ECGExampleData(Dataset):
         self,
         data_path: Path,
         *,
-        groupby_cols: Optional[Union[list[str], str]] = None,
-        subset_index: Optional[pd.DataFrame] = None,
+        groupby_cols: list[str] | str | None = None,
+        subset_index: pd.DataFrame | None = None,
     ):
         self.data_path = data_path
         super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
@@ -310,7 +317,9 @@ class ECGExampleData(Dataset):
         patient_group = [
             g
             for g, _ in zip(
-                cycle(("group_1", "group_2", "group_3")), participant_ids
+                cycle(("group_1", "group_2", "group_3")),
+                participant_ids,
+                strict=False,
             )
         ]
         df = pd.DataFrame(
@@ -377,8 +386,8 @@ class ECGExampleData(Dataset[ECGExampleDataGroupLabel]):
         self,
         data_path: Path,
         *,
-        groupby_cols: Optional[Union[list[str], str]] = None,
-        subset_index: Optional[pd.DataFrame] = None,
+        groupby_cols: list[str] | str | None = None,
+        subset_index: pd.DataFrame | None = None,
     ):
         self.data_path = data_path
         super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
@@ -448,7 +457,9 @@ class ECGExampleData(Dataset[ECGExampleDataGroupLabel]):
         patient_group = [
             g
             for g, _ in zip(
-                cycle(("group_1", "group_2", "group_3")), participant_ids
+                cycle(("group_1", "group_2", "group_3")),
+                participant_ids,
+                strict=False,
             )
         ]
         df = pd.DataFrame(
@@ -508,8 +519,8 @@ class ECGExampleData(Dataset[ECGExampleDataGroupLabel]):
         data_path: Path,
         *,
         use_lru_cache: bool = True,
-        groupby_cols: Optional[Union[list[str], str]] = None,
-        subset_index: Optional[pd.DataFrame] = None,
+        groupby_cols: list[str] | str | None = None,
+        subset_index: pd.DataFrame | None = None,
     ):
         self.data_path = data_path
         self.use_lru_cache = use_lru_cache
@@ -584,7 +595,9 @@ class ECGExampleData(Dataset[ECGExampleDataGroupLabel]):
         patient_group = [
             g
             for g, _ in zip(
-                cycle(("group_1", "group_2", "group_3")), participant_ids
+                cycle(("group_1", "group_2", "group_3")),
+                participant_ids,
+                strict=False,
             )
         ]
         df = pd.DataFrame(

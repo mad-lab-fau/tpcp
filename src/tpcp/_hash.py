@@ -8,6 +8,7 @@ import types
 import warnings
 from pathlib import Path
 
+import xxhash
 from joblib.func_inspect import get_func_code
 from joblib.hashing import Hasher, NumpyHasher
 
@@ -149,31 +150,34 @@ class NNHasher(NoMemoizeNumpyHasher):
 
 # This function is modified based on
 # https://github.com/joblib/joblib/blob/4dafaff788a3b5402acfed091558b4c511982959/joblib/hashing.py#L244
-def custom_hash(obj, hash_name="md5", coerce_mmap=False):
-    """Quick calculation of a hash to identify uniquely Python objects containing numpy arrays and torch models.
+def custom_hash(obj, hash_name=None, coerce_mmap=False):
+    """Hash Python objects to detect accidental changes or check repeatability.
 
-    This function is modified based on `joblib.hash` so that it can properly handle torch and tensorflow objects.
-    It adds some further "fixes" for dynamically defined functions.
+    Supports NumPy arrays, pandas objects, and Torch and TensorFlow models.
 
     Parameters
     ----------
     obj
         The object to be hashed
-    hash_name: 'md5' or 'sha1'
-        Hashing algorithm used. sha1 is supposedly safer, but md5 is faster.
+    hash_name: None, 'md5' or 'sha1'
+        Use the default for fast checks of whether an object has changed.
+        Select 'md5' or 'sha1' when you need to compare with hashes generated
+        using that algorithm. This function is not intended for security checks.
     coerce_mmap: boolean
         Make no difference between np.memmap and np.ndarray
 
     """
-    valid_hash_names = ("md5", "sha1")
+    valid_hash_names = (None, "md5", "sha1")
     if hash_name not in valid_hash_names:
         raise ValueError(f"Valid options for 'hash_name' are {valid_hash_names}. Got hash_name={hash_name!r} instead.")
     if "torch" in sys.modules or "tensorflow" in sys.modules:
-        hasher = NNHasher(hash_name=hash_name, coerce_mmap=coerce_mmap)
+        hasher = NNHasher(hash_name=hash_name or "md5", coerce_mmap=coerce_mmap)
     elif "numpy" in sys.modules:
-        hasher = NoMemoizeNumpyHasher(hash_name=hash_name, coerce_mmap=coerce_mmap)
+        hasher = NoMemoizeNumpyHasher(hash_name=hash_name or "md5", coerce_mmap=coerce_mmap)
     else:
-        hasher = NoMemoizeHasher(hash_name=hash_name)
+        hasher = NoMemoizeHasher(hash_name=hash_name or "md5")
+    if hash_name is None:
+        hasher._hash = xxhash.xxh3_128()
     with Path(os.devnull).open("w") as devnull, contextlib.redirect_stdout(devnull):
         # Some object decide to print stuff to stdout when pickling.
         # As we potentially pickle a lot of objects, we don't want to see this.

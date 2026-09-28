@@ -3,19 +3,17 @@
 import time
 import warnings
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 from functools import partial
 from tempfile import TemporaryDirectory
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Generic,
     Literal,
-    Optional,
+    Self,
     TypeVar,
-    Union,
 )
 
 import numpy as np
@@ -24,7 +22,6 @@ from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 from sklearn.model_selection import BaseCrossValidator, ParameterGrid
 from tqdm.auto import tqdm
-from typing_extensions import Self
 
 from tpcp._algorithm_utils import (
     OPTIMIZE_METHOD_INDICATOR,
@@ -47,7 +44,8 @@ from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.misc import iter_with_warning_error_context
 from tpcp.parallel import Parallel, delayed
-from tpcp.validate import DatasetSplitter
+from tpcp.validate import BaseDatasetSplitter
+from tpcp.validate._cross_val_helper import _normalize_splitter
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
 
 if TYPE_CHECKING:
@@ -195,7 +193,7 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
     """
 
     pipeline: Parameter[OptimizablePipelineT]
-    train_dataset_transform: Optional[Callable[[DatasetT], DatasetT]]
+    train_dataset_transform: Callable[[DatasetT], DatasetT] | None
     safe_optimize: bool
     optimize_with_info: bool
 
@@ -207,7 +205,7 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
         self,
         pipeline: OptimizablePipelineT,
         *,
-        train_dataset_transform: Optional[Callable[[DatasetT], DatasetT]] = None,
+        train_dataset_transform: Callable[[DatasetT], DatasetT] | None = None,
         safe_optimize: bool = True,
         optimize_with_info: bool = True,
     ) -> None:
@@ -367,9 +365,9 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
 
     parameter_grid: ParameterGrid
     scoring: ScorerTypes[PipelineT, DatasetT]
-    n_jobs: Optional[int]
-    return_optimized: Union[bool, str]
-    pre_dispatch: Union[int, str]
+    n_jobs: int | None
+    return_optimized: bool | str
+    pre_dispatch: int | str
     progress_bar: bool
 
     gs_results_: dict[str, Any]
@@ -384,9 +382,9 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
         parameter_grid: ParameterGrid,
         *,
         scoring: ScorerTypes[PipelineT, DatasetT],
-        n_jobs: Optional[int] = None,
-        return_optimized: Union[bool, str] = True,
-        pre_dispatch: Union[int, str] = "n_jobs",
+        n_jobs: int | None = None,
+        return_optimized: bool | str = True,
+        pre_dispatch: int | str = "n_jobs",
         progress_bar: bool = True,
     ) -> None:
         self.pipeline = pipeline
@@ -566,11 +564,10 @@ class GridSearchCV(
         In case of a single score, use `-score` to select the value with the lowest score.
     cv
         The cross-validation strategy to use.
-        For simple use-cases the same input as for the sklearn cross-validation function are supported.
-        For further inputs check the `sklearn` `documentation
-        <https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_validate.html>`_.
+        Accepts an integer, a sklearn-style splitter, a native tpcp splitter, or an explicit list of
+        positional fold assignments. Convert other positional iterables with ``list(folds)`` before passing them.
 
-        For more complex usecases like grouping or stratification, the :class:`~tpcp.TpcpSplitter` can be used.
+        For grouping or stratification, use :class:`~tpcp.validate.DatasetSplitter`.
     train_dataset_transform
         An optional callable that transforms each training dataset after splitting and immediately before
         `self_optimize` is called. The callable must return a dataset implementing the same interface as its input.
@@ -709,14 +706,14 @@ class GridSearchCV(
     pipeline: OptimizablePipelineT
     parameter_grid: ParameterGrid
     scoring: ScorerTypes[OptimizablePipelineT, DatasetT]
-    return_optimized: Union[bool, str]
-    cv: Optional[Union[DatasetSplitter, int, BaseCrossValidator, Iterator]]
-    train_dataset_transform: Optional[Callable[[DatasetT], DatasetT]]
-    pure_parameters: Union[bool, list[str]]
+    return_optimized: bool | str
+    cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None
+    train_dataset_transform: Callable[[DatasetT], DatasetT] | None
+    pure_parameters: bool | list[str]
     return_train_score: bool
     verbose: int
-    n_jobs: Optional[int]
-    pre_dispatch: Union[int, str]
+    n_jobs: int | None
+    pre_dispatch: int | str
     progress_bar: bool
     safe_optimize: bool
     optimize_with_info: bool
@@ -734,14 +731,14 @@ class GridSearchCV(
         parameter_grid: ParameterGrid,
         *,
         scoring: ScorerTypes[OptimizablePipelineT, DatasetT],
-        return_optimized: Union[bool, str] = True,
-        cv: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
-        train_dataset_transform: Optional[Callable[[DatasetT], DatasetT]] = None,
-        pure_parameters: Union[bool, list[str]] = False,
+        return_optimized: bool | str = True,
+        cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None = None,
+        train_dataset_transform: Callable[[DatasetT], DatasetT] | None = None,
+        pure_parameters: bool | list[str] = False,
         return_train_score: bool = False,
         verbose: int = 0,
-        n_jobs: Optional[int] = None,
-        pre_dispatch: Union[int, str] = "n_jobs",
+        n_jobs: int | None = None,
+        pre_dispatch: int | str = "n_jobs",
         progress_bar: bool = True,
         safe_optimize: bool = True,
         optimize_with_info: bool = True,
@@ -773,7 +770,7 @@ class GridSearchCV(
 
         scoring = _validate_scorer(self.scoring)
 
-        cv = self.cv if isinstance(self.cv, DatasetSplitter) else DatasetSplitter(self.cv)
+        cv = _normalize_splitter(self.cv)
 
         n_splits = cv.get_n_splits(dataset)
 
@@ -782,7 +779,7 @@ class GridSearchCV(
         # For each para combi, we separate the pure parameters (parameters that do not affect the optimization) and
         # the hyperparameters.
         # This allows for massive caching optimizations in the `_optimize_and_score`.
-        pure_parameters: Optional[list[str]]
+        pure_parameters: list[str] | None
         if self.pure_parameters is False:
             pure_parameters = None
         elif self.pure_parameters is True:
@@ -807,14 +804,14 @@ class GridSearchCV(
         # We only allow a temporary cache here, because the method that is cached internally is generic and the cache
         # might not be correctly invalidated, if GridSearchCv is called with a different pipeline or when the
         # pipeline itself is modified.
-        tmp_dir_context: Union[AbstractContextManager[None], TemporaryDirectory] = nullcontext()
+        tmp_dir_context: AbstractContextManager[None] | TemporaryDirectory = nullcontext()
         if pure_parameters:
             tmp_dir_context = TemporaryDirectory("joblib_tpcp_cache")
         with tmp_dir_context as cachedir:
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None
 
             def tasks():
-                parameter_iterations = iter_with_warning_error_context(zip(split_parameters, parameters))
+                parameter_iterations = iter_with_warning_error_context(zip(split_parameters, parameters, strict=True))
                 for make_candidate_context, ((hyper_paras, pure_paras), parameter) in parameter_iterations:
                     for make_fold_context, (train, test) in iter_with_warning_error_context(splits):
                         with (
@@ -825,8 +822,8 @@ class GridSearchCV(
                             task = delayed(_optimize_and_score)(
                                 optimizer.clone(),
                                 scoring,
-                                dataset[train],
-                                dataset[test],
+                                dataset.get_subset(group_labels=train),
+                                dataset.get_subset(group_labels=test),
                                 optimize_params=optimize_params,
                                 hyperparameters=_prefix_para_dict(hyper_paras, parameter_prefix),
                                 pure_parameters=_prefix_para_dict(pure_paras, parameter_prefix),
@@ -915,7 +912,7 @@ class GridSearchCV(
             iterable_array = iter(array)
             array = [[next(iterable_array) for _ in range(n_splits)] for _ in range(n_candidates)]
             # "Transpose" the array
-            array = map(list, zip(*array))
+            array = map(list, zip(*array, strict=True))
 
             for split_idx, split in enumerate(array):
                 # Uses closure to alter the results
@@ -1007,7 +1004,7 @@ class GridSearchCV(
         return results
 
 
-def _validate_return_optimized(return_optimized, multi_metric, results) -> tuple[bool, Union[str, Literal[False]]]:
+def _validate_return_optimized(return_optimized, multi_metric, results) -> tuple[bool, str | Literal[False]]:
     """Check if `return_optimize` fits to the multimetric output of the scorer."""
     if return_optimized is False:
         return False, False

@@ -1,8 +1,7 @@
 """Helper to validate/evaluate pipelines and Optimize."""
 
-from collections.abc import Iterator
 from functools import partial
-from typing import Any, Optional, Union
+from typing import Any
 
 from sklearn.model_selection import BaseCrossValidator
 from tqdm.auto import tqdm
@@ -15,7 +14,7 @@ from tpcp._utils._general import _aggregate_final_results, _normalize_score_resu
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.misc import iter_with_warning_error_context
 from tpcp.parallel import Parallel, delayed
-from tpcp.validate._cross_val_helper import DatasetSplitter
+from tpcp.validate._cross_val_helper import BaseDatasetSplitter, _normalize_splitter
 from tpcp.validate._scorer import ScoreFunc, Scorer, ScorerTypes, _validate_scorer
 
 
@@ -24,11 +23,11 @@ def cross_validate(
     dataset: DatasetT,
     *,
     scoring: ScoreFunc[PipelineT, DatasetT],
-    cv: Optional[Union[DatasetSplitter, int, BaseCrossValidator, Iterator]] = None,
-    n_jobs: Optional[int] = None,
+    cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None = None,
+    n_jobs: int | None = None,
     verbose: int = 0,
-    optimize_params: Optional[dict[str, Any]] = None,
-    pre_dispatch: Union[str, int] = "2*n_jobs",
+    optimize_params: dict[str, Any] | None = None,
+    pre_dispatch: str | int = "2*n_jobs",
     return_train_score: bool = False,
     return_optimizer: bool = False,
     progress_bar: bool = True,
@@ -50,11 +49,11 @@ def cross_validate(
         This function should return either a single score or a dictionary of scores.
     cv
         The cross-validation strategy to use.
-        For simple use-cases the same input as for the sklearn cross-validation function are supported.
-        For further inputs check the `sklearn` `documentation
-        <https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_validate.html>`_.
+        Accepts an integer, a sklearn-style splitter, a native tpcp splitter, or an explicit list of
+        positional fold assignments. Convert other positional iterables with ``list(folds)`` before passing them.
 
-        For more complex usecases like grouping or stratification, the :class:`~tpcp.TpcpSplitter` can be used.
+        For grouping or stratification, use :class:`~tpcp.validate.DatasetSplitter`. Native tpcp splitters such as
+        :class:`~tpcp.validate.CombinedSplitter` can also be passed directly.
     n_jobs
         Number of jobs to run in parallel.
         One job is created per CV fold.
@@ -115,7 +114,7 @@ def cross_validate(
     """
     scoring = _validate_scorer(scoring)
 
-    cv = cv if isinstance(cv, DatasetSplitter) else DatasetSplitter(base_splitter=cv)
+    cv = _normalize_splitter(cv)
 
     splits = list(cv.split(dataset))
 
@@ -130,8 +129,8 @@ def cross_validate(
                     # independent, and that it is pickle-able.
                     optimizable.clone(),
                     scoring,
-                    dataset[train],
-                    dataset[test],
+                    dataset.get_subset(group_labels=train),
+                    dataset.get_subset(group_labels=test),
                     optimize_params=optimize_params,
                     hyperparameters=None,
                     pure_parameters=None,
@@ -164,9 +163,9 @@ def validate(
     dataset: DatasetT,
     *,
     scoring: ScorerTypes[PipelineT, DatasetT],
-    n_jobs: Optional[int] = _Default(None),
+    n_jobs: int | None = _Default(None),
     verbose: int = _Default(0),
-    pre_dispatch: Union[str, int] = _Default("2*n_jobs"),
+    pre_dispatch: str | int = _Default("2*n_jobs"),
     progress_bar: bool = _Default(True),
 ) -> dict[str, Any]:
     """Evaluate a pipeline on a dataset without any optimization.

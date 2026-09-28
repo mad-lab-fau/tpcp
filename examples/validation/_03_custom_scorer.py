@@ -438,13 +438,13 @@ complicated_single_no_raw.keys()
 # Note, that we don't provide such generalized aggregators in tpcp on purpose, as they really depend on the specific
 # usecase, your data, and the type of scores you want to calculate.
 # Hence, we recommend to use these examples as a starting point to implement your own custom aggregators.
-from typing import Callable, Union
+from collections.abc import Callable
 
 
 class SingleValueAggregator(Aggregator[np.ndarray]):
     def __init__(
         self,
-        func: Callable[[Sequence[np.ndarray]], Union[float, dict[str, float]]],
+        func: Callable[[Sequence[np.ndarray]], float | dict[str, float]],
         *,
         return_raw_scores: bool = True,
     ):

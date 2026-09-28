@@ -32,10 +32,8 @@ We will omit the algorithm implementation here, as it is not relevant for the ex
 """
 
 from types import MappingProxyType
-from typing import Optional
 
 import pandas as pd
-
 from tpcp import Algorithm, Parameter
 
 
@@ -108,7 +106,7 @@ noisy_free_living_params = (
     QRSDetector.PredefinedParameters.noisy_free_living_data
 )
 algo_with_custom_noisy_params = QRSDetector(
-    **(noisy_free_living_params | dict(min_r_peak_height_over_baseline=3.0))
+    **(noisy_free_living_params | {"min_r_peak_height_over_baseline": 3.0})
 )
 algo_with_custom_noisy_params.get_params()
 
@@ -186,7 +184,7 @@ class MLQRSDetector(Algorithm):
 
     max_heart_rate_bpm: Parameter[float]
     min_r_peak_height_over_baseline: Parameter[float]
-    model: Parameter[Optional[str]]
+    model: Parameter[str | None]
 
     r_peak_positions_: pd.Series
 
@@ -199,8 +197,8 @@ class MLQRSDetector(Algorithm):
             return "model_" + model_name
 
         @classproperty
-        def clean_lab_data(cls):
-            model = cls._load_from_file("clean_lab_data")
+        def clean_lab_data(self):
+            model = self._load_from_file("clean_lab_data")
             return MappingProxyType(
                 {
                     "max_heart_rate_bpm": 180.0,
@@ -210,8 +208,8 @@ class MLQRSDetector(Algorithm):
             )
 
         @classproperty
-        def noisy_free_living_data(cls):
-            model = cls._load_from_file("noisy_free_living_data")
+        def noisy_free_living_data(self):
+            model = self._load_from_file("noisy_free_living_data")
             return MappingProxyType(
                 {
                     "max_heart_rate_bpm": 220.0,
@@ -224,7 +222,7 @@ class MLQRSDetector(Algorithm):
         self,
         max_heart_rate_bpm: float = 200.0,
         min_r_peak_height_over_baseline: float = 1.0,
-        model: Optional[str] = None,
+        model: str | None = None,
     ):
         self.max_heart_rate_bpm = max_heart_rate_bpm
         self.min_r_peak_height_over_baseline = min_r_peak_height_over_baseline

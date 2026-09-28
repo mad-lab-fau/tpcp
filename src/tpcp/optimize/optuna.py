@@ -11,15 +11,14 @@ import multiprocessing
 import warnings
 from ast import literal_eval
 from collections import defaultdict
-from collections.abc import Sequence
-from typing import Any, Callable, Optional, TypedDict, TypeVar, Union
+from collections.abc import Callable, Sequence
+from typing import Any, Self, TypedDict, TypeVar
 
 import numpy as np
 from optuna import Study
 from optuna.study import StudyDirection
 from optuna.study.study import ObjectiveFuncType
 from optuna.trial import FrozenTrial, Trial
-from typing_extensions import Self
 
 from tpcp import OptimizablePipeline, clone
 from tpcp._dataset import DatasetT
@@ -56,13 +55,13 @@ def _split_trials(n_trials, n_jobs):
 class StudyParamsDict(TypedDict, total=False):
     """Type of the dictionary returned by `get_study_params`."""
 
-    study_name: Optional[str]
-    storage: Union[str, optuna.storages.BaseStorage]
-    sampler: Optional[optuna.samplers.BaseSampler]
-    pruner: Optional[optuna.pruners.BasePruner]
-    direction: Optional[Union[str, StudyDirection]]
+    study_name: str | None
+    storage: str | optuna.storages.BaseStorage
+    sampler: optuna.samplers.BaseSampler | None
+    pruner: optuna.pruners.BasePruner | None
+    direction: str | StudyDirection | None
     load_if_exists: bool
-    directions: Optional[Sequence[Union[str, StudyDirection]]]
+    directions: Sequence[str | StudyDirection] | None
 
 
 class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
@@ -71,13 +70,13 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
     return_optimized: bool
 
     # Optuna Parameters that are directly forwarded to study.optimize
-    n_trials: Optional[int]
-    timeout: Optional[float]
-    callbacks: Optional[list[Callable[[Study, FrozenTrial], None]]]
+    n_trials: int | None
+    timeout: float | None
+    callbacks: list[Callable[[Study, FrozenTrial], None]] | None
     gc_after_trial: bool
     show_progress_bar: bool
     n_jobs: int
-    random_seed: Optional[int]
+    random_seed: int | None
 
     eval_str_paras: Sequence[str]
 
@@ -257,7 +256,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         )
         return study
 
-    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
+    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], float | Sequence[float]]:
         """Return the objective function that should be optimized.
 
         This method should be implemented by a child class and return an objective function that is compatible with
@@ -541,12 +540,12 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
         pipeline: PipelineT,
         get_study_params: Callable[[int], StudyParamsDict],
         *,
-        n_trials: Optional[int] = None,
-        timeout: Optional[float] = None,
-        callbacks: Optional[list[Callable[[Study, FrozenTrial], None]]] = None,
+        n_trials: int | None = None,
+        timeout: float | None = None,
+        callbacks: list[Callable[[Study, FrozenTrial], None]] | None = None,
         gc_after_trial: bool = False,
         n_jobs: int = 1,
-        random_seed: Optional[int] = None,
+        random_seed: int | None = None,
         eval_str_paras: Sequence[str] = (),
         show_progress_bar: bool = False,
         return_optimized: bool = True,
@@ -577,14 +576,14 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             get_study_params: Callable[[int], StudyParamsDict]
 
             # Optuna Parameters that are directly forwarded to study.optimize
-            n_trials: Optional[int] = None
-            timeout: Optional[float] = None
-            callbacks: Optional[list[Callable[[Study, FrozenTrial], None]]] = None
+            n_trials: int | None = None
+            timeout: float | None = None
+            callbacks: list[Callable[[Study, FrozenTrial], None]] | None = None
             gc_after_trial: bool = False
             show_progress_bar: bool = False
 
             n_jobs: int = 1
-            random_seed: Optional[int] = None
+            random_seed: int | None = None
             return_optimized: bool = True
 
             eval_str_paras: Sequence[str] = ()
@@ -610,14 +609,14 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             get_study_params: Callable[[int], StudyParamsDict]
 
             # Optuna Parameters that are directly forwarded to study.optimize
-            n_trials: Optional[int] = None
-            timeout: Optional[float] = None
-            callbacks: Optional[list[Callable[[Study, FrozenTrial], None]]] = None
+            n_trials: int | None = None
+            timeout: float | None = None
+            callbacks: list[Callable[[Study, FrozenTrial], None]] | None = None
             gc_after_trial: bool = False
             show_progress_bar: bool = False
 
             n_jobs: int = 1
-            random_seed: Optional[int] = None
+            random_seed: int | None = None
             return_optimized: bool = True
 
             eval_str_paras: Sequence[str] = ()
@@ -779,7 +778,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
     create_search_space: Callable[[Trial], None]
     scoring: ScorerTypes[PipelineT, DatasetT]
-    score_name: Optional[str]
+    score_name: str | None
 
     multimetric_: bool
 
@@ -790,13 +789,13 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         create_search_space: Callable[[Trial], None],
         *,
         scoring: ScorerTypes[PipelineT, DatasetT],
-        score_name: Optional[str] = None,
-        n_trials: Optional[int] = None,
-        timeout: Optional[float] = None,
-        callbacks: Optional[list[Callable[[Study, FrozenTrial], None]]] = None,
+        score_name: str | None = None,
+        n_trials: int | None = None,
+        timeout: float | None = None,
+        callbacks: list[Callable[[Study, FrozenTrial], None]] | None = None,
         gc_after_trial: bool = False,
         n_jobs: int = 1,
-        random_seed: Optional[int] = None,
+        random_seed: int | None = None,
         eval_str_paras: Sequence[str] = (),
         show_progress_bar: bool = False,
         return_optimized: bool = True,
@@ -817,7 +816,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         self.show_progress_bar = show_progress_bar
         self.return_optimized = return_optimized
 
-    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
+    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], float | Sequence[float]]:
         """Create the objective function for optuna.
 
         This is an internal function and should not be called directly.

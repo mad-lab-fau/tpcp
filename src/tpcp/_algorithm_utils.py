@@ -7,9 +7,7 @@ import warnings
 from functools import wraps
 from inspect import isclass
 from pickle import PicklingError
-from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar, Union, cast, overload
-
-from typing_extensions import Concatenate, ParamSpec
+from typing import TYPE_CHECKING, Any, Concatenate, ParamSpec, TypeVar, cast, overload
 
 from tpcp import Algorithm
 from tpcp._base import NOTHING, BaseTpcpObject, _get_annotated_fields_of_type, _Nothing
@@ -21,6 +19,8 @@ ACTION_METHOD_INDICATOR = "__tpcp_action_method"
 OPTIMIZE_METHOD_INDICATOR = "__tpcp_optimize_method"
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from tpcp._algorithm import AlgorithmT
 
 
@@ -46,7 +46,7 @@ def _split_returns(values):
     return value, other
 
 
-def get_action_method(instance: Union[type[Algorithm], Algorithm], method_name: Optional[str] = None) -> Callable:
+def get_action_method(instance: type[Algorithm] | Algorithm, method_name: str | None = None) -> Callable:
     """Get the action method for an Algorithm.
 
     If method_name is None, the primary action method is returned (the one listed first in `Algorithm._action_methods`).
@@ -64,7 +64,7 @@ def get_action_method(instance: Union[type[Algorithm], Algorithm], method_name: 
     return getattr(instance, method_name)
 
 
-def get_action_methods_names(instance_or_cls: Union[type[Algorithm], Algorithm]) -> tuple[str, ...]:
+def get_action_methods_names(instance_or_cls: type[Algorithm] | Algorithm) -> tuple[str, ...]:
     """Get the names of all action methods of a class.
 
     This basically returns `instance_or_cls._action_method`, but ensures that the return type is a tuple.
@@ -253,10 +253,10 @@ def _get_nested_opti_paras(
 
 def _check_safe_optimize(  # noqa: C901, PLR0912
     algorithm: AlgorithmT,
-    old_method: Callable[Concatenate[AlgorithmT, P], Union[AlgorithmT, tuple[AlgorithmT, T]]],
+    old_method: Callable[Concatenate[AlgorithmT, P], AlgorithmT | tuple[AlgorithmT, T]],
     *args: Any,
     **kwargs: Any,
-) -> Union[AlgorithmT, tuple[AlgorithmT, T]]:
+) -> AlgorithmT | tuple[AlgorithmT, T]:
     # record the hash of the pipeline to make an educated guess if the optimization works
     opti_para_names = _get_annotated_fields_of_type(algorithm, _ParaTypes.OPTI)
     optimizable_paras, other_paras = _get_nested_opti_paras(algorithm, opti_para_names)

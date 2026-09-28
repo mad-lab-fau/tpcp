@@ -1,14 +1,30 @@
 import numbers
 import warnings
 from collections.abc import Iterator
-from typing import Optional, Union
 
 from sklearn.model_selection import BaseCrossValidator, GroupKFold, StratifiedGroupKFold, StratifiedKFold, check_cv
 
 from tpcp import BaseTpcpObject, Dataset
+from tpcp._dataset import GroupLabelT
 
 
-class DatasetSplitter(BaseTpcpObject):
+class BaseDatasetSplitter(BaseTpcpObject):
+    """Base class for splitters that yield dataset group labels."""
+
+    def split(self, dataset: Dataset) -> Iterator[tuple[list[GroupLabelT], list[GroupLabelT]]]:
+        """Yield train and test group labels for each fold."""
+        raise NotImplementedError
+
+    def get_n_splits(self, dataset: Dataset) -> int:
+        """Return the number of folds for the dataset."""
+        raise NotImplementedError
+
+
+def _normalize_splitter(cv) -> BaseDatasetSplitter:
+    return cv if isinstance(cv, BaseDatasetSplitter) else DatasetSplitter(base_splitter=cv)
+
+
+class DatasetSplitter(BaseDatasetSplitter):
     """Wrapper around sklearn cross-validation splitters to support grouping and stratification with tpcp-Datasets.
 
     This wrapper can be used instead of a sklearn-style splitter with all methods that support a ``cv`` parameter.
@@ -17,13 +33,18 @@ class DatasetSplitter(BaseTpcpObject):
     You can either select your own base splitter, or we will select from KFold, StratifiedKFold, GroupKFold, or
     StratifiedGroupKFold, depending on the provided ``groupby`` and ``stratify`` parameters.
 
+    ``split(dataset)`` yields lists of the dataset's group labels. Use
+    ``dataset.get_subset(group_labels=train_labels)`` to access a fold. A raw sklearn splitter still
+    yields positional indices when called directly.
+
     .. warning:: If you use a custom splitter, that does not support grouping or stratification, these parameters might
         be silently ignored.
 
     Parameters
     ----------
     base_splitter
-        The base splitter to use. Can be an integer (for ``KFold``), an iterator, or any other valid sklearn-splitter.
+        The base splitter to use. Can be an integer (for ``KFold``), an explicit list of positional
+        folds, or a sklearn-style splitter. Convert a fold iterator with ``list(folds)`` before passing it.
         The default is None, which will use the sklearn default ``KFold`` splitter with 5 splits.
     groupby
         The column(s) to group by. If None, no grouping is done.
@@ -49,10 +70,10 @@ class DatasetSplitter(BaseTpcpObject):
 
     def __init__(
         self,
-        base_splitter: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
+        base_splitter: int | BaseCrossValidator | list | None = None,
         *,
-        groupby: Optional[Union[str, list[str]]] = None,
-        stratify: Optional[Union[str, list[str]]] = None,
+        groupby: str | list[str] | None = None,
+        stratify: str | list[str] | None = None,
         ignore_potentially_invalid_splitter_warning: bool = False,
     ):
         self.base_splitter = base_splitter
@@ -62,6 +83,10 @@ class DatasetSplitter(BaseTpcpObject):
 
     def _get_splitter(self):
         cv = self.base_splitter
+        if cv is not None and not isinstance(cv, (numbers.Integral, list)) and not callable(getattr(cv, "split", None)):
+            raise ValueError(
+                "Positional folds must be a list; convert them with list(folds) before passing them as cv."
+            )
         cv = 5 if cv is None else cv
         if isinstance(cv, numbers.Integral):
             if self.groupby is not None and self.stratify is not None:
@@ -105,16 +130,18 @@ class DatasetSplitter(BaseTpcpObject):
             )
         return cv
 
-    def _get_labels(self, dataset: Dataset, labels: Union[None, str, list[str]]):
+    def _get_labels(self, dataset: Dataset, labels: None | str | list[str]):
         if labels:
             return dataset.create_string_group_labels(labels)
         return None
 
-    def split(self, dataset: Dataset) -> Iterator[tuple[list[int], list[int]]]:
-        """Split the dataset into train and test sets."""
-        return self._get_splitter().split(
+    def split(self, dataset: Dataset) -> Iterator[tuple[list[GroupLabelT], list[GroupLabelT]]]:
+        """Yield train and test group labels, in the order returned by the base splitter."""
+        labels = dataset.group_labels
+        for train, test in self._get_splitter().split(
             dataset, y=self._get_labels(dataset, self.stratify), groups=self._get_labels(dataset, self.groupby)
-        )
+        ):
+            yield [labels[i] for i in train], [labels[i] for i in test]
 
     def get_n_splits(self, dataset: Dataset) -> int:
         """Get the number of splits."""
