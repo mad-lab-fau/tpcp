@@ -51,7 +51,6 @@ from tpcp import OptimizableParameter, OptimizablePipeline, Parameter, cf
 # developed in :ref:`custom_algorithms_qrs_detection`.
 #
 # For more information about the pipeline below check our examples on :ref:`optimize_pipelines`.
-# Todo: Full dedicated example for `PureParameter`
 from examples.algorithms.algorithms_qrs_detection_final import (
     OptimizableQrsDetector,
 )
