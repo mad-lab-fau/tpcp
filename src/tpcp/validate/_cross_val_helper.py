@@ -33,6 +33,10 @@ class DatasetSplitter(BaseDatasetSplitter):
     You can either select your own base splitter, or we will select from KFold, StratifiedKFold, GroupKFold, or
     StratifiedGroupKFold, depending on the provided ``groupby`` and ``stratify`` parameters.
 
+    ``split(dataset)`` yields lists of the dataset's group labels. Use
+    ``dataset.get_subset(group_labels=train_labels)`` to access a fold. A raw sklearn splitter still
+    yields positional indices when called directly.
+
     .. warning:: If you use a custom splitter, that does not support grouping or stratification, these parameters might
         be silently ignored.
 
