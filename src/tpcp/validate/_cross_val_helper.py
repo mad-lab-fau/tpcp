@@ -43,7 +43,8 @@ class DatasetSplitter(BaseDatasetSplitter):
     Parameters
     ----------
     base_splitter
-        The base splitter to use. Can be an integer (for ``KFold``), an iterator, or any other valid sklearn-splitter.
+        The base splitter to use. Can be an integer (for ``KFold``), an explicit list of positional
+        folds, or a sklearn-style splitter. Convert a fold iterator with ``list(folds)`` before passing it.
         The default is None, which will use the sklearn default ``KFold`` splitter with 5 splits.
     groupby
         The column(s) to group by. If None, no grouping is done.
@@ -69,7 +70,7 @@ class DatasetSplitter(BaseDatasetSplitter):
 
     def __init__(
         self,
-        base_splitter: int | BaseCrossValidator | Iterator | None = None,
+        base_splitter: int | BaseCrossValidator | list | None = None,
         *,
         groupby: str | list[str] | None = None,
         stratify: str | list[str] | None = None,
@@ -82,6 +83,10 @@ class DatasetSplitter(BaseDatasetSplitter):
 
     def _get_splitter(self):
         cv = self.base_splitter
+        if cv is not None and not isinstance(cv, (numbers.Integral, list)) and not callable(getattr(cv, "split", None)):
+            raise ValueError(
+                "Positional folds must be a list; convert them with list(folds) before passing them as cv."
+            )
         cv = 5 if cv is None else cv
         if isinstance(cv, numbers.Integral):
             if self.groupby is not None and self.stratify is not None:
