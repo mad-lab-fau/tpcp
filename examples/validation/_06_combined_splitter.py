@@ -71,14 +71,16 @@ selected_extras.index
 
 n_splits = 3
 cv = CombinedSplitter(
-    (
-        lambda ds: ds.get_subset(kind="normal"),
-        KFold(n_splits=n_splits, shuffle=True, random_state=0),
-    ),
-    (
-        lambda ds: ds.get_subset(kind="train_only"),
-        NoSplit(n_splits=n_splits, train=select_training_extras),
-    ),
+    parts=[
+        (
+            lambda ds: ds.get_subset(kind="normal"),
+            KFold(n_splits=n_splits, shuffle=True, random_state=0),
+        ),
+        (
+            lambda ds: ds.get_subset(kind="train_only"),
+            NoSplit(n_splits=n_splits, train=select_training_extras),
+        ),
+    ]
 )
 
 # %%

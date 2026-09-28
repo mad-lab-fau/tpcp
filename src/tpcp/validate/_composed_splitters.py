@@ -65,17 +65,10 @@ class NoSplit(BaseDatasetSplitter):
             yield train.copy(), test.copy()
 
 
-class _VariadicPairsMeta(type):
-    def __call__(cls, *pairs, **kwargs):
-        if kwargs:
-            return super().__call__(**kwargs)
-        return super().__call__(pairs)
-
-
-class CombinedSplitter(BaseDatasetSplitter, metaclass=_VariadicPairsMeta):
+class CombinedSplitter(BaseDatasetSplitter):
     """Combine corresponding folds of splitters applied to selected dataset parts.
 
-    Construct with one or more ``(selector, splitter)`` pairs. Each selector receives the current
+    Pass a list of one or more ``(selector, splitter)`` pairs as ``parts``. Each selector receives the current
     dataset and returns a subset. A child splitter can be a native tpcp splitter or any input
     accepted by :class:`DatasetSplitter`, including raw sklearn splitters.
     Positional fold assignments must be supplied as lists, including for raw child inputs.
@@ -90,23 +83,25 @@ class CombinedSplitter(BaseDatasetSplitter, metaclass=_VariadicPairsMeta):
         from tpcp.validate import CombinedSplitter, DatasetSplitter, NoSplit
 
         cv = CombinedSplitter(
-            (
-                lambda ds: ds.get_subset(recording_type="real"),
-                DatasetSplitter(5, groupby="participant"),
-            ),
-            (
-                lambda ds: ds.get_subset(recording_type="artificial"),
-                NoSplit(5, train=lambda ds: ds),
-            ),
+            parts=[
+                (
+                    lambda ds: ds.get_subset(recording_type="real"),
+                    DatasetSplitter(5, groupby="participant"),
+                ),
+                (
+                    lambda ds: ds.get_subset(recording_type="artificial"),
+                    NoSplit(5, train=lambda ds: ds),
+                ),
+            ],
         )
 
     Parameters
     ----------
     parts
-        The selector and splitter pairs, supplied as variadic positional arguments.
+        A list of selector and splitter pairs, in the order their fold contributions are combined.
     """
 
-    def __init__(self, parts: tuple[tuple[DatasetSelector, object], ...]) -> None:
+    def __init__(self, parts: list[tuple[DatasetSelector, object]]) -> None:
         self.parts = parts
 
     def _prepare(self, dataset: Dataset) -> list[tuple[Dataset, BaseDatasetSplitter]]:
