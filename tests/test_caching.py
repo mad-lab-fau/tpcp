@@ -112,6 +112,19 @@ class TestGlobalCache:
         assert example.result_1_ == 6 * multiplier
         assert not w
 
+    def test_numeric_dataframe_layouts_remain_distinct(self, example_class):
+        import numpy as np
+        import pandas as pd
+
+        config, algorithm = example_class
+        self.cache_method(**config)(algorithm)
+        action = getattr(algorithm(1, 2), config.get("action_method_name", "action"))
+        values = np.arange(12).reshape(4, 3)
+        with pytest.warns(CacheWarning):
+            action(pd.DataFrame(values, copy=False))
+        with pytest.warns(CacheWarning):
+            action(pd.DataFrame(np.asfortranarray(values), copy=False))
+
     def test_caching_twice_new_instance(self, example_class):
         config, example_class = example_class
         action_name = config.get("action_method_name", "action")
