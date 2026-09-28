@@ -11,6 +11,8 @@ from pickle import PicklingError
 from typing import Callable, Generic, Optional, TypeVar, Union
 
 from joblib import Memory
+from joblib.func_inspect import filter_args
+from joblib.memory import MemorizedFunc
 
 from tpcp import Algorithm, get_action_methods_names, get_results, make_action_safe
 from tpcp._hash import custom_hash
@@ -97,10 +99,48 @@ class UniversalHashableWrapper(Generic[T]):
         return self._hash(self.obj) == self._hash(other.obj)
 
 
-class _LegacyHashableWrapper(UniversalHashableWrapper):
-    """Keep hybrid caching on legacy hashes unless explicitly opted in."""
+class _FastHashableWrapper:
+    """Snapshot the argument's content key once per call, including equality checks."""
 
-    _hash = staticmethod(functools.partial(custom_hash, hash_name="md5"))
+    def __init__(self, obj):
+        self.obj = obj
+        self._digest = custom_hash(obj)
+
+    def __hash__(self):
+        return hash(self._digest)
+
+    def __eq__(self, other):
+        if not isinstance(other, _FastHashableWrapper):
+            return NotImplemented
+        return self._digest == other._digest
+
+
+class _FastMemorizedFunc(MemorizedFunc):
+    """Change only joblib's argument key; retain original function invalidation."""
+
+    def _get_args_id(self, *args, **kwargs):
+        arguments = filter_args(self.func, self.ignore, args, kwargs)
+        digest = custom_hash(arguments, coerce_mmap=self.mmap_mode is not None)
+        return f"fast-v1-{digest}"
+
+    # joblib 1.3 used this name for the same argument-hashing hook.
+    _get_argument_hash = _get_args_id
+
+
+def _fast_disk_cache(memory, function):
+    if memory.store_backend is None:
+        return memory.cache(function)
+    # Mirror Memory.cache's configuration without changing the supplied Memory
+    # instance or joblib's global hashing behavior.
+    return _FastMemorizedFunc(
+        function,
+        location=memory.store_backend,
+        backend=memory.backend,
+        mmap_mode=memory.mmap_mode,
+        compress=memory.compress,
+        verbose=memory._verbose,
+        timestamp=memory.timestamp,
+    )
 
 
 def _is_cached(obj, action_name):
@@ -490,6 +530,8 @@ _GLOBAL_CACHE_REGISTRY: dict[tuple[str, str], Callable] = {}
 def hybrid_cache(
     joblib_memory: Memory = Memory(None),
     lru_cache_maxsize: Union[Optional[int], bool] = False,
+    *,
+    fast_inaccurate_hashing: bool = False,
 ):
     """Cache a function using joblib memory and a lru cache at the same time.
 
@@ -522,6 +564,15 @@ def hybrid_cache(
         If None, the cache will grow without limit.
         If False, no lru_cache is used.
 
+    fast_inaccurate_hashing
+        Opt in to fast, best-effort content hashing for both cache tiers. This uses
+        :func:`~tpcp.misc.custom_hash`, including its numeric DataFrame fast path,
+        with normal serialization for unsupported objects. All values are read,
+        but unusual metadata or representation differences may be missed, which
+        can return an incorrect cached result. The default retains legacy hashing.
+        Fast disk entries are separate from default entries. RAM keys are computed
+        once per call; a RAM miss hashes arguments again for the disk lookup.
+
     Returns
     -------
     caching_decorator
@@ -544,29 +595,36 @@ def hybrid_cache(
     _global_cache_warning()
 
     def inner(function: Callable):
-        paras_hash = custom_hash((function.__name__, id(function), joblib_memory, lru_cache_maxsize))
+        paras_hash = custom_hash(
+            (function.__name__, id(function), joblib_memory, lru_cache_maxsize, fast_inaccurate_hashing)
+        )
         cache_key = (function.__name__, paras_hash)
         if cache_key in _GLOBAL_CACHE_REGISTRY:
             return _GLOBAL_CACHE_REGISTRY[cache_key]
+
+        disk_cached = (
+            _fast_disk_cache(joblib_memory, function) if fast_inaccurate_hashing else joblib_memory.cache(function)
+        )
+        wrapper = _FastHashableWrapper if fast_inaccurate_hashing else UniversalHashableWrapper
 
         if lru_cache_maxsize is False:
 
             @functools.wraps(function)
             def final_wrapped(*args, **kwargs):
-                return joblib_memory.cache(function)(*args, **kwargs)
+                return disk_cached(*args, **kwargs)
         else:
 
             def inner_cached(*hash_safe_args, **hash_safe_kwargs):
                 args = tuple(arg.obj for arg in hash_safe_args)
                 kwargs = {k: v.obj for k, v in hash_safe_kwargs.items()}
-                return joblib_memory.cache(function)(*args, **kwargs)
+                return disk_cached(*args, **kwargs)
 
             final_cached = functools.lru_cache(lru_cache_maxsize)(inner_cached)
 
             @functools.wraps(function)
             def final_wrapped(*args, **kwargs):
-                hash_safe_args = tuple(_LegacyHashableWrapper(arg) for arg in args)
-                hash_safe_kwargs = {k: _LegacyHashableWrapper(v) for k, v in kwargs.items()}
+                hash_safe_args = tuple(wrapper(arg) for arg in args)
+                hash_safe_kwargs = {k: wrapper(v) for k, v in kwargs.items()}
                 return final_cached(*hash_safe_args, **hash_safe_kwargs)
 
         _GLOBAL_CACHE_REGISTRY[cache_key] = final_wrapped

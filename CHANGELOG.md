@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `hybrid_cache(..., fast_inaccurate_hashing=True)` to opt in to fast, best-effort hashing for
+  RAM and disk lookups. Fast RAM keys are computed once per argument per call, and fast disk keys
+  are isolated from default cache entries. Default hashing and joblib function-code invalidation
+  are retained. Unsupported DataFrame types use the normal serialization with the faster digest.
+  (https://github.com/mad-lab-fau/tpcp/issues/143)
+
 ### Changed
 
 - **Breaking:** `Scorer` now uses `numpy.nanmean` for scores without an explicit aggregator, ignoring NaN scores.
