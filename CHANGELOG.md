@@ -40,9 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GridSearchCV`.
   (https://github.com/mad-lab-fau/tpcp/pull/148)
 
-- **Breaking, approved dataset representation change:** `repr(dataset)` now shows index dimensions, grouping,
-  and nested parameters instead of index row values. Use `dataset.index` to inspect rows. The Jupyter HTML
-  representation still displays the table.
+- **Breaking, approved object representation change:** Plain representations of tpcp objects now wrap long or nested
+  parameters and summarize DataFrames, Series, Indexes, and arrays without printing their values. They show constructor
+  parameters, not computed results; in particular, aggregators no longer append their wrapped score values. Dataset
+  representations also show index dimensions and grouping instead of index row values. Use `get_params(deep=False)` to
+  inspect full parameter values, `dataset.index` to inspect rows, and `aggregator.get_value()` to inspect a wrapped
+  score. The Jupyter dataset HTML representation still displays the index table.
   (https://github.com/mad-lab-fau/tpcp/issues/11)
 - **Breaking:** `Scorer` now uses `numpy.nanmean` for scores without an explicit aggregator, ignoring NaN scores.
   Pass `default_aggregator=mean_agg` to keep the previous mean behavior.

@@ -2,15 +2,13 @@
 
 import warnings
 from collections.abc import Iterator, Sequence
-from itertools import islice
 from keyword import iskeyword
-from reprlib import Repr
 from typing import ClassVar, Generic, Self, TypeVar, cast, get_args, get_origin, overload
 
 import numpy as np
 import pandas as pd
 
-from tpcp._base import BaseTpcpObject, _recursive_validate, get_param_names
+from tpcp._base import BaseTpcpObject, _recursive_validate, _repr_limits, _repr_value, _wrap_repr_lines, get_param_names
 from tpcp._hash import custom_hash
 from tpcp.exceptions import ValidationError
 
@@ -19,48 +17,11 @@ DatasetT = TypeVar("DatasetT", bound="_Dataset")
 GroupLabelT = TypeVar("GroupLabelT", bound=tuple[str, ...])
 
 
-_repr_limits = Repr()
-_repr_limits.maxstring = 80
-
-
-def _data_summary(value: object) -> str | None:
-    """Describe tabular and array data without inspecting its values."""
-    if isinstance(value, pd.DataFrame):
-        columns = ", ".join(_repr_limits.repr(column) for column in islice(value.columns, 6))
-        if len(value.columns) > 6:
-            columns += ", ..."
-        return f"DataFrame(shape={value.shape}, columns=[{columns}])"
-    if isinstance(value, pd.Series):
-        return f"Series(shape={value.shape}, name={_repr_limits.repr(value.name)}, dtype={value.dtype})"
-    if isinstance(value, pd.Index):
-        return f"Index(shape={value.shape}, dtype={value.dtype})"
-    if isinstance(value, np.ndarray):
-        return f"ndarray(shape={value.shape}, dtype={value.dtype})"
-    return None
-
-
 def _dataset_repr_parameter(name: str, value: object, depth: int) -> list[str]:
     """Describe one parameter with bounded values and nested object structure."""
     prefix = "  " * depth + name + ": "
-    if (summary := _data_summary(value)) is not None:
-        return [prefix + summary]
-    if isinstance(value, _Dataset):
-        nested = repr(value).splitlines()
-        return [prefix + nested[0], *["  " * depth + line for line in nested[1:]]]
-    if isinstance(value, BaseTpcpObject):
-        lines = [prefix + type(value).__name__]
-        for child_name, child_value in value.get_params(deep=False).items():
-            lines.extend(_dataset_repr_parameter(child_name, child_value, depth + 1))
-        return lines
-    if isinstance(value, (list, tuple, dict)):
-        items = value.items() if isinstance(value, dict) else enumerate(value)
-        lines = [prefix + f"{type(value).__name__}[{len(value)}]"]
-        for key, child in islice(items, 5):
-            lines.extend(_dataset_repr_parameter(_repr_limits.repr(key), child, depth + 1))
-        if len(value) > 5:
-            lines.append("  " * (depth + 1) + f"... ({len(value) - 5} more)")
-        return lines
-    return [prefix + _repr_limits.repr(value)]
+    rendered = _repr_value(value).splitlines()
+    return [prefix + rendered[0], *["  " * depth + line for line in rendered[1:]]]
 
 
 class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
@@ -423,7 +384,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
         for name, value in self.get_params(deep=False).items():
             if name not in ("groupby_cols", "subset_index"):
                 lines.extend(_dataset_repr_parameter(name, value, 1))
-        return "\n".join(lines)
+        return _wrap_repr_lines("\n".join(lines))
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
