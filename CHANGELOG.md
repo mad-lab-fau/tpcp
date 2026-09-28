@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `Scorer` now uses `numpy.nanmean` for scores without an explicit aggregator, ignoring NaN scores.
+  Pass `default_aggregator=mean_agg` to keep the previous mean behavior.
+  (https://github.com/mad-lab-fau/tpcp/pull/145)
+
 ## [2.3.0] - 2026-07-22
 
 ### Added
