@@ -11,6 +11,7 @@ This is the API Reference for tpcp.
 
     Dataset <dataset>
     Parameter and Custom Objects <parameter>
+    Typing helpers <types>
     Custom Algorithms and Pipelines <algorithm_and_pipeline>
     Parameter Optimization <optimize>
     Validation and Scoring <validate>

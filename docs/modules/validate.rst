@@ -50,3 +50,6 @@ Functions
 
     cross_validate
     validate
+
+The :doc:`scoring aliases <types>` describe score functions, aggregator return values, and the
+``scoring`` argument accepted by validation functions.

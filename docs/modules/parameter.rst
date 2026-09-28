@@ -40,3 +40,6 @@ Utility classes
     BaseTpcpObject
     CloneFactory
     BaseFactory
+
+Use :data:`tpcp.types.BaseTpcpObjectT` to preserve a concrete :class:`tpcp.BaseTpcpObject`
+subclass in a typed helper.
