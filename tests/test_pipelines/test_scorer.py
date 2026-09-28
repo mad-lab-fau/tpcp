@@ -25,6 +25,14 @@ from tpcp.validate._scorer import Aggregator, FloatAggregator, _validate_scorer,
 class TestScorerCalls:
     scorer: Scorer
 
+    def test_aggregator_repr_shows_parameters_only(self):
+        aggregator = no_agg("hidden_result")
+
+        representation = repr(aggregator)
+
+        assert "return_raw_scores=True" in representation
+        assert "hidden_result" not in representation
+
     @pytest.fixture(autouse=True)
     def create_scorer(self):
         self.scorer = Scorer(lambda x: x)

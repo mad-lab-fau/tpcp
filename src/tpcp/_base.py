@@ -16,7 +16,10 @@ import sys
 import warnings
 from collections import defaultdict
 from functools import wraps
+from itertools import islice
 from pathlib import Path
+from reprlib import Repr
+from textwrap import TextWrapper
 from types import MethodWrapperType
 from typing import (
     TYPE_CHECKING,
@@ -52,6 +55,92 @@ T = TypeVar("T")
 P = ParamSpec("P")
 BaseTpcpObjectT = TypeVar("BaseTpcpObjectT", bound="BaseTpcpObject")
 _BaseTpcpObjectT = TypeVar("_BaseTpcpObjectT", bound="_BaseTpcpObject")
+
+_repr_limits = Repr()
+_repr_limits.maxstring = 72
+_column_repr_limits = Repr()
+_column_repr_limits.maxstring = 24
+
+
+def _dtype_summary(dtype: object) -> str:
+    description = str(dtype)
+    return description if len(description) <= 32 else description[:29] + "..."
+
+
+def _wrap_repr_lines(representation: str) -> str:
+    """Keep deeply indented representation lines within the display width."""
+    lines = []
+    for line in representation.splitlines():
+        content = line.lstrip(" ")
+        indent = len(line) - len(content)
+        rendered_line = line
+        if indent > 40:
+            rendered_line = " " * 40 + "... " + content
+            indent = 40
+        if len(rendered_line) <= 88:
+            lines.append(rendered_line)
+            continue
+        wrapper = TextWrapper(
+            width=88,
+            initial_indent=" " * indent,
+            subsequent_indent=" " * (indent + 2),
+            break_long_words=True,
+            break_on_hyphens=False,
+            replace_whitespace=False,
+        )
+        lines.extend(wrapper.wrap(rendered_line[indent:]))
+    return "\n".join(lines)
+
+
+def _data_summary(value: object) -> str | None:
+    """Describe array-like parameter data without printing its values."""
+    if isinstance(value, pd.DataFrame):
+        columns = []
+        for column in islice(value.columns, 6):
+            rendered = _column_repr_limits.repr(column)
+            if len(", ".join([*columns, rendered])) > 36:
+                break
+            columns.append(rendered)
+        if len(columns) < len(value.columns):
+            columns.append("...")
+        return f"DataFrame(shape={value.shape}, columns=[{', '.join(columns)}])"
+    if isinstance(value, pd.Series):
+        return (
+            f"Series(shape={value.shape}, name={_column_repr_limits.repr(value.name)}, "
+            f"dtype={_dtype_summary(value.dtype)})"
+        )
+    if isinstance(value, pd.Index):
+        return f"Index(shape={value.shape}, dtype={_dtype_summary(value.dtype)})"
+    if isinstance(value, np.ndarray):
+        return f"ndarray(shape={value.shape}, dtype={_dtype_summary(value.dtype)})"
+    return None
+
+
+def _repr_value(value: object) -> str:
+    """Format a parameter value while keeping nested structure visible."""
+    if (summary := _data_summary(value)) is not None:
+        return summary
+    if isinstance(value, BaseTpcpObject):
+        return repr(value)
+    if isinstance(value, (list, tuple, dict)):
+        items = value.items() if isinstance(value, dict) else enumerate(value)
+        lines = [f"{type(value).__name__}[{len(value)}]"]
+        for key, child in islice(items, 5):
+            rendered = _repr_value(child).splitlines()
+            key_repr = _column_repr_limits.repr(key)
+            if len(key_repr) > 40:
+                key_repr = key_repr[:37] + "..."
+            label = f"  {key_repr}:"
+            if len(label) + 1 + len(rendered[0]) <= 80:
+                lines.append(f"{label} {rendered[0]}")
+                lines.extend(f"  {line}" for line in rendered[1:])
+            else:
+                lines.append(label)
+                lines.extend(f"    {line}" for line in rendered)
+        if len(value) > 5:
+            lines.append(f"  ... ({len(value) - 5} more)")
+        return "\n".join(lines)
+    return _repr_limits.repr(value)
 
 
 class _Nothing:
@@ -450,21 +539,23 @@ class BaseTpcpObject(_BaseTpcpObject):
             The formatted string for the parameter
 
         """
-        return f"{name}={value!r}"
+        return f"{name}={_repr_value(value)}"
 
     def __repr__(self) -> str:
         """Provide generic representation for the object based on all parameters."""
         class_name = type(self).__name__
         paras = self.get_params(deep=False)
-        result = [class_name, "("]
-        first = True
-        for name, para in paras.items():
-            if first:
-                first = False
-            else:
-                result.append(", ")
-            result.append(self.__repr_parameter__(name, para))
-        return "".join(result) + ")"
+        formatted = [self.__repr_parameter__(name, para) for name, para in paras.items()]
+        compact = f"{class_name}({', '.join(formatted)})"
+        structured_types = (BaseTpcpObject, pd.DataFrame, pd.Series, pd.Index, np.ndarray, list, tuple, dict)
+        if (
+            "\n" not in compact
+            and len(compact) <= 88
+            and not any(isinstance(value, structured_types) for value in paras.values())
+        ):
+            return compact
+        body = ",\n".join("  " + parameter.replace("\n", "\n  ") for parameter in formatted)
+        return _wrap_repr_lines(f"{class_name}(\n{body}\n)")
 
     @classmethod
     def __clone_param__(cls, param_name: str, value: Any) -> Any:  # pylint: disable=unused-argument

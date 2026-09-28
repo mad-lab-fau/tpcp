@@ -156,6 +156,7 @@ class TestDataset:
 
         assert "samples: Series(shape=(1,), name=" in representation
         assert long_name not in representation
+        assert max(map(len, representation.splitlines())) <= 88
 
     def test_repr_shows_nested_tpcp_object_structure(self):
         class Source(BaseTpcpObject):
@@ -174,7 +175,7 @@ class TestDataset:
 
         representation = repr(dataset)
 
-        assert "source: Source\n    table: DataFrame(shape=(100, 1), columns=['signal'])" in representation
+        assert "source: Source(\n    table=DataFrame(shape=(100, 1), columns=['signal'])" in representation
         assert "hidden_signal" not in representation
 
     def test_grouping_materialized_during_index_creation_applies_immediately(self):

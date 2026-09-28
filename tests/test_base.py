@@ -7,10 +7,12 @@ from typing import Any, ClassVar
 from unittest.mock import patch
 
 import joblib
+import numpy as np
+import pandas as pd
 import pytest
 
 from tests.conftest import _get_params_without_nested_class
-from tpcp import Algorithm, OptimizablePipeline, OptiPara, Para, cf, clone
+from tpcp import Algorithm, OptimizablePipeline, OptiPara, Para, Pipeline, cf, clone
 from tpcp._algorithm_utils import (
     get_action_method,
     get_action_methods_names,
@@ -496,6 +498,106 @@ def test_custom_object_representation():
 
     test = Test(1, 2)
     assert repr(test) == "Test(a=`custom`, b=2)"
+
+
+def test_nested_object_representation_summarizes_data_parameters_and_omits_results():
+    class Inner(Algorithm):
+        def __init__(self, table):
+            self.table = table
+
+    class Outer(Pipeline):
+        def __init__(self, inner, tables):
+            self.inner = inner
+            self.tables = tables
+
+    table = pd.DataFrame({"signal": ["hidden_value"] * 1000})
+    obj = Outer(Inner(table), [table])
+    obj.result_ = "hidden_result"
+
+    representation = repr(obj)
+
+    assert "\n" in representation
+    assert "inner=Inner(" in representation
+    assert "table=DataFrame(shape=(1000, 1), columns=['signal'])" in representation
+    assert "tables=list[1]" in representation
+    assert "hidden_value" not in representation
+    assert "hidden_result" not in representation
+
+
+def test_long_parameter_representation_wraps_and_bounds_value():
+    class Test(Algorithm):
+        def __init__(self, message, extra):
+            self.message = message
+            self.extra = extra
+
+    representation = repr(Test("long_value_" * 100, "extra_value_" * 100))
+
+    assert "\n" in representation
+    assert "long_value_" * 100 not in representation
+    assert max(map(len, representation.splitlines())) <= 88
+
+
+def test_dataframe_column_preview_stays_bounded():
+    class Test(Algorithm):
+        def __init__(self, data):
+            self.data = data
+
+    columns = [f"a_long_column_name_{i}" for i in range(20)]
+    representation = repr(Test(pd.DataFrame(columns=columns)))
+
+    assert "DataFrame(shape=(0, 20), columns=[" in representation
+    assert "..." in representation
+    assert max(map(len, representation.splitlines())) <= 88
+
+
+def test_dictionary_entries_with_long_keys_and_values_wrap():
+    class Test(Algorithm):
+        def __init__(self, settings):
+            self.settings = settings
+
+    representation = repr(Test({"long_key_" * 30: "long_value_" * 30}))
+
+    assert "dict[1]" in representation
+    assert max(map(len, representation.splitlines())) <= 88
+
+
+def test_structured_array_dtype_summary_stays_bounded():
+    class Test(Algorithm):
+        def __init__(self, data):
+            self.data = data
+
+    dtype = np.dtype([(f"a_very_long_field_name_{i}", "f8") for i in range(20)])
+    representation = repr(Test(np.zeros(1, dtype=dtype)))
+
+    assert "ndarray(shape=(1,), dtype=" in representation
+    assert max(map(len, representation.splitlines())) <= 88
+
+
+def test_dictionary_tuple_key_preview_stays_bounded():
+    class Test(Algorithm):
+        def __init__(self, settings):
+            self.settings = settings
+
+    key = tuple(f"long_component_{i}" for i in range(20))
+    representation = repr(Test({key: 1}))
+
+    assert "dict[1]" in representation
+    assert max(map(len, representation.splitlines())) <= 88
+
+
+@pytest.mark.parametrize("depth", [10, 50])
+def test_deeply_nested_collection_lines_wrap(depth):
+    class Test(Algorithm):
+        def __init__(self, settings):
+            self.settings = settings
+
+    settings = "long_value_" * 30
+    for _ in range(depth):
+        settings = {"key": settings}
+    representation = repr(Test(settings))
+
+    assert "dict[1]" in representation
+    assert max(map(len, representation.splitlines())) <= 88
 
 
 def test_clone_factory_repr():
