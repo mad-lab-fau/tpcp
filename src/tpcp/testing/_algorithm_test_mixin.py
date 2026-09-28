@@ -15,6 +15,7 @@ from tpcp import (
     get_results,
     make_action_safe,
 )
+from tpcp._algorithm_utils import ACTION_METHOD_INDICATOR
 from tpcp._base import BaseTpcpObjectT
 from tpcp._hash import custom_hash
 
@@ -180,9 +181,9 @@ class TestAlgorithmMixin(Generic[BaseTpcpObjectT]):
 
     def test_passes_safe_action_checks(self, after_action_instance):
         """Test that the algorithm passes the safe action checks."""
-        # We just wrap the method and call it.
-        # We don't care about the return value
-        make_action_safe(get_action_method(after_action_instance))(
-            after_action_instance,
-            **get_action_params(after_action_instance),
-        )
+        action_method = get_action_method(after_action_instance)
+        action_params = get_action_params(after_action_instance)
+        if getattr(action_method, ACTION_METHOD_INDICATOR, False):
+            action_method(**action_params)
+        else:
+            make_action_safe(action_method)(after_action_instance, **action_params)

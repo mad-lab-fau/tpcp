@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Pass `default_aggregator=mean_agg` to keep the previous mean behavior.
   (https://github.com/mad-lab-fau/tpcp/pull/145)
 
+### Fixed
+
+- Fixed `TestAlgorithmMixin` passing the algorithm instance twice when its action method already uses
+  `@make_action_safe`.
+  (https://github.com/mad-lab-fau/tpcp/pull/146)
+
 ## [2.3.0] - 2026-07-22
 
 ### Added
