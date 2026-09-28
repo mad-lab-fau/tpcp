@@ -123,6 +123,23 @@ class TestDataset:
         assert "hidden_sample" not in representation
         assert "outer_index" not in representation
 
+    def test_repr_puts_simple_custom_parameters_before_nested_ones(self):
+        class ComposedDataset(Dataset):
+            def __init__(self, source, threshold, *, groupby_cols=None, subset_index=None):
+                self.source = source
+                self.threshold = threshold
+                super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
+
+        dataset = ComposedDataset(
+            Dataset(subset_index=pd.DataFrame({"item": [1]})),
+            0.5,
+            subset_index=pd.DataFrame({"item": [1]}),
+        )
+
+        representation = repr(dataset)
+
+        assert representation.index("  threshold: 0.5") < representation.index("  source: Dataset")
+
     def test_repr_summarizes_dataframes_inside_collection_parameters(self):
         class CollectionDataset(Dataset):
             def __init__(self, sources, *, groupby_cols=None, subset_index=None):

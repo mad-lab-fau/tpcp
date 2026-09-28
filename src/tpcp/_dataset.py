@@ -8,7 +8,15 @@ from typing import ClassVar, Generic, Self, TypeVar, cast, get_args, get_origin,
 import numpy as np
 import pandas as pd
 
-from tpcp._base import BaseTpcpObject, _recursive_validate, _repr_limits, _repr_value, _wrap_repr_lines, get_param_names
+from tpcp._base import (
+    BaseTpcpObject,
+    _is_complex_repr_parameter,
+    _recursive_validate,
+    _repr_limits,
+    _repr_value,
+    _wrap_repr_lines,
+    get_param_names,
+)
 from tpcp._hash import custom_hash
 from tpcp.exceptions import ValidationError
 
@@ -17,11 +25,11 @@ DatasetT = TypeVar("DatasetT", bound="_Dataset")
 GroupLabelT = TypeVar("GroupLabelT", bound=tuple[str, ...])
 
 
-def _dataset_repr_parameter(name: str, value: object, depth: int) -> list[str]:
+def _dataset_repr_parameter(name: str, value: object, depth: int, rendered: str | None = None) -> list[str]:
     """Describe one parameter with bounded values and nested object structure."""
     prefix = "  " * depth + name + ": "
-    rendered = _repr_value(value).splitlines()
-    return [prefix + rendered[0], *["  " * depth + line for line in rendered[1:]]]
+    rendered_lines = (rendered if rendered is not None else _repr_value(value)).splitlines()
+    return [prefix + rendered_lines[0], *["  " * depth + line for line in rendered_lines[1:]]]
 
 
 class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
@@ -381,9 +389,14 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
         lines.extend(_dataset_repr_parameter("index", index, 1))
         if self.groupby_cols is not None:
             lines.append(f"  groupby_cols: {_repr_limits.repr(self.groupby_cols)}")
-        for name, value in self.get_params(deep=False).items():
-            if name not in ("groupby_cols", "subset_index"):
-                lines.extend(_dataset_repr_parameter(name, value, 1))
+        parameters = [
+            (name, value, _repr_value(value))
+            for name, value in self.get_params(deep=False).items()
+            if name not in ("groupby_cols", "subset_index")
+        ]
+        parameters.sort(key=lambda item: _is_complex_repr_parameter(item[1], item[2]))
+        for name, value, rendered in parameters:
+            lines.extend(_dataset_repr_parameter(name, value, 1, rendered))
         return _wrap_repr_lines("\n".join(lines))
 
     def __eq__(self, other):
