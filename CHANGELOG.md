@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** Native tpcp splitters now return train and test lists of dataset group labels from `split(dataset)`.
   Replace positional access such as `dataset[train]` with `dataset.get_subset(group_labels=train)`. Raw sklearn
   splitters still work as `cv` arguments to `cross_validate` and `GridSearchCV`.
+- **Breaking:** `Dataset.get_subset(group_labels=...)` now requires group-label tuples with the dataset's grouping
+  arity. For one-column datasets, replace scalar labels such as `["alice"]` with `[("alice",)]`.
 
 - **Breaking:** `Scorer` now uses `numpy.nanmean` for scores without an explicit aggregator, ignoring NaN scores.
   Pass `default_aggregator=mean_agg` to keep the previous mean behavior.

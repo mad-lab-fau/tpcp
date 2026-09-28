@@ -294,10 +294,11 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
         Parameters
         ----------
         group_labels
-            A valid row locator or slice that can be passed to `self.grouped_index.loc[locator, :]`.
-            This basically needs to be a subset of `self.group_labels`.
-            Note that this is the only indexer that works on the grouped index.
-            All other indexers work on the pure index.
+            A list of group-label tuples with one entry per effective grouping column, such as
+            ``[("alice",)]`` for a one-column dataset. Named tuples from ``self.group_labels`` and
+            an empty list are valid. Scalar labels such as ``["alice"]`` are not accepted.
+            This is the only indexer that works on the grouped index. All other indexers work on
+            the pure index.
         index
             `pd.DataFrame` that is a valid subset of the current dataset index.
         bool_map
@@ -320,6 +321,9 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
             raise ValueError("Only one of `group_labels`, `selected_keys`, `index`, `bool_map` or kwarg can be set!")
 
         if group_labels is not None:
+            group_arity = len(self._get_groupby_columns())
+            if any(not isinstance(label, tuple) or len(label) != group_arity for label in group_labels):
+                raise ValueError(f"group_labels must contain tuples with {group_arity} entries each.")
             grouped_index = self.grouped_index
             # A one-column grouped index is a pandas Index of scalars, while group labels are one-item tuples.
             locator = (
