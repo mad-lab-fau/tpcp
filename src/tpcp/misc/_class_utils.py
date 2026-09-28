@@ -91,7 +91,7 @@ def set_defaults(**defaults: Unpack[dict[str, Any]]) -> Callable[[Callable[P, R]
             for name, (kind, default) in zip(
                 sig.parameters,
                 [(p.kind, defaults.get(p.name, p.default)) for p in sig.parameters.values()],
-                strict=False,
+                strict=True,
             )
         ]
 

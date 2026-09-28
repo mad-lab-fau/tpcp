@@ -148,14 +148,14 @@ class TestCrossValidate:
 
         # We use len(ds) splits, effectively a leave one out CV for testing.
         cv = KFold(n_splits=len(ds))
-        train, test = zip(*cv.split(ds))
+        train, test = zip(*cv.split(ds), strict=True)
         with patch.object(DummyOptimizablePipeline, "self_optimize", return_value=pipeline) as mock:
             mock.__name__ = "self_optimize"
             mock.__self__ = "bla"  # We simulate a bound method
             cross_validate(Optimize(pipeline), ds, cv=cv, scoring=lambda x, y: 1)
 
         assert mock.call_count == len(train)
-        for expected, actual in zip(train, mock.call_args_list):
+        for expected, actual in zip(train, mock.call_args_list, strict=True):
             pd.testing.assert_frame_equal(ds[expected].index, actual[0][0].index)
 
     def test_run_called(self):
@@ -170,13 +170,13 @@ class TestCrossValidate:
 
         # We want to have two datapoints in the test set sometimes
         cv = KFold(n_splits=len(ds) // 2)
-        train, test = zip(*cv.split(ds))
+        train, test = zip(*cv.split(ds), strict=True)
         with patch.object(DummyOptimizablePipeline, "run", return_value=pipeline) as mock:
             cross_validate(Optimize(pipeline), ds, cv=cv, scoring=scoring)
 
         test_flat = [t for split in test for t in split]
         assert mock.call_count == len(test_flat)
-        for expected, actual in zip(test_flat, mock.call_args_list):
+        for expected, actual in zip(test_flat, mock.call_args_list, strict=True):
             pd.testing.assert_frame_equal(ds[expected].index, actual[0][0].index)
 
     @pytest.mark.parametrize(
@@ -342,7 +342,7 @@ class TestTpcpSplitter:
 
         splits = list(splitter.split(ds))
 
-        for (train_expected, test_expected), (train, test) in zip(splits_expected, splits):
+        for (train_expected, test_expected), (train, test) in zip(splits_expected, splits, strict=True):
             assert train_expected.tolist() == train.tolist()
             assert test_expected.tolist() == test.tolist()
 
@@ -358,7 +358,7 @@ class TestTpcpSplitter:
 
         splits_expected = list(KFold(n_splits=5).split(ds))
 
-        for (train_expected, test_expected), (train, test) in zip(splits_expected, splits):
+        for (train_expected, test_expected), (train, test) in zip(splits_expected, splits, strict=True):
             assert train_expected.tolist() == train.tolist()
             assert test_expected.tolist() == test.tolist()
 
@@ -370,7 +370,7 @@ class TestTpcpSplitter:
 
         splits = list(splitter.split(ds))
 
-        for (train_expected, test_expected), (train, test) in zip(splits_expected, splits):
+        for (train_expected, test_expected), (train, test) in zip(splits_expected, splits, strict=True):
             assert train_expected.tolist() == train.tolist()
             assert test_expected.tolist() == test.tolist()
 
@@ -382,7 +382,7 @@ class TestTpcpSplitter:
 
         splits = list(splitter.split(ds))
 
-        for (train_expected, test_expected), (train, test) in zip(splits_expected, splits):
+        for (train_expected, test_expected), (train, test) in zip(splits_expected, splits, strict=True):
             assert train_expected.tolist() == train.tolist()
             assert test_expected.tolist() == test.tolist()
 

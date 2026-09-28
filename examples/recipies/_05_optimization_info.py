@@ -87,7 +87,7 @@ class OptimizableQrsDetectorWithInfo(QRSDetector):
     ) -> tuple[Self, dict[str, np.ndarray]]:
         all_labels = []
         all_peak_heights = []
-        for d, p in zip(ecg_data, r_peaks, strict=False):
+        for d, p in zip(ecg_data, r_peaks, strict=True):
             filtered = self._filter(d.to_numpy().flatten(), sampling_rate_hz)
             # Find all potential peaks without the height threshold
             potential_peaks = self._search_strategy(
