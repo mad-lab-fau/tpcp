@@ -22,11 +22,13 @@ Functions
     remove_any_cache
     get_ram_cache_obj
 
-Fast best-effort hashing
+Choosing a hashing mode
 -----------------------
 
-``hybrid_cache`` retains its existing hashing by default. For large numeric inputs,
-opt in to faster hashing for both RAM and disk lookups:
+``hybrid_cache`` identifies cached calls by hashing their arguments. The default
+mode uses MD5 with pickle-based object traversal, including pandas storage details.
+For large numeric inputs, set ``fast_inaccurate_hashing=True`` to use faster,
+best-effort content hashing for both RAM and disk lookups:
 
 .. code-block:: python
 
@@ -41,25 +43,31 @@ opt in to faster hashing for both RAM and disk lookups:
     def extract_features(data):
         return data.mean()
 
-Fast mode uses XXH3-128 and reads all numeric values. Homogeneous numeric pandas
-DataFrames are hashed by values, shape, dtypes, ordered columns, index, and
-``attrs``; their internal memory layout is ignored. Other objects, including
-object and extension dtypes, use the existing serialization with the faster
-digest. NumPy arrays retain joblib's dtype, shape, and stride handling.
+Both modes use pickle-based object traversal with joblib's direct buffer handling
+for numeric NumPy arrays. Fast mode uses XXH3-128 instead of MD5 and reads all
+values without sampling. Arrays and DataFrames keep their storage representation;
+changing between row-major and column-major layout can produce a different key.
 
-This is a best-effort content check. Unusual representation or metadata differences
-may be missed and can lead to an incorrect cache hit. Use the default when those
-differences matter to the cached function. Fast disk entries have their own key
-version and do not reuse default entries. Joblib still checks the original
-function's code for disk-cache invalidation.
+XXH3-128 is a non-cryptographic hash suited to fast content checks on trusted data.
+Hashes are a best-effort check, not a guarantee of object equality. The two modes
+use separate disk cache entries.
 
-Fast RAM keys are computed once per argument on each call, so mutations between
-calls cause a new lookup. A RAM miss hashes the arguments again for disk lookup.
-As with ordinary caching, avoid modifying arguments while a call is running or
-mutating cached return values. RAM entries retain the existing cache lifecycle;
-clear/recreate RAM caches when changing the function implementation.
+Cache lifetime and mutations
+----------------------------
 
-Algorithm safety checks use :func:`tpcp.misc.custom_hash`, which now enables fast
-hashing automatically. Its default digest values have changed. Pass
-``hash_name="md5"`` explicitly when comparing against fingerprints from the old
-implementation; explicit ``hash_name="sha1"`` also retains its previous behavior.
+Fast RAM keys are computed once per argument on each call. Changes to hashed
+values or metadata between calls cause a new lookup. A RAM miss hashes the
+arguments again for disk lookup. Avoid modifying arguments while a call is running
+or mutating cached return values.
+
+Joblib checks the function's code when looking up disk entries and invalidates
+results when that code changes. Clear and recreate RAM caches after changing the
+function implementation.
+
+Hashing for safety checks
+-------------------------
+
+Algorithm safety checks use :func:`tpcp.misc.custom_hash`, which uses fast,
+best-effort hashing by default. To select MD5 or SHA1 with the same object
+traversal, pass
+``hash_name="md5"`` or ``hash_name="sha1"``.

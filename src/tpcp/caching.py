@@ -565,11 +565,11 @@ def hybrid_cache(
         If False, no lru_cache is used.
 
     fast_inaccurate_hashing
-        Opt in to fast, best-effort content hashing for both cache tiers. This uses
-        :func:`~tpcp.misc.custom_hash`, including its numeric DataFrame fast path,
-        with normal serialization for unsupported objects. All values are read,
-        but unusual metadata or representation differences may be missed, which
-        can return an incorrect cached result. The default retains legacy hashing.
+        Use XXH3-128 via :func:`~tpcp.misc.custom_hash` for both cache tiers.
+        The default uses MD5. Both modes use pickle-based object traversal with
+        direct buffer handling for numeric arrays and read all values without
+        sampling. Array and DataFrame storage layouts are not normalized.
+        Hashes provide a best-effort content check, not a guarantee of equality.
         Fast disk entries are separate from default entries. RAM keys are computed
         once per call; a RAM miss hashes arguments again for the disk lookup.
 
