@@ -343,8 +343,8 @@ class TestTpcpSplitter:
         splits = list(splitter.split(ds))
 
         for (train_expected, test_expected), (train, test) in zip(splits_expected, splits, strict=True):
-            assert train_expected.tolist() == train.tolist()
-            assert test_expected.tolist() == test.tolist()
+            assert train == [ds.group_labels[i] for i in train_expected]
+            assert test == [ds.group_labels[i] for i in test_expected]
 
     @pytest.mark.parametrize("provide", ["groupby", "stratify"])
     def test_normal_k_fold_with_groupby_and_stratified_ignored(self, provide):
@@ -359,8 +359,8 @@ class TestTpcpSplitter:
         splits_expected = list(KFold(n_splits=5).split(ds))
 
         for (train_expected, test_expected), (train, test) in zip(splits_expected, splits, strict=True):
-            assert train_expected.tolist() == train.tolist()
-            assert test_expected.tolist() == test.tolist()
+            assert train == [ds.group_labels[i] for i in train_expected]
+            assert test == [ds.group_labels[i] for i in test_expected]
 
     def test_normal_group_k_fold(self):
         ds = DummyGroupedDataset()
@@ -371,8 +371,8 @@ class TestTpcpSplitter:
         splits = list(splitter.split(ds))
 
         for (train_expected, test_expected), (train, test) in zip(splits_expected, splits, strict=True):
-            assert train_expected.tolist() == train.tolist()
-            assert test_expected.tolist() == test.tolist()
+            assert train == [ds.group_labels[i] for i in train_expected]
+            assert test == [ds.group_labels[i] for i in test_expected]
 
     def test_normal_stratified_k_fold(self):
         ds = DummyGroupedDataset()
@@ -383,8 +383,14 @@ class TestTpcpSplitter:
         splits = list(splitter.split(ds))
 
         for (train_expected, test_expected), (train, test) in zip(splits_expected, splits, strict=True):
-            assert train_expected.tolist() == train.tolist()
-            assert test_expected.tolist() == test.tolist()
+            assert train == [ds.group_labels[i] for i in train_expected]
+            assert test == [ds.group_labels[i] for i in test_expected]
+
+    def test_positional_splits_use_current_dataset_order(self):
+        ds = DummyDataset()[[4, 1, 3, 0, 2]]
+        train, test = next(DatasetSplitter(KFold(n_splits=5)).split(ds))
+        assert train == [(1,), (3,), (0,), (2,)]
+        assert test == [(4,)]
 
     def test_auto_selection_group_k_fold(self):
         splitter = DatasetSplitter(base_splitter=None, groupby="v1")

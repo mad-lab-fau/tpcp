@@ -238,7 +238,7 @@ cv = DatasetSplitter(
 
 for train, test in cv.split(final_subset):
     # We only print the train set here
-    print(final_subset[train], end="\n\n")
+    print(final_subset.get_subset(group_labels=train), end="\n\n")
 
 
 # %%

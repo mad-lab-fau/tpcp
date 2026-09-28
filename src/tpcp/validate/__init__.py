@@ -1,6 +1,6 @@
 """Module for all helper methods to evaluate algorithms."""
 
-from tpcp.validate._cross_val_helper import DatasetSplitter
+from tpcp.validate._cross_val_helper import BaseDatasetSplitter, DatasetSplitter
 from tpcp.validate._scorer import (
     Aggregator,
     FloatAggregator,
@@ -14,6 +14,7 @@ from tpcp.validate._validate import cross_validate, validate
 
 __all__ = [
     "Aggregator",
+    "BaseDatasetSplitter",
     "DatasetSplitter",
     "FloatAggregator",
     "MacroFloatAggregator",

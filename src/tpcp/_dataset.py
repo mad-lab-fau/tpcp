@@ -320,7 +320,12 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
             raise ValueError("Only one of `group_labels`, `selected_keys`, `index`, `bool_map` or kwarg can be set!")
 
         if group_labels is not None:
-            return self.clone().set_params(subset_index=self.grouped_index.loc[group_labels, :].reset_index(drop=True))
+            grouped_index = self.grouped_index
+            # A one-column grouped index is a pandas Index of scalars, while group labels are one-item tuples.
+            locator = (
+                group_labels if isinstance(grouped_index.index, pd.MultiIndex) else [label[0] for label in group_labels]
+            )
+            return self.clone().set_params(subset_index=grouped_index.loc[locator, :].reset_index(drop=True))
 
         if index is not None:
             if len(index) == 0:

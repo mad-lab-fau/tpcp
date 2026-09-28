@@ -15,7 +15,7 @@ from tpcp._utils._general import _aggregate_final_results, _normalize_score_resu
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.misc import iter_with_warning_error_context
 from tpcp.parallel import Parallel, delayed
-from tpcp.validate._cross_val_helper import DatasetSplitter
+from tpcp.validate._cross_val_helper import BaseDatasetSplitter, _normalize_splitter
 from tpcp.validate._scorer import ScoreFunc, Scorer, ScorerTypes, _validate_scorer
 
 
@@ -24,7 +24,7 @@ def cross_validate(
     dataset: DatasetT,
     *,
     scoring: ScoreFunc[PipelineT, DatasetT],
-    cv: DatasetSplitter | int | BaseCrossValidator | Iterator | None = None,
+    cv: BaseDatasetSplitter | int | BaseCrossValidator | Iterator | None = None,
     n_jobs: int | None = None,
     verbose: int = 0,
     optimize_params: dict[str, Any] | None = None,
@@ -115,7 +115,7 @@ def cross_validate(
     """
     scoring = _validate_scorer(scoring)
 
-    cv = cv if isinstance(cv, DatasetSplitter) else DatasetSplitter(base_splitter=cv)
+    cv = _normalize_splitter(cv)
 
     splits = list(cv.split(dataset))
 
@@ -130,8 +130,8 @@ def cross_validate(
                     # independent, and that it is pickle-able.
                     optimizable.clone(),
                     scoring,
-                    dataset[train],
-                    dataset[test],
+                    dataset.get_subset(group_labels=train),
+                    dataset.get_subset(group_labels=test),
                     optimize_params=optimize_params,
                     hyperparameters=None,
                     pure_parameters=None,
