@@ -156,9 +156,9 @@ class TestAlgorithmMixin(Generic[BaseTpcpObjectT]):
         instance = after_action_instance.clone()
         valid_names = get_param_names(instance)
         values = list(range(len(valid_names)))
-        instance.set_params(**dict(zip(valid_names, values, strict=False)))
+        instance.set_params(**dict(zip(valid_names, values, strict=True)))
 
-        for k, v in zip(valid_names, values, strict=False):
+        for k, v in zip(valid_names, values, strict=True):
             assert getattr(instance, k) == v, k
 
     def test_set_params_invalid(self, after_action_instance):

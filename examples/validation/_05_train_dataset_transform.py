@@ -191,7 +191,7 @@ rotations = [
 ]
 fig, axes = plt.subplots(1, 4, figsize=(7, 2))
 for datapoint, angle, axis in zip(
-    rotations, (0, 90, 180, 270), axes, strict=False
+    rotations, (0, 90, 180, 270), axes, strict=True
 ):
     axis.imshow(datapoint.image, cmap="gray", vmin=0, vmax=1)
     axis.set_title(f"{angle}°")

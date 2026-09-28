@@ -114,7 +114,9 @@ class ECGExampleData(Dataset[ECGExampleDataGroupLabel]):
         patient_group = [
             g
             for g, _ in zip(
-                cycle(("group_1", "group_2", "group_3")), participant_ids
+                cycle(("group_1", "group_2", "group_3")),
+                participant_ids,
+                strict=False,
             )
         ]
         df = pd.DataFrame(

@@ -811,7 +811,7 @@ class GridSearchCV(
             tmp_cache = Memory(cachedir, verbose=self.verbose) if cachedir else None
 
             def tasks():
-                parameter_iterations = iter_with_warning_error_context(zip(split_parameters, parameters, strict=False))
+                parameter_iterations = iter_with_warning_error_context(zip(split_parameters, parameters, strict=True))
                 for make_candidate_context, ((hyper_paras, pure_paras), parameter) in parameter_iterations:
                     for make_fold_context, (train, test) in iter_with_warning_error_context(splits):
                         with (
@@ -912,7 +912,7 @@ class GridSearchCV(
             iterable_array = iter(array)
             array = [[next(iterable_array) for _ in range(n_splits)] for _ in range(n_candidates)]
             # "Transpose" the array
-            array = map(list, zip(*array, strict=False))
+            array = map(list, zip(*array, strict=True))
 
             for split_idx, split in enumerate(array):
                 # Uses closure to alter the results

@@ -37,7 +37,7 @@ class TestScorerCalls:
         scorer(pipeline=pipe, dataset=DummyDataset())
 
         assert mock_score_func.call_count == len(DummyDataset())
-        for call, d in zip(mock_score_func.call_args_list, DummyDataset()):
+        for call, d in zip(mock_score_func.call_args_list, DummyDataset(), strict=True):
             assert call[0][1].group_labels == d.group_labels
             assert isinstance(call[0][0], DummyOptimizablePipeline)
             # Check that the pipeline was cloned before calling
@@ -144,7 +144,7 @@ class TestScorer:
         scorer(pipeline=pipe, dataset=DummyDataset())
 
         assert mock_callback.call_count == len(DummyDataset())
-        for call, i in zip(mock_callback.call_args_list, range(len(DummyDataset()))):
+        for call, i in zip(mock_callback.call_args_list, range(len(DummyDataset())), strict=True):
             assert call[0] == ()
             kwargs = call[1]
             assert kwargs.pop("scorer") == scorer
@@ -570,7 +570,7 @@ class TestCustomAggregator:
         _ = scorer(pipe, data)
         assert mock_method.call_count == 1
         for v_real, d_real, d_exp in zip(
-            mock_method.call_args[1]["values"], mock_method.call_args[1]["datapoints"], data
+            mock_method.call_args[1]["values"], mock_method.call_args[1]["datapoints"], data, strict=True
         ):
             assert_frame_equal(d_real.index, d_exp.index)
             assert_frame_equal(v_real.index, d_exp.index)
