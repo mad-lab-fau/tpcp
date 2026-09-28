@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from sklearn.model_selection import GroupKFold, KFold
 
-from tpcp import Dataset
+from tpcp import BaseTpcpObject, Dataset
 from tpcp.exceptions import ValidationError
 
 
@@ -81,6 +81,101 @@ class TestDataset:
 
         valid_dataset = TypedDataset(subset_index=pd.DataFrame({"participant": ["p1"], "test": ["a"]}))
         assert valid_dataset.group_label.participant == "p1"
+
+    @pytest.mark.parametrize("dataset_type", [Dataset.as_dataclass(), Dataset.as_attrs()])
+    def test_repr_of_generated_dataset_types(self, dataset_type):
+        dataset = dataset_type(subset_index=pd.DataFrame({"item": ["hidden"]}))
+
+        representation = repr(dataset)
+
+        assert f"{dataset_type.__name__} [1 row]" in representation
+        assert "index: DataFrame(shape=(1, 1), columns=['item'])" in representation
+        assert "hidden" not in representation
+
+    def test_repr_summarizes_index_and_grouping(self):
+        index = pd.DataFrame({"patient": ["private_patient"] * 100, "trial": range(100)})
+        dataset = Dataset(subset_index=index, groupby_cols="patient")
+
+        representation = repr(dataset)
+
+        assert "Dataset [1 group / 100 rows]" in representation
+        assert "index: DataFrame(shape=(100, 2), columns=['patient', 'trial'])" in representation
+        assert "groupby_cols: 'patient'" in representation
+        assert "private_patient" not in representation
+
+    def test_repr_shows_nested_dataset_and_summarizes_data_parameters(self):
+        class ComposedDataset(Dataset):
+            def __init__(self, source, samples, *, groupby_cols=None, subset_index=None):
+                self.source = source
+                self.samples = samples
+                super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
+
+        source = Dataset(subset_index=pd.DataFrame({"item": ["hidden_index"]}))
+        samples = pd.DataFrame({"signal": ["hidden_sample"] * 1000})
+        dataset = ComposedDataset(source, samples, subset_index=pd.DataFrame({"item": ["outer_index"]}))
+
+        representation = repr(dataset)
+
+        assert "ComposedDataset [1 row]" in representation
+        assert "source: Dataset [1 row]" in representation
+        assert "samples: DataFrame(shape=(1000, 1), columns=['signal'])" in representation
+        assert "hidden_index" not in representation
+        assert "hidden_sample" not in representation
+        assert "outer_index" not in representation
+
+    def test_repr_summarizes_dataframes_inside_collection_parameters(self):
+        class CollectionDataset(Dataset):
+            def __init__(self, sources, *, groupby_cols=None, subset_index=None):
+                self.sources = sources
+                super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
+
+        dataset = CollectionDataset(
+            [pd.DataFrame({"signal": ["hidden_signal"] * 100})],
+            subset_index=pd.DataFrame({"item": [1]}),
+        )
+
+        representation = repr(dataset)
+
+        assert "sources: list[1]" in representation
+        assert "DataFrame(shape=(100, 1), columns=['signal'])" in representation
+        assert "hidden_signal" not in representation
+
+    def test_repr_bounds_series_names(self):
+        class SeriesDataset(Dataset):
+            def __init__(self, samples, *, groupby_cols=None, subset_index=None):
+                self.samples = samples
+                super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
+
+        long_name = "sensitive_" * 100
+        dataset = SeriesDataset(
+            pd.Series([1], name=long_name),
+            subset_index=pd.DataFrame({"item": [1]}),
+        )
+
+        representation = repr(dataset)
+
+        assert "samples: Series(shape=(1,), name=" in representation
+        assert long_name not in representation
+
+    def test_repr_shows_nested_tpcp_object_structure(self):
+        class Source(BaseTpcpObject):
+            def __init__(self, table):
+                self.table = table
+
+        class SourceDataset(Dataset):
+            def __init__(self, source, *, groupby_cols=None, subset_index=None):
+                self.source = source
+                super().__init__(groupby_cols=groupby_cols, subset_index=subset_index)
+
+        dataset = SourceDataset(
+            Source(pd.DataFrame({"signal": ["hidden_signal"] * 100})),
+            subset_index=pd.DataFrame({"item": [1]}),
+        )
+
+        representation = repr(dataset)
+
+        assert "source: Source\n    table: DataFrame(shape=(100, 1), columns=['signal'])" in representation
+        assert "hidden_signal" not in representation
 
     def test_grouping_materialized_during_index_creation_applies_immediately(self):
         class LazyGroupedDataset(Dataset):

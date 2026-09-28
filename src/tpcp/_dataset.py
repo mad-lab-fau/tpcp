@@ -2,7 +2,9 @@
 
 import warnings
 from collections.abc import Iterator, Sequence
+from itertools import islice
 from keyword import iskeyword
+from reprlib import Repr
 from typing import ClassVar, Generic, Self, TypeVar, cast, get_args, get_origin, overload
 
 import numpy as np
@@ -15,6 +17,50 @@ from tpcp.exceptions import ValidationError
 DatasetT = TypeVar("DatasetT", bound="_Dataset")
 
 GroupLabelT = TypeVar("GroupLabelT", bound=tuple[str, ...])
+
+
+_repr_limits = Repr()
+_repr_limits.maxstring = 80
+
+
+def _data_summary(value: object) -> str | None:
+    """Describe tabular and array data without inspecting its values."""
+    if isinstance(value, pd.DataFrame):
+        columns = ", ".join(_repr_limits.repr(column) for column in islice(value.columns, 6))
+        if len(value.columns) > 6:
+            columns += ", ..."
+        return f"DataFrame(shape={value.shape}, columns=[{columns}])"
+    if isinstance(value, pd.Series):
+        return f"Series(shape={value.shape}, name={_repr_limits.repr(value.name)}, dtype={value.dtype})"
+    if isinstance(value, pd.Index):
+        return f"Index(shape={value.shape}, dtype={value.dtype})"
+    if isinstance(value, np.ndarray):
+        return f"ndarray(shape={value.shape}, dtype={value.dtype})"
+    return None
+
+
+def _dataset_repr_parameter(name: str, value: object, depth: int) -> list[str]:
+    """Describe one parameter with bounded values and nested object structure."""
+    prefix = "  " * depth + name + ": "
+    if (summary := _data_summary(value)) is not None:
+        return [prefix + summary]
+    if isinstance(value, _Dataset):
+        nested = repr(value).splitlines()
+        return [prefix + nested[0], *["  " * depth + line for line in nested[1:]]]
+    if isinstance(value, BaseTpcpObject):
+        lines = [prefix + type(value).__name__]
+        for child_name, child_value in value.get_params(deep=False).items():
+            lines.extend(_dataset_repr_parameter(child_name, child_value, depth + 1))
+        return lines
+    if isinstance(value, (list, tuple, dict)):
+        items = value.items() if isinstance(value, dict) else enumerate(value)
+        lines = [prefix + f"{type(value).__name__}[{len(value)}]"]
+        for key, child in islice(items, 5):
+            lines.extend(_dataset_repr_parameter(_repr_limits.repr(key), child, depth + 1))
+        if len(value) > 5:
+            lines.append("  " * (depth + 1) + f"... ({len(value) - 5} more)")
+        return lines
+    return [prefix + _repr_limits.repr(value)]
 
 
 class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
@@ -361,10 +407,23 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
         )
 
     def __repr__(self) -> str:
-        """Return string representation of the dataset object."""
-        repr_index = self.index if self.groupby_cols is None else self.grouped_index
-        repr_index = str(repr_index).replace("\n", "\n   ")
-        return f"{self.__class__.__name__} [{self.shape[0]} groups/rows]\n\n   {repr_index}\n\n   "[:-5]
+        """Show the dataset's composition without printing index or data values."""
+        index = self.index
+        rows = len(index)
+        groups = len(self._get_unique_groups())
+        if self.groupby_cols is None and groups == rows:
+            count = f"{rows} {'row' if rows == 1 else 'rows'}"
+        else:
+            count = f"{groups} {'group' if groups == 1 else 'groups'} / {rows} {'row' if rows == 1 else 'rows'}"
+
+        lines = [f"{type(self).__name__} [{count}]"]
+        lines.extend(_dataset_repr_parameter("index", index, 1))
+        if self.groupby_cols is not None:
+            lines.append(f"  groupby_cols: {_repr_limits.repr(self.groupby_cols)}")
+        for name, value in self.get_params(deep=False).items():
+            if name not in ("groupby_cols", "subset_index"):
+                lines.extend(_dataset_repr_parameter(name, value, 1))
+        return "\n".join(lines)
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
@@ -592,93 +651,47 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
     >>> # index.
     >>> dataset = Dataset(subset_index=test_index)
     >>> dataset
-    Dataset [12 groups/rows]
-    <BLANKLINE>
-             patient    test extra
-       0   patient_1  test_1     1
-       1   patient_1  test_1     2
-       2   patient_1  test_2     1
-       3   patient_1  test_2     2
-       4   patient_2  test_1     1
-       5   patient_2  test_1     2
-       6   patient_2  test_2     1
-       7   patient_2  test_2     2
-       8   patient_3  test_1     1
-       9   patient_3  test_1     2
-       10  patient_3  test_2     1
-       11  patient_3  test_2     2
+    Dataset [12 rows]
+      index: DataFrame(shape=(12, 3), columns=['patient', 'test', 'extra'])
 
     We can loop over the dataset.
     By default, we will loop over each row.
 
     >>> for r in dataset[:2]:
     ...     print(r)
-    Dataset [1 groups/rows]
-    <BLANKLINE>
-            patient    test extra
-       0  patient_1  test_1     1
-    Dataset [1 groups/rows]
-    <BLANKLINE>
-            patient    test extra
-       0  patient_1  test_1     2
+    Dataset [1 row]
+      index: DataFrame(shape=(1, 3), columns=['patient', 'test', 'extra'])
+    Dataset [1 row]
+      index: DataFrame(shape=(1, 3), columns=['patient', 'test', 'extra'])
 
     We can also change `groupby` (either in the init or afterwards), to loop over other combinations.
     If we select the level `test`, we will loop over all `patient`-`test` combinations.
 
     >>> grouped_dataset = dataset.groupby(["patient", "test"])
     >>> grouped_dataset  # doctest: +NORMALIZE_WHITESPACE
-    Dataset [6 groups/rows]
-    <BLANKLINE>
-                           patient    test extra
-       patient   test
-       patient_1 test_1  patient_1  test_1     1
-                 test_1  patient_1  test_1     2
-                 test_2  patient_1  test_2     1
-                 test_2  patient_1  test_2     2
-       patient_2 test_1  patient_2  test_1     1
-                 test_1  patient_2  test_1     2
-                 test_2  patient_2  test_2     1
-                 test_2  patient_2  test_2     2
-       patient_3 test_1  patient_3  test_1     1
-                 test_1  patient_3  test_1     2
-                 test_2  patient_3  test_2     1
-                 test_2  patient_3  test_2     2
+    Dataset [6 groups / 12 rows]
+      index: DataFrame(shape=(12, 3), columns=['patient', 'test', 'extra'])
+      groupby_cols: ['patient', 'test']
 
     >>> for r in grouped_dataset[:2]:
     ...     print(r)  # doctest: +NORMALIZE_WHITESPACE
-    Dataset [1 groups/rows]
-    <BLANKLINE>
-                           patient    test extra
-       patient   test
-       patient_1 test_1  patient_1  test_1     1
-                 test_1  patient_1  test_1     2
-    Dataset [1 groups/rows]
-    <BLANKLINE>
-                           patient    test extra
-       patient   test
-       patient_1 test_2  patient_1  test_2     1
-                 test_2  patient_1  test_2     2
+    Dataset [1 group / 2 rows]
+      index: DataFrame(shape=(2, 3), columns=['patient', 'test', 'extra'])
+      groupby_cols: ['patient', 'test']
+    Dataset [1 group / 2 rows]
+      index: DataFrame(shape=(2, 3), columns=['patient', 'test', 'extra'])
+      groupby_cols: ['patient', 'test']
 
     To iterate over the unique values of a specific level use the "iter_level" function:
 
     >>> for r in list(grouped_dataset.iter_level("patient"))[:2]:
     ...     print(r)  # doctest: +NORMALIZE_WHITESPACE
-    Dataset [2 groups/rows]
-    <BLANKLINE>
-                           patient    test extra
-       patient   test
-       patient_1 test_1  patient_1  test_1     1
-                 test_1  patient_1  test_1     2
-                 test_2  patient_1  test_2     1
-                 test_2  patient_1  test_2     2
-    Dataset [2 groups/rows]
-    <BLANKLINE>
-                           patient    test extra
-       patient   test
-       patient_2 test_1  patient_2  test_1     1
-                 test_1  patient_2  test_1     2
-                 test_2  patient_2  test_2     1
-                 test_2  patient_2  test_2     2
+    Dataset [2 groups / 4 rows]
+      index: DataFrame(shape=(4, 3), columns=['patient', 'test', 'extra'])
+      groupby_cols: ['patient', 'test']
+    Dataset [2 groups / 4 rows]
+      index: DataFrame(shape=(4, 3), columns=['patient', 'test', 'extra'])
+      groupby_cols: ['patient', 'test']
 
     We can also get arbitary subsets from the dataset:
 
@@ -686,14 +699,9 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
     ...     patient=["patient_1", "patient_2"], extra="2"
     ... )
     >>> subset  # doctest: +NORMALIZE_WHITESPACE
-    Dataset [4 groups/rows]
-    <BLANKLINE>
-                           patient    test extra
-       patient   test
-       patient_1 test_1  patient_1  test_1     2
-                 test_2  patient_1  test_2     2
-       patient_2 test_1  patient_2  test_1     2
-                 test_2  patient_2  test_2     2
+    Dataset [4 groups / 4 rows]
+      index: DataFrame(shape=(4, 3), columns=['patient', 'test', 'extra'])
+      groupby_cols: ['patient', 'test']
 
     If we want to use datasets in combination with :class:`~sklearn.model_selection.GroupKFold`, we can generate
     valid group labels as follows.

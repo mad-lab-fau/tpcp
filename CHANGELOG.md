@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GridSearchCV`.
   (https://github.com/mad-lab-fau/tpcp/pull/148)
 
+- **Breaking, approved dataset representation change:** `repr(dataset)` now shows index dimensions, grouping,
+  and nested parameters instead of index row values. Use `dataset.index` to inspect rows. The Jupyter HTML
+  representation still displays the table.
+  (https://github.com/mad-lab-fau/tpcp/issues/11)
 - **Breaking:** `Scorer` now uses `numpy.nanmean` for scores without an explicit aggregator, ignoring NaN scores.
   Pass `default_aggregator=mean_agg` to keep the previous mean behavior.
   (https://github.com/mad-lab-fau/tpcp/pull/145)
