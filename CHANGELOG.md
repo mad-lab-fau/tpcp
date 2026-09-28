@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added an ECG example showing how `PureParameter` lets `GridSearchCV` reuse training across
+  postprocessing parameter values.
+  (https://github.com/mad-lab-fau/tpcp/pull/155)
 - `GridSearchCV` and the default final optimization of `CustomOptunaOptimize` now expose the information returned by
   `self_optimize_with_info` as `optimization_info_`.
   (https://github.com/mad-lab-fau/tpcp/pull/153)
