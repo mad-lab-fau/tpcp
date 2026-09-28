@@ -44,7 +44,8 @@ from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.misc import iter_with_warning_error_context
 from tpcp.parallel import Parallel, delayed
-from tpcp.validate import DatasetSplitter
+from tpcp.validate import BaseDatasetSplitter
+from tpcp.validate._cross_val_helper import _normalize_splitter
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
 
 if TYPE_CHECKING:
@@ -567,7 +568,7 @@ class GridSearchCV(
         For further inputs check the `sklearn` `documentation
         <https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_validate.html>`_.
 
-        For more complex usecases like grouping or stratification, the :class:`~tpcp.TpcpSplitter` can be used.
+        For grouping or stratification, use :class:`~tpcp.validate.DatasetSplitter`.
     train_dataset_transform
         An optional callable that transforms each training dataset after splitting and immediately before
         `self_optimize` is called. The callable must return a dataset implementing the same interface as its input.
@@ -707,7 +708,7 @@ class GridSearchCV(
     parameter_grid: ParameterGrid
     scoring: ScorerTypes[OptimizablePipelineT, DatasetT]
     return_optimized: bool | str
-    cv: DatasetSplitter | int | BaseCrossValidator | Iterator | None
+    cv: BaseDatasetSplitter | int | BaseCrossValidator | Iterator | None
     train_dataset_transform: Callable[[DatasetT], DatasetT] | None
     pure_parameters: bool | list[str]
     return_train_score: bool
@@ -732,7 +733,7 @@ class GridSearchCV(
         *,
         scoring: ScorerTypes[OptimizablePipelineT, DatasetT],
         return_optimized: bool | str = True,
-        cv: int | BaseCrossValidator | Iterator | None = None,
+        cv: BaseDatasetSplitter | int | BaseCrossValidator | Iterator | None = None,
         train_dataset_transform: Callable[[DatasetT], DatasetT] | None = None,
         pure_parameters: bool | list[str] = False,
         return_train_score: bool = False,
@@ -770,7 +771,7 @@ class GridSearchCV(
 
         scoring = _validate_scorer(self.scoring)
 
-        cv = self.cv if isinstance(self.cv, DatasetSplitter) else DatasetSplitter(self.cv)
+        cv = _normalize_splitter(self.cv)
 
         n_splits = cv.get_n_splits(dataset)
 
@@ -822,8 +823,8 @@ class GridSearchCV(
                             task = delayed(_optimize_and_score)(
                                 optimizer.clone(),
                                 scoring,
-                                dataset[train],
-                                dataset[test],
+                                dataset.get_subset(group_labels=train),
+                                dataset.get_subset(group_labels=test),
                                 optimize_params=optimize_params,
                                 hyperparameters=_prefix_para_dict(hyper_paras, parameter_prefix),
                                 pure_parameters=_prefix_para_dict(pure_paras, parameter_prefix),
