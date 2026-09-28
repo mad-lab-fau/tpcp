@@ -533,26 +533,11 @@ def hybrid_cache(
     *,
     fast_inaccurate_hashing: bool = False,
 ):
-    """Cache a function using joblib memory and a lru cache at the same time.
+    """Cache function results in memory and on disk.
 
-    This function attempts to be the best of both worlds and uses joblib.Memory to cache function calls between runs
-    and a lru_cache to cache function calls during a run.
-
-    When the cached function is called, the lookup will work as follows:
-
-    1. Is the function result in the lrucache? If yes, return it.
-    2. Is the function result in the joblib memory? If yes, return it and cache it in the lru cache.
-    3. Call the function and cache it in the joblib memory and the lru cache. Return the result.
-
-    It further solves one of the issues that you might run into with ``lru_cache``, that it is difficult to create a
-    wrapped function during runtime, as calling ``lru_cache`` directly will create a new cache for each call.
-    We work around this by using a global cache that stores the wrapped functions.
-    The cache key is a tuple of the function name and a hash of the function, the joblib memory and the lru_cache paras.
-    This means, if you create a new cache with different cache parameters, you will get a new cache, but if you call
-    ``staggered_cache`` with the same parameters, you will get the same object back.
-
-    You can access this global cache via the ``__cache_registry__`` attribute of this function
-    (``staggered_cache.__cache_registry__``).
+    The RAM cache reuses results during a run; the disk cache reuses saved results
+    across runs. Calls check RAM first, then disk, and run the function if neither
+    cache has a matching result.
 
     Parameters
     ----------
@@ -565,13 +550,10 @@ def hybrid_cache(
         If False, no lru_cache is used.
 
     fast_inaccurate_hashing
-        Use XXH3-128 via :func:`~tpcp.misc.custom_hash` for both cache tiers.
-        The default uses MD5. Both modes use pickle-based object traversal with
-        direct buffer handling for numeric arrays and read all values without
-        sampling. Array and DataFrame storage layouts are not normalized.
-        Hashes provide a best-effort content check, not a guarantee of equality.
-        Fast disk entries are separate from default entries. RAM keys are computed
-        once per call; a RAM miss hashes arguments again for the disk lookup.
+        Enable when checking large arrays or DataFrames makes cached calls slow.
+        Leave disabled if cache lookups are already fast or you want to reuse
+        results cached with the default settings. Switching this option can
+        require results to be computed again.
 
     Returns
     -------

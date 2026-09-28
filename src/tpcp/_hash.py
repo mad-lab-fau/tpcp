@@ -151,23 +151,18 @@ class NNHasher(NoMemoizeNumpyHasher):
 # This function is modified based on
 # https://github.com/joblib/joblib/blob/4dafaff788a3b5402acfed091558b4c511982959/joblib/hashing.py#L244
 def custom_hash(obj, hash_name=None, coerce_mmap=False):
-    """Quick calculation of a hash to identify uniquely Python objects containing numpy arrays and torch models.
+    """Hash Python objects to detect accidental changes or check repeatability.
 
-    This function is modified based on `joblib.hash` so that it can properly handle torch and tensorflow objects.
-    It adds some further "fixes" for dynamically defined functions.
+    Supports NumPy arrays, pandas objects, and Torch and TensorFlow models.
 
     Parameters
     ----------
     obj
         The object to be hashed
     hash_name: None, 'md5' or 'sha1'
-        By default, use XXH3-128 for a fast, non-cryptographic change check.
-        All modes use the same pickle-based object traversal and joblib's direct
-        buffer handling for numeric arrays. Array and DataFrame storage layouts
-        are not normalized, so layout changes can produce different hashes.
-        All numeric values are read; values are not sampled. This is a best-effort
-        check, not a guarantee of object equality. Explicit 'md5' or 'sha1' selects
-        that digest instead of XXH3-128.
+        Use the default for fast checks of whether an object has changed.
+        Select 'md5' or 'sha1' when you need to compare with hashes generated
+        using that algorithm. This function is not intended for security checks.
     coerce_mmap: boolean
         Make no difference between np.memmap and np.ndarray
 
