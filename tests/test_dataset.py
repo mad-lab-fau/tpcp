@@ -99,6 +99,7 @@ class TestDataset:
         representation = repr(dataset)
 
         assert "Dataset(groupby_cols='patient')" in representation
+        assert "Index [1 groups/rows]" in representation
         assert "patient  trial" in representation
         assert "private_patient" in representation
 
@@ -113,7 +114,9 @@ class TestDataset:
             subset_index=pd.DataFrame({"item": ["hidden"]}),
         )
 
-        assert repr(dataset) == "ConfiguredDataset(threshold=0.7)\n\n        item\n   0  hidden"
+        assert (
+            repr(dataset) == "ConfiguredDataset(threshold=0.7)\n\nIndex [1 groups/rows]\n\n        item\n   0  hidden"
+        )
 
     def test_repr_shows_nested_dataset_and_summarizes_data_parameters(self):
         class ComposedDataset(Dataset):
