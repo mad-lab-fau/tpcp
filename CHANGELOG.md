@@ -19,11 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are isolated from default cache entries. Default hashing and joblib function-code invalidation
   are retained. Both modes use pickle-based object traversal with different digest algorithms.
   (https://github.com/mad-lab-fau/tpcp/issues/143)
+- `NoSplit` repeats one selected train/test assignment for a required positive fold count. `CombinedSplitter` applies
+  child splitters to selected dataset parts and combines corresponding folds by group label.
+
 ### Changed
 
 - **Breaking:** Native tpcp splitters now return train and test lists of dataset group labels from `split(dataset)`.
   Replace positional access such as `dataset[train]` with `dataset.get_subset(group_labels=train)`. Raw sklearn
   splitters still work as `cv` arguments to `cross_validate` and `GridSearchCV`.
+
 - **Breaking:** `Scorer` now uses `numpy.nanmean` for scores without an explicit aggregator, ignoring NaN scores.
   Pass `default_aggregator=mean_agg` to keep the previous mean behavior.
   (https://github.com/mad-lab-fau/tpcp/pull/145)

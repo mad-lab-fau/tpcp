@@ -54,7 +54,8 @@ def cross_validate(
         For further inputs check the `sklearn` `documentation
         <https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_validate.html>`_.
 
-        For more complex usecases like grouping or stratification, the :class:`~tpcp.TpcpSplitter` can be used.
+        For grouping or stratification, use :class:`~tpcp.validate.DatasetSplitter`. Native tpcp splitters such as
+        :class:`~tpcp.validate.CombinedSplitter` can also be passed directly.
     n_jobs
         Number of jobs to run in parallel.
         One job is created per CV fold.
