@@ -50,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `Dataset[NamedTuple]` now checks supplied `subset_index` column names and order against the declared label fields.
+  (https://github.com/mad-lab-fau/tpcp/pull/154)
 - Fixed `TestAlgorithmMixin` passing the algorithm instance twice when its action method already uses
   `@make_action_safe`.
   (https://github.com/mad-lab-fau/tpcp/pull/146)
