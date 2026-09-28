@@ -1,6 +1,7 @@
 import doctest
 from itertools import product
 from operator import itemgetter
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -65,6 +66,22 @@ def _create_random_bool_map(n, seed):
 
 
 class TestDataset:
+    def test_supplied_index_matches_declared_group_label_fields(self):
+        class RowLabel(NamedTuple):
+            participant: str
+            test: str
+
+        class TypedDataset(Dataset[RowLabel]):
+            pass
+
+        dataset = TypedDataset(subset_index=pd.DataFrame({"test": ["a"], "participant": ["p1"]}))
+
+        with pytest.raises(ValueError, match="must match the fields"):
+            _ = dataset.index
+
+        valid_dataset = TypedDataset(subset_index=pd.DataFrame({"participant": ["p1"], "test": ["a"]}))
+        assert valid_dataset.group_label.participant == "p1"
+
     def test_grouping_materialized_during_index_creation_applies_immediately(self):
         class LazyGroupedDataset(Dataset):
             def create_index(self) -> pd.DataFrame:

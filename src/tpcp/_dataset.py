@@ -38,6 +38,15 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
             # but the errors that you are running into are hopefully less obscure.
             self.subset_index = self._create_check_index()
 
+        group_label_type = self._get_group_label_type()
+        if (label_fields := getattr(group_label_type, "_fields", None)) and label_fields != (
+            index_cols := tuple(self.subset_index.columns)
+        ):
+            raise ValueError(
+                f"The columns of the index ({index_cols}) must match the fields (in order!) of the group label "
+                f"named tuple ({label_fields}) provided as Generic to the dataset."
+            )
+
         return self.subset_index
 
     @classmethod
@@ -121,17 +130,6 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
                 "Furthermore, they must not shadow a built-in Python keyword.",
                 RuntimeWarning,
                 stacklevel=1,
-            )
-
-        # Get the generic type of the dataset
-        group_label_type = self._get_group_label_type()
-        # If group label type is a named tuple, we check that the keys are the same as the index columns
-        if (label_fields := getattr(group_label_type, "_fields", None)) and label_fields != (
-            index_cols := tuple(index_1.columns)
-        ):
-            raise ValueError(
-                f"The columns of the index ({index_cols}) must match the fields (in order!) of the group label "
-                f"named tuple ({label_fields}) provided as Generic to the dataclass."
             )
 
         # Attach a attribute to indicate that this is the original index.
