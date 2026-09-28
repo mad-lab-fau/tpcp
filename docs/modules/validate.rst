@@ -38,8 +38,9 @@ always include artificial recordings in training::
     )
 
 Selectors receive the dataset passed to the current splitter, so the same ``cv`` can be used on a
-subset in nested validation. Each selector must return complete, unchanged groups with the same
-index columns and grouping. A child may also be a raw sklearn splitter such as ``KFold(5)``.
+subset in nested validation. A selector's group labels must belong to its input dataset. The
+labels determine the fold assignment, so selecting only some rows of a group still assigns that
+whole group. A child may also be a raw sklearn splitter such as ``KFold(5)``.
 
 Scoring
 -------
