@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (+ the Migration Guide),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `NoSplit(None)` can take its fold count from another child of `CombinedSplitter`. At least one child must report an
+  integer fold count, and all reported counts must match.
+  (https://github.com/mad-lab-fau/tpcp/pull/156)
+- `BaseDatasetSplitter.split(dataset, n_splits=None)` accepts an optional requested fold count, and
+  `get_n_splits(dataset)` can return `None` for splitters that require a count at split time.
+  (https://github.com/mad-lab-fau/tpcp/pull/156)
+
 ## [3.0.0] - 2026-09-28
 
 ### Breaking
