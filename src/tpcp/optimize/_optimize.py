@@ -685,6 +685,9 @@ class GridSearchCV(
     optimized_pipeline_
         An instance of the input pipeline with the best parameter set.
         This is only available if `return_optimized` is not False.
+    optimization_info_
+        Additional information returned by `self_optimize_with_info` during the final optimization on all data.
+        Only available if `return_optimized` and `optimize_with_info` are enabled and the pipeline returns information.
     best_params_
         The parameter dict that resulted in the best result.
         This is only available if `return_optimized` is not False.
@@ -724,6 +727,7 @@ class GridSearchCV(
     best_score_: float
     multimetric_: bool
     final_optimize_time_: float
+    optimization_info_: Any
 
     def __init__(
         self,
@@ -766,6 +770,7 @@ class GridSearchCV(
         dataset
             The dataset to optimize on.
         """
+        vars(self).pop("optimization_info_", None)
         self.dataset = dataset
 
         scoring = _validate_scorer(self.scoring)
@@ -871,10 +876,12 @@ class GridSearchCV(
                 self.pipeline.clone().set_params(**self.best_params_).clone(),
                 train_dataset_transform=self.train_dataset_transform,
                 safe_optimize=self.safe_optimize,
+                optimize_with_info=self.optimize_with_info,
             )
             final_optimize_start_time = time.time()
-            optimize_params_clean = optimize_params or {}
-            self.optimized_pipeline_ = best_optimizer.optimize(dataset, **optimize_params_clean).optimized_pipeline_
+            self.optimized_pipeline_ = best_optimizer.optimize(dataset, **optimize_params).optimized_pipeline_
+            if hasattr(best_optimizer, "optimization_info_"):
+                self.optimization_info_ = best_optimizer.optimization_info_
             self.final_optimize_time_ = final_optimize_start_time - time.time()
 
         return self

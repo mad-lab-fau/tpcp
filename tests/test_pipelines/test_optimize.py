@@ -52,7 +52,7 @@ class TestMetaFunctionalityGridSearchCV(TestAlgorithmMixin):
     @pytest.fixture
     def after_action_instance(self) -> GridSearchCV:
         gs = GridSearchCV(
-            DummyOptimizablePipeline(), ParameterGrid({"para_1": [1]}), cv=2, scoring=dummy_single_score_func
+            DummyOptimizablePipelineWithInfo(), ParameterGrid({"para_1": [1]}), cv=2, scoring=dummy_single_score_func
         )
         gs.optimize(DummyDataset())
         return gs
@@ -366,6 +366,40 @@ class TestGridSearch:
 
 
 class TestGridSearchCV:
+    def test_final_optimization_info_cleared_on_repeat(self):
+        search = GridSearchCV(
+            DummyOptimizablePipelineWithInfo(),
+            ParameterGrid({"para_1": [1]}),
+            scoring=dummy_single_score_func,
+            cv=2,
+            progress_bar=False,
+        ).optimize(DummyDataset())
+        assert search.optimization_info_ == "info"
+
+        search.set_params(optimize_with_info=False)
+        search.optimize(DummyDataset())
+        assert not hasattr(search, "optimization_info_")
+
+    @pytest.mark.parametrize(
+        ("return_optimized", "optimize_with_info"),
+        [(True, True), (True, False), (False, True)],
+    )
+    def test_final_optimization_info(self, return_optimized, optimize_with_info):
+        search = GridSearchCV(
+            DummyOptimizablePipelineWithInfo(),
+            ParameterGrid({"para_1": [1]}),
+            scoring=dummy_single_score_func,
+            cv=2,
+            return_optimized=return_optimized,
+            optimize_with_info=optimize_with_info,
+            progress_bar=False,
+        ).optimize(DummyDataset())
+
+        if return_optimized and optimize_with_info:
+            assert search.optimization_info_ == "info"
+        else:
+            assert not hasattr(search, "optimization_info_")
+
     @pytest.mark.parametrize(
         "kwargs",
         [
