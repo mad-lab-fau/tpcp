@@ -44,8 +44,9 @@ This also allows us to set nested parameters if the nested objects support a `se
 The plain representation of an algorithm or pipeline shows required constructor parameters and parameters that differ
 from their defaults. Simple parameters appear before nested objects and other complex values. It indents nested tpcp
 objects and summarizes DataFrames, Series, Indexes, and NumPy arrays by their structure instead of printing their
-values. It does not show results or other instance attributes. Use ``get_params(deep=False)`` to inspect every
-parameter and its full value, and access result attributes directly after running the object.
+values. It does not show results or other instance attributes. An aggregator with a wrapped value is the exception:
+its representation appends that value. Use ``get_params(deep=False)`` to inspect every parameter and its full value,
+and access result attributes directly after running the object.
 Datasets use the same parameter layout. Below it, they show the number of groups or rows and print their index
 DataFrame. When grouped, they print the grouped index DataFrame.
 

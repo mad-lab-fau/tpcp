@@ -40,13 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GridSearchCV`.
   (https://github.com/mad-lab-fau/tpcp/pull/148)
 
-- **Breaking, approved object representation change:** Plain representations of tpcp objects now wrap long or nested
-  parameters and summarize DataFrames, Series, Indexes, and arrays without printing their values. They show constructor
-  parameters, not computed results; in particular, aggregators no longer append their wrapped score values. Simple
-  parameters appear before nested and other complex values, and unchanged constructor defaults are omitted. Dataset
-  representations use the same parameter layout, followed by an `Index [N groups/rows]` heading and the index DataFrame.
-  Use `get_params(deep=False)` to inspect all parameter values and `aggregator.get_value()` to inspect a wrapped score.
-  The Jupyter dataset HTML representation still displays the index table.
+- **Breaking, approved plain representation change:** All tpcp objects now show required and changed constructor
+  parameters, with simple values before nested and other complex values. Long representations wrap across lines;
+  DataFrame, Series, Index, and array parameters show their structure instead of their contents. Results and other
+  instance attributes stay out of the representation. Valued aggregators retain their previous `(value)` suffix.
+  Datasets use the same parameter layout, followed by `Index [N groups/rows]` and the index DataFrame, grouped when
+  applicable. Use `get_params(deep=False)` to inspect every parameter and `aggregator.get_value()` to inspect a wrapped
+  value. The Jupyter dataset HTML representation is unchanged.
   (https://github.com/mad-lab-fau/tpcp/issues/11)
 - **Breaking:** `Scorer` now uses `numpy.nanmean` for scores without an explicit aggregator, ignoring NaN scores.
   Pass `default_aggregator=mean_agg` to keep the previous mean behavior.

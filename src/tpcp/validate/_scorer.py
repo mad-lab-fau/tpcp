@@ -81,6 +81,13 @@ class Aggregator(BaseTpcpObject, Generic[T]):
     def __init__(self, *, return_raw_scores: bool = True) -> None:
         self.return_raw_scores = return_raw_scores
 
+    def __repr__(self) -> str:
+        """Show constructor parameters and, when present, the wrapped score value."""
+        representation = super().__repr__()
+        if hasattr(self, "_value"):
+            return f"{representation}({self._value!r})"
+        return representation
+
     def __call__(self, value: T) -> Self:
         """Set the value of the aggregator.
 
