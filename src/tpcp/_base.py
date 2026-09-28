@@ -92,6 +92,12 @@ def _wrap_repr_lines(representation: str) -> str:
     return "\n".join(lines)
 
 
+def _is_complex_repr_parameter(value: object, rendered: str) -> bool:
+    return isinstance(value, (BaseTpcpObject, pd.DataFrame, pd.Series, pd.Index, np.ndarray, list, tuple, dict)) or (
+        "\n" in rendered or len(rendered) > 80
+    )
+
+
 def _data_summary(value: object) -> str | None:
     """Describe array-like parameter data without printing its values."""
     if isinstance(value, pd.DataFrame):
@@ -545,13 +551,14 @@ class BaseTpcpObject(_BaseTpcpObject):
         """Provide generic representation for the object based on all parameters."""
         class_name = type(self).__name__
         paras = self.get_params(deep=False)
-        formatted = [self.__repr_parameter__(name, para) for name, para in paras.items()]
+        parameters = [(para, self.__repr_parameter__(name, para)) for name, para in paras.items()]
+        parameters.sort(key=lambda item: _is_complex_repr_parameter(*item))
+        formatted = [rendered for _, rendered in parameters]
         compact = f"{class_name}({', '.join(formatted)})"
-        structured_types = (BaseTpcpObject, pd.DataFrame, pd.Series, pd.Index, np.ndarray, list, tuple, dict)
         if (
             "\n" not in compact
             and len(compact) <= 88
-            and not any(isinstance(value, structured_types) for value in paras.values())
+            and not any(_is_complex_repr_parameter(*parameter) for parameter in parameters)
         ):
             return compact
         body = ",\n".join("  " + parameter.replace("\n", "\n  ") for parameter in formatted)

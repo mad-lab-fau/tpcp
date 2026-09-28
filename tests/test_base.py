@@ -485,6 +485,21 @@ def test_object_representation():
     assert repr(test) == "Test(a=1, b=2)"
 
 
+def test_object_representation_puts_simple_parameters_before_nested_parameters():
+    class Inner(Algorithm):
+        def __init__(self, value):
+            self.value = value
+
+    class Outer(Algorithm):
+        def __init__(self, algorithm, threshold):
+            self.algorithm = algorithm
+            self.threshold = threshold
+
+    representation = repr(Outer(Inner(1), 0.5))
+
+    assert representation.index("threshold=0.5") < representation.index("algorithm=Inner(")
+
+
 def test_custom_object_representation():
     class Test(Algorithm):
         def __init__(self, a, b):
