@@ -368,7 +368,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
         """Show constructor parameters followed by the original index table."""
         repr_index = self.index if self.groupby_cols is None else self.grouped_index
         index_table = str(repr_index).replace("\n", "\n   ")
-        return f"{super().__repr__()}\n\n   {index_table}"
+        return f"{super().__repr__()}\n\nIndex [{self.shape[0]} groups/rows]\n\n   {index_table}"
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
@@ -598,6 +598,8 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
     >>> dataset
     Dataset()
     <BLANKLINE>
+    Index [12 groups/rows]
+    <BLANKLINE>
              patient    test extra
        0   patient_1  test_1     1
        1   patient_1  test_1     2
@@ -619,9 +621,13 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
     ...     print(r)
     Dataset()
     <BLANKLINE>
+    Index [1 groups/rows]
+    <BLANKLINE>
             patient    test extra
        0  patient_1  test_1     1
     Dataset()
+    <BLANKLINE>
+    Index [1 groups/rows]
     <BLANKLINE>
             patient    test extra
        0  patient_1  test_1     2
@@ -636,6 +642,8 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
         0: 'patient'
         1: 'test'
     )
+    <BLANKLINE>
+    Index [6 groups/rows]
     <BLANKLINE>
                            patient    test extra
        patient   test
@@ -660,6 +668,8 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
         1: 'test'
     )
     <BLANKLINE>
+    Index [1 groups/rows]
+    <BLANKLINE>
                            patient    test extra
        patient   test
        patient_1 test_1  patient_1  test_1     1
@@ -669,6 +679,8 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
         0: 'patient'
         1: 'test'
     )
+    <BLANKLINE>
+    Index [1 groups/rows]
     <BLANKLINE>
                            patient    test extra
        patient   test
@@ -685,6 +697,8 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
         1: 'test'
     )
     <BLANKLINE>
+    Index [2 groups/rows]
+    <BLANKLINE>
                            patient    test extra
        patient   test
        patient_1 test_1  patient_1  test_1     1
@@ -696,6 +710,8 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
         0: 'patient'
         1: 'test'
     )
+    <BLANKLINE>
+    Index [2 groups/rows]
     <BLANKLINE>
                            patient    test extra
        patient   test
@@ -715,6 +731,8 @@ class Dataset(_Dataset[GroupLabelT], Generic[GroupLabelT]):
         0: 'patient'
         1: 'test'
     )
+    <BLANKLINE>
+    Index [4 groups/rows]
     <BLANKLINE>
                            patient    test extra
        patient   test
