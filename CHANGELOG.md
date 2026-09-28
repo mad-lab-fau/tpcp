@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `GridSearchCV` and the default final optimization of `CustomOptunaOptimize` now expose the information returned by
+  `self_optimize_with_info` as `optimization_info_`.
+  (https://github.com/mad-lab-fau/tpcp/pull/153)
 - Added `hybrid_cache(..., fast_inaccurate_hashing=True)` to opt in to fast, best-effort hashing for
   RAM and disk lookups. Fast RAM keys are computed once per argument per call, and fast disk keys
   are isolated from default cache entries. Default hashing and joblib function-code invalidation
