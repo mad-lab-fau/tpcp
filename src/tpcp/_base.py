@@ -98,6 +98,53 @@ def _is_complex_repr_parameter(value: object, rendered: str) -> bool:
     )
 
 
+def _matches_repr_default(value: Any, default: Any) -> bool:  # noqa: C901, PLR0911
+    """Compare parameter defaults without ambiguous array truth values."""
+    if isinstance(default, CloneFactory):
+        default = default.default_value
+    if type(value) is not type(default):
+        return False
+    if value is default:
+        return True
+    if isinstance(value, (float, np.floating)) and np.isnan(value) and np.isnan(default):
+        return True
+    if isinstance(value, (BaseTpcpObject, BaseEstimator)):
+        params = value.get_params(deep=False)
+        default_params = default.get_params(deep=False)
+        return params.keys() == default_params.keys() and all(
+            _matches_repr_default(param, default_params[name]) for name, param in params.items()
+        )
+    if isinstance(value, pd.Series):
+        return (
+            _matches_repr_default(value.name, default.name)
+            and _matches_repr_default(list(value.index.names), list(default.index.names))
+            and value.equals(default)
+        )
+    if isinstance(value, pd.DataFrame):
+        return (
+            _matches_repr_default(list(value.index.names), list(default.index.names))
+            and _matches_repr_default(list(value.columns.names), list(default.columns.names))
+            and value.equals(default)
+        )
+    if isinstance(value, pd.Index):
+        return _matches_repr_default(list(value.names), list(default.names)) and value.equals(default)
+    if isinstance(value, np.ndarray):
+        return bool(np.array_equal(value, default, equal_nan=np.issubdtype(value.dtype, np.number)))
+    if isinstance(value, (list, tuple)):
+        return len(value) == len(default) and all(
+            _matches_repr_default(item, default_item) for item, default_item in zip(value, default, strict=True)
+        )
+    if isinstance(value, dict):
+        return value.keys() == default.keys() and all(
+            _matches_repr_default(item, default[key]) for key, item in value.items()
+        )
+    try:
+        equal = value == default
+    except (TypeError, ValueError):
+        return False
+    return isinstance(equal, (bool, np.bool_)) and bool(equal)
+
+
 def _data_summary(value: object) -> str | None:
     """Describe array-like parameter data without printing its values."""
     if isinstance(value, pd.DataFrame):
@@ -547,10 +594,20 @@ class BaseTpcpObject(_BaseTpcpObject):
         """
         return f"{name}={_repr_value(value)}"
 
+    def _repr_params(self) -> dict[str, Any]:
+        """Return constructor parameters whose values differ from their defaults."""
+        defaults = _get_init_defaults(type(self))
+        return {
+            name: value
+            for name, value in self.get_params(deep=False).items()
+            if defaults[name].default is inspect.Parameter.empty
+            or not _matches_repr_default(value, defaults[name].default)
+        }
+
     def __repr__(self) -> str:
-        """Provide generic representation for the object based on all parameters."""
+        """Represent required and changed constructor parameters without results."""
         class_name = type(self).__name__
-        paras = self.get_params(deep=False)
+        paras = self._repr_params()
         parameters = [(para, self.__repr_parameter__(name, para)) for name, para in paras.items()]
         parameters.sort(key=lambda item: _is_complex_repr_parameter(*item))
         formatted = [rendered for _, rendered in parameters]

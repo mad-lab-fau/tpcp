@@ -42,9 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking, approved object representation change:** Plain representations of tpcp objects now wrap long or nested
   parameters and summarize DataFrames, Series, Indexes, and arrays without printing their values. They show constructor
-  parameters, not computed results; in particular, aggregators no longer append their wrapped score values. Dataset
+  parameters, not computed results; in particular, aggregators no longer append their wrapped score values. Simple
+  parameters appear before nested and other complex values, and unchanged constructor defaults are omitted. Dataset
   representations also show index dimensions and grouping instead of index row values. Use `get_params(deep=False)` to
-  inspect full parameter values, `dataset.index` to inspect rows, and `aggregator.get_value()` to inspect a wrapped
+  inspect all parameter values, `dataset.index` to inspect rows, and `aggregator.get_value()` to inspect a wrapped
   score. The Jupyter dataset HTML representation still displays the index table.
   (https://github.com/mad-lab-fau/tpcp/issues/11)
 - **Breaking:** `Scorer` now uses `numpy.nanmean` for scores without an explicit aggregator, ignoring NaN scores.

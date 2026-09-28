@@ -10,6 +10,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.preprocessing import StandardScaler
 
 from tests.conftest import _get_params_without_nested_class
 from tpcp import Algorithm, OptimizablePipeline, OptiPara, Para, Pipeline, cf, clone
@@ -498,6 +499,100 @@ def test_object_representation_puts_simple_parameters_before_nested_parameters()
     representation = repr(Outer(Inner(1), 0.5))
 
     assert representation.index("threshold=0.5") < representation.index("algorithm=Inner(")
+
+
+def test_object_representation_omits_unchanged_defaults_but_keeps_required_parameters():
+    class Test(Algorithm):
+        def __init__(self, required, threshold=0.5):
+            self.required = required
+            self.threshold = threshold
+
+    assert repr(Test(2)) == "Test(required=2)"
+    assert repr(Test(2, threshold=0.7)) == "Test(required=2, threshold=0.7)"
+
+
+def test_object_representation_omits_unchanged_factory_defaults():
+    class Inner(Algorithm):
+        def __init__(self, threshold=0.5):
+            self.threshold = threshold
+
+    class Outer(Algorithm):
+        def __init__(self, algorithm=cf(Inner()), values=cf(np.array([1, 2]))):
+            self.algorithm = algorithm
+            self.values = values
+
+    obj = Outer()
+    assert repr(obj) == "Outer()"
+    obj.algorithm.set_params(threshold=0.7)
+    assert "algorithm=Inner(threshold=0.7)" in repr(obj)
+    obj.values[0] = 3
+    assert "values=ndarray(shape=(2,), dtype=int64)" in repr(obj)
+
+
+def test_object_representation_omits_nan_default():
+    class Test(Algorithm):
+        def __init__(self, threshold=np.nan):
+            self.threshold = threshold
+
+    assert repr(Test(float("nan"))) == "Test()"
+
+
+def test_object_representation_omits_factory_array_with_nan_default():
+    class Test(Algorithm):
+        def __init__(self, values=cf(np.array([1.0, np.nan]))):
+            self.values = values
+
+    assert repr(Test()) == "Test()"
+
+
+def test_object_representation_omits_unchanged_sklearn_estimator_default():
+    class Test(Algorithm):
+        def __init__(self, scaler=cf(StandardScaler())):
+            self.scaler = scaler
+
+    obj = Test()
+    assert repr(obj) == "Test()"
+    obj.scaler.set_params(with_mean=False)
+    assert "scaler=StandardScale" in repr(obj)
+
+
+def test_object_representation_shows_factory_series_with_changed_name():
+    class Test(Algorithm):
+        def __init__(self, values=cf(pd.Series([1, 2], name="original"))):
+            self.values = values
+
+    obj = Test()
+    assert repr(obj) == "Test()"
+    obj.values.name = "renamed"
+    assert "values=Series(shape=(2,), name='renamed', dtype=int64)" in repr(obj)
+    obj = Test()
+    obj.values.index.name = "row"
+    assert "values=Series(shape=(2,), name='original', dtype=int64)" in repr(obj)
+
+
+def test_object_representation_shows_factory_dataframe_with_changed_axis_name():
+    class Test(Algorithm):
+        def __init__(self, values=cf(pd.DataFrame({"a": [1]}))):
+            self.values = values
+
+    obj = Test()
+    assert repr(obj) == "Test()"
+    obj.values.index.name = "row"
+    assert "values=DataFrame(shape=(1, 1), columns=['a'])" in repr(obj)
+    obj = Test()
+    obj.values.columns.name = "column"
+    assert "values=DataFrame(shape=(1, 1), columns=['a'])" in repr(obj)
+
+
+def test_object_representation_shows_factory_index_with_changed_name():
+    class Test(Algorithm):
+        def __init__(self, values=cf(pd.Index([1], name="original"))):
+            self.values = values
+
+    obj = Test()
+    assert repr(obj) == "Test()"
+    obj.values.name = "renamed"
+    assert "values=Index(shape=(1,), dtype=int64)" in repr(obj)
 
 
 def test_custom_object_representation():
