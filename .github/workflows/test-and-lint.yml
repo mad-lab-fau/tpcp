@@ -20,12 +20,6 @@ jobs:
     strategy:
       matrix:
         include:
-        - python-version: "3.9"
-          all-extras: true
-          coverage: false
-        - python-version: "3.10"
-          all-extras: false
-          coverage: false
         - python-version: "3.11"
           all-extras: true
           coverage: true

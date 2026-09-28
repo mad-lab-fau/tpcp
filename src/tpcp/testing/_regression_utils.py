@@ -7,7 +7,6 @@ Note that it can not be used in combination with this module!
 import difflib
 import re
 from pathlib import Path
-from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -171,7 +170,7 @@ class PyTestSnapshotTest:
             return diff
         return f"stored={prev_snapshot!r}\ncurrent={value!r}"
 
-    def _format_mismatch(self, dtype, value, prev_snapshot, error: Optional[AssertionError] = None) -> str:
+    def _format_mismatch(self, dtype, value, prev_snapshot, error: AssertionError | None = None) -> str:
         if dtype is str:
             details = self._format_string_difference(value, prev_snapshot)
         else:
@@ -201,7 +200,7 @@ class PyTestSnapshotTest:
             return
         raise TypeError(f"The dtype {value_dtype} is not supported for snapshot testing")
 
-    def assert_match(self, value: Union[str, pd.DataFrame, np.ndarray], name: Optional[str] = None, **kwargs):
+    def assert_match(self, value: str | pd.DataFrame | np.ndarray, name: str | None = None, **kwargs):
         """Assert that the value matches the snapshot.
 
         This compares the value with a stored snapshot of the same name.

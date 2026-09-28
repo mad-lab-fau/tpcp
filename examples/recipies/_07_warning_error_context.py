@@ -64,7 +64,7 @@ with warning_error_context(
 # ---------------
 # Contexts compose from outermost to innermost. Each context is removed when its
 # ``with`` block ends.
-with warning_error_context("participant", {"id": "p1"}):  # noqa: SIM117 - Python 3.9 compatibility
+with warning_error_context("participant", {"id": "p1"}):  # noqa: SIM117 - show the two context levels
     with warning_error_context("recording", {"id": 3}):
         warnings.warn("nested warning", UserWarning, stacklevel=1)
 
@@ -73,15 +73,13 @@ with warning_error_context("participant", {"id": "p1"}):  # noqa: SIM117 - Pytho
 # ------
 # The context manager re-raises the original error, so it can be caught and
 # handled normally. The active context is attached to the caught exception
-# through exception notes. On Python 3.11 and newer, the standard traceback
-# renderer displays these notes. On Python 3.9 and 3.10, renderers with
-# exception-note support, such as Rich, can display them.
+# through exception notes, which the standard traceback renderer displays.
 try:
     with warning_error_context("recording", {"id": 3}):
         raise ValueError("invalid signal")
 except ValueError as error:
     print(f"Caught error: {error}")
-    print(f"Context: {getattr(error, '__notes__', [])}")
+    print(f"Context: {error.__notes__}")
 
 # %%
 # Manual lifecycle

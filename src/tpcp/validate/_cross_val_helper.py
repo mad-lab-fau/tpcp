@@ -1,7 +1,6 @@
 import numbers
 import warnings
 from collections.abc import Iterator
-from typing import Optional, Union
 
 from sklearn.model_selection import BaseCrossValidator, GroupKFold, StratifiedGroupKFold, StratifiedKFold, check_cv
 
@@ -49,10 +48,10 @@ class DatasetSplitter(BaseTpcpObject):
 
     def __init__(
         self,
-        base_splitter: Optional[Union[int, BaseCrossValidator, Iterator]] = None,
+        base_splitter: int | BaseCrossValidator | Iterator | None = None,
         *,
-        groupby: Optional[Union[str, list[str]]] = None,
-        stratify: Optional[Union[str, list[str]]] = None,
+        groupby: str | list[str] | None = None,
+        stratify: str | list[str] | None = None,
         ignore_potentially_invalid_splitter_warning: bool = False,
     ):
         self.base_splitter = base_splitter
@@ -105,7 +104,7 @@ class DatasetSplitter(BaseTpcpObject):
             )
         return cv
 
-    def _get_labels(self, dataset: Dataset, labels: Union[None, str, list[str]]):
+    def _get_labels(self, dataset: Dataset, labels: None | str | list[str]):
         if labels:
             return dataset.create_string_group_labels(labels)
         return None

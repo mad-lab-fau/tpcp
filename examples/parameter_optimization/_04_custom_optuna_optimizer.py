@@ -72,9 +72,9 @@ own project-specific optimizers.
 #           generics.
 #           You should read that as "Some subclass of :class:`~tpcp.Pipeline`, but we don't know which yet".
 #
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any
 
 import pandas as pd
 from tpcp import Parameter, Pipeline, cf
@@ -210,13 +210,13 @@ class OptunaSearch(
     CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT],
     Generic[PipelineT, DatasetT],
 ):
-    # We need to provide default values in Python <3.10, as we can not use the keyword-only syntax for dataclasses.
-    create_search_space: Optional[Callable[[Trial], None]] = None
-    score_function: Optional[Callable[[PipelineT, DatasetT], float]] = None
+    # These fields need defaults because the generated base dataclass has fields with defaults.
+    create_search_space: Callable[[Trial], None] | None = None
+    score_function: Callable[[PipelineT, DatasetT], float] | None = None
 
     def create_objective(
         self,
-    ) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
+    ) -> Callable[[Trial, PipelineT, DatasetT], float | Sequence[float]]:
         # Here we define our objective function
 
         def objective(
@@ -402,13 +402,13 @@ class OptunaSearchEarlyStopping(
     CustomOptunaOptimize.as_dataclass()[PipelineT, DatasetT],
     Generic[PipelineT, DatasetT],
 ):
-    # We need to provide default values in Python <3.10, as we can not use the keyword-only syntax for dataclasses.
-    create_search_space: Optional[Callable[[Trial], None]] = None
-    score_function: Optional[Callable[[PipelineT, DatasetT], float]] = None
+    # These fields need defaults because the generated base dataclass has fields with defaults.
+    create_search_space: Callable[[Trial], None] | None = None
+    score_function: Callable[[PipelineT, DatasetT], float] | None = None
 
     def create_objective(
         self,
-    ) -> Callable[[Trial, PipelineT, DatasetT], Union[float, Sequence[float]]]:
+    ) -> Callable[[Trial, PipelineT, DatasetT], float | Sequence[float]]:
         def objective(
             trial: Trial, pipeline: PipelineT, dataset: DatasetT
         ) -> float:

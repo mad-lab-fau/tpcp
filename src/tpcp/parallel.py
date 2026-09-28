@@ -20,10 +20,11 @@ from __future__ import annotations
 import functools
 import multiprocessing
 import warnings
+from collections.abc import Callable
 from contextlib import AbstractContextManager, ExitStack
 from contextvars import Context, ContextVar, copy_context
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import joblib
 

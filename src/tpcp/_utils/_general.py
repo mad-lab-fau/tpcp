@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import copy
 import numbers
-from typing import Optional
 
 import numpy as np
 
@@ -66,7 +65,7 @@ def _normalize_score_results(scores: list, single_score_key="score"):
     return {single_score_key: scores}
 
 
-def _prefix_para_dict(params_dict: Optional[dict], prefix="pipeline__") -> Optional[dict]:
+def _prefix_para_dict(params_dict: dict | None, prefix="pipeline__") -> dict | None:
     """Add a prefix to all parameter names in the dictionary.
 
     This can be helpful to adjust a parameter grid that was originally created for a pipeline to work on a wrapper like
@@ -77,7 +76,7 @@ def _prefix_para_dict(params_dict: Optional[dict], prefix="pipeline__") -> Optio
     return {prefix + k: v for k, v in params_dict.items()}
 
 
-def _get_nested_paras(param_dict: Optional[dict], nested_object_name="pipeline") -> dict:
+def _get_nested_paras(param_dict: dict | None, nested_object_name="pipeline") -> dict:
     """Get the parameters belonging to a nested object and remove the suffix.
 
     If the parameter of a double nested object are required, use `level_1__level_1`.
@@ -88,8 +87,8 @@ def _get_nested_paras(param_dict: Optional[dict], nested_object_name="pipeline")
 
 
 def _split_hyper_and_pure_parameters(
-    param_dict: list[dict], pure_parameters: Optional[list[str]]
-) -> list[tuple[Optional[dict], Optional[dict]]]:
+    param_dict: list[dict], pure_parameters: list[str] | None
+) -> list[tuple[dict | None, dict | None]]:
     """Split a list of parameters in hyperparameters and pure parameters.
 
     For each dictionary in the list, this separates the pure parameters (names provided in input) from all

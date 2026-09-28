@@ -22,26 +22,21 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Callable,
     ClassVar,
+    Concatenate,
     Generic,
-    Optional,
+    Literal,
+    ParamSpec,
+    Self,
     TypeVar,
-    Union,
     cast,
+    get_args,
+    get_origin,
 )
 
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
-from typing_extensions import (
-    Concatenate,
-    Literal,
-    ParamSpec,
-    Self,
-    get_args,
-    get_origin,
-)
 
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import (
@@ -51,7 +46,7 @@ from tpcp.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
 T = TypeVar("T")
 P = ParamSpec("P")
@@ -67,7 +62,7 @@ class _Nothing:
     This implementation is taken from the attrs package.
     """
 
-    _singleton: Optional[_Nothing] = None
+    _singleton: _Nothing | None = None
 
     def __new__(cls) -> _Nothing:
         if _Nothing._singleton is None:
@@ -193,8 +188,8 @@ def _replace_defaults_wrapper(
 
 def _retry_eval_with_missing_locals(
     expression: str,
-    globalns: Optional[dict[str, Any]] = None,
-    localns: Optional[dict[str, Any]] = None,
+    globalns: dict[str, Any] | None = None,
+    localns: dict[str, Any] | None = None,
 ) -> Any:
     globalns = globalns or {}
     localns = localns or {}
@@ -259,10 +254,7 @@ def _custom_get_type_hints(cls: type) -> dict[str, Any]:
     hints = {}
     for base in reversed(cls.__mro__):
         base_globals = sys.modules[base.__module__].__dict__
-        if sys.version_info >= (3, 10):
-            ann = getattr(base, "__annotations__", {})
-        else:
-            ann = base.__dict__.get("__annotations__", {})
+        ann = getattr(base, "__annotations__", {})
         for name, value in ann.items():
             if name.startswith("__"):
                 continue
@@ -343,12 +335,12 @@ def _validate_all_parent_parameters_implemented(cls: type[_BaseTpcpObject]):
             )
 
 
-def _get_tpcp_validated(cls_or_instance: Union[type[_BaseTpcpObject], _BaseTpcpObject]):
+def _get_tpcp_validated(cls_or_instance: type[_BaseTpcpObject] | _BaseTpcpObject):
     cls = cls_or_instance if isinstance(cls_or_instance, type) else type(cls_or_instance)
     return cls.__dict__.get("__tpcp_validated_hidden__", False)
 
 
-def _set_tpcp_validated(cls_or_instance: Union[type[_BaseTpcpObject], _BaseTpcpObject], value: bool):
+def _set_tpcp_validated(cls_or_instance: type[_BaseTpcpObject] | _BaseTpcpObject, value: bool):
     cls = cls_or_instance if isinstance(cls_or_instance, type) else type(cls_or_instance)
     cls.__tpcp_validated_hidden__ = value
 
@@ -629,7 +621,7 @@ def _set_params(instance: BaseTpcpObjectT, **params: Any) -> BaseTpcpObjectT:
     return instance
 
 
-def get_param_names(obj: Union[type[_BaseTpcpObject], _BaseTpcpObject]) -> list[str]:
+def get_param_names(obj: type[_BaseTpcpObject] | _BaseTpcpObject) -> list[str]:
     """Get parameter names for the object.
 
     The parameters of an algorithm/pipeline are defined based on its `__init__` method.
@@ -658,7 +650,7 @@ def get_param_names(obj: Union[type[_BaseTpcpObject], _BaseTpcpObject]) -> list[
 
 
 def _get_annotated_fields_of_type(
-    instance_or_cls: BaseTpcpObject, field_type: Union[_ParaTypes, Iterable[_ParaTypes]]
+    instance_or_cls: BaseTpcpObject, field_type: _ParaTypes | Iterable[_ParaTypes]
 ) -> list[str]:
     if isinstance(field_type, _ParaTypes):
         field_type = [field_type]

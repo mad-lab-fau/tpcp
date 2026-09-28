@@ -18,7 +18,6 @@ attribute:
 
 import dataclasses
 import traceback
-from typing import Optional
 
 from tpcp import Pipeline
 from tpcp.exceptions import ValidationError
@@ -28,7 +27,7 @@ from tpcp.exceptions import ValidationError
 class Workflow(Pipeline):
     _composite_params = ("pipelines",)
 
-    pipelines: Optional[list[tuple[str, Pipeline]]] = None
+    pipelines: list[tuple[str, Pipeline]] | None = None
 
     def __init__(self, pipelines=None):
         self.pipelines = pipelines

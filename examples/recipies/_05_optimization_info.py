@@ -30,6 +30,8 @@ In the following we will show how all of this works by expanding the QRS detecti
 examples to return additional information from the optimization.
 """
 
+from typing import Self
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_curve
@@ -42,7 +44,6 @@ from tpcp import (
     make_optimize_safe,
 )
 from tpcp.optimize import Optimize
-from typing_extensions import Self
 
 from examples.algorithms.algorithms_qrs_detection_final import (
     QRSDetector,
@@ -86,7 +87,7 @@ class OptimizableQrsDetectorWithInfo(QRSDetector):
     ) -> tuple[Self, dict[str, np.ndarray]]:
         all_labels = []
         all_peak_heights = []
-        for d, p in zip(ecg_data, r_peaks):
+        for d, p in zip(ecg_data, r_peaks, strict=False):
             filtered = self._filter(d.to_numpy().flatten(), sampling_rate_hz)
             # Find all potential peaks without the height threshold
             potential_peaks = self._search_strategy(

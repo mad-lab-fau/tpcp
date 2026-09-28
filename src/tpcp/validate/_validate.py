@@ -2,7 +2,7 @@
 
 from collections.abc import Iterator
 from functools import partial
-from typing import Any, Optional, Union
+from typing import Any
 
 from sklearn.model_selection import BaseCrossValidator
 from tqdm.auto import tqdm
@@ -24,11 +24,11 @@ def cross_validate(
     dataset: DatasetT,
     *,
     scoring: ScoreFunc[PipelineT, DatasetT],
-    cv: Optional[Union[DatasetSplitter, int, BaseCrossValidator, Iterator]] = None,
-    n_jobs: Optional[int] = None,
+    cv: DatasetSplitter | int | BaseCrossValidator | Iterator | None = None,
+    n_jobs: int | None = None,
     verbose: int = 0,
-    optimize_params: Optional[dict[str, Any]] = None,
-    pre_dispatch: Union[str, int] = "2*n_jobs",
+    optimize_params: dict[str, Any] | None = None,
+    pre_dispatch: str | int = "2*n_jobs",
     return_train_score: bool = False,
     return_optimizer: bool = False,
     progress_bar: bool = True,
@@ -164,9 +164,9 @@ def validate(
     dataset: DatasetT,
     *,
     scoring: ScorerTypes[PipelineT, DatasetT],
-    n_jobs: Optional[int] = _Default(None),
+    n_jobs: int | None = _Default(None),
     verbose: int = _Default(0),
-    pre_dispatch: Union[str, int] = _Default("2*n_jobs"),
+    pre_dispatch: str | int = _Default("2*n_jobs"),
     progress_bar: bool = _Default(True),
 ) -> dict[str, Any]:
     """Evaluate a pipeline on a dataset without any optimization.

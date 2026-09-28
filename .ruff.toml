@@ -1,5 +1,5 @@
 line-length = 120
-target-version = "py39"
+target-version = "py311"
 
 [lint]
 select = [
@@ -97,10 +97,6 @@ ignore = [
     "A003",
     # Ignore because of formatting
     "ISC001",
-    # Syntax not supported in Python 3.9
-    "UP007",
-    # Not supported by Python 3.9 typing syntax
-    "UP045",
     # Imports intentionally local in a few callsites
     "PLC0415",
     # Hashable protocol false-positive for this codebase

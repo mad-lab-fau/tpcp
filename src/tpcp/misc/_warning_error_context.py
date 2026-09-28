@@ -7,7 +7,7 @@ from contextvars import ContextVar, Token
 from copy import copy
 from dataclasses import dataclass
 from io import StringIO
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeVar
 from uuid import uuid4
 from weakref import WeakValueDictionary
 
@@ -39,7 +39,7 @@ class WarningErrorContextRecord(NamedTuple):
 
     type: Literal["warning", "error", "print"]
     context: str
-    message: Union[Warning, BaseException, str]
+    message: Warning | BaseException | str
 
 
 class WarningErrorContext(AbstractContextManager["WarningErrorContext"]):
@@ -56,9 +56,9 @@ class WarningErrorContext(AbstractContextManager["WarningErrorContext"]):
     def __init__(
         self,
         name: str,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         *,
-        context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
+        context_provider: Callable[[], Mapping[str, Any]] | None = None,
         record_only: bool = False,
     ) -> None:
         self.records: list[WarningErrorContextRecord] = []
@@ -66,10 +66,10 @@ class WarningErrorContext(AbstractContextManager["WarningErrorContext"]):
         self._context = context
         self._context_provider = context_provider
         self._record_only = record_only
-        self._frame: Optional[_ContextFrame] = None
-        self._token: Optional[Token] = None
+        self._frame: _ContextFrame | None = None
+        self._token: Token | None = None
         self._started = False
-        self._parallel_target_id: Optional[str] = None
+        self._parallel_target_id: str | None = None
 
     def start(self) -> WarningErrorContext:
         """Activate the context and return this object.
@@ -112,7 +112,7 @@ class WarningErrorContext(AbstractContextManager["WarningErrorContext"]):
     def __enter__(self) -> WarningErrorContext:
         return self.start()
 
-    def __exit__(self, _exc_type: Any, exc: Optional[BaseException], _traceback: Any) -> Optional[bool]:
+    def __exit__(self, _exc_type: Any, exc: BaseException | None, _traceback: Any) -> bool | None:
         frame = self._frame
         if frame is None:
             raise RuntimeError("The warning/error context is not active.")
@@ -121,7 +121,7 @@ class WarningErrorContext(AbstractContextManager["WarningErrorContext"]):
                 if _recorded_error.get() is not exc:
                     _record_event("error", _render_context_stack(), exc)
                     _recorded_error.set(exc)
-                _add_note(exc, f"Context: {frame.render()}")
+                exc.add_note(f"Context: {frame.render()}")
         finally:
             self.stop()
         return None
@@ -157,7 +157,7 @@ def _safe_exception_description(exc: BaseException) -> str:
 
 
 def _render_context_with_provider(
-    context: dict[str, Any], context_provider: Optional[Callable[[], Mapping[str, Any]]]
+    context: dict[str, Any], context_provider: Callable[[], Mapping[str, Any]] | None
 ) -> str:
     if context_provider is not None:
         try:
@@ -183,7 +183,7 @@ class _ContextFrame:
     name: str
     context: dict[str, Any]
     result: WarningErrorContext
-    context_provider: Optional[Callable[[], Mapping[str, Any]]] = None
+    context_provider: Callable[[], Mapping[str, Any]] | None = None
     record_only: bool = False
 
     def _render_context(self) -> str:
@@ -198,7 +198,7 @@ class _ContextFrame:
 class _ParallelContextFrame:
     name: str
     context: dict[str, Any]
-    context_provider: Optional[Callable[[], Mapping[str, Any]]]
+    context_provider: Callable[[], Mapping[str, Any]] | None
     record_only: bool
     target_id: str
 
@@ -208,7 +208,7 @@ class _ParallelContextFrame:
 
 
 _context_stack: ContextVar[tuple[_ContextFrame, ...]] = ContextVar("tpcp_warning_error_context", default=())
-_recorded_error: ContextVar[Optional[BaseException]] = ContextVar("tpcp_warning_error_recorded_error", default=None)
+_recorded_error: ContextVar[BaseException | None] = ContextVar("tpcp_warning_error_recorded_error", default=None)
 _parallel_context_targets: WeakValueDictionary[str, WarningErrorContext] = WeakValueDictionary()
 
 
@@ -216,7 +216,7 @@ def _render_context_stack() -> str:
     return " > ".join(frame.render() for frame in _context_stack.get())
 
 
-def _capture_parallel_context() -> Optional[tuple[_ParallelContextFrame, ...]]:
+def _capture_parallel_context() -> tuple[_ParallelContextFrame, ...] | None:
     stack = _context_stack.get()
     if not stack:
         return None
@@ -278,7 +278,7 @@ def _merge_parallel_context_side_channel_data(side_channel_data: _ParallelContex
 def _record_event(
     event_type: Literal["warning", "error", "print"],
     context: str,
-    message: Union[Warning, BaseException, str],
+    message: Warning | BaseException | str,
 ) -> None:
     record = WarningErrorContextRecord(event_type, context, message)
     for frame in _context_stack.get():
@@ -323,7 +323,7 @@ def _warning_with_context(message: Warning, context: str) -> Warning:
     return contextualized_warning
 
 
-def _contextualize_warning(message: Union[Warning, str], context: Optional[str] = None) -> Union[Warning, str]:
+def _contextualize_warning(message: Warning | str, context: str | None = None) -> Warning | str:
     context = _render_context_stack() if context is None else context
     if not context:
         return message
@@ -375,7 +375,7 @@ else:
         filename: str,
         lineno: int,
         file: Any = None,
-        line: Optional[str] = None,
+        line: str | None = None,
     ) -> None:
         """Fallback for Python implementations without warnings._showwarnmsg."""
         context = _render_context_stack()
@@ -388,30 +388,12 @@ else:
     warnings.showwarning = _showwarning_with_context
 
 
-def _add_note(exc: BaseException, note: str) -> None:
-    try:
-        add_note = getattr(exc, "add_note", None)
-        if callable(add_note):
-            add_note(note)
-            return
-    except BaseException:  # noqa: BLE001 - diagnostic context must never replace the original exception
-        pass
-
-    try:
-        notes = list(getattr(exc, "__notes__", []))
-        if not notes or notes[-1] != note:
-            notes.append(note)
-        setattr(exc, "__notes__", notes)
-    except BaseException:  # noqa: BLE001 - re-raising the original exception is more important than its note
-        pass
-
-
 def warning_error_context(
     name: str,
-    context: Optional[dict[str, Any]] = None,
+    context: dict[str, Any] | None = None,
     /,
     *,
-    context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
+    context_provider: Callable[[], Mapping[str, Any]] | None = None,
     record_only: bool = False,
 ) -> WarningErrorContext:
     """Add structured context information to warnings and exceptions raised in the context.
@@ -462,9 +444,6 @@ def warning_error_context(
     :func:`print` calls. Warning filters still run before recording, including in
     record-only mode.
 
-    On Python 3.9 and 3.10, exception context is stored in ``__notes__`` but is not
-    displayed by Python's standard traceback renderer. Traceback renderers that
-    support exception notes, such as Rich, display this context on those versions.
     """
     return WarningErrorContext(
         name,
@@ -476,8 +455,8 @@ def warning_error_context(
 
 def print_with_context(
     *values: Any,
-    sep: Optional[str] = " ",
-    end: Optional[str] = "\n",
+    sep: str | None = " ",
+    end: str | None = "\n",
     file: Any = None,
     flush: bool = False,
 ) -> None:
@@ -510,10 +489,10 @@ def print_with_context(
 def _make_iteration_context_factory(i: int) -> _WarningErrorContextFactory:
     def make_context(
         name: str,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         /,
         *,
-        context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
+        context_provider: Callable[[], Mapping[str, Any]] | None = None,
         record_only: bool = False,
     ) -> WarningErrorContext:
         context = {} if context is None else context
