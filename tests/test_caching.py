@@ -114,19 +114,6 @@ class TestGlobalCache:
         assert example.result_1_ == 6 * multiplier
         assert not w
 
-    def test_numeric_dataframe_layouts_remain_distinct(self, example_class):
-        import numpy as np
-        import pandas as pd
-
-        config, algorithm = example_class
-        self.cache_method(**config)(algorithm)
-        action = getattr(algorithm(1, 2), config.get("action_method_name", "action"))
-        values = np.arange(12).reshape(4, 3)
-        with pytest.warns(CacheWarning):
-            action(pd.DataFrame(values, copy=False))
-        with pytest.warns(CacheWarning):
-            action(pd.DataFrame(np.asfortranarray(values), copy=False))
-
     def test_caching_twice_new_instance(self, example_class):
         config, example_class = example_class
         action_name = config.get("action_method_name", "action")
@@ -381,28 +368,13 @@ def test_fast_hybrid_cache_hits_and_detects_mutation(tmp_path, hybrid_cache_clea
     cached = hybrid_cache(memory, lru_size, fast_inaccurate_hashing=True)(total)
     values = np.arange(12, dtype=np.float32).reshape(4, 3)
     frame = pd.DataFrame(values, copy=False)
-    equivalent = pd.DataFrame(np.asfortranarray(values), copy=False)
+    equivalent = pd.DataFrame(values.copy(), copy=False)
     assert cached(frame) == 66
     assert cached(equivalent) == 66
     assert len(calls) == (1 if disk or lru_size else 2)
     frame.iloc[-1, -1] = 20
     assert cached(frame) == 75
     assert len(calls) == (2 if disk or lru_size else 3)
-
-
-@pytest.mark.parametrize("fast", [False, True])
-def test_hybrid_dataframe_layout_policy(tmp_path, hybrid_cache_clear, fast):
-    calls = []
-
-    def total(data):
-        calls.append(1)
-        return data.to_numpy().sum()
-
-    cached = hybrid_cache(Memory(None), 2, fast_inaccurate_hashing=fast)(total)
-    values = np.arange(12).reshape(4, 3)
-    assert cached(pd.DataFrame(values, copy=False)) == 66
-    assert cached(pd.DataFrame(np.asfortranarray(values), copy=False)) == 66
-    assert len(calls) == (1 if fast else 2)
 
 
 def test_fast_hybrid_cache_isolated_from_default_and_joblib(tmp_path, hybrid_cache_clear):

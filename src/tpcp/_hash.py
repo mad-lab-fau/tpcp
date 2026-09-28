@@ -148,29 +148,6 @@ class NNHasher(NoMemoizeNumpyHasher):
         super().save(obj)
 
 
-class _FastNumpyHasher(NoMemoizeNumpyHasher):
-    """Hash numeric DataFrames by content instead of pandas' storage representation."""
-
-    def save(self, obj):
-        pandas = sys.modules.get("pandas")
-        if pandas is not None and type(obj) is pandas.DataFrame:
-            dtypes = tuple(obj.dtypes)
-            if dtypes and all(
-                isinstance(dtype, self.np.dtype) and dtype.kind in "biufc" and dtype == dtypes[0] for dtype in dtypes
-            ):
-                super().save(("tpcp.dataframe.v1", obj.shape, obj.columns, obj.index, dtypes, obj.attrs))
-                # Canonical column order avoids differences between C/F layouts and
-                # consolidated/fragmented frames. At most one column is copied at a time.
-                for _, column in obj.items():
-                    super().save(self.np.ascontiguousarray(column.to_numpy()))
-                return
-        super().save(obj)
-
-
-class _FastNNHasher(NNHasher, _FastNumpyHasher):
-    """Keep tensor conversion before the fast NumPy/DataFrame traversal."""
-
-
 # This function is modified based on
 # https://github.com/joblib/joblib/blob/4dafaff788a3b5402acfed091558b4c511982959/joblib/hashing.py#L244
 def custom_hash(obj, hash_name=None, coerce_mmap=False):
@@ -185,13 +162,12 @@ def custom_hash(obj, hash_name=None, coerce_mmap=False):
         The object to be hashed
     hash_name: None, 'md5' or 'sha1'
         By default, use XXH3-128 for a fast, non-cryptographic change check.
-        Homogeneous numeric DataFrames are hashed by values, shape, dtypes, columns,
-        index, and attrs, ignoring their internal storage layout. Other objects use
-        the existing pickle-based traversal with the faster digest.
-        This is a best-effort check, not a guarantee of object equality: unusual
-        metadata or representation differences may be missed. All numeric values
-        are read; values are not sampled. Explicit 'md5' or 'sha1' preserves the
-        legacy traversal and digest, including DataFrame storage details.
+        All modes use the same pickle-based object traversal and joblib's direct
+        buffer handling for numeric arrays. Array and DataFrame storage layouts
+        are not normalized, so layout changes can produce different hashes.
+        All numeric values are read; values are not sampled. This is a best-effort
+        check, not a guarantee of object equality. Explicit 'md5' or 'sha1' selects
+        that digest instead of XXH3-128.
     coerce_mmap: boolean
         Make no difference between np.memmap and np.ndarray
 
@@ -200,11 +176,9 @@ def custom_hash(obj, hash_name=None, coerce_mmap=False):
     if hash_name not in valid_hash_names:
         raise ValueError(f"Valid options for 'hash_name' are {valid_hash_names}. Got hash_name={hash_name!r} instead.")
     if "torch" in sys.modules or "tensorflow" in sys.modules:
-        hasher_class = _FastNNHasher if hash_name is None else NNHasher
-        hasher = hasher_class(hash_name=hash_name or "md5", coerce_mmap=coerce_mmap)
+        hasher = NNHasher(hash_name=hash_name or "md5", coerce_mmap=coerce_mmap)
     elif "numpy" in sys.modules:
-        hasher_class = _FastNumpyHasher if hash_name is None else NoMemoizeNumpyHasher
-        hasher = hasher_class(hash_name=hash_name or "md5", coerce_mmap=coerce_mmap)
+        hasher = NoMemoizeNumpyHasher(hash_name=hash_name or "md5", coerce_mmap=coerce_mmap)
     else:
         hasher = NoMemoizeHasher(hash_name=hash_name or "md5")
     if hash_name is None:
