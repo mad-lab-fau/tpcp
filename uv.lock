@@ -2509,6 +2509,7 @@ test = [
     { name = "optuna" },
     { name = "pytest" },
     { name = "pytest-xdist" },
+    { name = "sphinx" },
 ]
 
 [package.metadata]
@@ -2565,6 +2566,7 @@ test = [
     { name = "optuna", specifier = ">=2.10" },
     { name = "pytest", specifier = ">=8.4.2,<9" },
     { name = "pytest-xdist", specifier = ">=3.8.0,<4" },
+    { name = "sphinx", specifier = ">=7.2.6,<8" },
 ]
 
 [[package]]
