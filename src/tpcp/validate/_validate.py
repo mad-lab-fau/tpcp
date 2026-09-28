@@ -1,6 +1,5 @@
 """Helper to validate/evaluate pipelines and Optimize."""
 
-from collections.abc import Iterator
 from functools import partial
 from typing import Any
 
@@ -24,7 +23,7 @@ def cross_validate(
     dataset: DatasetT,
     *,
     scoring: ScoreFunc[PipelineT, DatasetT],
-    cv: BaseDatasetSplitter | int | BaseCrossValidator | Iterator | None = None,
+    cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None = None,
     n_jobs: int | None = None,
     verbose: int = 0,
     optimize_params: dict[str, Any] | None = None,
@@ -50,9 +49,8 @@ def cross_validate(
         This function should return either a single score or a dictionary of scores.
     cv
         The cross-validation strategy to use.
-        For simple use-cases the same input as for the sklearn cross-validation function are supported.
-        For further inputs check the `sklearn` `documentation
-        <https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_validate.html>`_.
+        Accepts an integer, a sklearn-style splitter, a native tpcp splitter, or an explicit list of
+        positional fold assignments. Convert other positional iterables with ``list(folds)`` before passing them.
 
         For grouping or stratification, use :class:`~tpcp.validate.DatasetSplitter`. Native tpcp splitters such as
         :class:`~tpcp.validate.CombinedSplitter` can also be passed directly.

@@ -176,7 +176,7 @@ def test_native_splitters_work_in_validation_and_grid_search():
     assert len(optimizer.cv_results_["split1__test__agg__score"]) == 1
 
 
-def test_positional_iterable_is_adapted_on_reordered_dataset():
+def test_positional_fold_list_is_adapted_on_reordered_dataset():
     dataset = DummyDataset()[[4, 1, 3, 0, 2]]
     positional_folds = [([0, 1, 2], [3, 4]), ([3, 4], [0, 1, 2])]
     assert list(DatasetSplitter(positional_folds).split(dataset)) == [
@@ -187,3 +187,56 @@ def test_positional_iterable_is_adapted_on_reordered_dataset():
         Optimize(DummyOptimizablePipeline()), dataset, cv=positional_folds, scoring=_score, progress_bar=False
     )
     assert result["test__data_labels"] == [[(0,), (2,)], [(4,), (1,), (3,)]]
+
+
+def test_positional_fold_list_survives_count_split_and_clone():
+    dataset = DummyDataset()[[4, 1, 3, 0, 2]]
+    folds = [([0, 1, 2], [3, 4]), ([3, 4], [0, 1, 2])]
+    splitter = DatasetSplitter(folds)
+    cloned = splitter.clone()
+    expected = [
+        ([(4,), (1,), (3,)], [(0,), (2,)]),
+        ([(0,), (2,)], [(4,), (1,), (3,)]),
+    ]
+    assert splitter.get_n_splits(dataset) == 2
+    assert list(splitter.split(dataset)) == expected
+    assert list(splitter.split(dataset)) == expected
+    assert list(cloned.split(dataset)) == expected
+
+
+def test_combined_raw_fold_list_survives_count_split_and_grid_search():
+    dataset = DummyDataset()
+    folds = [([0, 1, 2], [3, 4]), ([3, 4], [0, 1, 2])]
+    splitter = CombinedSplitter((lambda ds: ds, folds))
+    cloned = splitter.clone()
+    expected = [
+        ([(0,), (1,), (2,)], [(3,), (4,)]),
+        ([(3,), (4,)], [(0,), (1,), (2,)]),
+    ]
+    assert splitter.get_n_splits(dataset) == 2
+    assert list(splitter.split(dataset)) == expected
+    assert list(splitter.split(dataset)) == expected
+    assert list(cloned.split(dataset)) == expected
+    optimizer = GridSearchCV(
+        DummyOptimizablePipeline(), [{"para_1": 1}], cv=splitter, scoring=_score, progress_bar=False
+    )
+    optimizer.optimize(dataset)
+    assert len(optimizer.cv_results_["split0__test__agg__score"]) == 1
+    assert len(optimizer.cv_results_["split1__test__agg__score"]) == 1
+
+
+@pytest.mark.parametrize("make_folds", [lambda: iter([([0, 1], [2, 3, 4])]), lambda: (([0, 1], [2, 3, 4]),)])
+def test_non_list_positional_folds_require_explicit_list_conversion(make_folds):
+    dataset = DummyDataset()
+    with pytest.raises(ValueError, match=r"list\(folds\)"):
+        DatasetSplitter(make_folds()).get_n_splits(dataset)
+    with pytest.raises(ValueError, match=r"list\(folds\)"):
+        CombinedSplitter((lambda ds: ds, make_folds())).get_n_splits(dataset)
+    with pytest.raises(ValueError, match=r"list\(folds\)"):
+        cross_validate(
+            Optimize(DummyOptimizablePipeline()), dataset, cv=make_folds(), scoring=_score, progress_bar=False
+        )
+    with pytest.raises(ValueError, match=r"list\(folds\)"):
+        GridSearchCV(
+            DummyOptimizablePipeline(), [{"para_1": 1}], cv=make_folds(), scoring=_score, progress_bar=False
+        ).optimize(dataset)

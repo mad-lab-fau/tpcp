@@ -2,7 +2,6 @@
 
 import numbers
 from collections.abc import Callable, Iterator
-from typing import Optional
 
 from tpcp import Dataset
 from tpcp._dataset import GroupLabelT
@@ -19,7 +18,7 @@ def _validate_subset(parent: Dataset, selected: Dataset) -> list[GroupLabelT]:
     return labels
 
 
-def _selected_labels(dataset: Dataset, selector: Optional[DatasetSelector]) -> list[GroupLabelT]:
+def _selected_labels(dataset: Dataset, selector: DatasetSelector | None) -> list[GroupLabelT]:
     return [] if selector is None else _validate_subset(dataset, selector(dataset))
 
 
@@ -44,7 +43,7 @@ class NoSplit(BaseDatasetSplitter):
     """
 
     def __init__(
-        self, n_splits: int, *, train: Optional[DatasetSelector] = None, test: Optional[DatasetSelector] = None
+        self, n_splits: int, *, train: DatasetSelector | None = None, test: DatasetSelector | None = None
     ) -> None:
         self.n_splits = n_splits
         self.train = train
@@ -79,6 +78,7 @@ class CombinedSplitter(BaseDatasetSplitter, metaclass=_VariadicPairsMeta):
     Construct with one or more ``(selector, splitter)`` pairs. Each selector receives the current
     dataset and returns a subset. A child splitter can be a native tpcp splitter or any input
     accepted by :class:`DatasetSplitter`, including raw sklearn splitters.
+    Positional fold assignments must be supplied as lists, including for raw child inputs.
 
     All children must report the same fold count and yield exactly that many folds. Train and test
     labels are deduplicated separately in first-occurrence order, and overlapping assignments raise

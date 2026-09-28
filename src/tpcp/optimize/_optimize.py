@@ -3,7 +3,7 @@
 import time
 import warnings
 from collections import defaultdict
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 from functools import partial
 from tempfile import TemporaryDirectory
@@ -564,9 +564,8 @@ class GridSearchCV(
         In case of a single score, use `-score` to select the value with the lowest score.
     cv
         The cross-validation strategy to use.
-        For simple use-cases the same input as for the sklearn cross-validation function are supported.
-        For further inputs check the `sklearn` `documentation
-        <https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_validate.html>`_.
+        Accepts an integer, a sklearn-style splitter, a native tpcp splitter, or an explicit list of
+        positional fold assignments. Convert other positional iterables with ``list(folds)`` before passing them.
 
         For grouping or stratification, use :class:`~tpcp.validate.DatasetSplitter`.
     train_dataset_transform
@@ -708,7 +707,7 @@ class GridSearchCV(
     parameter_grid: ParameterGrid
     scoring: ScorerTypes[OptimizablePipelineT, DatasetT]
     return_optimized: bool | str
-    cv: BaseDatasetSplitter | int | BaseCrossValidator | Iterator | None
+    cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None
     train_dataset_transform: Callable[[DatasetT], DatasetT] | None
     pure_parameters: bool | list[str]
     return_train_score: bool
@@ -733,7 +732,7 @@ class GridSearchCV(
         *,
         scoring: ScorerTypes[OptimizablePipelineT, DatasetT],
         return_optimized: bool | str = True,
-        cv: BaseDatasetSplitter | int | BaseCrossValidator | Iterator | None = None,
+        cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None = None,
         train_dataset_transform: Callable[[DatasetT], DatasetT] | None = None,
         pure_parameters: bool | list[str] = False,
         return_train_score: bool = False,
