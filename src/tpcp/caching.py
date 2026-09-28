@@ -548,7 +548,9 @@ def hybrid_cache(
         If False, no lru_cache is used.
 
     fast_inaccurate_hashing
-        Enable when checking large arrays or DataFrames makes cached calls slow.
+        Enable when checking large NumPy arrays or pandas DataFrames makes cached
+        calls slow. This can reduce the time spent checking whether a result is
+        already cached.
         Leave disabled if cache lookups are already fast or you want to reuse
         results cached with the default settings. Switching this option can
         require results to be computed again.
@@ -570,6 +572,16 @@ def hybrid_cache(
     >>> df1 = pd.DataFrame({"a": [1, 2, 3]})
     >>> df2 = pd.DataFrame({"a": [4, 5, 6]})
     >>> add(df1, df2)
+
+    For large inputs, enable faster hashing if cache lookups are slow:
+
+    >>> @hybrid_cache(
+    ...     Memory(".cache", verbose=0),
+    ...     lru_cache_maxsize=2,
+    ...     fast_inaccurate_hashing=True,
+    ... )
+    ... def extract_features(data):
+    ...     return data.mean()
 
     """
     _global_cache_warning()
