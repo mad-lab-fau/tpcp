@@ -142,7 +142,7 @@ dataset[0].labels_as_array().shape
 # We store the prediction on our output attribute `predictions_`.
 # The trailing underscore is a convention to signify, that this is an "result" attribute.
 import warnings
-from typing import Optional
+from typing import Self
 
 from tpcp import (
     OptimizablePipeline,
@@ -150,13 +150,12 @@ from tpcp import (
     make_action_safe,
     make_optimize_safe,
 )
-from typing_extensions import Self
 
 
 class KerasPipeline(OptimizablePipeline):
     n_dense_layer_nodes: int
     n_train_epochs: int
-    _model: OptiPara[Optional[tf.keras.Sequential]]
+    _model: OptiPara[tf.keras.Sequential | None]
 
     predictions_: np.ndarray
 
@@ -164,7 +163,7 @@ class KerasPipeline(OptimizablePipeline):
         self,
         n_dense_layer_nodes=128,
         n_train_epochs=5,
-        _model: Optional[tf.keras.Sequential] = None,
+        _model: tf.keras.Sequential | None = None,
     ):
         self.n_dense_layer_nodes = n_dense_layer_nodes
         self.n_train_epochs = n_train_epochs
@@ -185,7 +184,7 @@ class KerasPipeline(OptimizablePipeline):
 
         print(data.shape)
         if self._model is not None:
-            warnings.warn("Overwriting existing model!")
+            warnings.warn("Overwriting existing model!", stacklevel=2)
 
         self._model = tf.keras.Sequential(
             [

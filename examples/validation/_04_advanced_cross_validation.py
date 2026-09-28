@@ -1,5 +1,5 @@
 """
-Advanced cross-validation
+Advanced cross-validation.
 -------------------------
 In many real world datasets, a normal k-fold cross-validation might not be ideal, as it assumes that each data point is
 fully independent of each other.

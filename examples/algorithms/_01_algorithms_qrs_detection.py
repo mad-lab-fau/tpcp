@@ -239,7 +239,7 @@ class OptimizableQrsDetector(QRSDetector):
     ):
         all_labels = []
         all_peak_heights = []
-        for d, p in zip(ecg_data, r_peaks):
+        for d, p in zip(ecg_data, r_peaks, strict=False):
             filtered = self._filter(d.to_numpy().flatten(), sampling_rate_hz)
             # Find all potential peaks without the height threshold
             potential_peaks = self._search_strategy(

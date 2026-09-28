@@ -8,15 +8,14 @@ authors = [
     { name = "Raul C. Sîmpetru", email = "raul.simpetru@fau.de" },
     { name = "Björn Eskofier", email = "bjoern.eskofier@fau.de" },
 ]
-requires-python = ">=3.9,<4.0"
+requires-python = ">=3.11,<4.0"
 readme = "README.md"
 dependencies = [
     "joblib>=1.3",
     "scikit-learn>=1.2.0",
-    "numpy>=1.0",
-    "pandas>=1.3",
+    "numpy>=1.26",
+    "pandas>=3.0",
     "tqdm>=4.62.3",
-    "typing-extensions>=4.1.1",
     "xxhash>=3.0",
 ]
 
@@ -106,7 +105,7 @@ docs_preview = { cmd = "python -m http.server --directory docs/_build/html", hel
 version = { "script" = "_tasks:task_update_version()" }
 
 [tool.pyright]
-pythonVersion = "3.9"
+pythonVersion = "3.11"
 
 [build-system]
 requires = ["uv_build>=0.10.4,<0.11.0"]

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Callable
 from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Generic,
-    Optional,
+    Protocol,
+    Self,
     TypeVar,
     Union,
 )
@@ -17,7 +18,6 @@ from typing import (
 import numpy as np
 import pandas as pd
 from tqdm.auto import tqdm
-from typing_extensions import Protocol, Self
 
 from tpcp import NOTHING
 from tpcp._base import BaseTpcpObject, _Nothing, cf
@@ -33,12 +33,12 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 T = TypeVar("T")
-AggReturnType = Union[float, dict[str, float], _Nothing]
+AggReturnType = float | dict[str, float] | _Nothing
 
 
 SingleScoreType = Union[float, "Aggregator[Any]"]
 MultiScoreType = dict[str, SingleScoreType]
-ScoreType = Union[SingleScoreType, MultiScoreType]
+ScoreType = SingleScoreType | MultiScoreType
 
 ScoreFuncSingle = Callable[[PipelineT, DatasetT], SingleScoreType]
 ScoreFuncMultiple = Callable[[PipelineT, DatasetT], MultiScoreType]
@@ -146,12 +146,12 @@ class Aggregator(BaseTpcpObject, Generic[T]):
 
 class FloatAggregator(Aggregator[float]):
     def __init__(
-        self, func: Callable[[Sequence[float]], Union[float, dict[str, float]]], *, return_raw_scores: bool = True
+        self, func: Callable[[Sequence[float]], float | dict[str, float]], *, return_raw_scores: bool = True
     ) -> None:
         self.func = func
         super().__init__(return_raw_scores=return_raw_scores)
 
-    def aggregate(self, /, values: Sequence[float], datapoints: Sequence[Dataset]) -> Union[float, dict[str, float]]:  # noqa: ARG002
+    def aggregate(self, /, values: Sequence[float], datapoints: Sequence[Dataset]) -> float | dict[str, float]:  # noqa: ARG002
         """Aggregate a sequence of floats by taking the mean."""
         try:
             vals = self.func(values)
@@ -195,7 +195,7 @@ class MacroFloatAggregator(Aggregator[float]):
     def __init__(
         self,
         *,
-        groupby: Union[str, list[str]],
+        groupby: str | list[str],
         group_agg: Callable[[pd.DataFrame], float] = np.mean,
         final_agg: Callable[[pd.DataFrame], float] = np.mean,
         final_agg_name: str = "macro",
@@ -315,24 +315,24 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
 
     score_func: ScoreFunc[PipelineT, DatasetT]
     default_aggregator: Aggregator
-    final_aggregator: Optional[FinalAggregatorType[PipelineT, DatasetT]]
-    single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT]]
-    n_jobs: Optional[int]
+    final_aggregator: FinalAggregatorType[PipelineT, DatasetT] | None
+    single_score_callback: ScoreCallback[PipelineT, DatasetT] | None
+    n_jobs: int | None
     verbose: int
-    pre_dispatch: Union[str, int]
+    pre_dispatch: str | int
     progress_bar: bool
 
     def __init__(
         self,
         score_func: ScoreFunc[PipelineT, DatasetT, ScoreType],
         *,
-        final_aggregator: Optional[FinalAggregatorType[PipelineT, DatasetT]] = None,
+        final_aggregator: FinalAggregatorType[PipelineT, DatasetT] | None = None,
         default_aggregator: Aggregator = cf(FloatAggregator(np.nanmean)),
-        single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT, T]] = None,
+        single_score_callback: ScoreCallback[PipelineT, DatasetT, T] | None = None,
         # Multiprocess_kwargs
-        n_jobs: Optional[int] = None,
+        n_jobs: int | None = None,
         verbose: int = 0,
-        pre_dispatch: Union[str, int] = "2*n_jobs",
+        pre_dispatch: str | int = "2*n_jobs",
         progress_bar: bool = True,
     ) -> None:
         self.final_aggregator = final_aggregator
@@ -346,7 +346,7 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
 
     def __call__(
         self, pipeline: PipelineT, dataset: DatasetT
-    ) -> tuple[Union[float, dict[str, float]], Union[Optional[list], dict[str, list]]]:
+    ) -> tuple[float | dict[str, float], list | None | dict[str, list]]:
         """Score the pipeline with the provided data.
 
         Returns
@@ -363,7 +363,7 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
         self,
         scores: dict[str, tuple[Aggregator, list]],
         datapoints: list[DatasetT],
-    ) -> tuple[Union[float, dict[str, float]], Union[Optional[list], dict[str, list]]]:
+    ) -> tuple[float | dict[str, float], list | None | dict[str, list]]:
         """Aggregate the scores."""
         is_single = len(scores) == 1 and "__single__" in scores
         if is_single and isinstance(scores["__single__"][0], _NoAgg):
@@ -460,7 +460,7 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
         return agg_scores, raw_scores
 
 
-ScorerTypes = Union[ScoreFunc[PipelineT, DatasetT], Scorer[PipelineT, DatasetT]]
+ScorerTypes = ScoreFunc[PipelineT, DatasetT] | Scorer[PipelineT, DatasetT]
 
 
 def _validate_scorer(

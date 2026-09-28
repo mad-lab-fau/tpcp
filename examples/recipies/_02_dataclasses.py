@@ -48,7 +48,7 @@ class QRSDetector(Algorithm):
 # make sure that these parameters are excluded from the init.
 # Otherwise, tpcp will explode ;)
 #
-# Note, if you are using Python >=3.10, we highly recommend to use the `kw_only` option for dataclasses,
+# We recommend the `kw_only` option for dataclasses,
 # which prevent some of the inheritance issues of dataclasses.
 from dataclasses import dataclass, field
 from typing import ClassVar
@@ -92,8 +92,7 @@ QRSDetector(
 #
 # ... warning :: New parameters will be added at the end in the positional order in the init method.
 #                To avoid passing the wrong values to the wrong parameters, we highly recommend to pass parameters
-#                only by name and not by position, or use the `kw_only` parameter of dataclasses supported in Python
-#                >=3.10.
+#                only by name and not by position, or use the `kw_only` parameter of dataclasses.
 @dataclass(repr=False)
 class ModifiedQRSDetector(QRSDetector):
     new_parameter: Parameter[float] = 3

@@ -3,9 +3,7 @@
 This is in a separate file to avoid circular imports.
 """
 
-from typing import Any, ClassVar, Generic
-
-from typing_extensions import Self
+from typing import Any, ClassVar, Generic, Self
 
 from tpcp import Algorithm, Parameter
 from tpcp._dataset import DatasetT

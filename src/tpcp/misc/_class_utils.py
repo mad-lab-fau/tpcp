@@ -2,9 +2,8 @@
 
 import functools
 import inspect
-from typing import Any, Callable, Generic, Optional, TypeVar
-
-from typing_extensions import Concatenate, ParamSpec, Self, Unpack
+from collections.abc import Callable
+from typing import Any, Concatenate, Generic, ParamSpec, Self, TypeVar, Unpack
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -35,10 +34,10 @@ class classproperty(Generic[P, T, R]):  # noqa: N801
 
     """
 
-    def __init__(self, method: Optional[Callable[Concatenate[type[T], P], R]] = None):
+    def __init__(self, method: Callable[Concatenate[type[T], P], R] | None = None):
         self.fget = method
 
-    def __get__(self, instance: Optional[T], cls: Optional[type[T]] = None) -> R:
+    def __get__(self, instance: T | None, cls: type[T] | None = None) -> R:
         """Return the class property value."""
         return self.fget(cls)
 
@@ -92,6 +91,7 @@ def set_defaults(**defaults: Unpack[dict[str, Any]]) -> Callable[[Callable[P, R]
             for name, (kind, default) in zip(
                 sig.parameters,
                 [(p.kind, defaults.get(p.name, p.default)) for p in sig.parameters.values()],
+                strict=False,
             )
         ]
 

@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 import numpy as np
 import pytest
-from pandas._testing import assert_frame_equal
+from pandas.testing import assert_frame_equal
 
 from tests.test_pipelines.conftest import (
     DummyDataset,

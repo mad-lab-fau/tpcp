@@ -6,9 +6,9 @@ import functools
 import multiprocessing
 import sys
 import warnings
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pickle import PicklingError
-from typing import Callable, Generic, Optional, TypeVar, Union
+from typing import Generic, Optional, TypeVar
 
 from joblib import Memory
 from joblib.func_inspect import filter_args
@@ -41,9 +41,7 @@ _class_level_lru_cache_key = "__tpcp_lru_cached_action_method"
 T = TypeVar("T")
 
 
-def _get_action_method(
-    algorithm_object: type[Algorithm], action_func_name: Optional[str] = None
-) -> tuple[str, Callable]:
+def _get_action_method(algorithm_object: type[Algorithm], action_func_name: str | None = None) -> tuple[str, Callable]:
     action_names = get_action_methods_names(algorithm_object)
     if len(action_names) > 1 and not action_func_name:
         raise ValueError(
@@ -184,8 +182,8 @@ def _register_global_parallel_callback(func, name):
 def global_disk_cache(  # noqa: C901
     memory: Memory = Memory(None),
     *,
-    cache_only: Optional[Sequence[str]] = None,
-    action_method_name: Optional[str] = None,
+    cache_only: Sequence[str] | None = None,
+    action_method_name: str | None = None,
     restore_in_parallel_process: bool = True,
 ):
     """Wrap an algorithm/pipeline class to enable joblib based disk cashing for its primary action method.
@@ -368,10 +366,10 @@ def remove_disk_cache(algorithm_object: type[Algorithm]):
 
 
 def global_ram_cache(  # noqa: C901
-    max_n: Optional[int] = None,
+    max_n: int | None = None,
     *,
-    cache_only: Optional[Sequence[str]] = None,
-    action_method_name: Optional[str] = None,
+    cache_only: Sequence[str] | None = None,
+    action_method_name: str | None = None,
     restore_in_parallel_process: bool = True,
 ):
     """Wrap an algorithm/pipeline class to enable LRU based RAM cashing for the specified action method.
@@ -518,7 +516,7 @@ def remove_any_cache(algorithm_object: type[Algorithm]):
     return remove_disk_cache(remove_ram_cache(algorithm_object))
 
 
-def get_ram_cache_obj(algorithm_object: type[Algorithm], action_method_name: Optional[str] = None) -> Optional:
+def get_ram_cache_obj(algorithm_object: type[Algorithm], action_method_name: str | None = None) -> Optional:
     """Get the RAM cache object from an algorithm class."""
     action_method_name, _ = _get_action_method(algorithm_object, action_method_name)
     return getattr(algorithm_object, _class_level_lru_cache_key, None)[action_method_name]
@@ -529,7 +527,7 @@ _GLOBAL_CACHE_REGISTRY: dict[tuple[str, str], Callable] = {}
 
 def hybrid_cache(
     joblib_memory: Memory = Memory(None),
-    lru_cache_maxsize: Union[Optional[int], bool] = False,
+    lru_cache_maxsize: int | None | bool = False,
     *,
     fast_inaccurate_hashing: bool = False,
 ):

@@ -16,9 +16,9 @@ tuning hyperparameters <https://scikit-learn.org/stable/modules/grid_search.html
 """
 
 import random
+from typing import Self
 
 import pandas as pd
-from typing_extensions import Self
 
 random.seed(1)  # We set the random seed for repeatable results
 

@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- Python 3.11, pandas 3.0, and NumPy 1.26 are now the minimum supported versions. Upgrade these dependencies
+  before upgrading tpcp. Projects that must remain on older versions should pin to a release published before
+  this change. This support drop requires a major release.
+
 ### Added
 
 - Added `hybrid_cache(..., fast_inaccurate_hashing=True)` to opt in to fast, best-effort hashing for
@@ -13,7 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are isolated from default cache entries. Default hashing and joblib function-code invalidation
   are retained. Both modes use pickle-based object traversal with different digest algorithms.
   (https://github.com/mad-lab-fau/tpcp/issues/143)
-
 ### Changed
 
 - **Breaking:** `Scorer` now uses `numpy.nanmean` for scores without an explicit aggregator, ignoring NaN scores.

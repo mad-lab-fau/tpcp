@@ -1,9 +1,7 @@
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import fields, is_dataclass
-from typing import Any, Generic, Optional, TypeVar
-
-from typing_extensions import NamedTuple, TypeAlias
+from typing import Any, Generic, NamedTuple, TypeAlias, TypeVar
 
 from tpcp import Algorithm, cf
 from tpcp.misc._warning_error_context import WarningErrorContext
@@ -137,7 +135,7 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
         iterable: Iterable[T],
         *,
         iteration_name: str = "__main__",
-        iteration_context: Optional[dict[str, Any]] = None,
+        iteration_context: dict[str, Any] | None = None,
     ) -> Iterator[tuple[T, DataclassT]]:
         """Iterate over the given iterable and yield the input and a new empty result object for each iteration.
 
@@ -199,10 +197,10 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
     def warning_error_context(
         self,
         name: str,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         /,
         *,
-        context_provider: Optional[Callable[[], Mapping[str, Any]]] = None,
+        context_provider: Callable[[], Mapping[str, Any]] | None = None,
         record_only: bool = False,
     ) -> WarningErrorContext:
         """Create explicit warning/error context for an iteration body.
