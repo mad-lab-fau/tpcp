@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [3.1.0] - 2026-09-28
+
 ### Added
 
 - `NoSplit(None)` can take its fold count from another child of `CombinedSplitter`. At least one child must report an
