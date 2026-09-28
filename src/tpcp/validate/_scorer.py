@@ -272,6 +272,9 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
     ----------
     score_func
         The callable that is used to score each data point
+    default_aggregator
+        Aggregates scores that do not specify their own aggregator. By default, this uses ``numpy.nanmean``
+        and ignores NaN scores. Pass :func:`mean_agg` to retain the previous mean behavior.
     single_score_callback
         Callback function that is called after each datapoint that is scored.
         It should have the following call signature:
@@ -324,7 +327,7 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
         score_func: ScoreFunc[PipelineT, DatasetT, ScoreType],
         *,
         final_aggregator: Optional[FinalAggregatorType[PipelineT, DatasetT]] = None,
-        default_aggregator: Aggregator = cf(mean_agg),
+        default_aggregator: Aggregator = cf(FloatAggregator(np.nanmean)),
         single_score_callback: Optional[ScoreCallback[PipelineT, DatasetT, T]] = None,
         # Multiprocess_kwargs
         n_jobs: Optional[int] = None,
