@@ -189,6 +189,24 @@ class TestDataset:
             right=Dataset(subset_index=_create_valid_index()).get_subset(group_labels=group_labels).index,
         )
 
+    @pytest.mark.parametrize("labels", [["alice"], [42], [("alice", "extra")]])
+    def test_get_subset_group_labels_require_tuples_of_grouping_arity(self, labels):
+        dataset = Dataset(subset_index=pd.DataFrame({"participant": ["alice", "a"]}))
+        with pytest.raises(ValueError, match="group_labels.*tuple"):
+            dataset.get_subset(group_labels=labels)
+
+    def test_get_subset_group_labels_accept_namedtuples_and_empty_list(self):
+        dataset = Dataset(subset_index=pd.DataFrame({"participant": ["alice", "a"]}))
+        assert dataset.get_subset(group_labels=[dataset.group_labels[0]]).index["participant"].tolist() == ["alice"]
+        assert dataset.get_subset(group_labels=[]).index.empty
+
+    def test_get_subset_group_label_arity_uses_effective_grouping(self):
+        dataset = Dataset(subset_index=_create_valid_index()).groupby(["patients", "tests"])
+        with pytest.raises(ValueError, match="2 entries"):
+            dataset.get_subset(group_labels=[("patient_1",)])
+        with pytest.raises(ValueError, match="2 entries"):
+            dataset.get_subset(group_labels=[("patient_1", "test_1", "0")])
+
     def test_equals(self):
         ds = Dataset(subset_index=_create_valid_index())
         ds2 = Dataset(subset_index=_create_valid_index())
