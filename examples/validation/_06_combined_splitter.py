@@ -65,9 +65,9 @@ selected_extras.index
 # testing because its ``test`` selector is omitted. The remaining three
 # train-only datapoints are unused.
 #
-# Both splitters must report the same number of folds. A raw sklearn splitter
-# such as ``KFold`` can be passed directly; ``CombinedSplitter`` adapts its
-# positional outputs to dataset group labels.
+# ``KFold`` supplies the fold count, so ``NoSplit`` can leave it unspecified.
+# A raw sklearn splitter such as ``KFold`` can be passed directly;
+# ``CombinedSplitter`` adapts its positional outputs to dataset group labels.
 
 n_splits = 3
 cv = CombinedSplitter(
@@ -78,7 +78,7 @@ cv = CombinedSplitter(
         ),
         (
             lambda ds: ds.get_subset(kind="train_only"),
-            NoSplit(n_splits=n_splits, train=select_training_extras),
+            NoSplit(n_splits=None, train=select_training_extras),
         ),
     ]
 )

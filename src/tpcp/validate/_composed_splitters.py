@@ -5,7 +5,7 @@ from collections.abc import Callable, Iterator
 
 from tpcp import Dataset
 from tpcp._dataset import GroupLabelT
-from tpcp.validate._cross_val_helper import BaseDatasetSplitter, _normalize_splitter
+from tpcp.validate._cross_val_helper import BaseDatasetSplitter, _normalize_splitter, _requested_fold_count
 
 DatasetSelector = Callable[[Dataset], Dataset]
 
@@ -37,27 +37,33 @@ class NoSplit(BaseDatasetSplitter):
     Parameters
     ----------
     n_splits
-        A positive integer number of identical folds to yield.
+        A positive integer number of identical folds to yield. Use ``None`` to
+        supply the count through ``split(dataset, n_splits=...)`` or through
+        another child of :class:`CombinedSplitter`.
     train, test
         Optional callables that receive the current dataset and return a dataset with group labels from it.
     """
 
     def __init__(
-        self, n_splits: int, *, train: DatasetSelector | None = None, test: DatasetSelector | None = None
+        self, n_splits: int | None, *, train: DatasetSelector | None = None, test: DatasetSelector | None = None
     ) -> None:
         self.n_splits = n_splits
         self.train = train
         self.test = test
 
-    def get_n_splits(self, dataset: Dataset) -> int:  # noqa: ARG002
-        """Return the configured number of folds."""
+    def get_n_splits(self, dataset: Dataset) -> int | None:  # noqa: ARG002
+        """Return the configured number of folds, or ``None`` if unspecified."""
+        if self.n_splits is None:
+            return None
         if isinstance(self.n_splits, bool) or not isinstance(self.n_splits, numbers.Integral) or self.n_splits < 1:
             raise ValueError("n_splits must be a positive integer.")
         return int(self.n_splits)
 
-    def split(self, dataset: Dataset) -> Iterator[tuple[list[GroupLabelT], list[GroupLabelT]]]:
-        """Yield the selected group labels exactly ``n_splits`` times."""
-        count = self.get_n_splits(dataset)
+    def split(
+        self, dataset: Dataset, n_splits: int | None = None
+    ) -> Iterator[tuple[list[GroupLabelT], list[GroupLabelT]]]:
+        """Yield the selected group labels for the requested number of folds."""
+        count = _requested_fold_count(n_splits, self.get_n_splits(dataset))
         train = _selected_labels(dataset, self.train)
         test = _selected_labels(dataset, self.test)
         _check_disjoint(train, test)
@@ -73,10 +79,13 @@ class CombinedSplitter(BaseDatasetSplitter):
     accepted by :class:`DatasetSplitter`, including raw sklearn splitters.
     Positional fold assignments must be supplied as lists, including for raw child inputs.
 
-    All children must report the same fold count and yield exactly that many folds. Train and test
-    labels are deduplicated separately in first-occurrence order, and overlapping assignments raise
-    ``ValueError``. Selectors receive the current input dataset, including within nested splits,
-    and may return any dataset whose group labels belong to that input.
+    All specified fold counts must match, and at least one child must specify a count.
+    Children that report ``None`` receive that count through their ``split`` method.
+    All children must yield exactly that many folds. Train and test labels are
+    deduplicated separately in first-occurrence order, and overlapping assignments
+    raise ``ValueError``. Selectors receive the current input dataset, including
+    within nested splits, and may return any dataset whose group labels belong to
+    that input.
 
     For example, cross-validate real recordings and always train on artificial recordings::
 
@@ -90,7 +99,7 @@ class CombinedSplitter(BaseDatasetSplitter):
                 ),
                 (
                     lambda ds: ds.get_subset(recording_type="artificial"),
-                    NoSplit(5, train=lambda ds: ds),
+                    NoSplit(None, train=lambda ds: ds),
                 ),
             ],
         )
@@ -115,21 +124,30 @@ class CombinedSplitter(BaseDatasetSplitter):
         return prepared
 
     @staticmethod
-    def _fold_count(prepared: list[tuple[Dataset, BaseDatasetSplitter]]) -> int:
-        counts = [splitter.get_n_splits(dataset) for dataset, splitter in prepared]
+    def _fold_count(prepared: list[tuple[Dataset, BaseDatasetSplitter]]) -> tuple[int, list[int | None]]:
+        reported = [splitter.get_n_splits(dataset) for dataset, splitter in prepared]
+        counts = [count for count in reported if count is not None]
+        if not counts:
+            raise ValueError("CombinedSplitter requires at least one child to report an integer number of folds.")
         if len(set(counts)) != 1:
             raise ValueError("All child splitters must report the same number of folds.")
-        return counts[0]
+        return counts[0], reported
 
     def get_n_splits(self, dataset: Dataset) -> int:
         """Return the shared number of folds after selecting each part."""
-        return self._fold_count(self._prepare(dataset))
+        return self._fold_count(self._prepare(dataset))[0]
 
-    def split(self, dataset: Dataset) -> Iterator[tuple[list[GroupLabelT], list[GroupLabelT]]]:
+    def split(
+        self, dataset: Dataset, n_splits: int | None = None
+    ) -> Iterator[tuple[list[GroupLabelT], list[GroupLabelT]]]:
         """Yield deduplicated, disjoint train and test labels for corresponding child folds."""
         prepared = self._prepare(dataset)
-        count = self._fold_count(prepared)
-        iterators = [iter(splitter.split(selected)) for selected, splitter in prepared]
+        available, reported = self._fold_count(prepared)
+        count = _requested_fold_count(n_splits, available)
+        iterators = [
+            iter(splitter.split(selected, n_splits=count)) if child_count is None else iter(splitter.split(selected))
+            for (selected, splitter), child_count in zip(prepared, reported, strict=True)
+        ]
         for _ in range(count):
             folds = []
             for child in iterators:
@@ -141,7 +159,9 @@ class CombinedSplitter(BaseDatasetSplitter):
             test = list(dict.fromkeys(label for fold in folds for label in fold[1]))
             _check_disjoint(train, test)
             yield train, test
-        for child in iterators:
+        for child, child_count in zip(iterators, reported, strict=True):
+            if child_count is not None and count < available:
+                continue
             try:
                 next(child)
             except StopIteration:

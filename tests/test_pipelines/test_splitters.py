@@ -34,6 +34,17 @@ def test_no_split_repeats_labels_and_selects_once():
     assert calls == ["train", "test"]
 
 
+def test_split_can_request_fewer_folds_or_bind_an_unbounded_splitter():
+    dataset = DummyDataset()
+    assert len(list(DatasetSplitter(5).split(dataset, n_splits=2))) == 2
+    assert list(NoSplit(3).split(dataset, n_splits=2)) == [([], [])] * 2
+    assert list(NoSplit(None).split(dataset, n_splits=2)) == [([], [])] * 2
+    with pytest.raises(ValueError, match="exceeds"):
+        list(DatasetSplitter(5).split(dataset, n_splits=6))
+    with pytest.raises(ValueError, match="exceeds"):
+        list(NoSplit(3).split(dataset, n_splits=4))
+
+
 def test_no_split_omitted_sides_and_overlap():
     dataset = DummyDataset()
     assert list(NoSplit(2).split(dataset)) == [([], [])] * 2
@@ -46,6 +57,69 @@ def test_no_split_omitted_sides_and_overlap():
 def test_no_split_requires_positive_integer_count(count):
     with pytest.raises(ValueError, match="positive integer"):
         NoSplit(count).get_n_splits(DummyDataset())
+
+
+def test_combined_splitter_uses_known_count_for_no_split_parts():
+    dataset = DummyGroupedDataset()
+    splitter = CombinedSplitter(
+        parts=[
+            (lambda ds: ds.get_subset(v1="a"), DatasetSplitter(5)),
+            (lambda ds: ds.get_subset(v1="b"), NoSplit(None, train=lambda ds: ds)),
+            (lambda ds: ds.get_subset(v1="c"), NoSplit(None, test=lambda ds: ds)),
+        ]
+    )
+    assert NoSplit(None).get_n_splits(dataset) is None
+    assert splitter.get_n_splits(dataset) == 5
+    folds = list(splitter.split(dataset))
+    assert len(folds) == 5
+    assert folds[0] == (
+        [("a", i) for i in range(1, 5)] + [("b", i) for i in range(5)],
+        [("a", 0)] + [("c", i) for i in range(5)],
+    )
+    assert splitter.parts[1][1].n_splits is None
+    assert list(splitter.split(dataset, n_splits=2)) == folds[:2]
+    with pytest.raises(ValueError, match="exceeds"):
+        list(splitter.split(dataset, n_splits=6))
+
+
+def test_combined_splitter_requires_a_known_fold_count():
+    dataset = DummyDataset()
+    splitter = CombinedSplitter(parts=[(lambda ds: ds, NoSplit(None))])
+    with pytest.raises(ValueError, match=r"at least one.*number of folds"):
+        splitter.get_n_splits(dataset)
+    with pytest.raises(ValueError, match=r"at least one.*number of folds"):
+        list(splitter.split(dataset))
+    with pytest.raises(ValueError, match="requires a fold count"):
+        list(NoSplit(None).split(dataset))
+
+
+class _UnboundedSplitter(BaseDatasetSplitter):
+    def get_n_splits(self, dataset: Dataset) -> None:
+        return None
+
+    def split(self, dataset: Dataset, n_splits: int | None = None) -> Iterator:
+        if n_splits is None:
+            raise ValueError("A fold count is required.")
+        for _ in range(n_splits):
+            yield dataset.group_labels, []
+
+
+def test_combined_splitter_passes_count_to_any_unbounded_child():
+    dataset = DummyDataset()
+    splitter = CombinedSplitter(parts=[(lambda ds: ds, NoSplit(3)), (lambda ds: ds, _UnboundedSplitter())])
+    assert list(splitter.split(dataset, n_splits=2)) == [(dataset.group_labels, [])] * 2
+
+
+def test_combined_splitter_rejects_extra_folds_from_unbounded_child():
+    class ExtraFoldSplitter(_UnboundedSplitter):
+        def split(self, dataset: Dataset, n_splits: int | None = None) -> Iterator:
+            yield from super().split(dataset, n_splits=n_splits)
+            yield dataset.group_labels, []
+
+    dataset = DummyDataset()
+    splitter = CombinedSplitter(parts=[(lambda ds: ds, NoSplit(3)), (lambda ds: ds, ExtraFoldSplitter())])
+    with pytest.raises(ValueError, match="more folds"):
+        list(splitter.split(dataset, n_splits=2))
 
 
 def test_combined_splitter_pairs_selected_folds_and_excludes_other_groups():

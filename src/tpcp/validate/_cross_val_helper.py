@@ -1,6 +1,7 @@
 import numbers
 import warnings
 from collections.abc import Iterator
+from itertools import islice
 
 from sklearn.model_selection import BaseCrossValidator, GroupKFold, StratifiedGroupKFold, StratifiedKFold, check_cv
 
@@ -9,15 +10,35 @@ from tpcp._dataset import GroupLabelT
 
 
 class BaseDatasetSplitter(BaseTpcpObject):
-    """Base class for splitters that yield dataset group labels."""
+    """Base class for splitters that yield dataset group labels.
 
-    def split(self, dataset: Dataset) -> Iterator[tuple[list[GroupLabelT], list[GroupLabelT]]]:
+    ``split(dataset, n_splits=None)`` yields all available folds by default. A positive
+    ``n_splits`` requests that many folds. Splitters with a finite fold count reject
+    requests above ``get_n_splits(dataset)``; splitters that return ``None`` require
+    an explicit count to avoid unbounded iteration.
+    """
+
+    def split(
+        self, dataset: Dataset, n_splits: int | None = None
+    ) -> Iterator[tuple[list[GroupLabelT], list[GroupLabelT]]]:
         """Yield train and test group labels for each fold."""
         raise NotImplementedError
 
-    def get_n_splits(self, dataset: Dataset) -> int:
-        """Return the number of folds for the dataset."""
+    def get_n_splits(self, dataset: Dataset) -> int | None:
+        """Return the number of folds, or ``None`` if it is unbounded."""
         raise NotImplementedError
+
+
+def _requested_fold_count(requested: int | None, available: int | None) -> int:
+    if requested is None:
+        if available is None:
+            raise ValueError("This splitter requires a fold count when get_n_splits returns None.")
+        return available
+    if isinstance(requested, bool) or not isinstance(requested, numbers.Integral) or requested < 1:
+        raise ValueError("n_splits must be a positive integer.")
+    if available is not None and requested > available:
+        raise ValueError("Requested n_splits exceeds the available fold count.")
+    return int(requested)
 
 
 def _normalize_splitter(cv) -> BaseDatasetSplitter:
@@ -135,12 +156,17 @@ class DatasetSplitter(BaseDatasetSplitter):
             return dataset.create_string_group_labels(labels)
         return None
 
-    def split(self, dataset: Dataset) -> Iterator[tuple[list[GroupLabelT], list[GroupLabelT]]]:
+    def split(
+        self, dataset: Dataset, n_splits: int | None = None
+    ) -> Iterator[tuple[list[GroupLabelT], list[GroupLabelT]]]:
         """Yield train and test group labels, in the order returned by the base splitter."""
         labels = dataset.group_labels
-        for train, test in self._get_splitter().split(
+        folds = self._get_splitter().split(
             dataset, y=self._get_labels(dataset, self.stratify), groups=self._get_labels(dataset, self.groupby)
-        ):
+        )
+        if n_splits is not None:
+            folds = islice(folds, _requested_fold_count(n_splits, self.get_n_splits(dataset)))
+        for train, test in folds:
             yield [labels[i] for i in train], [labels[i] for i in test]
 
     def get_n_splits(self, dataset: Dataset) -> int:
