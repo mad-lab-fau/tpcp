@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Breaking
+
+- `hybrid_cache` now defaults to `evict_before_load=True` for bounded RAM caches, an explicitly approved
+  change to the previous default. On a miss at capacity it releases the oldest key and result before
+  loading from disk or computing a replacement. Failed loads do not restore the evicted entry.
+  Pass `evict_before_load=False` to keep the previous `functools.lru_cache` behavior.
+  Disabled, zero-size, and unbounded caches are unaffected. Concurrent and recursive loads run outside
+  the bookkeeping lock and can compute the same key more than once. This reduces cache-owned memory
+  retention without guaranteeing a process memory limit or forcing garbage collection.
+  (https://github.com/mad-lab-fau/tpcp/issues/159, https://github.com/mad-lab-fau/tpcp/pull/160)
+
 ## [3.1.0] - 2026-09-28
 
 ### Added

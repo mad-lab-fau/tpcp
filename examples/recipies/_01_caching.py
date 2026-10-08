@@ -502,6 +502,9 @@ remove_any_cache(QRSDetector)
 #
 # This is exactly what we implemented in :func:`~tpcp.caching.hybrid_cache`.
 # It is a decorator that takes a function and wraps it in a RAM cache and a disk cache.
+# A bounded RAM cache releases its oldest key and result before loading a replacement by default.
+# This reduces overlap between large results, but a failed replacement leaves that entry evicted.
+# Pass ``evict_before_load=False`` to keep the previous behavior of retaining the old entry until loading succeeds.
 #
 # Below we define a simple function and wrap it with the staggered cache.
 # Then we call it 3 times with different arguments.

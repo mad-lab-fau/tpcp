@@ -1,5 +1,8 @@
 import warnings
+import weakref
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
+from threading import Barrier, Event, Thread
 from typing import Callable, Literal
 
 import joblib
@@ -491,3 +494,318 @@ def test_fast_disk_cache_preserves_memmap_configuration(tmp_path, hybrid_cache_c
     mapped[:] = data
     np.testing.assert_array_equal(cached(mapped), result)
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize("fast", [False, True])
+@pytest.mark.parametrize("keyword", [False, True])
+def test_hybrid_releases_previous_key_and_result_before_loading(hybrid_cache_clear, fast, keyword):
+    previous = []
+
+    def load(data):
+        if previous:
+            assert all(ref() is None for ref in previous)
+        return np.array([data.sum()])
+
+    cached = hybrid_cache(Memory(None), 1, fast_inaccurate_hashing=fast)(load)
+    data = np.array([1])
+    result = cached(data=data) if keyword else cached(data)
+    previous.extend([weakref.ref(data), weakref.ref(result)])
+    del data, result
+    replacement = cached(data=np.array([2])) if keyword else cached(np.array([2]))
+    assert replacement.tolist() == [2]
+
+
+@pytest.mark.parametrize("fast", [False, True])
+def test_hybrid_early_eviction_retains_hits_and_lru_order(hybrid_cache_clear, fast):
+    calls = []
+
+    def load(value):
+        calls.append(value)
+        return np.array([value])
+
+    cached = hybrid_cache(Memory(None), 2, fast_inaccurate_hashing=fast)(load)
+    first = cached(1)
+    second_ref = weakref.ref(cached(2))
+    assert cached(1) is first
+    assert cached(3).tolist() == [3]
+    assert second_ref() is None
+    assert cached(1) is first
+    assert cached(2).tolist() == [2]
+    assert calls == [1, 2, 3, 2]
+
+
+@pytest.mark.parametrize("early", [False, True])
+def test_hybrid_failed_replacement_and_legacy_retention(hybrid_cache_clear, early):
+    previous = []
+    fail = True
+
+    def load(value):
+        if value == 2:
+            assert (previous[0]() is None) is early
+            if fail:
+                raise RuntimeError("replacement failed")
+        return np.array([value])
+
+    cached = hybrid_cache(Memory(None), 1, evict_before_load=early)(load)
+    previous.append(weakref.ref(cached(1)))
+    with pytest.raises(RuntimeError, match="replacement failed"):
+        cached(2)
+    assert (previous[0]() is None) is early
+    fail = False
+    assert cached(2).tolist() == [2]
+    assert previous[0]() is None
+
+
+@pytest.mark.parametrize("fast", [False, True])
+def test_hybrid_cache_policies_have_separate_ram_and_shared_disk(tmp_path, hybrid_cache_clear, fast):
+    calls = []
+
+    def load(value):
+        calls.append(value)
+        return np.array([value])
+
+    memory = Memory(tmp_path, verbose=0)
+    early = hybrid_cache(memory, 1, fast_inaccurate_hashing=fast)(load)
+    legacy = hybrid_cache(memory, 1, fast_inaccurate_hashing=fast, evict_before_load=False)(load)
+    assert early is hybrid_cache(memory, 1, fast_inaccurate_hashing=fast)(load)
+    assert legacy is hybrid_cache(memory, 1, fast_inaccurate_hashing=fast, evict_before_load=False)(load)
+    assert early is not legacy
+    early_first = early(1)
+    legacy_first = legacy(1)
+    assert early_first is not legacy_first
+    early(2)
+    assert legacy(1) is legacy_first
+    assert early(1).tolist() == [1]
+    assert calls == [1, 2]
+
+
+@pytest.mark.parametrize("fast", [False, True])
+def test_hybrid_evicts_before_loading_disk_result(tmp_path, hybrid_cache_clear, fast, monkeypatch):
+    calls = []
+    previous = []
+
+    def check_eviction():
+        assert previous[0]() is None
+
+    monkeypatch.setattr(DiskLoadProbe, "on_load", staticmethod(check_eviction))
+
+    def load(value):
+        calls.append(value)
+        return DiskLoadProbe(value)
+
+    cached = hybrid_cache(Memory(tmp_path, verbose=0), 1, fast_inaccurate_hashing=fast)(load)
+    cached(1)
+    previous.append(weakref.ref(cached(2)))
+    assert cached(1).value == 1
+    assert calls == [1, 2]
+
+
+class DiskLoadProbe:
+    on_load = None
+
+    def __init__(self, value):
+        self.value = value
+
+    def __setstate__(self, state):
+        self.on_load()
+        self.__dict__.update(state)
+
+
+@pytest.mark.parametrize("size", [False, 0, None])
+@pytest.mark.parametrize("early", [False, True])
+def test_hybrid_disabled_and_unbounded_policy(hybrid_cache_clear, size, early):
+    calls = []
+
+    def load(value):
+        calls.append(value)
+        return np.array([value])
+
+    cached = hybrid_cache(Memory(None), size, evict_before_load=early)(load)
+    first = cached(1)
+    cached(2)
+    again = cached(1)
+    if size is None:
+        assert again is first
+        assert calls == [1, 2]
+    else:
+        assert again is not first
+        assert calls == [1, 2, 1]
+
+
+def test_hybrid_recursive_misses_recheck_capacity_and_key(hybrid_cache_clear):
+    nested = []
+    recurse = True
+    calls = []
+
+    def load(value):
+        nonlocal recurse
+        calls.append(value)
+        if recurse:
+            recurse = False
+            nested.append(cached(value))
+            cached(2)
+        return np.array([value])
+
+    cached = hybrid_cache(Memory(None), 1)(load)
+    outer = cached(1)
+    assert cached(1) is outer
+    assert calls == [1, 1, 2]
+    assert cached(2).tolist() == [2]
+    assert calls == [1, 1, 2, 2]
+
+
+def test_hybrid_recursive_same_key_keeps_first_cached_result(hybrid_cache_clear):
+    nested = []
+
+    def load(value):
+        if not nested:
+            nested.append(None)
+            nested[0] = cached(value)
+        return np.array([value])
+
+    cached = hybrid_cache(Memory(None), 1)(load)
+    outer = cached(1)
+    assert cached(1) is nested[0]
+    assert outer is not nested[0]
+
+
+@pytest.mark.parametrize("same_key", [False, True])
+def test_hybrid_concurrent_loads_run_outside_lock_and_recheck_cache(hybrid_cache_clear, same_key):
+    entered = Barrier(2)
+    finish_first = Event()
+    calls = []
+
+    def load(value):
+        calls.append(value)
+        entered.wait(timeout=5)
+        if value == 1:
+            assert finish_first.wait(timeout=5)
+        return np.array([value])
+
+    cached = hybrid_cache(Memory(None), 1)(load)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(cached, 1)
+        # For equal keys both wait on the same event. For distinct keys the
+        # second result is cached before the first loader is released.
+        second = executor.submit(cached, 1 if same_key else 2)
+        if same_key:
+            finish_first.set()
+            first_result = first.result(timeout=5)
+            second_result = second.result(timeout=5)
+            assert first_result is not second_result
+            assert cached(1) is first_result or cached(1) is second_result
+        else:
+            second_ref = weakref.ref(second.result(timeout=5))
+            # Futures retain their result too; release that caller-owned reference.
+            del second
+            finish_first.set()
+            first_result = first.result(timeout=5)
+            assert cached(1) is first_result
+            assert second_ref() is None
+        assert len(calls) == 2
+
+
+def test_early_hybrid_ram_keys_snapshot_mutable_arguments(hybrid_cache_clear):
+    calls = []
+
+    def total(data):
+        calls.append(1)
+        return data.sum()
+
+    cached = hybrid_cache(Memory(None), 3)(total)
+    values = np.array([1, 2])
+    assert cached(values) == 3
+    values[0] = 10
+    assert cached(values) == 12
+    assert cached(np.array([1, 2])) == 3
+    assert len(calls) == 2
+
+
+def test_hybrid_snapshots_keys_before_loader_mutates_input(hybrid_cache_clear):
+    def total_and_clear(data):
+        result = data.sum()
+        data[:] = 0
+        return result
+
+    cached = hybrid_cache(Memory(None), 2)(total_and_clear)
+    assert cached(np.array([1, 2])) == 3
+    assert cached(np.array([0, 0])) == 0
+    assert cached(np.array([1, 2])) == 3
+
+
+def test_hybrid_reentrant_eviction_cleanup_keeps_capacity(hybrid_cache_clear):
+    entered = Barrier(2)
+    finish_first = Event()
+    cleanup_results = []
+    calls = []
+
+    def load(value):
+        calls.append(value)
+        if len(calls) <= 2:
+            entered.wait(timeout=5)
+            if value == 1:
+                assert finish_first.wait(timeout=5)
+        return np.array([value])
+
+    cached = hybrid_cache(Memory(None), 1)(load)
+
+    def cleanup(_):
+        cleanup_results.append(weakref.ref(cached(3)))
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(cached, 1)
+        second = executor.submit(cached, 2)
+        evicted_ref = weakref.ref(second.result(timeout=5), cleanup)
+        del second
+        finish_first.set()
+        first.result(timeout=5)
+    assert evicted_ref() is None
+    assert cached(3) is cleanup_results[0]()
+    # If insertion after cleanup overfilled the cache, 1 would incorrectly hit.
+    assert cached(1).tolist() == [1]
+    assert sorted(calls[:2]) == [1, 2]
+    assert calls[2:] == [3, 1]
+
+
+@pytest.mark.parametrize("post_load", [False, True])
+def test_hybrid_eviction_cleanup_runs_outside_bookkeeping_lock(hybrid_cache_clear, post_load):
+    completed = Event()
+    cleanup_progress = []
+    threads = []
+    entered = Barrier(2)
+    finish_first = Event()
+
+    def load(value):
+        if post_load and value in (1, 2):
+            entered.wait(timeout=5)
+            if value == 1:
+                assert finish_first.wait(timeout=5)
+        return np.array([value])
+
+    cached = hybrid_cache(Memory(None), 1)(load)
+
+    def cleanup(_):
+        def use_cache():
+            cached(3)
+            completed.set()
+
+        thread = Thread(target=use_cache, daemon=True)
+        threads.append(thread)
+        thread.start()
+        cleanup_progress.append(completed.wait(timeout=5))
+
+    if post_load:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            first = executor.submit(cached, 1)
+            second = executor.submit(cached, 2)
+            previous = weakref.ref(second.result(timeout=5), cleanup)
+            del second
+            finish_first.set()
+            first.result(timeout=10)
+    else:
+        previous = weakref.ref(cached(1), cleanup)
+        cached(2)
+    for thread in threads:
+        thread.join(timeout=5)
+    assert previous() is None
+    assert cleanup_progress == [True]
