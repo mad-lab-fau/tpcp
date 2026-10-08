@@ -698,6 +698,9 @@ def test_hybrid_concurrent_loads_run_outside_lock_and_recheck_cache(hybrid_cache
             second_ref = weakref.ref(second.result(timeout=5))
             # Futures retain their result too; release that caller-owned reference.
             del second
+            # The first worker is blocked. A new task on the other worker proves
+            # it has released the previous task and its result references.
+            executor.submit(lambda: None).result(timeout=5)
             finish_first.set()
             first_result = first.result(timeout=5)
             assert cached(1) is first_result
@@ -757,6 +760,8 @@ def test_hybrid_reentrant_eviction_cleanup_keeps_capacity(hybrid_cache_clear):
         second = executor.submit(cached, 2)
         evicted_ref = weakref.ref(second.result(timeout=5), cleanup)
         del second
+        # Advance the available worker beyond its previous result references.
+        executor.submit(lambda: None).result(timeout=5)
         finish_first.set()
         first.result(timeout=5)
     assert evicted_ref() is None
@@ -800,6 +805,9 @@ def test_hybrid_eviction_cleanup_runs_outside_bookkeeping_lock(hybrid_cache_clea
             second = executor.submit(cached, 2)
             previous = weakref.ref(second.result(timeout=5), cleanup)
             del second
+            # The first worker is blocked. A new task on the other worker proves
+            # it has released the previous task and its result references.
+            executor.submit(lambda: None).result(timeout=5)
             finish_first.set()
             first.result(timeout=10)
     else:
