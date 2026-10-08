@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [3.2.0] - 2026-10-08
+
 ### Breaking
 
 - `hybrid_cache` now defaults to `evict_before_load=True` for bounded RAM caches, an explicitly approved
