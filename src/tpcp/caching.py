@@ -6,8 +6,10 @@ import functools
 import multiprocessing
 import sys
 import warnings
+from collections import OrderedDict
 from collections.abc import Callable, Sequence
 from pickle import PicklingError
+from threading import RLock
 from typing import Generic, Optional, TypeVar
 
 from joblib import Memory
@@ -97,18 +99,18 @@ class UniversalHashableWrapper(Generic[T]):
         return self._hash(self.obj) == self._hash(other.obj)
 
 
-class _FastHashableWrapper:
+class _SnapshotHashableWrapper:
     """Snapshot the argument's content key once per call, including equality checks."""
 
-    def __init__(self, obj):
+    def __init__(self, obj, *, hash_func=custom_hash):
         self.obj = obj
-        self._digest = custom_hash(obj)
+        self._digest = hash_func(obj)
 
     def __hash__(self):
         return hash(self._digest)
 
     def __eq__(self, other):
-        if not isinstance(other, _FastHashableWrapper):
+        if not isinstance(other, _SnapshotHashableWrapper):
             return NotImplemented
         return self._digest == other._digest
 
@@ -525,11 +527,46 @@ def get_ram_cache_obj(algorithm_object: type[Algorithm], action_method_name: str
 _GLOBAL_CACHE_REGISTRY: dict[tuple[str, str], Callable] = {}
 
 
+def _early_eviction_lru_cache(function: Callable, maxsize: int) -> Callable:
+    """Bounded LRU with cache-owned references released before a miss is loaded."""
+    cache = OrderedDict()
+    lock = RLock()
+
+    def wrapped(*args, **kwargs):
+        key = (args, tuple(kwargs.items()))
+        evicted = None
+        with lock:
+            if key in cache:
+                cache.move_to_end(key)
+                return cache[key]
+            if len(cache) >= maxsize:
+                evicted = cache.popitem(last=False)
+        # Releasing references can run user cleanup callbacks. Do this outside
+        # the lock and before loading, with the bookkeeping already consistent.
+        del evicted
+
+        result = function(*args, **kwargs)
+
+        evicted = None
+        with lock:
+            # Another thread or a recursive call can populate the cache while the
+            # loader runs. Keep its entry, but return this call's computed result.
+            if key not in cache:
+                if len(cache) >= maxsize:
+                    evicted = cache.popitem(last=False)
+                cache[key] = result
+        del evicted
+        return result
+
+    return wrapped
+
+
 def hybrid_cache(
     joblib_memory: Memory = Memory(None),
     lru_cache_maxsize: int | None | bool = False,
     *,
     fast_inaccurate_hashing: bool = False,
+    evict_before_load: bool = True,
 ):
     """Cache function results in memory and on disk.
 
@@ -555,10 +592,28 @@ def hybrid_cache(
         results cached with the default settings. Switching this option can
         require results to be computed again.
 
+    evict_before_load
+        For a bounded RAM cache, release the least-recently-used key and result
+        before loading a replacement from disk or computing it. Defaults to True.
+        A failed load does not restore the evicted entry. Set False to preserve
+        the previous ``functools.lru_cache`` behavior, which retains the old entry
+        until the replacement succeeds. Has no effect for disabled, zero-size,
+        or unbounded RAM caches.
+
     Returns
     -------
     caching_decorator
         A decorator that can be used to cache a function with the given parameters.
+
+    Notes
+    -----
+    Cache bookkeeping is protected by a reentrant lock. Loads run outside the
+    lock, so concurrent or recursive misses can compute the same key more than
+    once. The cache rechecks the key and capacity after each load. Each call
+    returns its own computed result, even if another call cached that key first.
+    Early eviction reduces cache-owned references, but cannot enforce a process
+    memory limit. Callers and allocators can retain memory. No garbage collection
+    is forced.
 
     Examples
     --------
@@ -588,7 +643,14 @@ def hybrid_cache(
 
     def inner(function: Callable):
         paras_hash = custom_hash(
-            (function.__name__, id(function), joblib_memory, lru_cache_maxsize, fast_inaccurate_hashing)
+            (
+                function.__name__,
+                id(function),
+                joblib_memory,
+                lru_cache_maxsize,
+                fast_inaccurate_hashing,
+                evict_before_load,
+            )
         )
         cache_key = (function.__name__, paras_hash)
         if cache_key in _GLOBAL_CACHE_REGISTRY:
@@ -597,7 +659,15 @@ def hybrid_cache(
         disk_cached = (
             _fast_disk_cache(joblib_memory, function) if fast_inaccurate_hashing else joblib_memory.cache(function)
         )
-        wrapper = _FastHashableWrapper if fast_inaccurate_hashing else UniversalHashableWrapper
+        early_eviction = evict_before_load and lru_cache_maxsize is not None and lru_cache_maxsize > 0
+        if fast_inaccurate_hashing:
+            wrapper = _SnapshotHashableWrapper
+        elif early_eviction:
+            # OrderedDict performs multiple hash/equality operations per access.
+            # Snapshot the accurate digest once, retaining the existing hash policy.
+            wrapper = functools.partial(_SnapshotHashableWrapper, hash_func=UniversalHashableWrapper._hash)
+        else:
+            wrapper = UniversalHashableWrapper
 
         if lru_cache_maxsize is False:
 
@@ -611,7 +681,10 @@ def hybrid_cache(
                 kwargs = {k: v.obj for k, v in hash_safe_kwargs.items()}
                 return disk_cached(*args, **kwargs)
 
-            final_cached = functools.lru_cache(lru_cache_maxsize)(inner_cached)
+            if early_eviction:
+                final_cached = _early_eviction_lru_cache(inner_cached, lru_cache_maxsize)
+            else:
+                final_cached = functools.lru_cache(lru_cache_maxsize)(inner_cached)
 
             @functools.wraps(function)
             def final_wrapped(*args, **kwargs):
