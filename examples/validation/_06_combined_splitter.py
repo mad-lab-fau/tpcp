@@ -22,9 +22,8 @@ from sklearn.model_selection import KFold
 from tpcp import Dataset
 from tpcp.validate import (
     CombinedSplitter,
-    DatasetSplitter,
     NoSplit,
-    SplitterPart,
+    SubsetSplitter,
 )
 
 
@@ -64,32 +63,32 @@ selected_extras.index
 # %%
 # Combine the two splitting rules
 # -------------------------------
-# Each named ``SplitterPart`` supplies a selector and a splitter. ``KFold`` sees only normal
-# datapoints, so the train-only recordings cannot enter its test folds.
+# Each named ``SubsetSplitter`` selects a subset and splits it. ``KFold`` sees
+# only normal datapoints, so the train-only recordings cannot enter its test folds.
 # ``NoSplit`` contributes the selected extras to training and an empty list to
 # testing because its ``test`` selector is omitted. The remaining three
 # train-only datapoints are unused.
 #
 # ``KFold`` supplies the fold count, so ``NoSplit`` can leave it unspecified.
-# Raw sklearn splitters can be passed directly to ``SplitterPart``. Here we
-# wrap ``KFold`` in ``DatasetSplitter`` to expose the wrapper's parameters for
-# nested updates. It adapts positional outputs to dataset group labels.
+# ``SubsetSplitter`` accepts raw sklearn splitters and adapts their positional
+# outputs to dataset group labels. No explicit ``DatasetSplitter`` wrapper is
+# needed here. Use that wrapper when grouping or stratification by dataset
+# index columns is needed. ``SubsetSplitter`` can also be used on its own as
+# the ``cv`` argument to validation or grid search.
 
 n_splits = 3
 cv = CombinedSplitter(
     parts=[
         (
             "normal",
-            SplitterPart(
+            SubsetSplitter(
                 lambda ds: ds.get_subset(kind="normal"),
-                DatasetSplitter(
-                    KFold(n_splits=n_splits, shuffle=True, random_state=0)
-                ),
+                KFold(n_splits=n_splits, shuffle=True, random_state=0),
             ),
         ),
         (
             "extras",
-            SplitterPart(
+            SubsetSplitter(
                 lambda ds: ds.get_subset(kind="train_only"),
                 NoSplit(n_splits=None, train=select_training_extras),
             ),
@@ -140,23 +139,25 @@ fold_summary
 
 updated_cv = cv.clone()
 updated_cv.set_params(
-    parts__extras=SplitterPart(
+    parts__extras=SubsetSplitter(
         lambda ds: ds.get_subset(kind="train_only"),
         NoSplit(None, train=lambda ds: ds),
     )
 )
 
-# Replace the normal part's base splitter with a four-fold configuration,
+# Replace the normal part's splitter with a four-fold configuration,
 # and overwrite the training selector inside the extras part's ``NoSplit``.
 # The extras part still takes its fold count from the normal part.
 
 updated_cv.set_params(
-    parts__normal__splitter__base_splitter=KFold(
-        n_splits=4, shuffle=True, random_state=0
-    ),
+    parts__normal__splitter=KFold(n_splits=4, shuffle=True, random_state=0),
     parts__extras__splitter__train=select_training_extras,
 )
-updated_cv.get_params()["parts__normal__splitter__base_splitter"]
+updated_cv.get_params()["parts__normal__splitter"]
+
+# ``KFold`` has no ``get_params``/``set_params`` API, so replace that object as
+# above to change its configuration. ``NoSplit`` is a tpcp object, so its
+# ``train`` selector can be changed through the deeper parameter path.
 
 updated_folds = list(updated_cv.split(dataset))
 assert len(updated_folds) == 4
