@@ -18,6 +18,7 @@ Classes
     CombinedSplitter
     DatasetSplitter
     NoSplit
+    SplitterPart
 
 Scoring
 -------

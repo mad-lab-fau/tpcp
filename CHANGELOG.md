@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Breaking
+
+- `CombinedSplitter.parts` now requires named composite entries. This is an explicitly approved
+  breaking change. Replace each `(selector, splitter)` with
+  `("name", SplitterPart(selector, splitter))`, importing `SplitterPart` from `tpcp.validate`.
+  Replace one part with `set_params(parts__name=new_part)` or update nested values with
+  `set_params(parts__name__splitter__n_splits=3)`. Selectors and splitters can also be replaced
+  through `parts__name__selector` and `parts__name__splitter`. Use unique names without `__`.
+  Raw sklearn splitters and positional fold lists remain supported inside `SplitterPart`;
+  wrap them in `DatasetSplitter` to expose the wrapper's nested parameters.
+
 ## [3.2.0] - 2026-10-08
 
 ### Breaking
