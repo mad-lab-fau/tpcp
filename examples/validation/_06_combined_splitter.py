@@ -20,7 +20,12 @@ train-only datapoints to every training fold using
 import pandas as pd
 from sklearn.model_selection import KFold
 from tpcp import Dataset
-from tpcp.validate import CombinedSplitter, NoSplit
+from tpcp.validate import (
+    CombinedSplitter,
+    DatasetSplitter,
+    NoSplit,
+    SplitterPart,
+)
 
 
 class ExampleDataset(Dataset):
@@ -59,26 +64,35 @@ selected_extras.index
 # %%
 # Combine the two splitting rules
 # -------------------------------
-# Each pair supplies a selector and a splitter. ``KFold`` sees only normal
+# Each named ``SplitterPart`` supplies a selector and a splitter. ``KFold`` sees only normal
 # datapoints, so the train-only recordings cannot enter its test folds.
 # ``NoSplit`` contributes the selected extras to training and an empty list to
 # testing because its ``test`` selector is omitted. The remaining three
 # train-only datapoints are unused.
 #
 # ``KFold`` supplies the fold count, so ``NoSplit`` can leave it unspecified.
-# A raw sklearn splitter such as ``KFold`` can be passed directly;
-# ``CombinedSplitter`` adapts its positional outputs to dataset group labels.
+# Raw sklearn splitters can be passed directly to ``SplitterPart``. Here we
+# wrap ``KFold`` in ``DatasetSplitter`` to expose the wrapper's parameters for
+# nested updates. It adapts positional outputs to dataset group labels.
 
 n_splits = 3
 cv = CombinedSplitter(
     parts=[
         (
-            lambda ds: ds.get_subset(kind="normal"),
-            KFold(n_splits=n_splits, shuffle=True, random_state=0),
+            "normal",
+            SplitterPart(
+                lambda ds: ds.get_subset(kind="normal"),
+                DatasetSplitter(
+                    KFold(n_splits=n_splits, shuffle=True, random_state=0)
+                ),
+            ),
         ),
         (
-            lambda ds: ds.get_subset(kind="train_only"),
-            NoSplit(n_splits=None, train=select_training_extras),
+            "extras",
+            SplitterPart(
+                lambda ds: ds.get_subset(kind="train_only"),
+                NoSplit(n_splits=None, train=select_training_extras),
+            ),
         ),
     ]
 )
@@ -116,3 +130,34 @@ fold_summary
 # The ``train-only extras`` column stays identical while the normal train/test
 # assignments change. Pass this same ``cv`` object to ``cross_validate`` or
 # ``GridSearchCV`` when using a pipeline with this dataset.
+
+# %%
+# Overwrite named parts and nested values
+# --------------------------------------
+# ``parts`` is a tpcp composite parameter. Use its names in ``set_params`` to
+# replace just one part, its selector, its splitter, or a nested parameter.
+# Clone first to keep the original three-fold configuration above.
+
+updated_cv = cv.clone()
+updated_cv.set_params(
+    parts__extras=SplitterPart(
+        lambda ds: ds.get_subset(kind="train_only"),
+        NoSplit(None, train=lambda ds: ds),
+    )
+)
+
+# Replace the normal part's base splitter with a four-fold configuration,
+# and overwrite the training selector inside the extras part's ``NoSplit``.
+# The extras part still takes its fold count from the normal part.
+
+updated_cv.set_params(
+    parts__normal__splitter__base_splitter=KFold(
+        n_splits=4, shuffle=True, random_state=0
+    ),
+    parts__extras__splitter__train=select_training_extras,
+)
+updated_cv.get_params()["parts__normal__splitter__base_splitter"]
+
+updated_folds = list(updated_cv.split(dataset))
+assert len(updated_folds) == 4
+assert len(list(cv.split(dataset))) == 3

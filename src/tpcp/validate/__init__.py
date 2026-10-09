@@ -1,6 +1,6 @@
 """Module for all helper methods to evaluate algorithms."""
 
-from tpcp.validate._composed_splitters import CombinedSplitter, NoSplit
+from tpcp.validate._composed_splitters import CombinedSplitter, NoSplit, SplitterPart
 from tpcp.validate._cross_val_helper import BaseDatasetSplitter, DatasetSplitter
 from tpcp.validate._scorer import (
     Aggregator,
@@ -23,6 +23,7 @@ __all__ = [
     "NoSplit",
     "Scorer",
     "ScorerTypes",
+    "SplitterPart",
     "cross_validate",
     "mean_agg",
     "no_agg",
