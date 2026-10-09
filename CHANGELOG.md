@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Raw sklearn splitters and positional fold lists remain supported inside `SubsetSplitter`.
   Use an explicit `DatasetSplitter` child when grouping or stratification by dataset index
   columns is needed. Raw `KFold` children can be replaced through `parts__name__splitter`.
+  (https://github.com/mad-lab-fau/tpcp/pull/161)
 
 ## [3.2.0] - 2026-10-08
 
