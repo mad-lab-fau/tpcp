@@ -3,7 +3,7 @@
 import numbers
 from collections.abc import Callable, Iterator
 
-from tpcp import BaseTpcpObject, Dataset
+from tpcp import Dataset
 from tpcp._dataset import GroupLabelT
 from tpcp.validate._cross_val_helper import BaseDatasetSplitter, _normalize_splitter, _requested_fold_count
 
@@ -71,8 +71,12 @@ class NoSplit(BaseDatasetSplitter):
             yield train.copy(), test.copy()
 
 
-class SplitterPart(BaseTpcpObject):
-    """Select a dataset subset and configure its splitter as tpcp parameters.
+class SubsetSplitter(BaseDatasetSplitter):
+    """Select a subset of the current dataset, then split it into train/test group labels.
+
+    This is a dataset splitter itself, usable directly as ``cv`` or as a named child of
+    :class:`CombinedSplitter`. The selector is evaluated for each ``get_n_splits`` or ``split``
+    call, so it should return the same subset for the same input when the calls are paired.
 
     Parameters
     ----------
@@ -80,31 +84,50 @@ class SplitterPart(BaseTpcpObject):
         Callable receiving the current dataset and returning a subset whose group labels belong to it.
     splitter
         A native tpcp splitter or any input accepted by :class:`DatasetSplitter`, including raw sklearn
-        splitters and explicit lists of positional folds. Wrap raw inputs in :class:`DatasetSplitter`
-        to expose its parameters through nested ``get_params`` and ``set_params`` calls.
+        splitters and explicit lists of positional folds. Raw inputs are adapted to group labels
+        when used. Pass :class:`DatasetSplitter` explicitly when grouping or stratification by
+        dataset index columns is needed.
     """
 
     def __init__(self, selector: DatasetSelector, splitter: object) -> None:
         self.selector = selector
         self.splitter = splitter
 
+    def _prepare(self, dataset: Dataset) -> tuple[Dataset, BaseDatasetSplitter]:
+        selected = self.selector(dataset)
+        _validate_subset(dataset, selected)
+        return selected, _normalize_splitter(self.splitter)
+
+    def get_n_splits(self, dataset: Dataset) -> int | None:
+        """Return the child splitter's fold count for the selected subset."""
+        selected, splitter = self._prepare(dataset)
+        return splitter.get_n_splits(selected)
+
+    def split(
+        self, dataset: Dataset, n_splits: int | None = None
+    ) -> Iterator[tuple[list[GroupLabelT], list[GroupLabelT]]]:
+        """Select the subset and yield its train/test group labels."""
+        selected, splitter = self._prepare(dataset)
+        if n_splits is None:
+            yield from splitter.split(selected)
+        else:
+            yield from splitter.split(selected, n_splits=n_splits)
+
 
 class CombinedSplitter(BaseDatasetSplitter):
-    """Combine corresponding folds of splitters applied to selected dataset parts.
+    """Combine corresponding folds of named dataset splitters.
 
-    Pass a list of one or more ``(name, SplitterPart(selector, splitter))`` pairs as ``parts``.
+    Pass a list of one or more ``(name, splitter)`` pairs as ``parts``, where each child implements
+    :class:`BaseDatasetSplitter`. Use :class:`SubsetSplitter` to apply a child to a selected subset.
     Names are unique strings without ``__``, following tpcp's composite parameter convention.
-    Each selector receives the current dataset and returns a subset. A child splitter can be a native
-    tpcp splitter or any input accepted by :class:`DatasetSplitter`, including raw sklearn splitters.
-    Positional fold assignments must be supplied as lists, including for raw child inputs.
+    All children receive the current input dataset. Raw sklearn splitters and positional fold lists
+    can be used inside :class:`SubsetSplitter` or :class:`DatasetSplitter`.
 
     All specified fold counts must match, and at least one child must specify a count.
     Children that report ``None`` receive that count through their ``split`` method.
     All children must yield exactly that many folds. Train and test labels are
     deduplicated separately in first-occurrence order, and overlapping assignments
-    raise ``ValueError``. Selectors receive the current input dataset, including
-    within nested splits, and may return any dataset whose group labels belong to
-    that input.
+    raise ``ValueError``. Nested compositions operate on the dataset supplied by their parent.
 
     For example, cross-validate real recordings and always train on artificial recordings::
 
@@ -112,23 +135,23 @@ class CombinedSplitter(BaseDatasetSplitter):
             CombinedSplitter,
             DatasetSplitter,
             NoSplit,
-            SplitterPart,
+            SubsetSplitter,
         )
 
         cv = CombinedSplitter(
             parts=[
                 (
                     "real",
-                    SplitterPart(
+                    SubsetSplitter(
                         lambda ds: ds.get_subset(recording_type="real"),
                         DatasetSplitter(5, groupby="participant"),
                     ),
                 ),
                 (
                     "artificial",
-                    SplitterPart(
-                        lambda ds: ds.get_subset(recording_type="artificial"),
-                        NoSplit(None, train=lambda ds: ds),
+                    NoSplit(
+                        None,
+                        train=lambda ds: ds.get_subset(recording_type="artificial"),
                     ),
                 ),
             ],
@@ -136,36 +159,27 @@ class CombinedSplitter(BaseDatasetSplitter):
 
         cv.set_params(parts__real__splitter__base_splitter=3)
 
-    Replace a whole part with ``set_params(parts__real=new_part)``, or replace its selector or splitter
-    with ``parts__real__selector`` or ``parts__real__splitter``. Adding or removing parts requires
-    replacing the entire ``parts`` list.
+    Replace a whole child with ``set_params(parts__real=new_splitter)``, or update its nested parameters
+    with paths such as ``parts__real__selector`` or ``parts__artificial__train``. Adding or removing parts
+    requires replacing the entire ``parts`` list.
 
     Parameters
     ----------
     parts
-        A composite parameter list of named :class:`SplitterPart` objects, in the order their fold
+        A composite parameter list of named :class:`BaseDatasetSplitter` objects, in the order their fold
         contributions are combined. Migrate old ``(selector, splitter)`` entries to
-        ``(name, SplitterPart(selector, splitter))``.
+        ``(name, SubsetSplitter(selector, splitter))``.
     """
 
     _composite_params = ("parts",)
 
-    def __init__(self, parts: list[tuple[str, SplitterPart]]) -> None:
+    def __init__(self, parts: list[tuple[str, BaseDatasetSplitter]]) -> None:
         self.parts = parts
 
-    def _prepare(self, dataset: Dataset) -> list[tuple[Dataset, BaseDatasetSplitter]]:
+    def _fold_count(self, dataset: Dataset) -> tuple[int, list[int | None]]:
         if not self.parts:
-            raise ValueError("CombinedSplitter requires at least one named SplitterPart.")
-        prepared = []
-        for _, part in self.parts:
-            selected = part.selector(dataset)
-            _validate_subset(dataset, selected)
-            prepared.append((selected, _normalize_splitter(part.splitter)))
-        return prepared
-
-    @staticmethod
-    def _fold_count(prepared: list[tuple[Dataset, BaseDatasetSplitter]]) -> tuple[int, list[int | None]]:
-        reported = [splitter.get_n_splits(dataset) for dataset, splitter in prepared]
+            raise ValueError("CombinedSplitter requires at least one named dataset splitter.")
+        reported = [splitter.get_n_splits(dataset) for _, splitter in self.parts]
         counts = [count for count in reported if count is not None]
         if not counts:
             raise ValueError("CombinedSplitter requires at least one child to report an integer number of folds.")
@@ -174,19 +188,18 @@ class CombinedSplitter(BaseDatasetSplitter):
         return counts[0], reported
 
     def get_n_splits(self, dataset: Dataset) -> int:
-        """Return the shared number of folds after selecting each part."""
-        return self._fold_count(self._prepare(dataset))[0]
+        """Return the shared number of folds reported by the children."""
+        return self._fold_count(dataset)[0]
 
     def split(
         self, dataset: Dataset, n_splits: int | None = None
     ) -> Iterator[tuple[list[GroupLabelT], list[GroupLabelT]]]:
         """Yield deduplicated, disjoint train and test labels for corresponding child folds."""
-        prepared = self._prepare(dataset)
-        available, reported = self._fold_count(prepared)
+        available, reported = self._fold_count(dataset)
         count = _requested_fold_count(n_splits, available)
         iterators = [
-            iter(splitter.split(selected, n_splits=count)) if child_count is None else iter(splitter.split(selected))
-            for (selected, splitter), child_count in zip(prepared, reported, strict=True)
+            iter(splitter.split(dataset, n_splits=count)) if child_count is None else iter(splitter.split(dataset))
+            for (_, splitter), child_count in zip(self.parts, reported, strict=True)
         ]
         for _ in range(count):
             folds = []

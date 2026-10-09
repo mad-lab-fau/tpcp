@@ -8,24 +8,41 @@ from sklearn.model_selection import KFold
 from tests.test_pipelines.conftest import DummyDataset, DummyGroupedDataset, DummyOptimizablePipeline
 from tpcp import Dataset, clone
 from tpcp.optimize import GridSearchCV, Optimize
-from tpcp.validate import BaseDatasetSplitter, CombinedSplitter, DatasetSplitter, NoSplit, SplitterPart, cross_validate
+from tpcp.validate import (
+    BaseDatasetSplitter,
+    CombinedSplitter,
+    DatasetSplitter,
+    NoSplit,
+    SubsetSplitter,
+    cross_validate,
+)
 
 
 def _score(_pipeline, data_point):
     return 1 if data_point.group_label[0] is not None else 0
 
 
+def test_subset_splitter_selects_then_splits_and_can_request_fewer_folds():
+    dataset = DummyGroupedDataset()
+    splitter = SubsetSplitter(lambda ds: ds.get_subset(v1="b"), KFold(5))
+    assert splitter.get_n_splits(dataset) == 5
+    assert next(splitter.split(dataset)) == ([("b", 1), ("b", 2), ("b", 3), ("b", 4)], [("b", 0)])
+    assert len(list(splitter.split(dataset, n_splits=2))) == 2
+    with pytest.raises(ValueError, match="exceeds"):
+        list(splitter.split(dataset, n_splits=6))
+
+
 def test_combined_named_part_parameters_change_folds_without_changing_other_parts():
     dataset = DummyGroupedDataset()
-    fixed = SplitterPart(lambda ds: ds.get_subset(v1="c"), NoSplit(None, test=lambda ds: ds))
+    fixed = SubsetSplitter(lambda ds: ds.get_subset(v1="c"), NoSplit(None, test=lambda ds: ds))
     splitter = CombinedSplitter(
         parts=[
-            ("training", SplitterPart(lambda ds: ds.get_subset(v1="a"), NoSplit(2, train=lambda ds: ds))),
+            ("training", SubsetSplitter(lambda ds: ds.get_subset(v1="a"), NoSplit(2, train=lambda ds: ds))),
             ("fixed", fixed),
         ]
     )
     assert splitter.get_params()["parts__training__splitter__n_splits"] == 2
-    replacement = SplitterPart(lambda ds: ds.get_subset(v1="b"), NoSplit(3, train=lambda ds: ds))
+    replacement = SubsetSplitter(lambda ds: ds.get_subset(v1="b"), NoSplit(3, train=lambda ds: ds))
     splitter.set_params(parts__training=replacement)
     assert list(splitter.split(dataset)) == [([("b", i) for i in range(5)], [("c", i) for i in range(5)])] * 3
     splitter.set_params(
@@ -83,9 +100,9 @@ def test_combined_splitter_uses_known_count_for_no_split_parts():
     dataset = DummyGroupedDataset()
     splitter = CombinedSplitter(
         parts=[
-            ("part_0", SplitterPart(lambda ds: ds.get_subset(v1="a"), DatasetSplitter(5))),
-            ("part_1", SplitterPart(lambda ds: ds.get_subset(v1="b"), NoSplit(None, train=lambda ds: ds))),
-            ("part_2", SplitterPart(lambda ds: ds.get_subset(v1="c"), NoSplit(None, test=lambda ds: ds))),
+            ("part_0", SubsetSplitter(lambda ds: ds.get_subset(v1="a"), DatasetSplitter(5))),
+            ("part_1", SubsetSplitter(lambda ds: ds.get_subset(v1="b"), NoSplit(None, train=lambda ds: ds))),
+            ("part_2", SubsetSplitter(lambda ds: ds.get_subset(v1="c"), NoSplit(None, test=lambda ds: ds))),
         ]
     )
     assert NoSplit(None).get_n_splits(dataset) is None
@@ -104,7 +121,7 @@ def test_combined_splitter_uses_known_count_for_no_split_parts():
 
 def test_combined_splitter_requires_a_known_fold_count():
     dataset = DummyDataset()
-    splitter = CombinedSplitter(parts=[("part_0", SplitterPart(lambda ds: ds, NoSplit(None)))])
+    splitter = CombinedSplitter(parts=[("part_0", SubsetSplitter(lambda ds: ds, NoSplit(None)))])
     with pytest.raises(ValueError, match=r"at least one.*number of folds"):
         splitter.get_n_splits(dataset)
     with pytest.raises(ValueError, match=r"at least one.*number of folds"):
@@ -128,8 +145,8 @@ def test_combined_splitter_passes_count_to_any_unbounded_child():
     dataset = DummyDataset()
     splitter = CombinedSplitter(
         parts=[
-            ("part_0", SplitterPart(lambda ds: ds, NoSplit(3))),
-            ("part_1", SplitterPart(lambda ds: ds, _UnboundedSplitter())),
+            ("part_0", NoSplit(3)),
+            ("part_1", _UnboundedSplitter()),
         ]
     )
     assert list(splitter.split(dataset, n_splits=2)) == [(dataset.group_labels, [])] * 2
@@ -144,8 +161,8 @@ def test_combined_splitter_rejects_extra_folds_from_unbounded_child():
     dataset = DummyDataset()
     splitter = CombinedSplitter(
         parts=[
-            ("part_0", SplitterPart(lambda ds: ds, NoSplit(3))),
-            ("part_1", SplitterPart(lambda ds: ds, ExtraFoldSplitter())),
+            ("part_0", NoSplit(3)),
+            ("part_1", ExtraFoldSplitter()),
         ]
     )
     with pytest.raises(ValueError, match="more folds"):
@@ -156,8 +173,8 @@ def test_combined_splitter_pairs_selected_folds_and_excludes_other_groups():
     dataset = DummyGroupedDataset()
     splitter = CombinedSplitter(
         parts=[
-            ("part_0", SplitterPart(lambda ds: ds.get_subset(v1="a"), KFold(5))),
-            ("part_1", SplitterPart(lambda ds: ds.get_subset(v1="b"), DatasetSplitter(5))),
+            ("part_0", SubsetSplitter(lambda ds: ds.get_subset(v1="a"), KFold(5))),
+            ("part_1", SubsetSplitter(lambda ds: ds.get_subset(v1="b"), DatasetSplitter(5))),
         ]
     )
     folds = list(splitter.split(dataset))
@@ -171,7 +188,7 @@ def test_combined_splitter_pairs_selected_folds_and_excludes_other_groups():
 def test_combined_splitter_deduplicates_ordered_labels_and_detects_overlap():
     dataset = DummyDataset()
     splitter = CombinedSplitter(
-        parts=[("part_0", SplitterPart(lambda ds: ds, KFold(5))), ("part_1", SplitterPart(lambda ds: ds, KFold(5)))]
+        parts=[("part_0", SubsetSplitter(lambda ds: ds, KFold(5))), ("part_1", SubsetSplitter(lambda ds: ds, KFold(5)))]
     )
     train, test = next(splitter.split(dataset))
     assert train == dataset.group_labels[1:]
@@ -180,8 +197,8 @@ def test_combined_splitter_deduplicates_ordered_labels_and_detects_overlap():
         list(
             CombinedSplitter(
                 parts=[
-                    ("part_0", SplitterPart(lambda ds: ds, NoSplit(1, train=lambda ds: ds))),
-                    ("part_1", SplitterPart(lambda ds: ds, NoSplit(1, test=lambda ds: ds))),
+                    ("part_0", SubsetSplitter(lambda ds: ds, NoSplit(1, train=lambda ds: ds))),
+                    ("part_1", SubsetSplitter(lambda ds: ds, NoSplit(1, test=lambda ds: ds))),
                 ]
             ).split(dataset)
         )
@@ -191,16 +208,16 @@ def test_nested_combined_splitter_uses_current_subset():
     dataset = DummyGroupedDataset()
     inner = CombinedSplitter(
         parts=[
-            ("part_0", SplitterPart(lambda ds: ds.get_subset(v2=[0, 1]), NoSplit(2, train=lambda ds: ds))),
-            ("part_1", SplitterPart(lambda ds: ds.get_subset(v2=2), NoSplit(2, test=lambda ds: ds))),
+            ("part_0", SubsetSplitter(lambda ds: ds.get_subset(v2=[0, 1]), NoSplit(2, train=lambda ds: ds))),
+            ("part_1", SubsetSplitter(lambda ds: ds.get_subset(v2=2), NoSplit(2, test=lambda ds: ds))),
         ]
     )
-    outer = CombinedSplitter(parts=[("part_0", SplitterPart(lambda ds: ds.get_subset(v1="b"), inner))])
+    outer = CombinedSplitter(parts=[("part_0", SubsetSplitter(lambda ds: ds.get_subset(v1="b"), inner))])
     assert list(outer.split(dataset)) == [([("b", 0), ("b", 1)], [("b", 2)])] * 2
 
 
 def test_combined_splitter_keeps_tpcp_parameters_and_clones():
-    splitter = CombinedSplitter(parts=[("part_0", SplitterPart(lambda ds: ds, NoSplit(2, train=lambda ds: ds)))])
+    splitter = CombinedSplitter(parts=[("part_0", SubsetSplitter(lambda ds: ds, NoSplit(2, train=lambda ds: ds)))])
     cloned = clone(splitter)
     assert cloned is not splitter
     assert cloned.parts[0][1] is not splitter.parts[0][1]
@@ -229,16 +246,19 @@ class _WrongCountSplitter(BaseDatasetSplitter):
 def test_combined_splitter_rejects_declared_and_actual_count_mismatches():
     dataset = DummyDataset()
     mismatch = CombinedSplitter(
-        parts=[("part_0", SplitterPart(lambda ds: ds, NoSplit(2))), ("part_1", SplitterPart(lambda ds: ds, NoSplit(3)))]
+        parts=[
+            ("part_0", SubsetSplitter(lambda ds: ds, NoSplit(2))),
+            ("part_1", SubsetSplitter(lambda ds: ds, NoSplit(3))),
+        ]
     )
     with pytest.raises(ValueError, match="same number"):
         next(mismatch.split(dataset))
     for actual in (1, 3):
         with pytest.raises(ValueError, match="fold count"):
             list(
-                CombinedSplitter(parts=[("part_0", SplitterPart(lambda ds: ds, _WrongCountSplitter(2, actual)))]).split(
-                    dataset
-                )
+                CombinedSplitter(
+                    parts=[("part_0", SubsetSplitter(lambda ds: ds, _WrongCountSplitter(2, actual)))]
+                ).split(dataset)
             )
 
 
@@ -248,7 +268,7 @@ def test_selectors_reject_unknown_group_labels():
     with pytest.raises(ValueError, match="subset"):
         list(NoSplit(1, train=selector).split(dataset))
     with pytest.raises(ValueError, match="subset"):
-        list(CombinedSplitter(parts=[("part_0", SplitterPart(selector, NoSplit(1)))]).split(dataset))
+        list(CombinedSplitter(parts=[("part_0", SubsetSplitter(selector, NoSplit(1)))]).split(dataset))
 
 
 def test_selectors_use_group_labels_for_partial_or_changed_rows():
@@ -257,7 +277,7 @@ def test_selectors_use_group_labels_for_partial_or_changed_rows():
     changed_rows = lambda ds: ds.get_subset(index=ds.index.rename(columns={"v2": "other"}))
     assert list(NoSplit(1, train=partial).split(dataset)) == [([("a",)], [])]
     assert list(
-        CombinedSplitter(parts=[("part_0", SplitterPart(partial, NoSplit(1, train=lambda ds: ds)))]).split(dataset)
+        CombinedSplitter(parts=[("part_0", SubsetSplitter(partial, NoSplit(1, train=lambda ds: ds)))]).split(dataset)
     ) == [([("a",)], [])]
     assert len(dataset.get_subset(group_labels=[("a",)]).index) == 5
     assert list(NoSplit(1, train=changed_rows).split(dataset)) == [(dataset.group_labels, [])]
@@ -288,9 +308,15 @@ def test_valid_empty_selection_and_reordered_group_labels():
     assert list(NoSplit(1, train=reversed_groups).split(dataset)) == [([("c",), ("b",), ("a",)], [])]
 
 
-def test_native_splitters_work_in_validation_and_grid_search():
+@pytest.mark.parametrize(
+    "splitter",
+    [
+        CombinedSplitter(parts=[("normal", DatasetSplitter(2))]),
+        SubsetSplitter(lambda ds: ds, KFold(2)),
+    ],
+)
+def test_native_splitters_work_in_validation_and_grid_search(splitter):
     dataset = DummyDataset()
-    splitter = CombinedSplitter(parts=[("part_0", SplitterPart(lambda ds: ds, DatasetSplitter(2)))])
     result = cross_validate(
         Optimize(DummyOptimizablePipeline()), dataset, cv=splitter, scoring=_score, progress_bar=False
     )
@@ -334,7 +360,7 @@ def test_positional_fold_list_survives_count_split_and_clone():
 def test_combined_raw_fold_list_survives_count_split_and_grid_search():
     dataset = DummyDataset()
     folds = [([0, 1, 2], [3, 4]), ([3, 4], [0, 1, 2])]
-    splitter = CombinedSplitter(parts=[("part_0", SplitterPart(lambda ds: ds, folds))])
+    splitter = CombinedSplitter(parts=[("part_0", SubsetSplitter(lambda ds: ds, folds))])
     cloned = splitter.clone()
     expected = [
         ([(0,), (1,), (2,)], [(3,), (4,)]),
@@ -358,7 +384,7 @@ def test_non_list_positional_folds_require_explicit_list_conversion(make_folds):
     with pytest.raises(ValueError, match=r"list\(folds\)"):
         DatasetSplitter(make_folds()).get_n_splits(dataset)
     with pytest.raises(ValueError, match=r"list\(folds\)"):
-        CombinedSplitter(parts=[("part_0", SplitterPart(lambda ds: ds, make_folds()))]).get_n_splits(dataset)
+        CombinedSplitter(parts=[("part_0", SubsetSplitter(lambda ds: ds, make_folds()))]).get_n_splits(dataset)
     with pytest.raises(ValueError, match=r"list\(folds\)"):
         cross_validate(
             Optimize(DummyOptimizablePipeline()), dataset, cv=make_folds(), scoring=_score, progress_bar=False
