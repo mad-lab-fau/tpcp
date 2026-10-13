@@ -99,6 +99,8 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         - "value" is renamed to score"
         - the score of pruned trials is set to `np.nan`
 
+        An empty study produces an empty dictionary.
+
         These changes are made to make the output comparable to the output of :class:`~tpcp.optimize.GridSearch` and
         :class:`~tpcp.optimize.GridSearchCV`.
         """
@@ -109,11 +111,11 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
                 return "param__" + name[len(param_start) :]
             return name
 
+        trials_df = self.study_.trials_dataframe()
+        if trials_df.empty:
+            return {}
         base_df = (
-            self.study_.trials_dataframe()
-            .drop("number", axis=1)
-            .rename(columns={"value": "score"})
-            .rename(columns=rename_param_columns)
+            trials_df.drop("number", axis=1).rename(columns={"value": "score"}).rename(columns=rename_param_columns)
         )
         base_df["params"] = [self.sanitize_params(t.params) for t in self.study_.trials]
 
@@ -899,6 +901,8 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
     @property
     def search_results_(self) -> dict[str, Sequence[Any]]:  # noqa: D102
         search_results = super().search_results_
+        if not search_results:
+            return {}
         search_results["data_labels"] = search_results.pop("user_attrs___data_labels")
 
         if self.multimetric_:
