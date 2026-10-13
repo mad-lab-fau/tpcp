@@ -5,30 +5,53 @@
 Parallel Optuna Trials on Multiple GPUs
 =======================================
 
-This recipe selects a GPU inside a custom Optuna objective. The optimizer has a
-``gpu_ids`` parameter containing the available GPU indices. TPCP supplies a
-logical ``worker_id`` for each trial chunk, so the objective selects
-``gpu_ids[worker_id]`` and builds its model inside a TensorFlow device scope.
-Joblib remains responsible for scheduling the chunks in its process pool.
+Use one trial chunk per configured GPU. TPCP passes a ``worker_id`` to a custom
+objective that declares it, and the objective selects ``gpu_ids[worker_id]``.
+The core pattern is:
 
-This parallelizes independent trials, rather than distributing one model fit.
-The example runs a tiny NumPy regression on CPUs by default, without TensorFlow.
-Supply ``GPU_IDS`` below to use the TensorFlow version. Install a GPU-enabled
-TensorFlow build following the
+.. code-block:: python
+
+    n_jobs = len(gpu_ids)
+
+
+    def objective(trial, pipeline, dataset, *, worker_id):
+        gpu_id = gpu_ids[worker_id]
+        with tf.device(f"/GPU:{gpu_id}"):
+            # Construct and train the model here, then return its score.
+            ...
+
+For example, with ``gpu_ids=[2, 5]`` and ``n_jobs=2``, chunk 0 evaluates its
+trials on GPU 2 and chunk 1 on GPU 5. Each chunk evaluates its trials
+sequentially; the chunks can run concurrently. This parallelizes independent
+trials. It does not distribute a single model fit across GPUs.
+
+A ``worker_id`` identifies a chunk, not an operating-system process. It stays
+the same for every trial in that chunk. Joblib schedules the chunks and may
+reuse a process for a different chunk in a later search. Serial execution uses
+``worker_id=0``. Existing objectives without this argument still work.
+
+Runnable CPU and GPU example
+----------------------------
+The complete example below runs a tiny NumPy regression on CPUs by default,
+without TensorFlow. Set ``GPU_IDS = [0, 1]`` to try two GPUs, or supply your own
+nonempty sequence of distinct GPU indices. Install a GPU-enabled TensorFlow
+build following the
 `TensorFlow installation guide <https://www.tensorflow.org/install/pip>`_.
 Indices refer to GPUs visible to TensorFlow, including restrictions imposed by
-``CUDA_VISIBLE_DEVICES`` or your cluster scheduler. Run the example from the
-repository root:
+``CUDA_VISIBLE_DEVICES`` or your cluster scheduler.
+
+Run the example from the repository root:
 
 .. code-block:: bash
 
     python -m examples.recipies._08_multi_gpu_optuna
 
-Choosing the worker count
---------------------------
-Copy this helper into your script to use the requested CPU worker count or one
-job per entry in your GPU list. Use ``None`` for CPU execution and a nonempty
-sequence of distinct GPU indices for GPU execution.
+The imported :ref:`regression dataset and pipeline
+<sphx_glr_auto_examples_algorithms_algorithms_linear_regression.py>` provide
+small demo implementations. Replace them with your own dataset and pipeline.
+The pipeline constructs its TensorFlow variables during training, inside the
+objective's device scope. Wrapping the training of an already constructed
+model in a device scope does not move its existing variables.
 """
 
 import os
@@ -50,45 +73,17 @@ from examples.algorithms.algorithms_linear_regression import (
     RegressionPipeline,
 )
 
-
-def select_n_jobs(cpu_n_jobs: int, *, gpu_ids: Sequence[int] | None) -> int:
-    """Use the supplied CPU worker count or the length of the GPU list."""
-    return cpu_n_jobs if gpu_ids is None else len(gpu_ids)
-
-
 # %%
-# A tiny dataset and trainable pipeline
-# --------------------------------------
-# Import a small synthetic dataset and pipeline from the example helper module.
-# Replace them with your own dataset and pipeline.
-# The TensorFlow model is built during training, inside the objective's device
-# scope. A model constructed earlier already has its variables placed on a
-# device; wrapping its training call does not move those variables.
-
-
-# %%
-# Custom search with a configured GPU list
-# -----------------------------------------
-# ``worker_id`` is the zero-based trial-chunk index. It is stable for every
-# trial in that chunk, independent of the process that executes the job.
-# TPCP inspects the objective signature once and passes this argument only
-# when the objective declares it. Existing three-argument objectives still work.
+# Select a device for trials and the final fit
+# --------------------------------------------
+# The objective sets a learning rate, trains on one subset, and measures mean
+# squared error on a held-out subset. Use your usual inner cross-validation
+# for a real experiment.
 #
-# The dataclass interface adds ``gpu_ids`` while retaining the base optimizer's
-# parameters; see :ref:`dataclasses` for more about this interface.
-# Use the helper above for ``n_jobs`` so each chunk has one GPU-list entry.
-# The objective trains on one subset and ranks candidates on a held-out subset.
-# Use your usual inner cross-validation instead for a real experiment.
-#
-# ``tf.device`` scopes cover model construction and training. The final fit
-# uses the first configured GPU through the same scope helper. CPU execution
-# uses ``nullcontext`` and does not import TensorFlow.
-# Memory growth is enabled before the first TensorFlow operation so processes
-# can share visible GPUs without reserving their entire memory at startup.
-# Run this recipe in a fresh script where TensorFlow has not been initialized
-# with a different memory configuration.
-# See `TensorFlow device scopes <https://www.tensorflow.org/api_docs/python/tf/device>`_
-# and `GPU memory growth <https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth>`_.
+# ``gpu_ids`` is an optimizer parameter. The dataclass interface retains the
+# base optimizer's parameters; see :ref:`dataclasses` for details.
+# The same device-scope helper covers trial training and the final fit. CPU
+# execution uses ``nullcontext`` and does not import TensorFlow.
 
 
 @dataclass(repr=False)
@@ -105,6 +100,9 @@ class RegressionSearch(
 
         import tensorflow as tf
 
+        # Enable memory growth before the first TensorFlow operation so each
+        # process allocates GPU memory as needed. Use a fresh script where
+        # TensorFlow has not been initialized with a different configuration.
         for gpu in tf.config.list_physical_devices("GPU"):
             tf.config.experimental.set_memory_growth(gpu, True)
         return tf.device(f"/GPU:{self.gpu_ids[worker_id]}")
@@ -128,26 +126,27 @@ class RegressionSearch(
                 fitted = (
                     Optimize(pipeline).optimize(training).optimized_pipeline_
                 )
-                return float(
-                    np.mean(
-                        (
-                            fitted.run(validation).predictions_
-                            - validation.target
-                        )
-                        ** 2
-                    )
-                )
+                predictions = fitted.run(validation).predictions_
+                mse = np.mean((predictions - validation.target) ** 2)
+                return float(mse)
 
         return objective
 
     def return_optimized_pipeline(self, pipeline, dataset, study):
+        # TPCP refits in the parent process. Select the first configured GPU.
         with self._device_scope(0):
             return super().return_optimized_pipeline(pipeline, dataset, study)
 
 
 # %%
-# Shared local storage and execution
+# Configure workers and shared storage
 # ------------------------------------
+# Use the requested CPU worker count or one job per configured GPU.
+# ``gpu_ids=None`` selects CPU execution.
+# See `TensorFlow device scopes <https://www.tensorflow.org/api_docs/python/tf/device>`_
+# and `GPU memory growth <https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth>`_
+# for the TensorFlow configuration used above.
+#
 # A fresh UUID gives each invocation its own database filename and study name.
 # ``load_if_exists=False`` prevents accidentally reopening a study during its
 # initial creation. TPCP then loads this same study in every job; there is no
@@ -159,6 +158,11 @@ class RegressionSearch(
 #
 # The optimizer performs the final fit automatically on all samples. Joblib's
 # normal pool reuse remains enabled; GPU choice is made inside each execution.
+
+
+def select_n_jobs(cpu_n_jobs: int, *, gpu_ids: Sequence[int] | None) -> int:
+    """Use the supplied CPU worker count or the length of the GPU list."""
+    return cpu_n_jobs if gpu_ids is None else len(gpu_ids)
 
 
 def get_study_params(seed: int, *, database: Path, study_name: str):
@@ -198,7 +202,6 @@ def run_search(
 
 # %%
 # Supply the GPU indices you want to use, or keep ``None`` for CPU execution.
-# More GPUs allow more trials to run concurrently; they do not speed up one fit.
 CPU_N_JOBS = 2
 GPU_IDS = None
 STUDY_DIRECTORY = Path("optuna_studies")
@@ -208,9 +211,34 @@ if __name__ == "__main__":
         cpu_n_jobs=CPU_N_JOBS, gpu_ids=GPU_IDS, study_directory=STUDY_DIRECTORY
     )
     print(search.study_.study_name)
+    trial_table = search.study_.trials_dataframe(
+        attrs=("number", "value", "user_attrs")
+    ).rename(
+        columns={
+            "number": "trial",
+            "value": "mse",
+            "user_attrs_worker_id": "chunk",
+            "user_attrs_pid": "pid",
+            "user_attrs_gpu_id": "requested_gpu",
+        }
+    )
     print(
-        search.study_.trials_dataframe(
-            attrs=("number", "value", "params", "user_attrs")
-        )
+        trial_table[
+            ["trial", "mse", "chunk", "pid", "requested_gpu"]
+        ].to_string(index=False)
     )
     print("Final fitted weights:", fitted_pipeline.weights)
+
+# %%
+# Read the trial table
+# --------------------
+# Each row shows a trial's score, chunk ID, process ID, and requested GPU.
+# Trials in the same chunk have the same ``chunk`` and ``requested_gpu``.
+# The default CPU run shows chunk scheduling and automatic final refitting;
+# ``requested_gpu`` is ``None`` because it makes no GPU request.
+#
+# With GPU execution enabled, ``requested_gpu`` records the device selected by
+# the objective. It does not verify where TensorFlow placed each operation.
+# To confirm actual placement on your hardware, enable TensorFlow's
+# `device placement logging <https://www.tensorflow.org/guide/gpu#logging_device_placement>`_
+# before the first TensorFlow operation inside each worker.
