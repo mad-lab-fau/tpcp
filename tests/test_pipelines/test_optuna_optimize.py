@@ -151,6 +151,23 @@ class TestMetaFunctionalityOptuna(TestAlgorithmMixin):
 
 
 class TestCustomOptunaOptimize:
+    @pytest.mark.parametrize("optimizer_class", [ProcessRecordingOptimizer, OptunaSearch])
+    def test_zero_trial_parallel_search_exports_empty_results(self, optimizer_class, tmp_path):
+        scorer_params = (
+            {"scoring": dummy_single_score_func, "create_search_space": dummy_search_space}
+            if optimizer_class is OptunaSearch
+            else {}
+        )
+        optimizer = optimizer_class(
+            DummyPipeline(),
+            lambda seed: {"storage": f"sqlite:///{tmp_path}/study.db"},
+            n_jobs=2,
+            n_trials=0,
+            return_optimized=False,
+            **scorer_params,
+        ).optimize(DummyDataset())
+        assert optimizer.search_results_ == {}
+
     @pytest.mark.parametrize("n_jobs", [1, 2])
     def test_objective_receives_logical_worker_id(self, n_jobs, tmp_path):
         optimizer = WorkerIdRecordingOptimizer(
