@@ -10,11 +10,12 @@ except ImportError as e:
 import multiprocessing
 import warnings
 from ast import literal_eval
-from collections import defaultdict
 from collections.abc import Callable, Sequence
 from typing import Any, Self, TypedDict, TypeVar
 
 import numpy as np
+import pandas as pd
+from joblib import effective_n_jobs
 from optuna import Study
 from optuna.study import StudyDirection
 from optuna.study.study import ObjectiveFuncType
@@ -220,12 +221,10 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
                 )
                 self._call_optimize_multi_process(study, objective, n_trials)
 
-            # We call the objective function once in the main thread to make sure that the study is created correctly
-            _multi_process_call_optimize(1, self.random_seed_)
             parallel = Parallel(self.n_jobs)
             parallel(
                 delayed(_multi_process_call_optimize)(n_trials=n_trials_i, seed=self.random_seed_ + i + 1)
-                for (i, n_trials_i) in enumerate(_split_trials(self.n_trials - 1, self.n_jobs))
+                for (i, n_trials_i) in enumerate(_split_trials(self.n_trials, effective_n_jobs(self.n_jobs)))
             )
 
         if self.return_optimized:
@@ -517,12 +516,18 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     Otherwise, each sampler/pruner instance might use the same random seed, which will lead to identical trials in
     each process.
 
-    From the implementation perspective, we split the number of trials into `n_jobs` chunks and then spawn one study
-    per job.
-    However, we first run the first trial in the main process, to make sure that the study is created correctly.
-    Then we split the remaining trials into chunks and spawn a new process for each chunk.
-    This study is a copy of the study from the main process and hence, points to the same database.
-    Each process will then complete its chunk of trials and then terminate.
+    From the implementation perspective, we split the trial budget across the effective joblib worker count.
+    Each worker loads the shared study and evaluates its assigned chunk of trials.
+    With a process-based backend and multiple effective workers, all objective evaluations run in worker processes,
+    so joblib worker initializers also apply to the first trial. A single effective worker uses joblib's sequential
+    execution and does not run a worker initializer.
+    Each worker loads the study created by the main process and points to the same database.
+    If requested, the final optimized pipeline is produced in the main process after the workers finish their trials.
+    A worker initializer does not configure that final optimization.
+    Objective-side mutations of an optimizer instance remain local to the worker. Store metadata needed in the
+    main process as study or trial attributes and recover it after optimization.
+    Moving the first trial into a worker changes its sampler seed compared with earlier versions.
+    Joblib may retain the worker processes for reuse after their trial chunks finish.
     This is a relatively naive implementation, but it avoids the overhead of spawning a new process for each trial.
     If this is always the best idea, is unclear.
 
@@ -824,6 +829,11 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         self.show_progress_bar = show_progress_bar
         self.return_optimized = return_optimized
 
+    @property
+    def multimetric_(self) -> bool:
+        """Whether the study contains results from a multi-metric scorer."""
+        return any("__average_scores" in trial.user_attrs for trial in self.study_.get_trials(deepcopy=False))
+
     def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], float | Sequence[float]]:
         """Create the objective function for optuna.
 
@@ -833,8 +843,6 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
         scoring = _validate_scorer(self.scoring)
 
-        # In a multiprocessing case, this function is called once in the main process and then in the worker processes.
-        # The first call in the main process allows us to set the multimetric_ attribute.
         def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
             # First we need to select parameters for the current trial
             if self.create_search_space is None:
@@ -845,13 +853,8 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
             average_scores, single_scores = scoring(pipeline, dataset)
 
-            if not hasattr(self, "multimetric_"):
-                if isinstance(average_scores, dict):
-                    self.multimetric_ = True
-                else:
-                    self.multimetric_ = False
-
-            if self.multimetric_:
+            multimetric = isinstance(average_scores, dict)
+            if multimetric:
                 if self.score_name is None:
                     raise ValueError("score_name must be set if scoring returns a dictionary of scores")
                 if self.score_name not in average_scores:
@@ -868,7 +871,7 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
             # As a bonus, we use the custom params option of optuna to store the individual scores per datapoint and the
             # respective data labels
-            if self.multimetric_:
+            if multimetric:
                 trial.set_user_attr("__average_scores", average_scores)
                 trial.set_user_attr("__single_scores", single_scores)
             else:
@@ -913,9 +916,8 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         return pipeline_with_best_params
 
 
-def _invert_list_of_dicts(list_of_dicts: list[dict[str, Any]]) -> dict[str, list]:
-    inverted = defaultdict(list)
-    for d in list_of_dicts:
-        for k, v in d.items():
-            inverted[k].append(v)
-    return dict(inverted)
+def _invert_list_of_dicts(list_of_dicts: list[dict[str, Any] | float]) -> dict[str, list]:
+    # Running trials have no score metadata yet. Preserve their positions in the trial table.
+    return pd.DataFrame([scores if isinstance(scores, dict) else {} for scores in list_of_dicts], dtype=object).to_dict(
+        orient="list"
+    )
