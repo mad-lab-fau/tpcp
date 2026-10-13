@@ -6,11 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [3.4.0] - 2026-10-13
+
+### Breaking
+
+- `worker_id` is now reserved for the Optuna objective execution keyword. This is an explicitly approved
+  compatibility exception. If an existing custom objective uses that parameter name for another purpose,
+  rename it before upgrading. Objectives without `worker_id` keep their original calling convention.
+
 ### Added
 
 - Custom Optuna objectives can declare a `worker_id` keyword argument to receive their logical trial-chunk index
   automatically. `worker_id` is reserved for this execution argument; objectives without it keep their original
   calling convention. Serial execution uses ID 0.
+  (https://github.com/mad-lab-fau/tpcp/pull/163)
 - A multi-GPU Optuna recipe with a configured GPU list, device selection inside each objective,
   CPU/GPU job-count selection, and a separate UUID-named local study database for each run.
 
