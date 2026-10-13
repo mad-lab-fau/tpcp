@@ -257,7 +257,7 @@ async def _cross_validate_async(
                 parameters = dict(optimize_params or {})
                 if resource != "cpu":
                     parameters.setdefault("resource", resource)
-                await optimizer.optimize_async(train, **parameters)
+                optimizer = await optimizer.optimize_async(train, **parameters)
             optimize_time = time.perf_counter() - start
             score_start = time.perf_counter()
             result: dict[str, Any] = {"debug__optimize_time": optimize_time}

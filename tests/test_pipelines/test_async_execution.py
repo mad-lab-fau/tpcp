@@ -631,3 +631,34 @@ def test_cross_validation_preserves_coroutine_override_dispatch():
 
     assert len(asyncio.run(run())["test__agg__score"]) == 2
     assert len(calls) == 2
+
+
+def test_cv_uses_optimizer_returned_by_worker_effect():
+    """A callee may return a fitted copy from a GPU worker rather than mutate its main-thread instance."""
+    from tpcp.parallel import Task
+
+    class WorkerSearch(GridSearch):
+        def async_optimize(self, dataset, **_):
+            return Task(self.optimize, args=(dataset,), resource="gpu", metadata={"stage": "custom_optimize"})
+
+    search = WorkerSearch(
+        DummyPipeline(), ParameterGrid({"para_1": [0, 2]}), scoring=score_candidate, n_jobs=1, progress_bar=False
+    )
+    expected = cross_validate(search, DummyDataset(), scoring=score_candidate, cv=2, progress_bar=False)
+    events = []
+
+    async def run():
+        async with execution_context(n_jobs=2, n_gpu_jobs=1, on_job_event=events.append):
+            return await async_cross_validate(
+                search, DummyDataset(), scoring=score_candidate, cv=2, return_optimizer=True, progress_bar=False
+            )
+
+    result = asyncio.run(run())
+    np.testing.assert_array_equal(result["test__agg__score"], expected["test__agg__score"])
+    assert all(hasattr(optimizer, "optimized_pipeline_") for optimizer in result["optimizer"])
+    optimizations = [
+        event for event in events if event.status == "completed" and event.metadata["stage"] == "custom_optimize"
+    ]
+    assert len(optimizations) == 2
+    assert all(event.worker.pid != os.getpid() and event.worker.gpu_id == 0 for event in optimizations)
+
