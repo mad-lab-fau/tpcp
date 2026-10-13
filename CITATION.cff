@@ -14,7 +14,7 @@ authors:
   given-names: "Bjoern M."
   orcid: "https://orcid.org/0000-0002-0417-0336"
 title: "tpcp: Tiny Pipelines for Complex Problems - A set of framework independent helpers for algorithms development and evaluation"
-version: 0.13.0
+version: 3.4.0
 doi: 10.17605/OSF.IO/GKY2U
 url: "https://github.com/mad-lab-fau/tpcp"
 
