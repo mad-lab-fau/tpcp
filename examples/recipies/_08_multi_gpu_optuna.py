@@ -1,5 +1,7 @@
-# ruff: noqa: D205, D400
+# ruff: noqa: D400
 """
+.. _multi_gpu_optuna:
+
 Parallel Optuna Trials on Multiple GPUs
 =======================================
 
@@ -15,7 +17,12 @@ Supply ``GPU_IDS`` below to use the TensorFlow version. Install a GPU-enabled
 TensorFlow build following the
 `TensorFlow installation guide <https://www.tensorflow.org/install/pip>`_.
 Indices refer to GPUs visible to TensorFlow, including restrictions imposed by
-``CUDA_VISIBLE_DEVICES`` or your cluster scheduler.
+``CUDA_VISIBLE_DEVICES`` or your cluster scheduler. Run the example from the
+repository root:
+
+.. code-block:: bash
+
+    python -m examples.recipies._08_multi_gpu_optuna
 
 Choosing the worker count
 --------------------------
@@ -33,17 +40,15 @@ from pathlib import Path
 from uuid import uuid4
 
 import numpy as np
-import pandas as pd
 from joblib import parallel_config
 from optuna.samplers import TPESampler
-from tpcp import (
-    Dataset,
-    OptimizableParameter,
-    OptimizablePipeline,
-    make_optimize_safe,
-)
 from tpcp.optimize import Optimize
 from tpcp.optimize.optuna import CustomOptunaOptimize
+
+from examples.algorithms.algorithms_linear_regression import (
+    RegressionDataset,
+    RegressionPipeline,
+)
 
 
 def select_n_jobs(cpu_n_jobs: int, *, gpu_ids: Sequence[int] | None) -> int:
@@ -54,77 +59,11 @@ def select_n_jobs(cpu_n_jobs: int, *, gpu_ids: Sequence[int] | None) -> int:
 # %%
 # A tiny dataset and trainable pipeline
 # --------------------------------------
-# Replace these synthetic regression classes with your dataset and pipeline.
+# Import a small synthetic dataset and pipeline from the example helper module.
+# Replace them with your own dataset and pipeline.
 # The TensorFlow model is built during training, inside the objective's device
 # scope. A model constructed earlier already has its variables placed on a
 # device; wrapping its training call does not move those variables.
-
-
-class RegressionDataset(Dataset):
-    """Deterministic samples for a small linear regression."""
-
-    def create_index(self):
-        return pd.DataFrame({"sample": range(32)})
-
-    @property
-    def features(self) -> np.ndarray:
-        """Input values and a bias column."""
-        x = self.index["sample"].to_numpy(dtype=np.float32) / 31
-        return np.column_stack([x, np.ones_like(x)])
-
-    @property
-    def target(self) -> np.ndarray:
-        """Reference values."""
-        return 2 * self.features[:, 0] - 0.5
-
-
-class RegressionPipeline(OptimizablePipeline[RegressionDataset]):
-    """Fit with NumPy or TensorFlow, inheriting the caller's device scope."""
-
-    weights: OptimizableParameter[np.ndarray | None]
-
-    def __init__(
-        self,
-        learning_rate: float = 0.1,
-        *,
-        use_gpu: bool = False,
-        weights: np.ndarray | None = None,
-    ):
-        self.learning_rate = learning_rate
-        self.use_gpu = use_gpu
-        self.weights = weights
-
-    @make_optimize_safe
-    def self_optimize(self, dataset: RegressionDataset):
-        """Run a few gradient steps, keeping training deliberately tiny."""
-        x, y = dataset.features, dataset.target
-        if self.use_gpu:
-            import tensorflow as tf
-
-            x, y = tf.constant(x), tf.constant(y)
-            weights = tf.Variable(tf.zeros(2))
-            for _ in range(20):
-                with tf.GradientTape() as tape:
-                    loss = tf.reduce_mean(
-                        tf.square(tf.linalg.matvec(x, weights) - y)
-                    )
-                weights.assign_sub(
-                    self.learning_rate * tape.gradient(loss, weights)
-                )
-            self.weights = weights.numpy()
-        else:
-            weights = np.zeros(2, dtype=np.float32)
-            for _ in range(20):
-                weights -= self.learning_rate * (
-                    2 * x.T @ (x @ weights - y) / len(y)
-                )
-            self.weights = weights
-        return self
-
-    def run(self, datapoint: RegressionDataset):
-        """Predict using the fitted weights."""
-        self.predictions_ = datapoint.features @ self.weights
-        return self
 
 
 # %%
