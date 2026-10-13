@@ -396,10 +396,36 @@ def remove_global_parallel_callback(name: str):
 
 
 __all__ = [
+    "Job",
+    "JobEvent",
     "Parallel",
+    "Task",
+    "TaskConfig",
+    "WorkerContext",
     "delayed",
+    "execution_context",
+    "get_job_metadata",
+    "get_worker_context",
+    "job_metadata",
     "register_global_parallel_callback",
     "register_parallel_side_channel",
     "remove_global_parallel_callback",
     "remove_parallel_side_channel",
+    "run_in_worker",
 ]
+
+
+# Re-export after the legacy worker helpers are defined. The async adapter uses
+# those helpers at execution time, preserving synchronous worker-state behavior.
+from tpcp._async_execution import (  # noqa: E402
+    Job,
+    JobEvent,
+    Task,
+    TaskConfig,
+    WorkerContext,
+    execution_context,
+    get_job_metadata,
+    get_worker_context,
+    job_metadata,
+    run_in_worker,
+)

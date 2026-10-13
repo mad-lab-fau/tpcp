@@ -28,6 +28,7 @@ from tpcp._algorithm_utils import (
     _check_safe_optimize,
     _split_returns,
 )
+from tpcp._async_execution import _gather_with_progress
 from tpcp._base import NOTHING, _get_annotated_fields_of_type
 from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
@@ -42,8 +43,8 @@ from tpcp._utils._general import (
 )
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
-from tpcp.misc import iter_with_warning_error_context
-from tpcp.parallel import Parallel, delayed
+from tpcp.misc import iter_with_warning_error_context, warning_error_context
+from tpcp.parallel import Parallel, Task, delayed, get_job_metadata, job_metadata
 from tpcp.validate import BaseDatasetSplitter
 from tpcp.validate._cross_val_helper import _normalize_splitter
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
@@ -442,6 +443,67 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
             # Evaluate each parameter combination
             results = list(pbar(parallel(tasks())))
         assert results is not None  # For the typechecker
+        return self._set_search_results(results)
+
+    def async_optimize(
+        self, dataset: DatasetT, *, resource: Literal["cpu", "gpu"] = "cpu", **kwargs: Any
+    ) -> Task[Self]:
+        """Bind an async optimization workflow without executing it.
+
+        Await the returned effect inside :func:`tpcp.parallel.execution_context`.
+        Candidates share its pool and run serial scoring within each worker.
+        ``resource="gpu"`` requests both GPU and CPU slots. ``progress_bar``
+        shows candidate completion; synchronous ``n_jobs`` is ignored. Selection
+        and result attributes are applied to this instance on the main thread.
+        """
+        return Task(self._optimize_async, args=(dataset,), kwargs={"resource": resource, **kwargs}, kind="workflow")
+
+    async def optimize_async(self, dataset: DatasetT, **kwargs: Any) -> Self:
+        """Execute :meth:`async_optimize` through a coroutine entry point."""
+        return await self.async_optimize(dataset, **kwargs)
+
+    async def _optimize_async(self, dataset: DatasetT, *, resource: Literal["cpu", "gpu"] = "cpu", **_: Any) -> Self:
+        """Run experimental async GridSearch in the active execution context.
+
+        Candidate evaluations share the context's pool with enclosing async CV
+        folds. The execution context controls pool concurrency; synchronous
+        ``n_jobs`` and ``pre_dispatch`` settings are ignored. ``progress_bar``
+        displays candidate completions using tqdm.
+        ``resource="gpu"`` requires both a GPU slot and a CPU/process slot.
+        Scorers run serially inside each candidate job to avoid nested pools.
+        Results are stored on this instance in the calling event loop.
+        Failures propagate as an ``ExceptionGroup`` from the task group.
+        """
+        self.dataset = dataset
+        scoring = _validate_scorer(self.scoring).clone().set_params(n_jobs=1, progress_bar=False)
+
+        async def evaluate(index, parameters):
+            with (
+                job_metadata(parameter_candidate=index, parameters=parameters, stage="candidate_score"),
+                warning_error_context("parameter_candidate", {"i": index, "parameters": parameters}),
+            ):
+                return await Task(
+                    _score,
+                    args=lambda: (self.pipeline.clone(), dataset, scoring, parameters),
+                    kwargs={
+                        "return_parameters": True,
+                        "return_data_labels": True,
+                        "return_times": True,
+                    },
+                    resource=resource,
+                )
+
+        fold = get_job_metadata().get("cv_fold")
+        desc = "Parameter Combinations" if fold is None else f"Parameter Combinations [fold {fold}]"
+        results = await _gather_with_progress(
+            (evaluate(i, paras) for i, paras in enumerate(self.parameter_grid)),
+            total=len(self.parameter_grid),
+            desc=desc,
+            progress_bar=self.progress_bar,
+        )
+        return self._set_search_results(results)
+
+    def _set_search_results(self, results) -> Self:
         # We check here if all results are dicts. We only check the dtype of the first value, as the scorer should
         # have handled issues with non-uniform cases already.
         first_test_score = results[0]["scores"]

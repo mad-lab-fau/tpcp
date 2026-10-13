@@ -1,21 +1,27 @@
 """Helper to validate/evaluate pipelines and Optimize."""
 
+import time
 from functools import partial
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from sklearn.model_selection import BaseCrossValidator
 from tqdm.auto import tqdm
 
+from tpcp._async_execution import _gather_with_progress
 from tpcp._base import _Default
 from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
 from tpcp._pipeline import PipelineT
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results, _passthrough, _prefix_para_dict
 from tpcp._utils._score import _optimize_and_score, _score
-from tpcp.misc import iter_with_warning_error_context
-from tpcp.parallel import Parallel, delayed
+from tpcp.misc import iter_with_warning_error_context, warning_error_context
+from tpcp.parallel import Parallel, Task, delayed, job_metadata
 from tpcp.validate._cross_val_helper import BaseDatasetSplitter, _normalize_splitter
 from tpcp.validate._scorer import ScoreFunc, Scorer, ScorerTypes, _validate_scorer
+
+if TYPE_CHECKING:
+    from tpcp import Dataset
+    from tpcp.optimize import GridSearch
 
 
 def cross_validate(
@@ -145,6 +151,149 @@ def cross_validate(
     with parallel:
         results = list(pbar(parallel(tasks())))
     assert results is not None  # For the typechecker
+    return _format_cv_results(results)
+
+
+def async_cross_validate(
+    optimizable: "GridSearch[PipelineT, DatasetT]",
+    dataset: DatasetT,
+    *,
+    scoring: ScorerTypes[PipelineT, DatasetT],
+    cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None = None,
+    optimize_params: dict[str, Any] | None = None,
+    return_train_score: bool = False,
+    return_optimizer: bool = False,
+    progress_bar: bool = True,
+    resource: Literal["cpu", "gpu"] = "cpu",
+) -> Task:
+    """Bind a lazy cross-validation workflow; await it inside an execution context.
+
+    Fold workflows and GridSearch candidates share one process pool. Search
+    selection and results stay on the main thread; scoring runs in workers.
+    ``resource="gpu"`` requests both CPU and GPU slots for leaf jobs.
+    ``progress_bar`` shows fold completion; candidate bars follow the search's
+    settings. Scorers run serially within each job. Timings include queue waits.
+    See :func:`cross_validate` for result fields. Failures from composed jobs
+    propagate as an ``ExceptionGroup``.
+    """
+    return Task(
+        _cross_validate_async,
+        args=(optimizable, dataset),
+        kwargs={
+            "scoring": scoring,
+            "cv": cv,
+            "optimize_params": optimize_params,
+            "return_train_score": return_train_score,
+            "return_optimizer": return_optimizer,
+            "progress_bar": progress_bar,
+            "resource": resource,
+        },
+        kind="workflow",
+    )
+
+
+async def cross_validate_async(
+    optimizable: "GridSearch[PipelineT, DatasetT]",
+    dataset: DatasetT,
+    *,
+    scoring: ScorerTypes[PipelineT, DatasetT],
+    cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None = None,
+    optimize_params: dict[str, Any] | None = None,
+    return_train_score: bool = False,
+    return_optimizer: bool = False,
+    progress_bar: bool = True,
+    resource: Literal["cpu", "gpu"] = "cpu",
+):
+    """Execute :func:`async_cross_validate` through a coroutine entry point."""
+    return await async_cross_validate(
+        optimizable,
+        dataset,
+        scoring=scoring,
+        cv=cv,
+        optimize_params=optimize_params,
+        return_train_score=return_train_score,
+        return_optimizer=return_optimizer,
+        progress_bar=progress_bar,
+        resource=resource,
+    )
+
+
+async def _cross_validate_async(
+    optimizable: "GridSearch[PipelineT, DatasetT]",
+    dataset: DatasetT,
+    *,
+    scoring: ScorerTypes[PipelineT, DatasetT],
+    cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None = None,
+    optimize_params: dict[str, Any] | None = None,
+    return_train_score: bool = False,
+    return_optimizer: bool = False,
+    progress_bar: bool = True,
+    resource: Literal["cpu", "gpu"] = "cpu",
+):
+    """Evaluate GridSearch folds through one experimental async execution context.
+
+    Use inside ``async with tpcp.parallel.execution_context(n_jobs=...)``.
+    Each fold awaits its own cloned GridSearch, which submits candidate jobs to
+    the shared pool. Test and optional train scoring use the same pool, with
+    datapoints scored serially inside each job. Results have the same structure
+    as :func:`cross_validate`; timings measure elapsed time including pool waits.
+    ``progress_bar`` displays completed folds using tqdm. Inner search progress
+    follows ``GridSearch.progress_bar``. Scorer ``n_jobs`` and datapoint progress
+    bars do not apply to this prototype.
+    ``resource="gpu"`` schedules candidate and held-out scoring through the GPU
+    gate. ``optimize_params`` can override the resource for optimization only.
+    Failures propagate as an ``ExceptionGroup`` from the task group.
+    """
+    scorer = _validate_scorer(scoring).clone().set_params(n_jobs=1, progress_bar=False)
+    splits = list(_normalize_splitter(cv).split(cast("Dataset", dataset)))
+
+    async def evaluate_fold(index, train_labels, test_labels):
+        optimizer = optimizable.clone()
+        train = dataset.get_subset(group_labels=train_labels)
+        test = dataset.get_subset(group_labels=test_labels)
+        with job_metadata(cv_fold=index), warning_error_context("cv_fold", {"i": index}):
+            start = time.perf_counter()
+            with warning_error_context("optimize", {"data_labels": train.group_labels}):
+                parameters = dict(optimize_params or {})
+                if resource != "cpu":
+                    parameters.setdefault("resource", resource)
+                await optimizer.optimize_async(train, **parameters)
+            optimize_time = time.perf_counter() - start
+            score_start = time.perf_counter()
+            result: dict[str, Any] = {"debug__optimize_time": optimize_time}
+            scoring_sets = [("test", test)]
+            if return_train_score:
+                scoring_sets.append(("train", train))
+            for prefix, subset in scoring_sets:
+                with (
+                    job_metadata(stage=f"{prefix}_score"),
+                    warning_error_context(f"{prefix}_score", {"data_labels": subset.group_labels}),
+                ):
+                    scores = cast(
+                        "dict[str, Any]",
+                        await Task(
+                            _score, args=(optimizer.optimized_pipeline_, subset, scorer, None), resource=resource
+                        ),
+                    )
+                result[f"{prefix}__scores"] = scores["scores"]
+                result[f"{prefix}__single__scores"] = scores["single__scores"]
+            result["debug__score_time"] = time.perf_counter() - score_start
+            result["train__data_labels"] = train.group_labels
+            result["test__data_labels"] = test.group_labels
+            if return_optimizer:
+                result["optimizer"] = optimizer
+            return result
+
+    results = await _gather_with_progress(
+        (evaluate_fold(i, train, test) for i, (train, test) in enumerate(splits)),
+        total=len(splits),
+        desc="CV Folds",
+        progress_bar=progress_bar,
+    )
+    return _format_cv_results(results)
+
+
+def _format_cv_results(results):
     results = _aggregate_final_results(results)
 
     # Fix the formatting of all the score results
