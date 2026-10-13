@@ -299,8 +299,11 @@ class _AsyncExecution:
 
     def _emit(self, job_id, status, metadata, resource, worker=None):
         if self._on_job_event is not None:
-            with job_metadata(**metadata):
+            token = _current_job_metadata.set(metadata)
+            try:
                 self._on_job_event(JobEvent(job_id, status, metadata.copy(), resource, worker))
+            finally:
+                _current_job_metadata.reset(token)
 
     def _prepare(self, request):
         from tpcp.parallel import delayed

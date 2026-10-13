@@ -662,3 +662,38 @@ def test_cv_uses_optimizer_returned_by_worker_effect():
     assert len(optimizations) == 2
     assert all(event.worker.pid != os.getpid() and event.worker.gpu_id == 0 for event in optimizations)
 
+
+def test_job_events_use_exact_metadata_across_overlapping_callers():
+    """A dispatcher's creation scope must not leak into another caller's events."""
+    from tpcp.parallel import Task
+
+    observations = []
+
+    def observe(event):
+        observations.append((event.metadata, get_job_metadata()))
+
+    async def run():
+        entered = asyncio.Event()
+        done = asyncio.Event()
+
+        async def owner():
+            with job_metadata(experiment="A"):
+                async with execution_context(n_jobs=1, on_job_event=observe):
+                    entered.set()
+                    await done.wait()
+                    return await Task(get_job_metadata)
+
+        async def caller():
+            await entered.wait()
+            try:
+                async with execution_context(n_jobs=1, on_job_event=observe):
+                    return await Task(get_job_metadata, metadata={"work": "B"})
+            finally:
+                done.set()
+
+        return await asyncio.gather(owner(), caller())
+
+    owner_metadata, caller_metadata = asyncio.run(run())
+    assert owner_metadata == {"experiment": "A"}
+    assert caller_metadata == {"work": "B"}
+    assert all(event_metadata == scope_metadata for event_metadata, scope_metadata in observations)
