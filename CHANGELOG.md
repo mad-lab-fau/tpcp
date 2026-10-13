@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Custom Optuna objectives can declare a `worker_id` keyword argument to receive their logical trial-chunk index
   automatically. `worker_id` is reserved for this execution argument; objectives without it keep their original
   calling convention. Serial execution uses ID 0.
+- A multi-GPU Optuna recipe with a configured GPU list, device selection inside each objective,
+  CPU/GPU job-count selection, and a separate UUID-named local study database for each run.
 
 ### Changed
 
