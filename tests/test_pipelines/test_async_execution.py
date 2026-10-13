@@ -319,14 +319,13 @@ def worker_interval(label):
     return label, start, time.monotonic()
 
 
-@pytest.mark.parametrize("gpu_slots", [1, 2])
-def test_gpu_jobs_take_gpu_and_cpu_slots_without_blocking_waiting_workers(gpu_slots):
+def test_gpu_jobs_take_gpu_and_cpu_slots_without_blocking_waiting_workers():
     """GPU waits do not consume CPU capacity, while running GPU jobs share the CPU budget."""
     # Warm both reusable workers so import timing cannot disguise scheduling.
     Parallel(n_jobs=2)(delayed(worker_interval)("warm") for _ in range(2))
 
     async def run():
-        async with execution_context(n_jobs=2, n_gpu_jobs=gpu_slots) as execution:
+        async with execution_context(n_jobs=2, n_gpu_jobs=1) as execution:
             return await asyncio.gather(
                 execution.run(Job(worker_interval, args=("gpu-a",), resource="gpu")),
                 execution.run(Job(worker_interval, args=("gpu-b",), resource="gpu")),
@@ -338,12 +337,31 @@ def test_gpu_jobs_take_gpu_and_cpu_slots_without_blocking_waiting_workers(gpu_sl
     def overlaps(first, second):
         return max(first[0], second[0]) < min(first[1], second[1])
 
-    if gpu_slots == 1:
-        assert not overlaps(intervals["gpu-a"], intervals["gpu-b"])
-        assert overlaps(intervals["gpu-a"], intervals["cpu"])
+    assert not overlaps(intervals["gpu-a"], intervals["gpu-b"])
+    assert overlaps(intervals["gpu-a"], intervals["cpu"])
+
+
+@pytest.mark.parametrize("cpu_slots", [1, 2])
+def test_gpu_parallelism_respects_cpu_budget(cpu_slots):
+    """GPU concurrency is independent of CPU admission order and still consumes process capacity."""
+    Parallel(n_jobs=cpu_slots)(delayed(worker_interval)("warm") for _ in range(cpu_slots))
+
+    async def run():
+        async with execution_context(n_jobs=cpu_slots, n_gpu_jobs=2) as execution:
+            jobs = [Job(worker_interval, args=(label,), resource="gpu") for label in ("gpu-a", "gpu-b")]
+            if cpu_slots == 1:
+                jobs.append(Job(worker_interval, args=("cpu",)))
+            return await asyncio.gather(*(execution.run(job) for job in jobs))
+
+    intervals = {label: (start, end) for label, start, end in asyncio.run(run())}
+    if cpu_slots == 2:
+        # Only GPU work competes here; a CPU job cannot validly take its slot.
+        first, second = intervals["gpu-a"], intervals["gpu-b"]
+        assert max(first[0], second[0]) < min(first[1], second[1])
     else:
-        assert overlaps(intervals["gpu-a"], intervals["gpu-b"])
-        assert not (overlaps(intervals["gpu-a"], intervals["cpu"]) and overlaps(intervals["gpu-b"], intervals["cpu"]))
+        ordered = sorted(intervals.values())
+        assert ordered[0][1] <= ordered[1][0]
+        assert ordered[1][1] <= ordered[2][0]
 
 
 def test_nested_grid_search_can_schedule_all_evaluations_as_gpu_jobs():
