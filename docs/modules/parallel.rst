@@ -80,7 +80,9 @@ main event loop. Workflow tasks compose child effects without reserving a worker
 only leaf effects occupy slots. ``asyncio.gather`` can await independent effects
 concurrently. A GPU search can override ``async_optimize`` to return
 ``super().async_optimize(dataset, resource="gpu")``; the surrounding CV awaits
-its effect normally. ``resource="gpu"`` on CV is also available as a convenience
+its effect normally. An optimizer effect may return a new fitted instance, for
+example after process serialization. CV uses the returned instance for held-out
+scoring and ``return_optimizer``. ``resource="gpu"`` on CV is also available as a convenience
 for its candidate and held-out scoring jobs.
 
 ``n_jobs`` is a positive CPU/process budget. ``n_gpu_jobs`` is an independent
