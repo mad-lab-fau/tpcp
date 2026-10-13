@@ -2,6 +2,7 @@ import os
 import re
 import tempfile
 import warnings
+from collections import Counter
 from collections.abc import Sequence
 from typing import Callable, Optional, Union
 from unittest.mock import Mock, patch
@@ -92,6 +93,15 @@ class ProcessRecordingOptimizer(CustomOptunaOptimize):
         return objective
 
 
+class WorkerIdRecordingOptimizer(CustomOptunaOptimize):
+    def create_objective(self):
+        def objective(trial, pipeline, dataset, *, worker_id):
+            trial.set_user_attr("worker_id", worker_id)
+            return 1
+
+        return objective
+
+
 class ProcessRecordingPipeline(DummyOptimizablePipelineWithInfo):
     @make_optimize_safe
     def self_optimize_with_info(self, dataset, **kwargs):
@@ -141,6 +151,19 @@ class TestMetaFunctionalityOptuna(TestAlgorithmMixin):
 
 
 class TestCustomOptunaOptimize:
+    @pytest.mark.parametrize("n_jobs", [1, 2])
+    def test_objective_receives_logical_worker_id(self, n_jobs, tmp_path):
+        optimizer = WorkerIdRecordingOptimizer(
+            DummyPipeline(),
+            lambda seed: {"storage": f"sqlite:///{tmp_path}/study.db"},
+            n_jobs=n_jobs,
+            n_trials=6,
+            return_optimized=False,
+        ).optimize(DummyDataset())
+
+        assignments = Counter(trial.user_attrs["worker_id"] for trial in optimizer.study_.trials)
+        assert assignments == ({0: 6} if n_jobs == 1 else {0: 3, 1: 3})
+
     @pytest.mark.parametrize("n_trials,n_jobs", [(0, 2), (1, 2), (5, 2), (5, -1)])
     def test_parallel_trials_use_worker_setup_and_refit_in_parent(self, n_trials, n_jobs, tmp_path, monkeypatch):
         if n_jobs == -1:

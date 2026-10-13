@@ -11,6 +11,8 @@ import multiprocessing
 import warnings
 from ast import literal_eval
 from collections.abc import Callable, Sequence
+from functools import partial
+from inspect import signature
 from typing import Any, Self, TypedDict, TypeVar
 
 import numpy as np
@@ -204,7 +206,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
 
             # This solution is based on the solution proposed here:
             # https://github.com/optuna/optuna/issues/2862
-            def _multi_process_call_optimize(n_trials: int, seed: int):
+            def _multi_process_call_optimize(n_trials: int, seed: int, worker_id: int):
                 study_params_per_process = self.get_study_params(seed)
                 if (name := study_params_per_process.get("study_name", None)) is not None:
                     assert name == self.study_.study_name, (
@@ -219,11 +221,11 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
                     sampler=study_params_per_process.get("sampler", None),
                     pruner=study_params_per_process.get("pruner", None),
                 )
-                self._call_optimize_multi_process(study, objective, n_trials)
+                self._call_optimize_multi_process(study, partial(objective, worker_id=worker_id), n_trials)
 
             parallel = Parallel(self.n_jobs)
             parallel(
-                delayed(_multi_process_call_optimize)(n_trials=n_trials_i, seed=self.random_seed_ + i + 1)
+                delayed(_multi_process_call_optimize)(n_trials=n_trials_i, seed=self.random_seed_ + i + 1, worker_id=i)
                 for (i, n_trials_i) in enumerate(_split_trials(self.n_trials, effective_n_jobs(self.n_jobs)))
             )
 
@@ -257,13 +259,19 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         )
         return study
 
-    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], float | Sequence[float]]:
+    def create_objective(self) -> Callable[..., float | Sequence[float]]:
         """Return the objective function that should be optimized.
 
         This method should be implemented by a child class and return an objective function that is compatible with
         Optuna.
         However, compared to a normal Optuna objective function, the function should expect a pipeline and a dataset
         object as additional inputs to the optimization Trial object.
+
+        The function may also declare a keyword argument ``worker_id``. TPCP then automatically passes the zero-based
+        index of its submitted trial chunk. All trials in a chunk receive the same ID. Serial execution uses ID 0.
+        This is a logical job ID, independent of the operating-system process that joblib uses to execute the chunk.
+        The name ``worker_id`` is reserved for this additional keyword argument. Objectives that do not declare it
+        keep the original three-argument calling convention without any configuration changes.
         """
         raise NotImplementedError()
 
@@ -283,8 +291,9 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
 
     def _create_objective(self, pipeline: PipelineT, dataset: DatasetT) -> ObjectiveFuncType:
         inner_objective = self.create_objective()
+        accepts_worker_id = "worker_id" in signature(inner_objective).parameters
 
-        def objective(trial: Trial):
+        def objective(trial: Trial, *, worker_id: int = 0):
             inner_pipe = clone(pipeline)
             with warning_error_context(
                 "optuna_trial",
@@ -293,7 +302,8 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
                 # Resolve it when a warning or exception occurs so the context reflects the parameters known then.
                 context_provider=lambda: {"params": trial.params},
             ):
-                return inner_objective(trial, inner_pipe, dataset)
+                kwargs = {"worker_id": worker_id} if accepts_worker_id else {}
+                return inner_objective(trial, inner_pipe, dataset, **kwargs)
 
         return objective
 
@@ -324,8 +334,10 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
     This provides a relatively simple tpcp compatible interface to Optuna.
     You basically need to subclass this class and implement the `create_objective` method to return the objective
     function you want to optimize.
-    The only difference to a normal objective function in Optuna is, that your objective here should expect a
-    pipeline and a dataset object as second and third argument (see Example).
+    Compared with a normal Optuna objective, your objective should also expect a pipeline and a dataset as its
+    second and third arguments (see Example). It can declare a keyword argument ``worker_id`` to receive the
+    zero-based trial-chunk index automatically. This ID can select an execution device from a configured list.
+    Serial execution uses ID 0, and the ID is independent of joblib's actual process IDs.
     If there are parameters you want to make customizable (e.g. which metric to optimize for), expose them in the
     `__init__` of your subclass.
 

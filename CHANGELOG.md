@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Custom Optuna objectives can declare a `worker_id` keyword argument to receive their logical trial-chunk index
+  automatically. `worker_id` is reserved for this execution argument; objectives without it keep their original
+  calling convention. Serial execution uses ID 0.
+
 ### Changed
 
 - Optuna optimization with multiple process workers runs every trial in a worker, including the first trial.
