@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- Optuna optimization with multiple process workers runs every trial in a worker, including the first trial.
+  Worker initializers therefore apply to all trial objectives, and a zero trial budget no longer
+  executes an extra trial in the main process. Trial allocation uses the effective joblib worker count
+  so negative `n_jobs` values receive the requested trial budget. Final optimization remains in the main process.
+  `OptunaSearch` derives its score type from stored trial metadata, including during callbacks and final optimization.
+  Result exports preserve rows for running trials whose score metadata is not available yet.
+  Parallel sampler sequences can differ from earlier versions because the first trial now uses a worker seed.
+
 ## [3.3.0] - 2026-10-09
 
 ### Breaking

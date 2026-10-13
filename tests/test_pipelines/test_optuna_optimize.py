@@ -1,3 +1,4 @@
+import os
 import re
 import tempfile
 import warnings
@@ -7,6 +8,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
+from joblib import cpu_count, parallel_config
 from optuna import Study, Trial
 from optuna.samplers import BruteForceSampler, RandomSampler, TPESampler
 from optuna.trial import FrozenTrial
@@ -24,7 +26,7 @@ from tpcp._dataset import DatasetT
 from tpcp._pipeline import OptimizablePipeline, PipelineT
 from tpcp.optimize.optuna import CustomOptunaOptimize, OptunaSearch, StudyParamsDict
 from tpcp.testing import TestAlgorithmMixin
-from tpcp.validate import Scorer
+from tpcp.validate import Aggregator, Scorer
 
 
 class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
@@ -79,6 +81,34 @@ class DummyOptunaOptimizer(CustomOptunaOptimize[PipelineT, DatasetT]):
         return objective
 
 
+class ProcessRecordingOptimizer(CustomOptunaOptimize):
+    def create_objective(self):
+        def objective(trial, pipeline, dataset):
+            trial.suggest_categorical("para_1", [1])
+            trial.set_user_attr("pid", os.getpid())
+            trial.set_user_attr("initialized", os.environ.get("TPCP_TEST_OPTUNA_INITIALIZED"))
+            return 1
+
+        return objective
+
+
+class ProcessRecordingPipeline(DummyOptimizablePipelineWithInfo):
+    @make_optimize_safe
+    def self_optimize_with_info(self, dataset, **kwargs):
+        self.optimized = True
+        return self, {"pid": os.getpid()}
+
+
+class ResultsReadingOptunaSearch(OptunaSearch):
+    def return_optimized_pipeline(self, pipeline, dataset, study):
+        self.final_score_ = self.search_results_["score"][0]
+        return super().return_optimized_pipeline(pipeline, dataset, study)
+
+
+def initialize_optuna_worker(token):
+    os.environ["TPCP_TEST_OPTUNA_INITIALIZED"] = token
+
+
 def dummy_search_space(trial: Trial):
     trial.suggest_categorical("para_1", [1])
 
@@ -111,6 +141,34 @@ class TestMetaFunctionalityOptuna(TestAlgorithmMixin):
 
 
 class TestCustomOptunaOptimize:
+    @pytest.mark.parametrize("n_trials,n_jobs", [(0, 2), (1, 2), (5, 2), (5, -1)])
+    def test_parallel_trials_use_worker_setup_and_refit_in_parent(self, n_trials, n_jobs, tmp_path, monkeypatch):
+        if n_jobs == -1:
+            monkeypatch.setenv("LOKY_MAX_CPU_COUNT", "2")
+            if cpu_count() < 2:
+                pytest.skip("Parallel all-core optimization needs multiple available CPUs")
+        token = str(tmp_path)
+        optimizer = ProcessRecordingOptimizer(
+            ProcessRecordingPipeline(),
+            lambda seed: {
+                "storage": f"sqlite:///{tmp_path}/study.db",
+                "sampler": RandomSampler(seed),
+            },
+            n_jobs=n_jobs,
+            n_trials=n_trials,
+            return_optimized=n_trials > 0,
+        )
+        with parallel_config(backend="loky", initializer=initialize_optuna_worker, initargs=(token,)):
+            optimizer.optimize(DummyDataset())
+
+        trials = optimizer.study_.trials
+        assert len(trials) == n_trials
+        assert all(trial.user_attrs["pid"] != os.getpid() for trial in trials)
+        assert all(trial.user_attrs["initialized"] == token for trial in trials)
+        if n_trials > 0:
+            assert optimizer.optimization_info_ == {"pid": os.getpid()}
+            assert optimizer.optimized_pipeline_.optimized is True
+
     def test_final_optimization_info_cleared_on_repeat(self):
         optimizer = DummyOptunaOptimizer(
             DummyOptimizablePipelineWithInfo(),
@@ -324,16 +382,44 @@ class TestMetaFunctionalityOptunaSearch(TestAlgorithmMixin):
 
 
 class TestOptunaSearch:
-    def test_single_score(self):
+    @pytest.mark.parametrize("n_jobs", [1, 2])
+    def test_callback_can_read_search_results(self, n_jobs, tmp_path):
+        def callback(study, trial):
+            study.set_user_attr(f"callback_score_{trial.number}", search.search_results_["score"][trial.number])
+
+        search = ResultsReadingOptunaSearch(
+            DummyOptimizablePipeline(),
+            lambda seed: {
+                **_get_study_params(seed),
+                "storage": f"sqlite:///{tmp_path}/study.db",
+            },
+            dummy_search_space,
+            scoring=dummy_single_score_func,
+            callbacks=[callback],
+            n_trials=2,
+            n_jobs=n_jobs,
+        )
+        search.optimize(DummyDataset())
+
+        assert search.study_.user_attrs == {"callback_score_0": 2.0, "callback_score_1": 2.0}
+        assert search.final_score_ == 2.0
+
+    @pytest.mark.parametrize("n_jobs", [1, 2])
+    def test_single_score(self, n_jobs, tmp_path):
         optuna_search = OptunaSearch(
             DummyOptimizablePipeline(),
-            _get_study_params,
+            lambda seed: {
+                **_get_study_params(seed),
+                "storage": f"sqlite:///{tmp_path}/study.db",
+            },
             dummy_search_space,
             scoring=dummy_single_score_func,
             n_trials=1,
+            n_jobs=n_jobs,
         )
 
         optuna_search.optimize(DummyDataset())
+        assert optuna_search.multimetric_ is False
         results = optuna_search.search_results_
 
         assert "param__para_1" in results
@@ -347,18 +433,31 @@ class TestOptunaSearch:
 
         assert optuna_search.optimized_pipeline_.get_params()["para_1"] == optuna_search.best_params_["para_1"]
 
+        # A concurrent trial has no score metadata yet, but still needs its own result row.
+        optuna_search.study_.ask()
+        live_results = optuna_search.search_results_
+        assert len(live_results["single__score"]) == 2
+        assert live_results["single__score"][0] == list(range(5))
+        assert np.isnan(live_results["single__score"][1])
+
     @pytest.mark.parametrize("score_name", ["score_2", "score_1"])
-    def test_search_result_columns_multi_score(self, score_name):
+    @pytest.mark.parametrize("n_jobs", [1, 2])
+    def test_search_result_columns_multi_score(self, score_name, n_jobs, tmp_path):
         optuna_search = OptunaSearch(
             DummyOptimizablePipeline(),
-            _get_study_params,
+            lambda seed: {
+                **_get_study_params(seed),
+                "storage": f"sqlite:///{tmp_path}/study.db",
+            },
             dummy_search_space,
             scoring=dummy_multi_score_func,
             score_name=score_name,
             n_trials=1,
+            n_jobs=n_jobs,
         )
 
         optuna_search.optimize(DummyDataset())
+        assert optuna_search.multimetric_ is True
         results = optuna_search.search_results_
 
         assert "param__para_1" in results
@@ -376,8 +475,36 @@ class TestOptunaSearch:
 
         assert optuna_search.optimized_pipeline_.get_params()["para_1"] == optuna_search.best_params_["para_1"]
 
+        optuna_search.study_.ask()
+        live_results = optuna_search.search_results_
+        for metric in ("score_1", "score_2", "single__score_1", "single__score_2"):
+            assert len(live_results[metric]) == 2
+            assert live_results[metric][0] == results[metric][0]
+            assert np.isnan(live_results[metric][1])
+
         # The dummy scorer returns the datapoint id for score 1 and the datapoint id + 1 for score 2.
         assert optuna_search.best_score_ == np.mean(range(5)) + int(score_name == "score_2")
+
+    def test_live_results_preserve_integer_metrics(self):
+        class CountAggregator(Aggregator):
+            def aggregate(self, values, datapoints):
+                return sum(values)
+
+        def score(pipeline, datapoint):
+            count = 2**53 + 1 if datapoint.group_label.value == 0 else 0
+            return {"sample_count": CountAggregator()(count)}
+
+        search = OptunaSearch(
+            DummyOptimizablePipeline(),
+            _get_study_params,
+            dummy_search_space,
+            scoring=score,
+            score_name="sample_count",
+            n_trials=1,
+        ).optimize(DummyDataset())
+        search.study_.ask()
+        assert search.search_results_["sample_count"][0] == 2**53 + 1
+        assert np.isnan(search.search_results_["sample_count"][1])
 
     @pytest.mark.parametrize("score_name", ["score_3", False, None])
     def test_multi_metric_wrong_score_name(self, score_name):
