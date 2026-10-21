@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Configuration is scoped to the current execution context and propagated through `tpcp.parallel.delayed` to process
   tasks. Use `tpcp.parallel.Parallel` with that wrapper for propagation in serial and thread execution too.
   Each worker task restores its previous settings even on failure; nested `config_context` scopes do the same.
+  (https://github.com/mad-lab-fau/tpcp/pull/167)
 
 ### Changed
 
@@ -21,10 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dictionaries. Hashing already includes each parameter object's serialized nested state, so flattened descendant
   entries were redundant. Public `get_params` behavior, cache implementation, and nested parameter selection for optimization
   checks are unchanged.
+  (https://github.com/mad-lab-fau/tpcp/pull/167)
 - Hashing local and non-importable classes excludes class annotation metadata and tpcp validation caches without
   evaluating type hints. This applies to tpcp and external classes on all supported Python versions and prevents
   bookkeeping changes from falsely appearing to mutate a parameter. Methods, other class attributes, and serialized
   instance state remain part of the hash.
+  (https://github.com/mad-lab-fau/tpcp/pull/167)
 
 ### Breaking
 
@@ -32,13 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   comparisons now rely on the serialized state of parameter objects, including nested tpcp objects and fitted sklearn
   models. Nested parameters exposed by `get_params` but omitted from custom serialization are no longer compared
   separately. Include all relevant parameter state in custom serializers to retain mutation detection and configuration
-  comparisons. This follows the user's explicit request to replace redundant deep-dictionary hashing with shallow
-  parameter hashing after discussing this serialization limitation.
+  comparisons.
+  (https://github.com/mad-lab-fau/tpcp/pull/167)
 - **Approved annotation metadata exclusion:** Class annotations and their lazy evaluation caches no longer affect
   fallback class hashes. Editing annotations alone does not invalidate a content key or trigger a parameter mutation
   error. If a setting must affect these checks or cache keys, expose it as ordinary parameter state. Existing keys for
-  affected local classes may change once. The user explicitly requested excluding annotation caches in general after
-  discussing runtime annotation edits.
+  affected local classes may change once.
+  (https://github.com/mad-lab-fau/tpcp/pull/167)
 
 ## [3.4.0] - 2026-10-13
 

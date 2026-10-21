@@ -61,11 +61,9 @@ You can learn more about that in the :ref:`optimization guide <optimization>`.
 Action safety checks hash ``get_params(deep=False)`` before and after the action.
 Hashing already includes each parameter object's serialized nested state, including fitted sklearn model state and
 results stored on a nested tpcp parameter object. The action's own results are excluded from this parameter dictionary.
-Adding flattened descendants from ``get_params(deep=True)`` would serialize state already included in the parent values.
 Dataset equality and aggregator configuration comparisons also use shallow parameter dictionaries.
 Custom serialization must include all state that should affect these checks or comparisons; nested parameters omitted
 by that serialization are not compared separately.
-Public ``get_params`` behavior, cache implementation, and nested parameter selection for optimization checks are unchanged.
 For local and non-importable classes, hashing excludes class annotation metadata and tpcp's validation caches.
 Reading or editing this metadata does not count as a parameter mutation and does not invalidate a content key.
 Hash-relevant configuration should be stored as ordinary parameter state. Methods, other class attributes, and serialized
