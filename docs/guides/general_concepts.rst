@@ -66,6 +66,10 @@ Dataset equality and aggregator configuration comparisons also use shallow param
 Custom serialization must include all state that should affect these checks or comparisons; nested parameters omitted
 by that serialization are not compared separately.
 Public ``get_params`` behavior, cache implementation, and nested parameter selection for optimization checks are unchanged.
+For local and non-importable classes, hashing excludes class annotation metadata and tpcp's validation caches.
+Reading or editing this metadata does not count as a parameter mutation and does not invalidate a content key.
+Hash-relevant configuration should be stored as ordinary parameter state. Methods, other class attributes, and serialized
+instance state remain included; annotations are not evaluated during hashing.
 
 Action safety configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
