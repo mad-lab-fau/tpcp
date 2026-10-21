@@ -12,6 +12,8 @@ import xxhash
 from joblib.func_inspect import get_func_code
 from joblib.hashing import Hasher, NumpyHasher
 
+from tpcp._base import BaseTpcpObject
+
 Pickler = pickle._Pickler
 
 
@@ -81,7 +83,12 @@ class NoMemoizeHasher(Hasher):
                 obj = ("F", obj.__qualname__, get_func_code(obj), vars(obj))
 
             if isinstance(obj, type):
-                obj = ("C", obj.__qualname__, obj.__bases__, dict(vars(obj)))
+                class_state = dict(vars(obj))
+                if issubclass(obj, BaseTpcpObject):
+                    # Lazy framework bookkeeping is not part of the class's behavior or parameter state.
+                    class_state.pop("__tpcp_validated_hidden__", None)
+                    class_state.pop("__field_annotations_cache__", None)
+                obj = ("C", obj.__qualname__, obj.__bases__, class_state)
 
             super().save(obj)
 

@@ -19,8 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Action safety checks, dataset equality, and aggregator configuration comparisons now hash shallow parameter
   dictionaries. Hashing already includes each parameter object's serialized nested state, so flattened descendant
-  entries were redundant. Public `get_params` behavior, cache hashing, and nested parameter selection for optimization
+  entries were redundant. Public `get_params` behavior, cache implementation, and nested parameter selection for optimization
   checks are unchanged.
+- Hashing function-local tpcp classes ignores internal validation and annotation caches, so initializing these caches
+  during a checked action does not falsely appear to mutate a parameter. Existing content keys for these local classes
+  may change once; the class definition and serialized parameter state remain part of the hash.
 
 ### Breaking
 

@@ -65,7 +65,7 @@ Adding flattened descendants from ``get_params(deep=True)`` would serialize stat
 Dataset equality and aggregator configuration comparisons also use shallow parameter dictionaries.
 Custom serialization must include all state that should affect these checks or comparisons; nested parameters omitted
 by that serialization are not compared separately.
-Public ``get_params`` behavior, cache hashing, and nested parameter selection for optimization checks are unchanged.
+Public ``get_params`` behavior, cache implementation, and nested parameter selection for optimization checks are unchanged.
 
 Action safety configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

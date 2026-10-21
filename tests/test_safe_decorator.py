@@ -102,6 +102,35 @@ class DummyActionPipelineUnsafe(Pipeline):
 
 
 class TestSafeAction:
+    @pytest.mark.parametrize("optimize", [False, True])
+    def test_action_can_clone_unvalidated_local_parameter(self, optimize):
+        class NestedPipeline(OptimizablePipeline):
+            value: OptimizableParameter[int]
+
+            def __init__(self, value=1):
+                self.value = value
+
+            @make_optimize_safe
+            def self_optimize(self, dataset):
+                self.value += 1
+                return self
+
+        class CloneNested(Pipeline):
+            def __init__(self, nested):
+                self.nested = nested
+
+            @make_action_safe
+            def run(self, datapoint):
+                nested = self.nested.clone()
+                if datapoint:
+                    nested.self_optimize(None)
+                self.result_ = nested.value
+                return self
+
+        instance = CloneNested(NestedPipeline())
+        assert instance.run(optimize) is instance
+        assert instance.result_ == (2 if optimize else 1)
+
     def test_external_get_params_is_not_required(self):
         class ReadExternal(Pipeline):
             def __init__(self, external):
