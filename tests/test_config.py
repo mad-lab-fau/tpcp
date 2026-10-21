@@ -1,3 +1,4 @@
+import gc
 from threading import Lock
 
 import pytest
@@ -88,6 +89,39 @@ def test_action_setting_is_captured_for_parallel_tasks(runner, n_jobs, backend):
     with config_context(action_safety_checks=False):
         tasks = [delayed(_unchecked_action_in_worker)() for _ in range(2)]
     assert runner(n_jobs=n_jobs, backend=backend)(tasks) == [(False, None), (False, None)]
+    assert get_config()["action_safety_checks"] is True
+
+
+@pytest.mark.parametrize(("n_jobs", "backend"), [(1, None), (2, None), (2, "threading")])
+def test_config_scope_can_span_multiple_lazy_task_yields(n_jobs, backend):
+    def tasks():
+        with config_context(action_safety_checks=False):
+            for _ in range(3):
+                yield delayed(_unchecked_action_in_worker)()
+
+    assert Parallel(n_jobs=n_jobs, backend=backend)(tasks()) == [(False, None)] * 3
+    assert get_config()["action_safety_checks"] is True
+
+
+def _fail_in_worker():
+    raise RuntimeError("task failure")
+
+
+def test_lazy_producer_scope_is_closed_in_its_context_after_task_failure():
+    cleanup_settings = []
+
+    def tasks():
+        with config_context(action_safety_checks=False):
+            try:
+                for _ in range(3):
+                    yield delayed(_fail_in_worker)()
+            finally:
+                cleanup_settings.append(get_config()["action_safety_checks"])
+
+    with pytest.raises(RuntimeError, match="task failure"):
+        Parallel(n_jobs=1)(tasks())
+    gc.collect()
+    assert cleanup_settings == [False]
     assert get_config()["action_safety_checks"] is True
 
 

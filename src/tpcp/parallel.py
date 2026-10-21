@@ -106,14 +106,20 @@ def _call_with_parallel_side_channels(func: Callable, args: tuple, kwargs: dict,
 
 class _ParallelTaskIterator:
     def __init__(self, iterable: Iterable, context: Context) -> None:
-        self._iterator = iter(iterable)
         self._context = context
+        self._iterator = iter(iterable)
+
+    def __del__(self):
+        close = getattr(getattr(self, "_iterator", None), "close", None)
+        if close is not None:
+            self._context.run(close)
 
     def __iter__(self) -> Iterator:
         return self
 
     def __next__(self):
-        func, args, kwargs = self._context.copy().run(next, self._iterator)
+        # A producer's context-manager scope can span multiple yields.
+        func, args, kwargs = self._context.run(next, self._iterator)
         return _run_with_parallel_side_channels, (func, args, kwargs), {}
 
 
