@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checks are unchanged.
 - Hashing function-local tpcp classes ignores internal validation and annotation caches, so initializing these caches
   during a checked action does not falsely appear to mutate a parameter. Existing content keys for these local classes
-  may change once; the class definition and serialized parameter state remain part of the hash.
+  may change once; the class definition and serialized parameter state remain part of the hash. Lazy Python 3.14
+  annotations are materialized before hashing the class definition, retaining their contents in the hash.
 
 ### Breaking
 
