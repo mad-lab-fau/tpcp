@@ -192,28 +192,6 @@ def test_nested_get_params():
         assert params[k] == v
 
 
-@pytest.mark.parametrize("deep", [True, False])
-@pytest.mark.parametrize("include_external", [True, False])
-def test_get_params_external_boundary_propagates_through_tpcp_objects(deep, include_external):
-    class External:
-        def get_params(self, deep=True):
-            return {"value": 7}
-
-    nested = create_test_class("nested", params={"external": None, "threshold": 3})
-    nested.external = External()
-    instance = create_test_class("run", params={"nested": cf(nested)})
-
-    expected = {"nested": instance.nested}
-    if deep:
-        expected.update(nested__external=instance.nested.external, nested__threshold=3)
-        if include_external:
-            expected["nested__external__value"] = 7
-
-    assert instance.get_params(deep=deep, include_external=include_external) == expected
-    if include_external:
-        assert instance.get_params(deep=deep) == expected
-
-
 def test_nested_set_params():
     nested_instance = create_test_class("nested", params={"nested1": "n1", "nested2": "n2"})
     top_level_params = {"test1": "t1"}

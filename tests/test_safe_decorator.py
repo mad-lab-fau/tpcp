@@ -40,6 +40,14 @@ class ExternalParameterNotSerialized:
         return {}
 
 
+class TpcpParameterNotSerialized(Pipeline):
+    def __init__(self, value=1):
+        self.value = value
+
+    def __getstate__(self):
+        return {}
+
+
 class PipelineInputModify(Pipeline):
     def __init__(self, test="a value"):
         self.test = test
@@ -129,13 +137,10 @@ class TestSafeAction:
         with pytest.raises(ValueError, match="did modify the parameters"):
             instance.run(mutation)
 
-    def test_nested_tpcp_parameter_omitted_by_serialization_is_still_checked(self):
-        class HiddenParameter(Pipeline):
+    def test_nested_tpcp_result_mutation_is_rejected(self):
+        class NestedPipeline(Pipeline):
             def __init__(self, value=1):
                 self.value = value
-
-            def __getstate__(self):
-                return {}
 
         class ModifyNested(Pipeline):
             def __init__(self, nested):
@@ -143,14 +148,15 @@ class TestSafeAction:
 
             @make_action_safe
             def run(self, datapoint):
-                self.nested.value += 1
+                self.nested.result_ = self.nested.value
                 self.result_ = 1
                 return self
 
         with pytest.raises(ValueError, match="did modify the parameters"):
-            ModifyNested(HiddenParameter()).run(None)
+            ModifyNested(NestedPipeline()).run(None)
 
-    def test_external_parameter_omitted_by_serialization_is_not_checked_separately(self):
+    @pytest.mark.parametrize("parameter_type", [ExternalParameterNotSerialized, TpcpParameterNotSerialized])
+    def test_parameter_omitted_by_serialization_is_not_checked_separately(self, parameter_type):
         class ModifyExternal(Pipeline):
             def __init__(self, external):
                 self.external = external
@@ -161,13 +167,13 @@ class TestSafeAction:
                 self.result_ = self.external.value
                 return self
 
-        instance = ModifyExternal(ExternalParameterNotSerialized())
+        instance = ModifyExternal(parameter_type())
         assert instance.get_params()["external__value"] == 1
         assert instance.run(None).result_ == 2
         assert instance.get_params()["external__value"] == 2
 
     @pytest.mark.parametrize("nested", [False, True])
-    def test_legacy_get_params_override_remains_supported(self, nested):
+    def test_get_params_override_remains_supported(self, nested):
         class Legacy(Pipeline):
             def __init__(self, value=7):
                 self.value = value

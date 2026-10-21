@@ -14,19 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Configuration is scoped to the current execution context and propagated through `tpcp.parallel.delayed` to process
   tasks. Use `tpcp.parallel.Parallel` with that wrapper for propagation in serial and thread execution too.
   Each worker task restores its previous settings even on failure; nested `config_context` scopes do the same.
-- `BaseTpcpObject.get_params` accepts keyword-only `include_external=True`. Set it to `False` to stop
-  parameter expansion at objects outside tpcp while retaining those objects as parameter values.
-  The option propagates through nested tpcp objects and composite parameters; the default is unchanged.
+
+### Changed
+
+- Action safety checks, dataset equality, and aggregator configuration comparisons now hash shallow parameter
+  dictionaries. Hashing already includes each parameter object's serialized nested state, so flattened descendant
+  entries were redundant. Public `get_params` behavior, cache hashing, and nested parameter selection for optimization
+  checks are unchanged.
 
 ### Breaking
 
-- **Approved action safety checking change:** Action checks now use `include_external=False` and
-  hash external objects through their serialized state, including fitted sklearn model state.
-  Parameters exposed by an external object's `get_params` but omitted from its serialization are
-  no longer checked separately. Include relevant state in custom serializers, or expose it as
-  parameters of a `BaseTpcpObject` wrapper to retain explicit parameter checks. Older tpcp
-  `get_params` overrides without the new keyword retain their original traversal. Cache hashing
-  and default `get_params()` enumeration are unchanged.
+- **Approved shallow parameter hashing change:** Action checks, dataset equality, and aggregator configuration
+  comparisons now rely on the serialized state of parameter objects, including nested tpcp objects and fitted sklearn
+  models. Nested parameters exposed by `get_params` but omitted from custom serialization are no longer compared
+  separately. Include all relevant parameter state in custom serializers to retain mutation detection and configuration
+  comparisons. This follows the user's explicit request to replace redundant deep-dictionary hashing with shallow
+  parameter hashing after discussing this serialization limitation.
 
 ## [3.4.0] - 2026-10-13
 

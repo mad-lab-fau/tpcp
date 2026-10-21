@@ -541,7 +541,7 @@ class BaseTpcpObject(_BaseTpcpObject):
 
     _composite_params: ClassVar[tuple[str, ...]] = ()
 
-    def get_params(self, deep: bool = True, *, include_external: bool = True) -> dict[str, Any]:
+    def get_params(self, deep: bool = True) -> dict[str, Any]:
         """Get parameters for this algorithm.
 
         Parameters
@@ -550,11 +550,6 @@ class BaseTpcpObject(_BaseTpcpObject):
             Only relevant if object contains nested algorithm objects.
             If this is the case and deep is True, the params of these nested objects are included in the output using a
             prefix like `nested_object_name__` (Note the two "_" at the end)
-        include_external
-            If False, only expand nested :class:`BaseTpcpObject` instances. Other objects, including sklearn estimators,
-            remain in the output as whole parameter values without adding entries from their ``get_params`` methods.
-            This also applies inside nested tpcp objects and composite parameters. Has no effect if ``deep=False``.
-            Nested tpcp objects overriding ``get_params`` without accepting this option retain their original traversal.
 
         Returns
         -------
@@ -562,7 +557,7 @@ class BaseTpcpObject(_BaseTpcpObject):
             Parameter names mapped to their values.
 
         """
-        return _get_params(self, deep, include_external=include_external)
+        return _get_params(self, deep)
 
     def set_params(self, **params: Any) -> Self:
         """Set the parameters of this Algorithm.
@@ -651,24 +646,12 @@ class BaseTpcpObject(_BaseTpcpObject):
         return clone(value, safe=False)
 
 
-def _get_params_without_external(instance: BaseTpcpObject) -> dict[str, Any]:
-    """Use the external boundary when supported, preserving older get_params overrides."""
-    if type(instance).get_params is BaseTpcpObject.get_params or any(
-        p.name == "include_external" or p.kind == inspect.Parameter.VAR_KEYWORD
-        for p in inspect.signature(instance.get_params).parameters.values()
-    ):
-        return instance.get_params(deep=True, include_external=False)
-    return instance.get_params(deep=True)
-
-
-def _get_deep_params(obj, parent_key, *, include_external: bool) -> dict[str, Any]:
-    if not include_external and isinstance(obj, BaseTpcpObject):
-        deep_items = _get_params_without_external(obj).items()
-    elif include_external and hasattr(obj, "get_params"):
+def _get_deep_params(obj, parent_key) -> dict[str, Any]:
+    # This is a little magic, that also gets the parameters of nested sklearn classifiers.
+    if hasattr(obj, "get_params"):
         deep_items = obj.get_params(deep=True).items()
-    else:
-        return {}
-    return {parent_key + "__" + k: val for k, val in deep_items}
+        return {parent_key + "__" + k: val for k, val in deep_items}
+    return {}
 
 
 def _assert_is_allowed_composite_value(val, parent_key: str, iteration: int):
@@ -694,7 +677,7 @@ def _recursive_validate(cls: type[_BaseTpcpObject]):
                 _recursive_validate(base)
 
 
-def _get_params(instance: _BaseTpcpObject, deep: bool = True, *, include_external: bool = True) -> dict[str, Any]:
+def _get_params(instance: _BaseTpcpObject, deep: bool = True) -> dict[str, Any]:
     # At some point, we want to validate that the user defined the class correctly.
     # To allow for all strange modifications of the class, we run the validation, when we actually need the parameters.
     # This usually required a call to `get_params`.
@@ -722,9 +705,9 @@ def _get_params(instance: _BaseTpcpObject, deep: bool = True, *, include_externa
                     nested_key = f"{key}__{name}"
                     out[nested_key] = obj
                     if deep:
-                        out.update(**_get_deep_params(obj, nested_key, include_external=include_external))
+                        out.update(**_get_deep_params(obj, nested_key))
             else:
-                out.update(**_get_deep_params(value, key, include_external=include_external))
+                out.update(**_get_deep_params(value, key))
         out[key] = value
     return out
 

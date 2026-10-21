@@ -377,7 +377,7 @@ class _Dataset(BaseTpcpObject, Generic[GroupLabelT]):
         #       for which `index` was not called yet.
         #       This might be a bit unexpected, but I consider this correct behaviour and I don't want to trigger the
         #       index creation here, as this might be costly.
-        return custom_hash(self.get_params()) == custom_hash(other.get_params())
+        return custom_hash(self.get_params(deep=False)) == custom_hash(other.get_params(deep=False))
 
     def _repr_html_(self) -> str:
         """Return html representation of the dataset object."""
