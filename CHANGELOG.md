@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- `BaseTpcpObject.get_params` accepts keyword-only `include_external=True`. Set it to `False` to stop
+  parameter expansion at objects outside tpcp while retaining those objects as parameter values.
+  The option propagates through nested tpcp objects and composite parameters; the default is unchanged.
+
+### Breaking
+
+- **Approved action safety checking change:** Action checks now use `include_external=False` and
+  hash external objects through their serialized state, including fitted sklearn model state.
+  Parameters exposed by an external object's `get_params` but omitted from its serialization are
+  no longer checked separately. Include relevant state in custom serializers, or expose it as
+  parameters of a `BaseTpcpObject` wrapper to retain explicit parameter checks. Older tpcp
+  `get_params` overrides without the new keyword retain their original traversal. Cache hashing
+  and default `get_params()` enumeration are unchanged.
+
 ## [3.4.0] - 2026-10-13
 
 ### Breaking

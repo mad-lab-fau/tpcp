@@ -1,4 +1,5 @@
 import pytest
+from sklearn.preprocessing import StandardScaler
 
 from tests.test_base import create_test_class
 from tpcp import cf
@@ -29,6 +30,29 @@ def test_composite_deep_get_params():
         assert v.nested1 == expected_value
         assert params[f"nested_class_list__{k}"].nested1 == expected_value
         assert params[f"nested_class_list__{k}__nested1"] == expected_value
+
+
+@pytest.mark.parametrize("include_external", [True, False])
+def test_composite_get_params_retains_external_objects_without_expanding_them(include_external):
+    nested = create_test_class("nested", params={"model": None, "threshold": 3})
+    nested.model = StandardScaler()
+    instance = create_test_class(
+        "run",
+        params={"steps": None},
+        private_params={"_composite_params": ("steps",)},
+    )
+    external = StandardScaler()
+    instance.steps = [("nested", nested), ("external", external)]
+
+    params = instance.get_params(include_external=include_external)
+
+    assert params["steps"] is instance.steps
+    assert params["steps__nested"] is nested
+    assert params["steps__nested__model"] is nested.model
+    assert params["steps__nested__threshold"] == 3
+    assert params["steps__external"] is external
+    assert ("steps__nested__model__with_mean" in params) is include_external
+    assert ("steps__external__with_mean" in params) is include_external
 
 
 @pytest.mark.parametrize(

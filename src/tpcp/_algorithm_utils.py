@@ -10,7 +10,7 @@ from pickle import PicklingError
 from typing import TYPE_CHECKING, Any, Concatenate, ParamSpec, TypeVar, cast, overload
 
 from tpcp import Algorithm
-from tpcp._base import NOTHING, BaseTpcpObject, _get_annotated_fields_of_type, _Nothing
+from tpcp._base import NOTHING, BaseTpcpObject, _get_annotated_fields_of_type, _get_params_without_external, _Nothing
 from tpcp._hash import custom_hash
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import PotentialUserErrorWarning
@@ -142,13 +142,13 @@ def is_action_applied(instance: Algorithm) -> bool:
 
 def _check_safe_run(algorithm: AlgorithmT, old_method: Callable, *args: Any, **kwargs: Any) -> AlgorithmT:
     """Run the pipeline and check that run behaved as expected."""
-    before_paras = algorithm.get_params()
+    before_paras = _get_params_without_external(algorithm)
     before_paras_hash = custom_hash(before_paras)
     output: AlgorithmT
 
     # In this case the method is already bound and we do not need to pass the algo as first argument
     output = old_method(*args, **kwargs) if hasattr(old_method, "__self__") else old_method(algorithm, *args, **kwargs)
-    after_paras = algorithm.get_params()
+    after_paras = _get_params_without_external(algorithm)
     after_paras_hash = custom_hash(after_paras)
     if not before_paras_hash == after_paras_hash:
         raise ValueError(
@@ -194,6 +194,13 @@ def make_action_safe(action_method: Callable[P, T]) -> Callable[P, T]:
 
     In general, we recommend to just apply this decorator to all custom action methods.
     The runtime overhead is usually small enough to not make a difference.
+
+    Notes
+    -----
+    Parameter checks expand nested tpcp objects, but hash external objects such as sklearn estimators through their
+    complete serialized state. This includes fitted model state. External ``get_params`` methods are not called;
+    changes omitted by an external object's serialization cannot be detected by these checks.
+    Legacy tpcp ``get_params`` overrides without ``include_external`` support retain their original traversal.
 
     Examples
     --------
