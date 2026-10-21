@@ -12,8 +12,6 @@ import xxhash
 from joblib.func_inspect import get_func_code
 from joblib.hashing import Hasher, NumpyHasher
 
-from tpcp._base import BaseTpcpObject
-
 Pickler = pickle._Pickler
 
 
@@ -83,22 +81,20 @@ class NoMemoizeHasher(Hasher):
                 obj = ("F", obj.__qualname__, get_func_code(obj), vars(obj))
 
             if isinstance(obj, type):
-                is_tpcp_class = issubclass(obj, BaseTpcpObject)
-                class_state = dict(vars(obj))
-                if is_tpcp_class:
-                    if sys.version_info >= (3, 14):
-                        import annotationlib
-
-                        # Keep declarations stable without resolving TYPE_CHECKING-only names.
-                        class_state.pop("__annotations_cache__", None)
-                        class_state.pop("__annotate_func__", None)
-                        class_state["__annotations__"] = annotationlib.get_annotations(
-                            obj, format=annotationlib.Format.STRING
-                        )
-                        class_state["__annotate__"] = getattr(obj, "__annotate__", None)
-                    # Lazy framework bookkeeping is not part of the class's behavior or parameter state.
-                    class_state.pop("__tpcp_validated_hidden__", None)
-                    class_state.pop("__field_annotations_cache__", None)
+                # Annotation metadata and lazy validation caches are not parameter state.
+                class_state = {
+                    name: value
+                    for name, value in vars(obj).items()
+                    if name
+                    not in {
+                        "__annotations__",
+                        "__annotations_cache__",
+                        "__annotate__",
+                        "__annotate_func__",
+                        "__field_annotations_cache__",
+                        "__tpcp_validated_hidden__",
+                    }
+                }
                 obj = ("C", obj.__qualname__, obj.__bases__, class_state)
 
             super().save(obj)

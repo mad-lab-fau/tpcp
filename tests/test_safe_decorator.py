@@ -1,5 +1,5 @@
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 from unittest import mock
 from unittest.mock import patch
 
@@ -107,6 +107,33 @@ class DummyActionPipelineUnsafe(Pipeline):
 
 
 class TestSafeAction:
+    @pytest.mark.parametrize("parameter_base", [Pipeline, ExternalWithUnrelatedGetParams], ids=["tpcp", "external"])
+    @pytest.mark.parametrize("edit_annotation", [False, True])
+    def test_action_ignores_nested_class_annotation_metadata(self, parameter_base, edit_annotation):
+        unit = "ms"
+
+        class NestedParameter(parameter_base):
+            value: Annotated[int, f"{unit}"]
+
+            def __init__(self, value=1):
+                self.value = value
+
+        class ReadNested(Pipeline):
+            def __init__(self, nested):
+                self.nested = nested
+
+            @make_action_safe
+            def run(self, datapoint):
+                annotations = type(self.nested).__annotations__
+                if datapoint:
+                    annotations["value"] = OptimizableParameter[int]
+                self.result_ = self.nested.value
+                return self
+
+        instance = ReadNested(NestedParameter())
+        assert instance.run(edit_annotation) is instance
+        assert instance.result_ == 1
+
     @pytest.mark.skipif(sys.version_info < (3, 14), reason="Deferred runtime annotations require Python 3.14")
     def test_action_can_clone_parameter_with_type_checking_only_annotation(self):
         class NestedPipeline(Pipeline):
