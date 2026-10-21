@@ -58,21 +58,14 @@ This means, if you want to use tpcp to train a neuronal network, some data struc
 one of the parameters.
 You can learn more about that in the :ref:`optimization guide <optimization>`.
 
-By default, ``get_params(deep=True)`` also expands parameters of external objects that provide a ``get_params`` method,
-such as sklearn estimators.
-Use ``get_params(include_external=False)`` to expand only nested tpcp objects, including those in composite parameters.
-External objects remain in the returned dictionary as whole parameter values, without additional flattened entries for
-their parameters.
-With ``deep=False``, neither tpcp nor external objects are expanded, regardless of ``include_external``.
-Subclasses overriding ``get_params`` should accept and forward ``include_external`` to support this boundary.
-Older overrides retain their original traversal when nested or used by action safety checks.
-
-Action safety checks use ``include_external=False`` and hash each external object's serialized state, including fitted
-sklearn model state.
-This avoids serializing a model again through its flattened parameter entries.
-An external object's custom serialization must include the state whose changes should be detected; exposed parameters
-omitted by that serialization are not checked separately.
-The default parameter enumeration and the hashing behavior of caches are unchanged.
+Action safety checks hash ``get_params(deep=False)`` before and after the action.
+Hashing already includes each parameter object's serialized nested state, including fitted sklearn model state and
+results stored on a nested tpcp parameter object. The action's own results are excluded from this parameter dictionary.
+Adding flattened descendants from ``get_params(deep=True)`` would serialize state already included in the parent values.
+Dataset equality and aggregator configuration comparisons also use shallow parameter dictionaries.
+Custom serialization must include all state that should affect these checks or comparisons; nested parameters omitted
+by that serialization are not compared separately.
+Public ``get_params`` behavior, cache hashing, and nested parameter selection for optimization checks are unchanged.
 
 Action safety configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

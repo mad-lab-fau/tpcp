@@ -10,7 +10,7 @@ from pickle import PicklingError
 from typing import TYPE_CHECKING, Any, Concatenate, ParamSpec, TypeVar, cast, overload
 
 from tpcp import Algorithm
-from tpcp._base import NOTHING, BaseTpcpObject, _get_annotated_fields_of_type, _get_params_without_external, _Nothing
+from tpcp._base import NOTHING, BaseTpcpObject, _get_annotated_fields_of_type, _Nothing
 from tpcp._config import get_config
 from tpcp._hash import custom_hash
 from tpcp._parameters import _ParaTypes
@@ -147,13 +147,13 @@ def _check_safe_run(algorithm: AlgorithmT, old_method: Callable, *args: Any, **k
         return (
             old_method(*args, **kwargs) if hasattr(old_method, "__self__") else old_method(algorithm, *args, **kwargs)
         )
-    before_paras = _get_params_without_external(algorithm)
+    before_paras = algorithm.get_params(deep=False)
     before_paras_hash = custom_hash(before_paras)
     output: AlgorithmT
 
     # In this case the method is already bound and we do not need to pass the algo as first argument
     output = old_method(*args, **kwargs) if hasattr(old_method, "__self__") else old_method(algorithm, *args, **kwargs)
-    after_paras = _get_params_without_external(algorithm)
+    after_paras = algorithm.get_params(deep=False)
     after_paras_hash = custom_hash(after_paras)
     if not before_paras_hash == after_paras_hash:
         raise ValueError(
@@ -202,10 +202,9 @@ def make_action_safe(action_method: Callable[P, T]) -> Callable[P, T]:
 
     Notes
     -----
-    Parameter checks expand nested tpcp objects, but hash external objects such as sklearn estimators through their
-    complete serialized state. This includes fitted model state. External ``get_params`` methods are not called;
-    changes omitted by an external object's serialization cannot be detected by these checks.
-    Legacy tpcp ``get_params`` overrides without ``include_external`` support retain their original traversal.
+    Parameter checks hash ``get_params(deep=False)``. Hashing already includes each parameter object's serialized
+    nested state, including fitted sklearn model state. Nested ``get_params`` methods are not called separately;
+    changes omitted by a parameter object's serialization cannot be detected by these checks.
     All action checks can be disabled with ``tpcp.set_config(action_safety_checks=False)`` or temporarily with
     ``tpcp.config_context(action_safety_checks=False)``. The action itself still runs and its exceptions propagate.
 

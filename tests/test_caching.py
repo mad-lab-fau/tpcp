@@ -399,14 +399,14 @@ def test_hybrid_cache_hashes_fitted_external_parameter_state(tmp_path, hybrid_ca
         predict
     )
     instance = ModelHolder(StandardScaler().fit([[0.0], [2.0]]))
-    original = instance.get_params(include_external=False)
+    original = instance.get_params(deep=False)
     assert cached(original) == 0.0
     assert cached(deepcopy(original)) == 0.0
     assert len(calls) == 1
 
     # Learned state is absent from sklearn's get_params, but must invalidate the cache.
     instance.model.mean_[0] = 3.0
-    assert cached(instance.get_params(include_external=False)) == -2.0
+    assert cached(instance.get_params(deep=False)) == -2.0
     assert len(calls) == 2
 
 

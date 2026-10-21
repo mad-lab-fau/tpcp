@@ -130,8 +130,8 @@ class Aggregator(BaseTpcpObject, Generic[T]):
                 f"to be wrapped in an aggregator of type {type(self)}. "
                 f"However, we encountered the following additional types: {encountered_types}"
             )
-        config_hash = custom_hash(self.get_params())
-        if not all(custom_hash(v.get_params()) == config_hash for v in values):
+        config_hash = custom_hash(self.get_params(deep=False))
+        if not all(custom_hash(v.get_params(deep=False)) == config_hash for v in values):
             raise ValidationError(
                 f"Based on the first value encountered for the scoring value {_key_name}, we expected all values to be "
                 f"to be wrapped in an aggregator of type {type(self)} with the same configuration. "
