@@ -33,5 +33,7 @@ Functions
     set_config
     config_context
 
+The :ref:`action safety example <action_safety>` shows how to check action methods and configure checks in parallel tasks.
+
 The :doc:`typing helpers <types>` include type variables for algorithms and pipelines that retain
 the concrete subclass in generic code.
