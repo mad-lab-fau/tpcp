@@ -1,6 +1,7 @@
 import warnings
 import weakref
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from functools import partial
 from threading import Barrier, Event, Thread
 from typing import Callable, Literal
@@ -11,6 +12,7 @@ import pandas as pd
 import pytest
 from joblib import Memory
 from joblib.externals.loky import get_reusable_executor
+from sklearn.preprocessing import StandardScaler
 
 from tests._example_pipelines import CacheWarning, ExampleClassOtherModule
 from tpcp import Algorithm
@@ -378,6 +380,34 @@ def test_fast_hybrid_cache_hits_and_detects_mutation(tmp_path, hybrid_cache_clea
     frame.iloc[-1, -1] = 20
     assert cached(frame) == 75
     assert len(calls) == (2 if disk or lru_size else 3)
+
+
+@pytest.mark.parametrize("fast", [False, True])
+@pytest.mark.parametrize(("disk", "lru_size"), [(False, 2), (True, False), (True, 2)])
+def test_hybrid_cache_hashes_fitted_external_parameter_state(tmp_path, hybrid_cache_clear, fast, disk, lru_size):
+    class ModelHolder(Algorithm):
+        def __init__(self, model):
+            self.model = model
+
+    calls = []
+
+    def predict(params):
+        calls.append(1)
+        return params["model"].transform([[1.0]])[0, 0]
+
+    cached = hybrid_cache(Memory(tmp_path if disk else None, verbose=0), lru_size, fast_inaccurate_hashing=fast)(
+        predict
+    )
+    instance = ModelHolder(StandardScaler().fit([[0.0], [2.0]]))
+    original = instance.get_params(include_external=False)
+    assert cached(original) == 0.0
+    assert cached(deepcopy(original)) == 0.0
+    assert len(calls) == 1
+
+    # Learned state is absent from sklearn's get_params, but must invalidate the cache.
+    instance.model.mean_[0] = 3.0
+    assert cached(instance.get_params(include_external=False)) == -2.0
+    assert len(calls) == 2
 
 
 def test_fast_hybrid_cache_isolated_from_default_and_joblib(tmp_path, hybrid_cache_clear):

@@ -58,6 +58,22 @@ This means, if you want to use tpcp to train a neuronal network, some data struc
 one of the parameters.
 You can learn more about that in the :ref:`optimization guide <optimization>`.
 
+By default, ``get_params(deep=True)`` also expands parameters of external objects that provide a ``get_params`` method,
+such as sklearn estimators.
+Use ``get_params(include_external=False)`` to expand only nested tpcp objects, including those in composite parameters.
+External objects remain in the returned dictionary as whole parameter values, without additional flattened entries for
+their parameters.
+With ``deep=False``, neither tpcp nor external objects are expanded, regardless of ``include_external``.
+Subclasses overriding ``get_params`` should accept and forward ``include_external`` to support this boundary.
+Older overrides retain their original traversal when nested or used by action safety checks.
+
+Action safety checks use ``include_external=False`` and hash each external object's serialized state, including fitted
+sklearn model state.
+This avoids serializing a model again through its flattened parameter entries.
+An external object's custom serialization must include the state whose changes should be detected; exposed parameters
+omitted by that serialization are not checked separately.
+The default parameter enumeration and the hashing behavior of caches are unchanged.
+
 Composite Parameters
 --------------------
 Sometimes it is required for a Pipeline or Algorithm to take a list of parameters or other algorithm objects as input.

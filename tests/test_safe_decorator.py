@@ -2,6 +2,7 @@ from unittest import mock
 from unittest.mock import patch
 
 import pytest
+from sklearn.preprocessing import StandardScaler
 
 from tests.conftest import warns_or_none
 from tests.test_pipelines.conftest import DummyDataset
@@ -18,6 +19,25 @@ from tpcp import (
     make_optimize_safe,
 )
 from tpcp.exceptions import PotentialUserErrorWarning
+
+
+class ExternalWithUnrelatedGetParams:
+    def __init__(self):
+        self.value = 7
+
+    def get_params(self):
+        return {"value": self.value}
+
+
+class ExternalParameterNotSerialized:
+    def __init__(self, value=1):
+        self.value = value
+
+    def get_params(self, deep=True):
+        return {"value": self.value}
+
+    def __getstate__(self):
+        return {}
 
 
 class PipelineInputModify(Pipeline):
@@ -74,6 +94,104 @@ class DummyActionPipelineUnsafe(Pipeline):
 
 
 class TestSafeAction:
+    def test_external_get_params_is_not_required(self):
+        class ReadExternal(Pipeline):
+            def __init__(self, external):
+                self.external = external
+
+            @make_action_safe
+            def run(self, datapoint):
+                self.result_ = self.external.value
+                return self
+
+        instance = ReadExternal(ExternalWithUnrelatedGetParams())
+        assert instance.run(None) is instance
+        assert instance.result_ == 7
+
+    @pytest.mark.parametrize("mutation", ["fitted_state", "hyperparameter", "replacement"])
+    def test_external_estimator_mutation_is_rejected(self, mutation):
+        class ModifyModel(Pipeline):
+            def __init__(self, model):
+                self.model = model
+
+            @make_action_safe
+            def run(self, datapoint):
+                if datapoint == "fitted_state":
+                    self.model.mean_[0] += 1
+                elif datapoint == "hyperparameter":
+                    self.model.with_mean = False
+                else:
+                    self.model = StandardScaler().fit([[10.0], [12.0]])
+                self.result_ = 1
+                return self
+
+        instance = ModifyModel(StandardScaler().fit([[0.0], [2.0]]))
+        with pytest.raises(ValueError, match="did modify the parameters"):
+            instance.run(mutation)
+
+    def test_nested_tpcp_parameter_omitted_by_serialization_is_still_checked(self):
+        class HiddenParameter(Pipeline):
+            def __init__(self, value=1):
+                self.value = value
+
+            def __getstate__(self):
+                return {}
+
+        class ModifyNested(Pipeline):
+            def __init__(self, nested):
+                self.nested = nested
+
+            @make_action_safe
+            def run(self, datapoint):
+                self.nested.value += 1
+                self.result_ = 1
+                return self
+
+        with pytest.raises(ValueError, match="did modify the parameters"):
+            ModifyNested(HiddenParameter()).run(None)
+
+    def test_external_parameter_omitted_by_serialization_is_not_checked_separately(self):
+        class ModifyExternal(Pipeline):
+            def __init__(self, external):
+                self.external = external
+
+            @make_action_safe
+            def run(self, datapoint):
+                self.external.value += 1
+                self.result_ = self.external.value
+                return self
+
+        instance = ModifyExternal(ExternalParameterNotSerialized())
+        assert instance.get_params()["external__value"] == 1
+        assert instance.run(None).result_ == 2
+        assert instance.get_params()["external__value"] == 2
+
+    @pytest.mark.parametrize("nested", [False, True])
+    def test_legacy_get_params_override_remains_supported(self, nested):
+        class Legacy(Pipeline):
+            def __init__(self, value=7):
+                self.value = value
+
+            def get_params(self, deep=True):
+                return super().get_params(deep=deep)
+
+            @make_action_safe
+            def run(self, datapoint):
+                self.result_ = self.value
+                return self
+
+        class Holder(Pipeline):
+            def __init__(self, child):
+                self.child = child
+
+            @make_action_safe
+            def run(self, datapoint):
+                self.result_ = self.child.value
+                return self
+
+        instance = Holder(Legacy()) if nested else Legacy()
+        assert instance.run(None).result_ == 7
+
     def test_double_wrapping_protection(self):
         before_wrapped = DummyActionPipelineUnsafe.run
         before_wrap_id = id(before_wrapped)
