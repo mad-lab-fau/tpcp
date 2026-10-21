@@ -1,3 +1,5 @@
+import sys
+from typing import TYPE_CHECKING
 from unittest import mock
 from unittest.mock import patch
 
@@ -19,6 +21,9 @@ from tpcp import (
     make_optimize_safe,
 )
 from tpcp.exceptions import PotentialUserErrorWarning
+
+if TYPE_CHECKING:
+    from sklearn.preprocessing import StandardScaler as TypeCheckingModel  # noqa: TC004 - Runtime absence is tested.
 
 
 class ExternalWithUnrelatedGetParams:
@@ -102,6 +107,27 @@ class DummyActionPipelineUnsafe(Pipeline):
 
 
 class TestSafeAction:
+    @pytest.mark.skipif(sys.version_info < (3, 14), reason="Deferred runtime annotations require Python 3.14")
+    def test_action_can_clone_parameter_with_type_checking_only_annotation(self):
+        class NestedPipeline(Pipeline):
+            model: TypeCheckingModel
+
+            def __init__(self, model):
+                self.model = model
+
+        class CloneNested(Pipeline):
+            def __init__(self, nested):
+                self.nested = nested
+
+            @make_action_safe
+            def run(self, datapoint):
+                self.result_ = self.nested.clone().model.with_mean
+                return self
+
+        instance = CloneNested(NestedPipeline(StandardScaler()))
+        assert instance.run(None) is instance
+        assert instance.result_ is True
+
     @pytest.mark.parametrize("optimize", [False, True])
     def test_action_can_clone_unvalidated_local_parameter(self, optimize):
         class NestedPipeline(OptimizablePipeline):
