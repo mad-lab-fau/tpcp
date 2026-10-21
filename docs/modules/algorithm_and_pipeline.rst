@@ -29,6 +29,9 @@ Functions
     get_param_names
     get_action_params
     get_results
+    get_config
+    set_config
+    config_context
 
 The :doc:`typing helpers <types>` include type variables for algorithms and pipelines that retain
 the concrete subclass in generic code.

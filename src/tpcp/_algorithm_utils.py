@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Concatenate, ParamSpec, TypeVar, cast, ov
 
 from tpcp import Algorithm
 from tpcp._base import NOTHING, BaseTpcpObject, _get_annotated_fields_of_type, _get_params_without_external, _Nothing
+from tpcp._config import get_config
 from tpcp._hash import custom_hash
 from tpcp._parameters import _ParaTypes
 from tpcp.exceptions import PotentialUserErrorWarning
@@ -142,6 +143,10 @@ def is_action_applied(instance: Algorithm) -> bool:
 
 def _check_safe_run(algorithm: AlgorithmT, old_method: Callable, *args: Any, **kwargs: Any) -> AlgorithmT:
     """Run the pipeline and check that run behaved as expected."""
+    if not get_config()["action_safety_checks"]:
+        return (
+            old_method(*args, **kwargs) if hasattr(old_method, "__self__") else old_method(algorithm, *args, **kwargs)
+        )
     before_paras = _get_params_without_external(algorithm)
     before_paras_hash = custom_hash(before_paras)
     output: AlgorithmT
@@ -201,6 +206,8 @@ def make_action_safe(action_method: Callable[P, T]) -> Callable[P, T]:
     complete serialized state. This includes fitted model state. External ``get_params`` methods are not called;
     changes omitted by an external object's serialization cannot be detected by these checks.
     Legacy tpcp ``get_params`` overrides without ``include_external`` support retain their original traversal.
+    All action checks can be disabled with ``tpcp.set_config(action_safety_checks=False)`` or temporarily with
+    ``tpcp.config_context(action_safety_checks=False)``. The action itself still runs and its exceptions propagate.
 
     Examples
     --------
@@ -219,6 +226,8 @@ def make_action_safe(action_method: Callable[P, T]) -> Callable[P, T]:
 
     @wraps(action_method)
     def safe_wrapped(*args: P.args, **kwargs: P.kwargs) -> AlgorithmT:
+        if not get_config()["action_safety_checks"]:
+            return action_method(*args, **kwargs)
         self: AlgorithmT = args[0]
         if action_method.__name__ not in get_action_methods_names(self):
             warnings.warn(

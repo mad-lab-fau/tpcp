@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `get_config`, `set_config`, and `config_context` with `action_safety_checks=True` by default.
+  Set it to `False` to disable all checks in `make_action_safe` and `Pipeline.safe_run`, including parameter hashes,
+  return-type checks, result checks, and action-registration warnings. Cloning and optimization checks are unaffected.
+  Configuration is scoped to the current execution context and propagated through `tpcp.parallel.delayed` to process
+  tasks. Use `tpcp.parallel.Parallel` with that wrapper for propagation in serial and thread execution too.
+  Each worker task restores its previous settings even on failure; nested `config_context` scopes do the same.
 - `BaseTpcpObject.get_params` accepts keyword-only `include_external=True`. Set it to `False` to stop
   parameter expansion at objects outside tpcp while retaining those objects as parameter values.
   The option propagates through nested tpcp objects and composite parameters; the default is unchanged.

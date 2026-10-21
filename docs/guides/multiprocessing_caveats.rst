@@ -168,6 +168,10 @@ TPCP-managed features
 
 TPCP registers the parallel state needed by several built-in features automatically:
 
+- **Runtime configuration:** :func:`~tpcp.parallel.delayed` captures :func:`~tpcp.get_config` for each task.
+  This includes the ``action_safety_checks`` setting. Process workers restore their previous configuration after each
+  task, including on failure. Pair :class:`~tpcp.parallel.Parallel` with :func:`~tpcp.parallel.delayed` for equivalent
+  propagation in serial and thread execution. Worker-local changes do not modify the parent configuration.
 - **Warning filters:** The active Python warning filters are captured for each delayed task and scoped to that task in
   process workers, preventing filter changes from leaking through reused processes. Thread workers share
   process-global filters and use the filters active when each task executes.

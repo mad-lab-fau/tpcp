@@ -74,6 +74,29 @@ An external object's custom serialization must include the state whose changes s
 omitted by that serialization are not checked separately.
 The default parameter enumeration and the hashing behavior of caches are unchanged.
 
+Action safety configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Action checks are enabled by default. To disable all checks from ``make_action_safe`` and ``Pipeline.safe_run``
+temporarily, use:
+
+.. code-block:: python
+
+    from tpcp import config_context
+
+    with config_context(action_safety_checks=False):
+        result = my_algo.detect(data)
+
+This skips parameter hashes, return-type checks, result checks, and action-registration warnings.
+The action still runs normally, including any exceptions it raises. Cloning and optimization checks are unaffected.
+Nested contexts restore the previous setting, including when an exception exits the context.
+
+Use ``set_config(action_safety_checks=False)`` for a persistent setting and ``get_config()`` to inspect the current
+configuration. Settings apply to the current thread and asynchronous execution context; new threads start with defaults.
+Pair ``tpcp.parallel.Parallel`` with ``tpcp.parallel.delayed`` to propagate settings to serial, process, and thread tasks.
+Settings are captured when each delayed task is created and restored after that task, including on failure.
+``joblib.Parallel`` also supports this propagation for process workers when paired with ``tpcp.parallel.delayed``.
+
 Composite Parameters
 --------------------
 Sometimes it is required for a Pipeline or Algorithm to take a list of parameters or other algorithm objects as input.
