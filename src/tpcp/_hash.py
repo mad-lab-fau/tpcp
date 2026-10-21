@@ -83,8 +83,12 @@ class NoMemoizeHasher(Hasher):
                 obj = ("F", obj.__qualname__, get_func_code(obj), vars(obj))
 
             if isinstance(obj, type):
+                is_tpcp_class = issubclass(obj, BaseTpcpObject)
+                if is_tpcp_class:
+                    # Python 3.14 materializes lazy annotation bookkeeping on the class at first access.
+                    getattr(obj, "__annotations__", {})
                 class_state = dict(vars(obj))
-                if issubclass(obj, BaseTpcpObject):
+                if is_tpcp_class:
                     # Lazy framework bookkeeping is not part of the class's behavior or parameter state.
                     class_state.pop("__tpcp_validated_hidden__", None)
                     class_state.pop("__field_annotations_cache__", None)
