@@ -393,3 +393,120 @@ def test_non_list_positional_folds_require_explicit_list_conversion(make_folds):
         GridSearchCV(
             DummyOptimizablePipeline(), [{"para_1": 1}], cv=make_folds(), scoring=_score, progress_bar=False
         ).optimize(dataset)
+
+
+def test_dataset_splitter_selects_each_assigned_side_after_groupwise_split():
+    dataset = DummyGroupedDataset()
+    seen = []
+
+    def training(ds):
+        seen.append(ds.group_labels)
+        return ds.get_subset(v2=[0, 1])
+
+    def testing(ds):
+        seen.append(ds.group_labels)
+        return ds.get_subset(v2=[3, 4])
+
+    splitter = DatasetSplitter(3, groupby="v1", train_selector=training, test_selector=testing)
+    assert splitter.get_n_splits(dataset) == 3
+    assert seen == []
+    folds = list(splitter.split(dataset, n_splits=1))
+    assert folds == [([("a", 0), ("a", 1), ("b", 0), ("b", 1)], [("c", 3), ("c", 4)])]
+    assert seen == [[(g, i) for g in "ab" for i in range(5)], [("c", i) for i in range(5)]]
+
+
+@pytest.mark.parametrize("side", ["train_selector", "test_selector"])
+def test_dataset_splitter_rejects_labels_outside_assigned_side(side):
+    dataset = DummyDataset()
+    splitter = DatasetSplitter(5, **{side: lambda _ds: dataset})
+    with pytest.raises(ValueError, match="subset.*outside"):
+        next(splitter.split(dataset))
+
+
+@pytest.mark.parametrize("side", ["train_selector", "test_selector"])
+def test_dataset_splitter_preserves_selected_label_order_and_allows_empty_side(side):
+    dataset = DummyDataset()[[4, 1, 3, 0, 2]]
+    splitter = DatasetSplitter([([2, 0, 1], [4, 3])], **{side: lambda ds: ds[::-1]})
+    expected = ([(1,), (4,), (3,)], [(2,), (0,)]) if side == "train_selector" else ([(3,), (4,), (1,)], [(0,), (2,)])
+    assert next(splitter.split(dataset)) == expected
+    splitter.set_params(**{side: lambda ds: ds.get_subset(bool_map=[False] * len(ds.index))})
+    fold = next(splitter.split(dataset))
+    assert fold[0 if side == "train_selector" else 1] == []
+
+
+def test_dataset_splitter_identity_selectors_preserve_defaults_and_fold_limit():
+    dataset = DummyGroupedDataset()[::-1]
+    default = DatasetSplitter(3, groupby="v1")
+    explicit = DatasetSplitter(3, groupby="v1", train_selector=lambda ds: ds, test_selector=lambda ds: ds)
+    assert list(explicit.split(dataset)) == list(default.split(dataset))
+    assert list(explicit.split(dataset, n_splits=2)) == list(default.split(dataset))[:2]
+    with pytest.raises(ValueError, match="exceeds"):
+        list(explicit.split(dataset, n_splits=4))
+
+
+def test_dataset_splitter_clones_and_updates_selectors_in_nested_parameters():
+    splitter = CombinedSplitter(parts=[("cv", DatasetSplitter(3, groupby="v1", train_selector=lambda ds: ds))])
+    cloned = clone(splitter)
+    assert cloned.get_params()["parts__cv__train_selector"] is splitter.parts[0][1].train_selector
+    assert cloned.get_params()["parts__cv__test_selector"] is None
+    cloned.set_params(
+        parts__cv__train_selector=lambda ds: ds.get_subset(v2=0),
+        parts__cv__test_selector=lambda ds: ds.get_subset(v2=4),
+    )
+    dataset = DummyGroupedDataset()
+    assert next(cloned.split(dataset)) == ([("a", 0), ("b", 0)], [("c", 4)])
+    assert next(splitter.split(dataset)) == ([(g, i) for g in "ab" for i in range(5)], [("c", i) for i in range(5)])
+
+
+class _RecordingDataset(Dataset):
+    def create_index(self):
+        import pandas as pd
+
+        return pd.DataFrame(
+            [(device, source, recording) for device in "abc" for source in ("bench", "field") for recording in (0, 1)],
+            columns=["device", "source", "recording"],
+        )
+
+
+class _RecordingPipeline(DummyOptimizablePipeline):
+    def self_optimize(self, dataset, **kwargs):
+        self.optimized = [tuple(label) for label in dataset.group_labels]
+        return self
+
+
+def test_dataset_splitter_source_protocol_reaches_training_and_scoring():
+    dataset = _RecordingDataset()
+    splitter = DatasetSplitter(
+        3,
+        groupby="device",
+        train_selector=lambda ds: ds.get_subset(source="bench"),
+        test_selector=lambda ds: ds.get_subset(source="field"),
+    )
+    result = cross_validate(
+        Optimize(_RecordingPipeline()),
+        dataset,
+        cv=splitter,
+        scoring=lambda _pipeline, dp: int(dp.group_label.source == "field"),
+        return_optimizer=True,
+        progress_bar=False,
+    )
+    assert list(result["test__agg__score"]) == [1, 1, 1]
+    assert result["test__data_labels"] == [[(device, "field", 0), (device, "field", 1)] for device in "cba"]
+    assert result["optimizer"][0].optimized_pipeline_.optimized == [
+        ("a", "bench", 0),
+        ("a", "bench", 1),
+        ("b", "bench", 0),
+        ("b", "bench", 1),
+    ]
+    for optimizer, test_labels in zip(result["optimizer"], result["test__data_labels"]):
+        training = optimizer.optimized_pipeline_.optimized
+        assert {label[1] for label in training} == {"bench"}
+        assert {label[0] for label in training}.isdisjoint(label.device for label in test_labels)
+
+
+def test_dataset_splitter_selection_of_partial_group_yields_original_whole_datapoint():
+    dataset = _RecordingDataset().groupby("device")
+    splitter = DatasetSplitter(3, test_selector=lambda ds: ds.get_subset(source="field"))
+    test_labels = next(splitter.split(dataset))[1]
+    assert test_labels == [("a",)]
+    assert len(dataset.get_subset(group_labels=test_labels).index) == 4
