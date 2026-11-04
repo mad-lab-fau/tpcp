@@ -12,7 +12,7 @@ are unused in that fold.
 :class:`~tpcp.validate.DatasetSplitter` first assigns participants to folds,
 then applies a selector to the test side. The training selector stays unset,
 so training keeps every assigned recording, including the continuous walking
-tests. See :ref:`per_side_subset_selection` for the selection contract.
+tests. See :class:`~tpcp.validate.DatasetSplitter` for the selection contract.
 """
 
 # %%
