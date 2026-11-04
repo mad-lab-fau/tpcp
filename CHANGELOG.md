@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Added optional `train_selector` and `test_selector` callbacks to `DatasetSplitter` to select subsets after
+  groupwise fold assignment. Each callback receives only its assigned side, and selecting labels outside that
+  side raises `ValueError`. Both default to `None`, preserving the existing assignments.
+  (https://github.com/mad-lab-fau/tpcp/pull/171)
+
 ## [3.5.0] - 2026-10-21
 
 ### Added
