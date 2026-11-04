@@ -262,17 +262,26 @@ def test_complex_clinical_evaluation():
     assert dataset[1].data.shape == (180, 3)
     assert dataset[0].metadata == dataset[1].metadata
     assert dataset[0].daily_annotations != dataset[1].daily_annotations
-    assert len(fold_results) == 12
+    assert len(fold_results) == 16
     assert fold_results["f1"].between(0, 1).all()
-    assert len(recording_results) == 144
+    assert len(recording_results) == 192
     # Each comparison must evaluate every home day exactly once, using identical
     # participant assignments for both training sources and algorithms.
     expected = {(p, day) for p in range(12) for day in (1, 2, 3)}
-    for _, comparison in recording_results.groupby(["train_source", "algorithm"]):
+    for _, comparison in recording_results.query("evaluation == 'cross_validation'").groupby(
+        ["train_source", "algorithm"]
+    ):
         assert len(comparison) == 36
         assert set(zip(comparison["participant"], comparison["day"], strict=True)) == expected
-    for _, fold in recording_results.groupby("fold"):
+    for _, fold in recording_results.groupby(["evaluation", "fold"]):
         assert fold["participant"].nunique() == 4
+
+    holdout = recording_results.query("evaluation == 'train_test'")
+    assert len(holdout) == 48
+    assert holdout["participant"].nunique() == 4
+    for _, comparison in holdout.groupby(["train_source", "algorithm"]):
+        assert len(comparison) == 12
+        assert not comparison.duplicated(["participant", "day"]).any()
 
     for evaluation in evaluations:
         train, test, search = (evaluation[key] for key in ("train", "test", "search"))

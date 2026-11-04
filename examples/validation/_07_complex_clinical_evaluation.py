@@ -10,8 +10,8 @@ sensor streams and toy algorithms. It needs only tpcp's core dependencies. Run
 from the repository root, or copy the file into a project with tpcp installed.
 
 We compare hospital-to-home and home-to-home generalization to **unseen
-participants**. A three-fold outer split holds out participants for final
-testing.
+participants**. We show both a single participant train/test split and
+three-fold outer cross-validation for final evaluation.
 Within each outer training set, a two-fold participant-wise grid search selects
 hyperparameters using only the training source. The winning model is then refit
 on all outer-training recordings from that source and tested on home recordings
@@ -37,7 +37,12 @@ from typing import Self
 import numpy as np
 import pandas as pd
 from sklearn.metrics import f1_score, precision_score, recall_score
-from sklearn.model_selection import GroupKFold, KFold, ParameterGrid
+from sklearn.model_selection import (
+    GroupKFold,
+    KFold,
+    ParameterGrid,
+    train_test_split,
+)
 from tpcp import (
     Algorithm,
     Dataset,
@@ -260,9 +265,9 @@ def score(
 
 
 # %%
-# Nested participant-wise evaluation
-# ----------------------------------
-# Make the outer folds once on a participant-grouped view, then select
+# Two outer evaluation strategies
+# -------------------------------
+# Make outer splits on a participant-grouped view, then select
 # recordings
 # from those participants in the original dataset. All algorithms and training
 # sources reuse these exact folds. Hospital recordings of a held-out participant
@@ -272,13 +277,20 @@ def score(
 # at random would allow recordings from one participant into both training and
 # validation. For hospital-to-home we tune on hospital validation recordings;
 # for home-to-home we tune on home validation recordings. Tuning on held-out
-# home
-# recordings would contaminate the final estimate.
+# home recordings would contaminate the final estimate.
 
 participants = dataset.groupby("participant")
-outer_folds = list(
-    KFold(n_splits=3, shuffle=True, random_state=42).split(participants)
+# The simple split holds out four of the twelve participants once. The CV
+# strategy holds out four participants per fold and tests everyone once.
+holdout_train, holdout_test = train_test_split(
+    np.arange(len(participants)), test_size=4, random_state=42
 )
+outer_splits = {
+    "train_test": [(holdout_train, holdout_test)],
+    "cross_validation": list(
+        KFold(n_splits=3, shuffle=True, random_state=42).split(participants)
+    ),
+}
 algorithms = {
     "dummy_hmm": (
         DummyHmmDetector(),
@@ -291,79 +303,93 @@ algorithms = {
 }
 fold_rows = []
 recording_rows = []
-# Keep searches and split datasets available for inspecting parameters and
-# folds.
+# Keep searches and datasets available for inspecting parameters and folds.
 evaluations = []
-for fold, (train_positions, test_positions) in enumerate(outer_folds):
-    train_ids = (
-        participants[train_positions].index["participant"].unique().tolist()
-    )
-    test_ids = (
-        participants[test_positions].index["participant"].unique().tolist()
-    )
-    test = dataset.get_subset(participant=test_ids, source="home")
-    for source in ("hospital", "home"):
-        train = dataset.get_subset(participant=train_ids, source=source)
-        for name, (algorithm, grid) in algorithms.items():
-            search = GridSearchCV(
-                pipeline=EventPipeline(algorithm.clone()),
-                parameter_grid=ParameterGrid(grid),
-                scoring=Scorer(score, progress_bar=False),
-                cv=DatasetSplitter(
-                    GroupKFold(n_splits=2), groupby="participant"
-                ),
-                return_optimized="f1",
-                progress_bar=False,
-            ).optimize(train)
-            # GridSearchCV refits the selected configuration on all of `train`.
-            # validate only runs inference; it never fits on `test`.
-            result = validate(
-                search.optimized_pipeline_,
-                test,
-                scoring=score,
-                progress_bar=False,
-            )
-            fold_rows.append(
-                {
-                    "fold": fold,
-                    "train_source": source,
-                    "algorithm": name,
-                    "f1": result["agg__f1"][0],
-                    "best_params": search.best_params_,
-                }
-            )
-            for label, f1 in zip(
-                result["data_labels"][0], result["single__f1"][0], strict=True
-            ):
-                recording_rows.append(
+for evaluation_name, folds in outer_splits.items():
+    for fold, (train_positions, test_positions) in enumerate(folds):
+        train_ids = (
+            participants[train_positions].index["participant"].unique().tolist()
+        )
+        test_ids = (
+            participants[test_positions].index["participant"].unique().tolist()
+        )
+        test = dataset.get_subset(participant=test_ids, source="home")
+        for source in ("hospital", "home"):
+            train = dataset.get_subset(participant=train_ids, source=source)
+            for name, (algorithm, grid) in algorithms.items():
+                search = GridSearchCV(
+                    pipeline=EventPipeline(algorithm.clone()),
+                    parameter_grid=ParameterGrid(grid),
+                    scoring=Scorer(score, progress_bar=False),
+                    cv=DatasetSplitter(
+                        GroupKFold(n_splits=2), groupby="participant"
+                    ),
+                    return_optimized="f1",
+                    progress_bar=False,
+                ).optimize(train)
+                # Refit the selected configuration on all of `train`.
+                # validate only runs inference; it never fits on `test`.
+                result = validate(
+                    search.optimized_pipeline_,
+                    test,
+                    scoring=score,
+                    progress_bar=False,
+                )
+                fold_rows.append(
                     {
+                        "evaluation": evaluation_name,
                         "fold": fold,
                         "train_source": source,
                         "algorithm": name,
-                        "participant": label.participant,
-                        "day": label.day,
-                        "f1": f1,
+                        "f1": result["agg__f1"][0],
+                        "best_params": search.best_params_,
                     }
                 )
-            evaluations.append({"train": train, "test": test, "search": search})
+                for label, f1 in zip(
+                    result["data_labels"][0],
+                    result["single__f1"][0],
+                    strict=True,
+                ):
+                    recording_rows.append(
+                        {
+                            "evaluation": evaluation_name,
+                            "fold": fold,
+                            "train_source": source,
+                            "algorithm": name,
+                            "participant": label.participant,
+                            "day": label.day,
+                            "f1": f1,
+                        }
+                    )
+                evaluations.append(
+                    {
+                        "evaluation": evaluation_name,
+                        "train": train,
+                        "test": test,
+                        "search": search,
+                    }
+                )
 
 # %%
 # Inspect the results
 # -------------------
-# There are twelve fitted searches: three outer folds, two training sources,
-# and two detectors. Each home recording is tested exactly once per comparison.
+# There are sixteen fitted searches: four for the single split and twelve for
+# outer cross-validation, covering two training sources and two detectors.
+# Each home recording is tested once per cross-validation comparison. The single
+# split evaluates only the four held-out participants. These two strategies are
+# alternative evaluation designs; do not pool their results.
 # ``fold_results`` shows the selected hyperparameters and held-out F1 per fold;
 # ``recording_results`` retains individual recording scores for further
 # analysis.
-# The table below reports mean and standard deviation across outer folds. With
-# only three folds, the standard deviation is descriptive, not a confidence
-# interval.
+# The table groups by evaluation strategy. The single split has no across-fold
+# standard deviation, so its std is NaN. For cross-validation, the standard
+# deviation across three folds is descriptive, not a confidence interval.
 
 fold_results = pd.DataFrame(fold_rows)
 recording_results = pd.DataFrame(recording_rows)
-summary = fold_results.groupby(["train_source", "algorithm"])["f1"].agg(
-    ["mean", "std"]
-)
+summary = fold_results.groupby(["evaluation", "train_source", "algorithm"])[
+    "f1"
+].agg(["mean", "std"])
 print(fold_results.to_string(index=False))
 print(summary)
 
@@ -372,7 +398,5 @@ print(summary)
 # properties and dummy detectors, specify the intended deployment population,
 # and choose appropriate event metrics before interpreting the comparison.
 # To train a deployment model afterwards, rerun the inner search on all
-# available
-# participants from the chosen training source. Its training score must not
-# replace
-# the held-out outer-fold performance reported here.
+# participants from the chosen source. Its training score must not replace
+# the held-out performance reported here.
