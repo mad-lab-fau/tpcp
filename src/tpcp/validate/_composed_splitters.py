@@ -15,7 +15,7 @@ from tpcp.validate._cross_val_helper import (
 
 
 def _selected_labels(dataset: Dataset, selector: DatasetSelector | None) -> list[GroupLabelT]:
-    return [] if selector is None else _validate_subset(dataset, selector(dataset))
+    return [] if selector is None else _validate_subset(dataset.group_labels, selector(dataset))
 
 
 def _check_disjoint(train: list[GroupLabelT], test: list[GroupLabelT]) -> None:
@@ -90,8 +90,9 @@ class SubsetSplitter(BaseDatasetSplitter):
         self.splitter = splitter
 
     def _prepare(self, dataset: Dataset) -> tuple[Dataset, BaseDatasetSplitter]:
+        labels = dataset.group_labels
         selected = self.selector(dataset)
-        _validate_subset(dataset, selected)
+        _validate_subset(labels, selected)
         return selected, _normalize_splitter(self.splitter)
 
     def get_n_splits(self, dataset: Dataset) -> int | None:

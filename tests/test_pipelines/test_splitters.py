@@ -510,3 +510,10 @@ def test_dataset_splitter_selection_of_partial_group_yields_original_whole_datap
     test_labels = next(splitter.split(dataset))[1]
     assert test_labels == [("a",)]
     assert len(dataset.get_subset(group_labels=test_labels).index) == 4
+
+
+@pytest.mark.parametrize("side", ["train_selector", "test_selector"])
+def test_dataset_splitter_rejects_selector_restoring_unassigned_datapoints(side):
+    splitter = DatasetSplitter(5, **{side: lambda ds: ds.set_params(subset_index=None)})
+    with pytest.raises(ValueError, match="subset.*outside"):
+        next(splitter.split(DummyDataset()))
