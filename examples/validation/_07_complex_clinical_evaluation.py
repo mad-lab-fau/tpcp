@@ -4,21 +4,17 @@ r"""
 A complete hospital-to-home evaluation
 ======================================
 
-This example implements the study outlined in the README using generated
-sensor streams and toy algorithms.
+Do we need labeled home data to build an algorithm that performs well at home?
+This example compares hospital-only development with development using labeled
+home recordings. Both approaches are evaluated on the same home recordings
+from unseen participants. Hospital-only development uses no home labels for
+training or hyperparameter selection.
 
-We compare hospital-to-home and home-to-home generalization to **unseen
-participants**. We show both a single participant train/test split and
-three-fold outer cross-validation for final evaluation.
-Within each outer training set, a two-fold participant-wise grid search selects
-hyperparameters using only the training source. The winning model is then refit
-on all outer-training recordings from that source and tested on home recordings
-of the held-out participants.
-
-The supervised two-state Gaussian HMM and the independent threshold detector
-below are teaching stand-ins, not implementations of the paper's algorithm or a
-state-of-the-art method. Replace them with real detectors while keeping the same
-dataset, pipeline, scoring function, and evaluation loop.
+We build the evaluation from the inside out: run two dummy algorithms, fit the
+learnable algorithm through a trainer, search hyperparameters, evaluate a single
+participant-wise train/test split, and finally use outer cross-validation.
+Dummy sensor recordings keep the example focused on the evaluation structure.
+Their results cannot answer the clinical research question.
 """  # noqa: D400
 
 # %%
@@ -35,21 +31,23 @@ from typing import Self
 import numpy as np
 import pandas as pd
 from sklearn.metrics import f1_score, precision_score, recall_score
-from sklearn.model_selection import (
-    GroupKFold,
-    KFold,
-    ParameterGrid,
-    train_test_split,
-)
+from sklearn.model_selection import GroupShuffleSplit, ParameterGrid
 from tpcp import (
     Algorithm,
     Dataset,
     OptimizableParameter,
     OptimizablePipeline,
     Parameter,
+    Pipeline,
 )
-from tpcp.optimize import GridSearchCV
-from tpcp.validate import DatasetSplitter, Scorer, validate
+from tpcp.optimize import GridSearch, GridSearchCV, Optimize
+from tpcp.validate import (
+    BaseDatasetSplitter,
+    DatasetSplitter,
+    Scorer,
+    cross_validate,
+    validate,
+)
 
 
 class ClinicalDataset(Dataset):
@@ -132,126 +130,134 @@ dataset[0].daily_annotations
 # %%
 # Two interchangeable dummy algorithms
 # ------------------------------------
-# The HMM learns a mean sensor vector for each state from annotated training
-# sequences. Viterbi decoding penalizes state changes, favoring continuous
-# events. It assumes unit emission variance and equal initial state
-# probabilities.
-# ``transition_cost`` is the log ratio of staying versus switching
-# probabilities.
-# Sequences remain separate so there are no artificial transitions between days.
-#
-# Learned values must be constructor parameters so tpcp cloning preserves them.
-# The threshold baseline uses the same training interface but predicts each
-# sample
-# independently. Its tunable offset moves the decision boundary. Both algorithms
-# receive sensor data only at inference time, never reference annotations.
+# The first algorithm learns a threshold from annotated training recordings
+# and has a tunable smoothing window. The second has no training step, but its
+# fixed threshold can still be selected by hyperparameter search.
+# Learned values are constructor parameters so tpcp cloning preserves them.
+# At inference time, both algorithms receive only sensor data.
 
 
-class DummyStateDetector(Algorithm):
-    """Common supervised training interface for the two toy detectors."""
+class DummySmoothedDetector(Algorithm):
+    """Dummy detector with a tunable smoothing window."""
 
     _action_methods = "detect"
     state_means: OptimizableParameter[np.ndarray | None]
     states_: np.ndarray
-
-    def __init__(self, state_means: np.ndarray | None = None):
-        self.state_means = state_means
-
-    def self_optimize(self, dataset: ClinicalDataset) -> Self:
-        """Estimate state means using only the supplied training recordings."""
-        signals = np.concatenate([d.data.to_numpy() for d in dataset])
-        labels = np.concatenate([d.reference_states for d in dataset])
-        self.state_means = np.stack(
-            [signals[labels == state].mean(axis=0) for state in (0, 1)]
-        )
-        return self
-
-
-class DummyHmmDetector(DummyStateDetector):
-    """Small supervised Gaussian HMM with fixed transition probabilities."""
-
-    transition_cost: Parameter[float]
+    window_size: Parameter[int]
 
     def __init__(
-        self,
-        transition_cost: float = 2.0,
-        state_means: np.ndarray | None = None,
+        self, window_size: int = 5, state_means: np.ndarray | None = None
     ):
-        self.transition_cost = transition_cost
+        self.window_size = window_size
         self.state_means = state_means
 
     def detect(self, data: pd.DataFrame) -> Self:
-        """Decode the state sequence using Viterbi recursion."""
-        emission_cost = 0.5 * (
-            (data.to_numpy()[:, None, :] - self.state_means) ** 2
-        ).sum(axis=2)
-        costs = emission_cost[0]
-        previous = np.zeros((len(data), 2), dtype=int)
-        transition = np.array(
-            [[0, self.transition_cost], [self.transition_cost, 0]]
+        """Threshold a smoothed signal."""
+        signal = (
+            data.mean(axis=1)
+            .rolling(self.window_size, center=True, min_periods=1)
+            .mean()
         )
-        for sample in range(1, len(data)):
-            candidates = costs[:, None] + transition
-            previous[sample] = candidates.argmin(axis=0)
-            costs = candidates.min(axis=0) + emission_cost[sample]
-        states = np.zeros(len(data), dtype=int)
-        states[-1] = costs.argmin()
-        for sample in range(len(data) - 1, 0, -1):
-            states[sample - 1] = previous[sample, states[sample]]
-        self.states_ = states
+        self.states_ = (signal.to_numpy() > self.state_means.mean()).astype(int)
         return self
 
 
-class DummyThresholdDetector(DummyStateDetector):
-    """Independent sample classifier standing in for a comparison algorithm."""
+class DummyThresholdDetector(Algorithm):
+    """Non-learnable detector with a tunable threshold."""
 
-    def __init__(
-        self, offset: float = 0.0, state_means: np.ndarray | None = None
-    ):
-        self.offset = offset
-        self.state_means = state_means
+    _action_methods = "detect"
+    states_: np.ndarray
+
+    def __init__(self, threshold: float = 0.9):
+        self.threshold = threshold
 
     def detect(self, data: pd.DataFrame) -> Self:
         """Threshold the mean across sensor channels."""
-        threshold = self.state_means.mean() + self.offset
-        self.states_ = (data.mean(axis=1).to_numpy() > threshold).astype(int)
+        self.states_ = (data.mean(axis=1).to_numpy() > self.threshold).astype(
+            int
+        )
         return self
 
 
 # %%
 # One pipeline and scorer for both detectors
 # ------------------------------------------
-# Training changes only the nested ``state_means`` parameter. Hyperparameters
-# remain fixed during each fit. Clone before training or inference so learned
-# values and action results do not leak between runs.
+# Both detectors use the same prediction pipeline. A trainer subclass adds
+# a training step that changes only ``state_means``. Hyperparameters remain
+# fixed during each fit. Clone before training and inference to isolate runs.
 #
 # We score the event state per sample, then average recording scores. These are
 # segmentation scores, not event matching scores. For real event detection,
 # replace this scorer with event matching and a tolerance appropriate to the
 # task.
-# Every participant has three home days, so the final mean weights participants
-# equally as well. Unequal recording counts would require explicit aggregation.
+# Every participant contributes three home days, so they have equal weight.
 
 
-class EventPipeline(OptimizablePipeline[ClinicalDataset]):
-    """Adapt either detector to tpcp training and evaluation."""
+class EventPipeline(Pipeline[ClinicalDataset]):
+    """Run either detector through the same prediction interface."""
 
-    algorithm: Parameter[DummyStateDetector]
-    algorithm__state_means: OptimizableParameter[np.ndarray | None]
+    algorithm: Parameter[DummySmoothedDetector | DummyThresholdDetector]
     states_: np.ndarray
 
-    def __init__(self, algorithm: DummyStateDetector):
+    def __init__(
+        self, algorithm: DummySmoothedDetector | DummyThresholdDetector
+    ):
         self.algorithm = algorithm
-
-    def self_optimize(self, dataset: ClinicalDataset, **_kwargs) -> Self:
-        """Fit the detector on the supplied training recordings."""
-        self.algorithm = self.algorithm.clone().self_optimize(dataset)
-        return self
 
     def run(self, datapoint: ClinicalDataset) -> Self:
         """Predict one recording without reading reference annotations."""
         self.states_ = self.algorithm.clone().detect(datapoint.data).states_
         return self
+
+
+class DummyDetectorTrainer(EventPipeline, OptimizablePipeline[ClinicalDataset]):
+    """Fit a detector and reuse the normal prediction pipeline."""
+
+    algorithm: Parameter[DummySmoothedDetector]
+    algorithm__state_means: OptimizableParameter[np.ndarray | None]
+
+    def self_optimize(self, dataset: ClinicalDataset, **_kwargs) -> Self:
+        """Fit a cloned detector using the supplied training recordings."""
+        signals = np.concatenate([d.data.to_numpy() for d in dataset])
+        labels = np.concatenate([d.reference_states for d in dataset])
+        state_means = np.stack(
+            [signals[labels == state].mean(axis=0) for state in (0, 1)]
+        )
+        self.algorithm = self.algorithm.clone().set_params(
+            state_means=state_means
+        )
+        return self
+
+
+# %%
+# Train and run on a few recordings
+# ---------------------------------
+# Start with the innermost operation. The trainer owns fitting, while the
+# detector owns prediction and its learned parameters. After fitting, the
+# detector can run independently of the trainer. The baseline runs directly.
+# These recordings demonstrate the interfaces; this is not a performance
+# estimate. The outer evaluations below start with fresh, untrained objects.
+
+demo_train = dataset.get_subset(participant=[0, 1, 2, 3], source="hospital")
+datapoint = demo_train[0]
+baseline = DummyThresholdDetector().detect(datapoint.data)
+baseline.states_[:20]
+
+# %%
+trainer = Optimize(DummyDetectorTrainer(DummySmoothedDetector())).optimize(
+    demo_train
+)
+learned_detector = trainer.optimized_pipeline_.algorithm
+learned_detector.state_means
+
+# %%
+learned_detector.detect(datapoint.data).states_[:20]
+
+# %%
+# Score predictions
+# -----------------
+# Both algorithms use the same prediction pipeline and scorer. Training and
+# hyperparameter search do not belong in the scoring function.
 
 
 def score(
@@ -268,143 +274,216 @@ def score(
 
 
 # %%
-# Two outer evaluation strategies
-# -------------------------------
-# Make outer splits on a participant-grouped view, then select
-# recordings
-# from those participants in the original dataset. All algorithms and training
-# sources reuse these exact folds. Hospital recordings of a held-out participant
-# are excluded too, even though we only score their home recordings.
-#
-# The inner search uses GroupKFold on participant IDs. Splitting individual days
-# at random would allow recordings from one participant into both training and
-# validation. For hospital-to-home we tune on hospital validation recordings;
-# for home-to-home we tune on home validation recordings. Tuning on held-out
-# home recordings would contaminate the final estimate.
+# Search hyperparameters on training data
+# ---------------------------------------
+# Next, wrap the inner training operation in hyperparameter search. The
+# learnable detector uses GridSearchCV with participant-wise inner folds.
+# GridSearchCV fits each candidate on inner training participants, scores it on
+# inner validation participants, and refits the winner on all supplied data.
+# The baseline has no fit step, so GridSearch selects its threshold directly
+# on the supplied recordings. Both return a pipeline with the same run API.
 
-participants = dataset.groupby("participant")
-# The simple split holds out four of the twelve participants once. The CV
-# strategy holds out four participants per fold and tests everyone once.
-holdout_train, holdout_test = train_test_split(
-    np.arange(len(participants)), test_size=4, random_state=42
+# All configuration lives here. The learnable algorithm uses a trainer and
+# participant-wise inner CV. The non-learnable algorithm needs no fitting, but
+# its threshold is still selected using labeled training data. Both optimizers
+# expose the same interface to the outer evaluation.
+searches = {
+    "learnable": GridSearchCV(
+        pipeline=DummyDetectorTrainer(DummySmoothedDetector()),
+        parameter_grid=ParameterGrid({"algorithm__window_size": [1, 5, 11]}),
+        scoring=Scorer(score, progress_bar=False),
+        cv=DatasetSplitter(2, groupby="participant"),
+        return_optimized="f1",
+        progress_bar=False,
+    ),
+    "baseline": GridSearch(
+        pipeline=EventPipeline(DummyThresholdDetector()),
+        parameter_grid=ParameterGrid({"algorithm__threshold": [0.7, 0.9, 1.1]}),
+        scoring=Scorer(score, progress_bar=False),
+        return_optimized="f1",
+        progress_bar=False,
+    ),
+}
+
+demo_searches = {
+    name: search.clone().optimize(demo_train)
+    for name, search in searches.items()
+}
+pd.DataFrame(
+    {name: search.best_params_ for name, search in demo_searches.items()}
 )
-outer_splits = {
-    "train_test": [(holdout_train, holdout_test)],
-    "cross_validation": list(
-        KFold(n_splits=3, shuffle=True, random_state=42).split(participants)
+
+# %%
+# The selected pipeline can now predict a recording. These are training
+# recordings, so this score is only an interface demonstration.
+
+validate(
+    demo_searches["learnable"].optimized_pipeline_,
+    demo_train[:1],
+    scoring=score,
+    progress_bar=False,
+)
+
+# %%
+# Select participants and recording sources in the splitter
+# ---------------------------------------------------------
+# Every inner and outer split groups by participant. Source selection is a
+# separate step: training uses either hospital or home recordings, while
+# testing always uses home recordings.
+#
+# DatasetSplitter handles the participant assignments. The small adapter below
+# only filters each side by source afterwards. It implements the native
+# BaseDatasetSplitter interface so cross_validate can handle the entire outer
+# evaluation. The trainer and algorithms never select their own training data.
+
+
+class RecordingSourceSplitter(BaseDatasetSplitter):
+    """Filter the two sides of a participant-wise split by recording source."""
+
+    def __init__(
+        self,
+        splitter: DatasetSplitter,
+        train_source: str,
+        test_source: str = "home",
+    ):
+        self.splitter = splitter
+        self.train_source = train_source
+        self.test_source = test_source
+
+    def get_n_splits(self, dataset: ClinicalDataset) -> int:
+        """Delegate the fold count to the participant splitter."""
+        return self.splitter.get_n_splits(dataset)
+
+    def split(self, dataset: ClinicalDataset, n_splits: int | None = None):
+        """Select sources after assigning participants to folds."""
+        for train, test in self.splitter.split(dataset, n_splits=n_splits):
+            yield (
+                dataset.get_subset(group_labels=train)
+                .get_subset(source=self.train_source)
+                .group_labels,
+                dataset.get_subset(group_labels=test)
+                .get_subset(source=self.test_source)
+                .group_labels,
+            )
+
+
+# %%
+# Evaluate one outer train/test split
+# -----------------------------------
+# A single grouped shuffle split holds out four participants. All experimental
+# configurations reuse the same assignments, so their home test recordings are
+# identical. Only the source of development labels changes between the two
+# research conditions. Even the baseline's hyperparameter search must use only
+# hospital labels in the hospital-only condition.
+
+participant_holdout = DatasetSplitter(
+    GroupShuffleSplit(n_splits=1, test_size=4, random_state=42),
+    groupby="participant",
+)
+experiments = {
+    "hospital_to_home_learnable": (
+        searches["learnable"],
+        RecordingSourceSplitter(
+            participant_holdout.clone(), train_source="hospital"
+        ),
+    ),
+    "home_to_home_learnable": (
+        searches["learnable"],
+        RecordingSourceSplitter(
+            participant_holdout.clone(), train_source="home"
+        ),
+    ),
+    "hospital_to_home_baseline": (
+        searches["baseline"],
+        RecordingSourceSplitter(
+            participant_holdout.clone(), train_source="hospital"
+        ),
+    ),
+    "home_to_home_baseline": (
+        searches["baseline"],
+        RecordingSourceSplitter(
+            participant_holdout.clone(), train_source="home"
+        ),
     ),
 }
-algorithms = {
-    "dummy_hmm": (
-        DummyHmmDetector(),
-        {"algorithm__transition_cost": [0.5, 2.0, 5.0]},
-    ),
-    "dummy_baseline": (
-        DummyThresholdDetector(),
-        {"algorithm__offset": [-0.2, 0.0, 0.2]},
-    ),
+
+# Each entry contains its optimizer and splitter. Adding another method does
+# not require changing any evaluation code or checking algorithm types.
+outer_scorer = Scorer(score, progress_bar=False)
+holdout_results = {
+    name: cross_validate(
+        search,
+        dataset,
+        scoring=outer_scorer,
+        cv=splitter,
+        return_optimizer=True,
+        progress_bar=False,
+    )
+    for name, (search, splitter) in experiments.items()
 }
-fold_rows = []
-recording_rows = []
-# Keep searches and datasets available for inspecting parameters and folds.
-evaluations = []
-for evaluation_name, folds in outer_splits.items():
-    for fold, (train_positions, test_positions) in enumerate(folds):
-        train_ids = (
-            participants[train_positions].index["participant"].unique().tolist()
-        )
-        test_ids = (
-            participants[test_positions].index["participant"].unique().tolist()
-        )
-        test = dataset.get_subset(participant=test_ids, source="home")
-        for source in ("hospital", "home"):
-            train = dataset.get_subset(participant=train_ids, source=source)
-            for name, (algorithm, grid) in algorithms.items():
-                search = GridSearchCV(
-                    pipeline=EventPipeline(algorithm.clone()),
-                    parameter_grid=ParameterGrid(grid),
-                    scoring=Scorer(score, progress_bar=False),
-                    cv=DatasetSplitter(
-                        GroupKFold(n_splits=2), groupby="participant"
-                    ),
-                    return_optimized="f1",
-                    progress_bar=False,
-                ).optimize(train)
-                # Refit the selected configuration on all of `train`.
-                # validate only runs inference; it never fits on `test`.
-                result = validate(
-                    search.optimized_pipeline_,
-                    test,
-                    scoring=score,
-                    progress_bar=False,
-                )
-                fold_rows.append(
-                    {
-                        "evaluation": evaluation_name,
-                        "fold": fold,
-                        "train_source": source,
-                        "algorithm": name,
-                        "f1": result["agg__f1"][0],
-                        "best_params": search.best_params_,
-                    }
-                )
-                for label, f1 in zip(
-                    result["data_labels"][0],
-                    result["single__f1"][0],
-                    strict=True,
-                ):
-                    recording_rows.append(
-                        {
-                            "evaluation": evaluation_name,
-                            "fold": fold,
-                            "train_source": source,
-                            "algorithm": name,
-                            "participant": label.participant,
-                            "day": label.day,
-                            "f1": f1,
-                        }
-                    )
-                evaluations.append(
-                    {
-                        "evaluation": evaluation_name,
-                        "train": train,
-                        "test": test,
-                        "search": search,
-                    }
-                )
+pd.concat(
+    {name: pd.DataFrame(result) for name, result in holdout_results.items()}
+)[
+    [
+        "test__agg__f1",
+        "test__agg__precision",
+        "test__agg__recall",
+        "test__data_labels",
+    ]
+]
 
 # %%
-# Inspect the results
-# -------------------
-# There are sixteen fitted searches: four for the single split and twelve for
-# outer cross-validation, covering two training sources and two detectors.
-# Each home recording is tested once per cross-validation comparison. The single
-# split evaluates only the four held-out participants. These two strategies are
-# alternative evaluation designs; do not pool their results.
-# ``fold_results`` shows the selected hyperparameters and held-out F1 per fold;
-# ``recording_results`` retains individual recording scores for further
-# analysis.
-# The table groups by evaluation strategy. The single split has no across-fold
-# standard deviation, so its std is NaN. For cross-validation, the standard
-# deviation across three folds is descriptive, not a confidence interval.
+# Extend the outer evaluation to cross-validation
+# -----------------------------------------------
+# Change only the participant splitter to three-fold grouped CV. Source
+# selectors and optimizers stay the same. cross_validate clones each optimizer
+# and runs the full search within each outer training fold. Every participant's
+# home days are tested exactly once per experimental configuration.
 
-fold_results = pd.DataFrame(fold_rows)
-recording_results = pd.DataFrame(recording_rows)
-summary = fold_results.groupby(["evaluation", "train_source", "algorithm"])[
-    "f1"
-].agg(["mean", "std"])
-fold_results
+cv_experiments = {
+    name: (
+        search,
+        splitter.clone().set_params(
+            splitter=DatasetSplitter(3, groupby="participant")
+        ),
+    )
+    for name, (search, splitter) in experiments.items()
+}
+cv_results = {
+    name: cross_validate(
+        search,
+        dataset,
+        scoring=outer_scorer,
+        cv=splitter,
+        return_optimizer=True,
+        progress_bar=False,
+    )
+    for name, (search, splitter) in cv_experiments.items()
+}
+cv_result_table = pd.concat(
+    {name: pd.DataFrame(result) for name, result in cv_results.items()}
+)
+cv_result_table[
+    [
+        "test__agg__f1",
+        "test__agg__precision",
+        "test__agg__recall",
+        "test__data_labels",
+    ]
+]
 
 # %%
-recording_results
+# tpcp retains recording scores, data labels, and fitted optimizers. These
+# scores average recordings; every participant has three home days, so all
+# participants have equal weight. The standard deviation across three folds
+# below is descriptive, not a confidence interval. Keep the single-split and
+# cross-validation results separate.
+
+cv_result_table.groupby(level=0)["test__agg__f1"].agg(["mean", "std"])
 
 # %%
-summary
-
-# %%
-# These scores describe generated data only. For a real study, replace the data
-# properties and dummy detectors, specify the intended deployment population,
-# and choose appropriate event metrics before interpreting the comparison.
-# To train a deployment model afterwards, rerun the inner search on all
-# participants from the chosen source. Its training score must not replace
-# the held-out performance reported here.
+# With real data, the paired held-out home results would let us assess whether
+# home labels improve performance over hospital-only development. The dummy
+# data cannot establish that conclusion. To fit a deployment detector, repeat
+# its configured search on all development participants from the chosen source.
+# Report held-out performance rather than its development score.

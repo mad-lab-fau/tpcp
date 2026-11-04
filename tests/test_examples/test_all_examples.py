@@ -248,13 +248,12 @@ def test_warning_error_context_example():
 
 
 def test_complex_clinical_evaluation():
-    """The clinical workflow isolates participants and tests all home recordings."""
+    """Both development sources evaluate identical unseen participants at home."""
     from examples.validation._07_complex_clinical_evaluation import (
-        algorithms,
+        cv_results,
         dataset,
-        evaluations,
-        fold_results,
-        recording_results,
+        holdout_results,
+        searches,
     )
 
     assert len(dataset) == 48
@@ -262,47 +261,47 @@ def test_complex_clinical_evaluation():
     assert dataset[1].data.shape == (180, 3)
     assert dataset[0].metadata == dataset[1].metadata
     assert dataset[0].daily_annotations != dataset[1].daily_annotations
-    assert len(fold_results) == 16
-    assert fold_results["f1"].between(0, 1).all()
-    assert len(recording_results) == 192
-    # Each comparison must evaluate every home day exactly once, using identical
-    # participant assignments for both training sources and algorithms.
-    expected = {(p, day) for p in range(12) for day in (1, 2, 3)}
-    for _, comparison in recording_results.query("evaluation == 'cross_validation'").groupby(
-        ["train_source", "algorithm"]
-    ):
-        assert len(comparison) == 36
-        assert set(zip(comparison["participant"], comparison["day"], strict=True)) == expected
-    for _, fold in recording_results.groupby(["evaluation", "fold"]):
-        assert fold["participant"].nunique() == 4
-
-    holdout = recording_results.query("evaluation == 'train_test'")
-    assert len(holdout) == 48
-    assert holdout["participant"].nunique() == 4
-    for _, comparison in holdout.groupby(["train_source", "algorithm"]):
-        assert len(comparison) == 12
-        assert not comparison.duplicated(["participant", "day"]).any()
-
-    for evaluation in evaluations:
-        train, test, search = (evaluation[key] for key in ("train", "test", "search"))
-        train_ids = set(train.index["participant"])
-        test_ids = set(test.index["participant"])
-        assert len(train_ids) == 8
-        assert len(test_ids) == 4
-        assert train_ids.isdisjoint(test_ids)
-        assert set(test.index["source"]) == {"home"}
-        assert len(set(train.index["source"])) == 1
-        for split in range(2):
-            for train_labels, validation_labels in zip(
-                search.cv_results_[f"split{split}__train__data_labels"],
-                search.cv_results_[f"split{split}__test__data_labels"],
-                strict=True,
+    expected_home = {(p, day) for p in range(12) for day in (1, 2, 3)}
+    for results, n_folds in ((holdout_results, 1), (cv_results, 3)):
+        reference_test_folds = None
+        for name, result in results.items():
+            assert len(result["test__agg__f1"]) == n_folds
+            assert np.all((0 <= result["test__agg__f1"]) & (result["test__agg__f1"] <= 1))
+            test_folds = [set(labels) for labels in result["test__data_labels"]]
+            if reference_test_folds is None:
+                reference_test_folds = test_folds
+            assert test_folds == reference_test_folds
+            if n_folds == 3:
+                tested = [label for labels in result["test__data_labels"] for label in labels]
+                assert len(tested) == 36
+                assert {(label.participant, label.day) for label in tested} == expected_home
+            expected_source = "hospital" if name.startswith("hospital") else "home"
+            for train_labels, test_labels, search in zip(
+                result["train__data_labels"], result["test__data_labels"], result["optimizer"], strict=True
             ):
-                inner_train_ids = {label.participant for label in train_labels}
-                inner_validation_ids = {label.participant for label in validation_labels}
-                assert inner_train_ids.isdisjoint(inner_validation_ids)
-                assert inner_train_ids | inner_validation_ids == train_ids
-                assert {label.source for label in train_labels + validation_labels} == set(train.index["source"])
-        assert search.optimized_pipeline_.algorithm.state_means.shape == (2, 3)
-    # Cloning must leave the original detector configurations untrained.
-    assert all(algorithm.state_means is None for algorithm, _ in algorithms.values())
+                train_ids = {label.participant for label in train_labels}
+                test_ids = {label.participant for label in test_labels}
+                assert len(train_ids) == 8
+                assert len(test_ids) == 4
+                assert train_ids.isdisjoint(test_ids)
+                assert {label.source for label in train_labels} == {expected_source}
+                assert {label.source for label in test_labels} == {"home"}
+                assert len(test_labels) == 12
+                if name.endswith("learnable"):
+                    assert search.optimized_pipeline_.algorithm.state_means.shape == (2, 3)
+                    for split in range(2):
+                        for inner_train, inner_test in zip(
+                            search.cv_results_[f"split{split}__train__data_labels"],
+                            search.cv_results_[f"split{split}__test__data_labels"],
+                            strict=True,
+                        ):
+                            inner_train_ids = {label.participant for label in inner_train}
+                            inner_test_ids = {label.participant for label in inner_test}
+                            assert inner_train_ids.isdisjoint(inner_test_ids)
+                            assert inner_train_ids | inner_test_ids == train_ids
+                            assert {label.source for label in inner_train + inner_test} == {expected_source}
+                else:
+                    assert not hasattr(search.optimized_pipeline_.algorithm, "self_optimize")
+                    assert len(search.gs_results_["params"]) == 3
+                    assert {p["algorithm__threshold"] for p in search.gs_results_["params"]} == {0.7, 0.9, 1.1}
+    assert searches["learnable"].pipeline.algorithm.state_means is None
