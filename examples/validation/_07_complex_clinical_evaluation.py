@@ -4,10 +4,8 @@ r"""
 A complete hospital-to-home evaluation
 ======================================
 
-This is a runnable version of the study outlined in the README, using generated
-sensor streams and toy algorithms. It needs only tpcp's core dependencies. Run
-``uv run python examples/validation/_07_complex_clinical_evaluation.py``
-from the repository root, or copy the file into a project with tpcp installed.
+This example implements the study outlined in the README using generated
+sensor streams and toy algorithms.
 
 We compare hospital-to-home and home-to-home generalization to **unseen
 participants**. We show both a single participant train/test split and

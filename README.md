@@ -54,11 +54,6 @@ With `tpcp` we want to provide a flexible framework to approach such complex pro
 See the [complete hospital-to-home evaluation example](https://tpcp.readthedocs.io/en/latest/auto_examples/validation/_07_complex_clinical_evaluation.html)
 for a runnable version with dummy sensor data, participant metadata and daily annotations, a toy HMM and comparison
 algorithm, and both a participant-wise train/test split and nested cross-validation for outer evaluation.
-Run it from this repository with:
-
-```bash
-uv run python examples/validation/_07_complex_clinical_evaluation.py
-```
 
 ## How?
 
