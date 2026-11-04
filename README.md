@@ -51,7 +51,7 @@ sources per participant, a non-traditional ML algorithm, and a complex train-tes
 
 With `tpcp` we want to provide a flexible framework to approach such complex problems with structure and confidence.
 
-See the [complete hospital-to-home evaluation example](https://tpcp.readthedocs.io/en/latest/auto_examples/validation/_07_complex_clinical_evaluation.html)
+See the [complete hospital-to-home evaluation example](https://tpcp.readthedocs.io/en/latest/auto_examples/validation/_08_complex_clinical_evaluation.html)
 for a walkthrough of the question: do we need labeled home data to build an algorithm that works at home?
 It uses dummy recordings and algorithms to compare hospital-only and home-data development, with participant-wise
 hyperparameter tuning, a single outer train/test split, and outer cross-validation.

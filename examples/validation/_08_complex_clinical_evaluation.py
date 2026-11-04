@@ -58,7 +58,6 @@ from tpcp import (
 )
 from tpcp.optimize import GridSearch, GridSearchCV, Optimize
 from tpcp.validate import (
-    BaseDatasetSplitter,
     DatasetSplitter,
     Scorer,
     cross_validate,
@@ -176,13 +175,17 @@ class DummySmoothedDetector(Algorithm):
         self.window_size = window_size
         self.threshold = threshold
 
-    def detect(self, data: pd.DataFrame) -> Self:
-        """Threshold a smoothed signal."""
-        signal = (
+    def smooth(self, data: pd.DataFrame) -> pd.Series:
+        """Apply the same preprocessing during fitting and prediction."""
+        return (
             data.mean(axis=1)
             .rolling(self.window_size, center=True, min_periods=1)
             .mean()
         )
+
+    def detect(self, data: pd.DataFrame) -> Self:
+        """Threshold a smoothed signal."""
+        signal = self.smooth(data)
         self.states_ = (signal.to_numpy() > self.threshold).astype(int)
         return self
 
@@ -246,7 +249,8 @@ class EventPipeline(Pipeline[ClinicalDataset]):
 # This separation follows mobgap's wear-time trainers: detectors own inference
 # parameters, trainers own fitting, and splitters decide which data they see.
 # ``OptimizableParameter`` marks the nested threshold as a value fitting may
-# change. The window size stays fixed during a fit. See
+# change. The window size stays fixed during a fit and controls the smoothing
+# used to estimate the threshold, so it affects the fitted model. See
 # :ref:`optimize_pipelines` and the :ref:`optimization guide <optimization>` for
 # these conventions.
 
@@ -259,7 +263,9 @@ class DummyDetectorTrainer(EventPipeline, OptimizablePipeline[ClinicalDataset]):
 
     def self_optimize(self, dataset: ClinicalDataset, **_kwargs) -> Self:
         """Fit a cloned detector using the supplied training recordings."""
-        signals = np.concatenate([d.data.to_numpy() for d in dataset])
+        signals = np.concatenate(
+            [self.algorithm.smooth(d.data).to_numpy() for d in dataset]
+        )
         labels = np.concatenate([d.reference_states for d in dataset])
         background_mean = signals[labels == 0].mean()
         event_mean = signals[labels == 1].mean()
@@ -337,6 +343,7 @@ def score(
 # stay outside testing.
 #
 # Each entry below carries its pipeline or trainer, search space, and scorer.
+# The ``algorithm__...`` search keys address parameters on the nested detector.
 # ``return_optimized="f1"`` ranks candidates by F1 and makes the selected
 # pipeline available as ``optimized_pipeline_``. Evaluation code can treat both
 # optimizers identically, without checking algorithm types.
@@ -382,51 +389,25 @@ validate(
 # %%
 # Select participants and recording sources in the splitter
 # ---------------------------------------------------------
-# Now define the experiment through its splitters, rather than changing the
-# trainer. Every participant's hospital visit and home days must stay on one
-# side of a split. After participant assignment, select hospital or home
-# training recordings and always select home test recordings.
+# :class:`~tpcp.validate.DatasetSplitter` first assigns recordings to folds,
+# keeping each participant's recordings together. Its ``train_selector`` and
+# ``test_selector`` then select recordings from their respective assigned sides.
+# Selecting a source cannot introduce a held-out participant into training.
 #
-# The built-in :class:`~tpcp.validate.DatasetSplitter` owns participant
-# splitting. The adapter below adds only the source filter. Native splitters
-# yield dataset group labels, so it can select recordings through ``get_subset``
-# without manipulating sample arrays or positional indices.
-#
-# Subclassing :class:`~tpcp.validate.BaseDatasetSplitter` makes this custom rule
-# usable by the standard evaluation tools. For fixed assignments or selection
-# before splitting, see :class:`~tpcp.validate.NoSplit` and
-# :class:`~tpcp.validate.SubsetSplitter`;
-# :class:`~tpcp.validate.CombinedSplitter` combines rules for multiple subsets.
+# These selectors define the experiment. Neither trainer nor algorithm needs
+# to know whether we are developing on hospital or home recordings. For an
+# example that retains all training tests and selects only one evaluation test,
+# see :ref:`participant_test_selection`.
 
 
-class RecordingSourceSplitter(BaseDatasetSplitter):
-    """Filter the two sides of a participant-wise split by recording source."""
+def hospital_recordings(data: ClinicalDataset) -> ClinicalDataset:
+    """Select hospital recordings from an already assigned fold side."""
+    return data.get_subset(source="hospital")
 
-    def __init__(
-        self,
-        splitter: DatasetSplitter,
-        train_source: str,
-        test_source: str = "home",
-    ):
-        self.splitter = splitter
-        self.train_source = train_source
-        self.test_source = test_source
 
-    def get_n_splits(self, dataset: ClinicalDataset) -> int:
-        """Delegate the fold count to the participant splitter."""
-        return self.splitter.get_n_splits(dataset)
-
-    def split(self, dataset: ClinicalDataset, n_splits: int | None = None):
-        """Select sources after assigning participants to folds."""
-        for train, test in self.splitter.split(dataset, n_splits=n_splits):
-            yield (
-                dataset.get_subset(group_labels=train)
-                .get_subset(source=self.train_source)
-                .group_labels,
-                dataset.get_subset(group_labels=test)
-                .get_subset(source=self.test_source)
-                .group_labels,
-            )
+def home_recordings(data: ClinicalDataset) -> ClinicalDataset:
+    """Select home recordings from an already assigned fold side."""
+    return data.get_subset(source="home")
 
 
 # %%
@@ -451,26 +432,26 @@ participant_holdout = DatasetSplitter(
 experiments = {
     "hospital_to_home_learnable": (
         searches["learnable"],
-        RecordingSourceSplitter(
-            participant_holdout.clone(), train_source="hospital"
+        participant_holdout.clone().set_params(
+            train_selector=hospital_recordings, test_selector=home_recordings
         ),
     ),
     "home_to_home_learnable": (
         searches["learnable"],
-        RecordingSourceSplitter(
-            participant_holdout.clone(), train_source="home"
+        participant_holdout.clone().set_params(
+            train_selector=home_recordings, test_selector=home_recordings
         ),
     ),
     "hospital_to_home_baseline": (
         searches["baseline"],
-        RecordingSourceSplitter(
-            participant_holdout.clone(), train_source="hospital"
+        participant_holdout.clone().set_params(
+            train_selector=hospital_recordings, test_selector=home_recordings
         ),
     ),
     "home_to_home_baseline": (
         searches["baseline"],
-        RecordingSourceSplitter(
-            participant_holdout.clone(), train_source="home"
+        participant_holdout.clone().set_params(
+            train_selector=home_recordings, test_selector=home_recordings
         ),
     ),
 }
@@ -507,8 +488,8 @@ holdout_table[score_columns]
 # -----------------------------------------------
 # Change only the participant splitter to three-fold grouped CV. tpcp's
 # ``clone().set_params(...)`` creates a new configuration while preserving the
-# single-split experiment. The ``splitter__base_splitter`` path updates a nested
-# parameter; the participant grouping and source selectors stay in place.
+# single-split experiment. Updating ``base_splitter`` changes the fold strategy;
+# participant grouping and source selectors stay in place.
 # :func:`~tpcp.validate.cross_validate` clones each optimizer and runs the full
 # search within each outer training fold. Every participant's home days are
 # tested exactly once per experimental configuration.
@@ -516,7 +497,7 @@ holdout_table[score_columns]
 cv_experiments = {
     name: (
         search,
-        splitter.clone().set_params(splitter__base_splitter=3),
+        splitter.clone().set_params(base_splitter=3),
     )
     for name, (search, splitter) in experiments.items()
 }

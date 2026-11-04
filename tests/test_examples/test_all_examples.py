@@ -249,7 +249,7 @@ def test_warning_error_context_example():
 
 def test_complex_clinical_evaluation():
     """Both development sources evaluate identical unseen participants at home."""
-    from examples.validation._07_complex_clinical_evaluation import (
+    from examples.validation._08_complex_clinical_evaluation import (
         cv_results,
         dataset,
         holdout_results,
