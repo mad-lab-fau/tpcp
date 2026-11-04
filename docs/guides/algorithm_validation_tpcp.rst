@@ -88,6 +88,43 @@ A couple of things you should keep in mind:
 
 If you use multiprocessing via `n_jobs`, also review :ref:`multiprocessing_caveats`.
 
+.. _per_side_subset_selection:
+
+Select subsets after fold assignment
+------------------------------------
+Use :class:`~tpcp.validate.DatasetSplitter` to assign related recordings together
+and optionally select a different subset on each side. Its ``train_selector`` and
+``test_selector`` callbacks receive only the Dataset assigned to their respective
+side of each fold, after the base splitter applies grouping and stratification.
+Each callback returns a Dataset with group labels from that side. Returning labels
+outside the assigned side raises ``ValueError`` to prevent cross-fold leakage.
+``None`` keeps that side unchanged. Selected labels follow the returned Dataset's
+order; without a selector, the base splitter's order is preserved.
+
+Keep one datapoint per recording and pass ``groupby="participant"`` or
+``groupby="device"`` to the splitter to keep related recordings together.
+This differs from ``Dataset.groupby``, which merges index rows into datapoints.
+If one grouped datapoint contains several test types or sources, selecting some
+rows still returns its group label. Consumers select the whole original datapoint
+by that label, so this cannot represent selecting half of a grouped datapoint.
+
+For example, retain all tests of training participants and evaluate only their
+held-out counterparts' continuous walking tests. Leave ``train_selector`` unset
+and set only ``test_selector``. Training then includes its participants' continuous
+walking tests too; every recording of the held-out participants stays out of
+training. See :ref:`participant_test_selection` for an executable example.
+
+These selectors define the experimental protocol. They do not augment data or
+replace an optimizer's ``train_dataset_transform``. Pipelines and training code
+can remain independent of recording sources and test types. Selectors run once
+per requested fold on each configured side; ``get_n_splits`` does not call them.
+
+:class:`~tpcp.validate.SubsetSplitter` instead selects before splitting.
+:class:`~tpcp.validate.CombinedSplitter` unions its children's train contributions;
+adding a train-only :class:`~tpcp.validate.NoSplit` child cannot remove recordings
+already assigned to training by another child. ``NoSplit`` repeats a fixed
+assignment and does not rotate participant folds.
+
 Custom Scoring
 --------------
 In tpcp we assume that your problem is likely complex enough to require a custom scoring function.
