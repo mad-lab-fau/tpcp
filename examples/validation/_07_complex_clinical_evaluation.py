@@ -121,8 +121,13 @@ class ClinicalDataset(Dataset):
 
 
 dataset = ClinicalDataset()
-print(dataset.index.head())
-print(dataset[0].metadata, dataset[0].daily_annotations)
+dataset.index.head()
+
+# %%
+dataset[0].metadata
+
+# %%
+dataset[0].daily_annotations
 
 # %%
 # Two interchangeable dummy algorithms
@@ -388,8 +393,13 @@ recording_results = pd.DataFrame(recording_rows)
 summary = fold_results.groupby(["evaluation", "train_source", "algorithm"])[
     "f1"
 ].agg(["mean", "std"])
-print(fold_results.to_string(index=False))
-print(summary)
+fold_results
+
+# %%
+recording_results
+
+# %%
+summary
 
 # %%
 # These scores describe generated data only. For a real study, replace the data
