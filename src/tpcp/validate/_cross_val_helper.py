@@ -1,12 +1,22 @@
 import numbers
 import warnings
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from itertools import islice
 
 from sklearn.model_selection import BaseCrossValidator, GroupKFold, StratifiedGroupKFold, StratifiedKFold, check_cv
 
 from tpcp import BaseTpcpObject, Dataset
 from tpcp._dataset import GroupLabelT
+
+DatasetSelector = Callable[[Dataset], Dataset]
+
+
+def _validate_subset(parent: Dataset, selected: Dataset) -> list[GroupLabelT]:
+    """Require selected group labels to exist in the input dataset."""
+    labels = selected.group_labels
+    if not set(labels).issubset(parent.group_labels):
+        raise ValueError("Selector returned a subset containing a group outside its input dataset.")
+    return labels
 
 
 class BaseDatasetSplitter(BaseTpcpObject):
@@ -87,6 +97,21 @@ class DatasetSplitter(BaseDatasetSplitter):
         If they are not supported, but you provided groupby or stratify columns, we will warn you.
         Note, that this warning is not a perfect check, as it is not possible to detect all cases.
         If you know what you are doing, and you want to disable this warning, set this parameter to True.
+    train_selector, test_selector
+        Optional callables receiving only the training or test Dataset assigned by the base splitter
+        in each fold. Each returns a Dataset whose group labels are a subset of that side's labels;
+        labels outside that side raise ``ValueError``. ``None`` keeps the assigned side unchanged.
+        Selection happens after grouping and stratification. Selected labels retain selector output order.
+
+    Notes
+    -----
+    Selectors select existing Dataset datapoints/groups, not individual rows within a grouped datapoint.
+    Keep one datapoint per recording and use ``DatasetSplitter(groupby="device")`` or
+    ``groupby="participant"`` to assign related recordings together before selecting sources per side.
+    If ``Dataset.groupby`` merges multiple source rows into one datapoint, selecting some of those rows
+    still yields the whole original datapoint when a consumer selects it by group label.
+    Selectors define the experimental protocol; they do not transform training data or change the
+    interfaces of pipelines and optimizers.
     """
 
     def __init__(
@@ -96,7 +121,11 @@ class DatasetSplitter(BaseDatasetSplitter):
         groupby: str | list[str] | None = None,
         stratify: str | list[str] | None = None,
         ignore_potentially_invalid_splitter_warning: bool = False,
+        train_selector: DatasetSelector | None = None,
+        test_selector: DatasetSelector | None = None,
     ):
+        self.train_selector = train_selector
+        self.test_selector = test_selector
         self.base_splitter = base_splitter
         self.stratify = stratify
         self.groupby = groupby
@@ -159,7 +188,7 @@ class DatasetSplitter(BaseDatasetSplitter):
     def split(
         self, dataset: Dataset, n_splits: int | None = None
     ) -> Iterator[tuple[list[GroupLabelT], list[GroupLabelT]]]:
-        """Yield train and test group labels, in the order returned by the base splitter."""
+        """Yield group labels in base-splitter order, or selector output order when provided."""
         labels = dataset.group_labels
         folds = self._get_splitter().split(
             dataset, y=self._get_labels(dataset, self.stratify), groups=self._get_labels(dataset, self.groupby)
@@ -167,7 +196,15 @@ class DatasetSplitter(BaseDatasetSplitter):
         if n_splits is not None:
             folds = islice(folds, _requested_fold_count(n_splits, self.get_n_splits(dataset)))
         for train, test in folds:
-            yield [labels[i] for i in train], [labels[i] for i in test]
+            train_labels = [labels[i] for i in train]
+            test_labels = [labels[i] for i in test]
+            if self.train_selector is not None:
+                train_subset = dataset.get_subset(group_labels=train_labels)
+                train_labels = _validate_subset(train_subset, self.train_selector(train_subset))
+            if self.test_selector is not None:
+                test_subset = dataset.get_subset(group_labels=test_labels)
+                test_labels = _validate_subset(test_subset, self.test_selector(test_subset))
+            yield train_labels, test_labels
 
     def get_n_splits(self, dataset: Dataset) -> int:
         """Get the number of splits."""

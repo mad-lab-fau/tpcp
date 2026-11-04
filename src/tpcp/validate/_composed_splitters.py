@@ -1,21 +1,17 @@
 """Dataset-subset selection and composition for label-based cross-validation splitters."""
 
 import numbers
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 
 from tpcp import Dataset
 from tpcp._dataset import GroupLabelT
-from tpcp.validate._cross_val_helper import BaseDatasetSplitter, _normalize_splitter, _requested_fold_count
-
-DatasetSelector = Callable[[Dataset], Dataset]
-
-
-def _validate_subset(parent: Dataset, selected: Dataset) -> list[GroupLabelT]:
-    """Require selected group labels to exist in the input dataset."""
-    labels = selected.group_labels
-    if not set(labels).issubset(parent.group_labels):
-        raise ValueError("Selector returned a subset containing a group outside its input dataset.")
-    return labels
+from tpcp.validate._cross_val_helper import (
+    BaseDatasetSplitter,
+    DatasetSelector,
+    _normalize_splitter,
+    _requested_fold_count,
+    _validate_subset,
+)
 
 
 def _selected_labels(dataset: Dataset, selector: DatasetSelector | None) -> list[GroupLabelT]:
