@@ -15,16 +15,32 @@ learnable algorithm through a trainer, search hyperparameters, evaluate a single
 participant-wise train/test split, and finally use outer cross-validation.
 Dummy sensor recordings keep the example focused on the evaluation structure.
 Their results cannot answer the clinical research question.
+
+The tpcp approach is to give each layer one job. A :class:`~tpcp.Dataset`
+provides recordings and labels. An :class:`~tpcp.Algorithm` processes a signal,
+and a :class:`~tpcp.Pipeline` connects it to the dataset. Optimizers wrap
+fitting and parameter selection. :func:`~tpcp.validate.cross_validate`
+evaluates the whole procedure. These layers compose, so changing an algorithm
+does not require rewriting the evaluation.
+
+For background, see the :ref:`dataset and pipeline guide
+<datasets_algorithms_pipelines>` and the :ref:`evaluation guide
+<algorithm_evaluation>`.
 """  # noqa: D400
 
 # %%
 # Recordings, metadata, and annotations
 # -------------------------------------
-# One index row describes a recording, not a sensor sample. Each participant has
-# one hospital visit and three home days. Properties load the corresponding
-# time series, global metadata, and daily annotations on demand. Real datasets
-# would read files here. The signal has three channels and variable lengths;
-# the index remains a small table describing these non-tabular data.
+# Start with a :class:`~tpcp.Dataset`. Its index lists the available recordings;
+# the recordings themselves can be arbitrary Python objects. Here each row
+# identifies a participant, a source, and a day. Sensor arrays do not need to be
+# flattened into a table to use tpcp's selection and evaluation tools.
+#
+# Properties provide data, participant metadata, and annotations on demand. In a
+# real dataset they would load files. The generator below supplies three sensor
+# channels, two annotated event periods, and noisier home recordings. See
+# :ref:`custom_dataset_basics` for indexing, subsets, and grouping, and
+# :ref:`custom_dataset_ecg` for a dataset backed by real recordings.
 
 from typing import Self
 
@@ -122,6 +138,12 @@ dataset = ClinicalDataset()
 dataset.index.head()
 
 # %%
+# Selecting one row returns another dataset object with the same properties.
+# Access the sensor samples without changing the representation of the index.
+dataset[0].data.head()
+
+# %%
+# Participant metadata and recording annotations remain separate properties.
 dataset[0].metadata
 
 # %%
@@ -130,26 +152,29 @@ dataset[0].daily_annotations
 # %%
 # Two interchangeable dummy algorithms
 # ------------------------------------
-# The first algorithm learns a threshold from annotated training recordings
-# and has a tunable smoothing window. The second has no training step, but its
-# fixed threshold can still be selected by hyperparameter search.
-# Learned values are constructor parameters so tpcp cloning preserves them.
-# At inference time, both algorithms receive only sensor data.
+# An :class:`~tpcp.Algorithm` keeps configuration in constructor parameters and
+# writes results to attributes ending in ``_``. ``_action_methods`` declares the
+# method that produces those results. tpcp supplies ``clone()``,
+# ``get_params()``, and ``set_params()`` for composing and configuring objects.
+# See :ref:`custom_algorithms_qrs_detection` for a complete algorithm example.
+#
+# We use two small detectors. One smooths the signal and uses a threshold fitted
+# from labeled recordings. Its window size is a hyperparameter. The baseline
+# uses a fixed threshold, which can still be selected by hyperparameter search.
+# Neither detector needs to know where recordings or labels are stored.
 
 
 class DummySmoothedDetector(Algorithm):
     """Dummy detector with a tunable smoothing window."""
 
     _action_methods = "detect"
-    state_means: OptimizableParameter[np.ndarray | None]
+    threshold: Parameter[float | None]
     states_: np.ndarray
     window_size: Parameter[int]
 
-    def __init__(
-        self, window_size: int = 5, state_means: np.ndarray | None = None
-    ):
+    def __init__(self, window_size: int = 5, threshold: float | None = None):
         self.window_size = window_size
-        self.state_means = state_means
+        self.threshold = threshold
 
     def detect(self, data: pd.DataFrame) -> Self:
         """Threshold a smoothed signal."""
@@ -158,7 +183,7 @@ class DummySmoothedDetector(Algorithm):
             .rolling(self.window_size, center=True, min_periods=1)
             .mean()
         )
-        self.states_ = (signal.to_numpy() > self.state_means.mean()).astype(int)
+        self.states_ = (signal.to_numpy() > self.threshold).astype(int)
         return self
 
 
@@ -180,17 +205,16 @@ class DummyThresholdDetector(Algorithm):
 
 
 # %%
-# One pipeline and scorer for both detectors
-# ------------------------------------------
-# Both detectors use the same prediction pipeline. A trainer subclass adds
-# a training step that changes only ``state_means``. Hyperparameters remain
-# fixed during each fit. Clone before training and inference to isolate runs.
+# Connect a detector to a dataset
+# -------------------------------
+# A :class:`~tpcp.Pipeline` defines ``run(datapoint)``. Our detector accepts a
+# DataFrame, so the pipeline reads ``datapoint.data`` and passes it to the
+# detector. Both detectors use this same adapter and produce the same output.
+# Reference labels are absent from this inference path.
 #
-# We score the event state per sample, then average recording scores. These are
-# segmentation scores, not event matching scores. For real event detection,
-# replace this scorer with event matching and a tolerance appropriate to the
-# task.
-# Every participant contributes three home days, so they have equal weight.
+# Clone the detector before running it. Each recording then gets an independent
+# result object, while constructor parameters, including fitted values, survive
+# cloning. See :ref:`general_concepts` for parameters, results, and cloning.
 
 
 class EventPipeline(Pipeline[ClinicalDataset]):
@@ -210,21 +234,37 @@ class EventPipeline(Pipeline[ClinicalDataset]):
         return self
 
 
+# %%
+# Add fitting with a trainer
+# --------------------------
+# An :class:`~tpcp.OptimizablePipeline` adds ``self_optimize(dataset)``. Here a
+# trainer subclasses the inference pipeline, fits a cloned detector, and stores
+# that detector as its ``algorithm`` parameter. It can therefore run through the
+# same prediction interface after training, or hand the detector to an ordinary
+# ``EventPipeline``.
+#
+# This separation follows mobgap's wear-time trainers: detectors own inference
+# parameters, trainers own fitting, and splitters decide which data they see.
+# ``OptimizableParameter`` marks the nested threshold as a value fitting may
+# change. The window size stays fixed during a fit. See
+# :ref:`optimize_pipelines` and the :ref:`optimization guide <optimization>` for
+# these conventions.
+
+
 class DummyDetectorTrainer(EventPipeline, OptimizablePipeline[ClinicalDataset]):
     """Fit a detector and reuse the normal prediction pipeline."""
 
     algorithm: Parameter[DummySmoothedDetector]
-    algorithm__state_means: OptimizableParameter[np.ndarray | None]
+    algorithm__threshold: OptimizableParameter[float | None]
 
     def self_optimize(self, dataset: ClinicalDataset, **_kwargs) -> Self:
         """Fit a cloned detector using the supplied training recordings."""
         signals = np.concatenate([d.data.to_numpy() for d in dataset])
         labels = np.concatenate([d.reference_states for d in dataset])
-        state_means = np.stack(
-            [signals[labels == state].mean(axis=0) for state in (0, 1)]
-        )
+        background_mean = signals[labels == 0].mean()
+        event_mean = signals[labels == 1].mean()
         self.algorithm = self.algorithm.clone().set_params(
-            state_means=state_means
+            threshold=float((background_mean + event_mean) / 2)
         )
         return self
 
@@ -232,11 +272,12 @@ class DummyDetectorTrainer(EventPipeline, OptimizablePipeline[ClinicalDataset]):
 # %%
 # Train and run on a few recordings
 # ---------------------------------
-# Start with the innermost operation. The trainer owns fitting, while the
-# detector owns prediction and its learned parameters. After fitting, the
-# detector can run independently of the trainer. The baseline runs directly.
-# These recordings demonstrate the interfaces; this is not a performance
-# estimate. The outer evaluations below start with fresh, untrained objects.
+# Start with one hospital recording. The baseline can run immediately.
+# :class:`~tpcp.optimize.Optimize` calls the trainer's ``self_optimize`` on the
+# supplied training dataset and exposes the result as ``optimized_pipeline_``.
+# Extracting its ``algorithm`` gives a detector that can run on its own. These
+# recordings demonstrate the interfaces; this is not a performance estimate. The
+# outer evaluations below start with fresh, untrained objects.
 
 demo_train = dataset.get_subset(participant=[0, 1, 2, 3], source="hospital")
 datapoint = demo_train[0]
@@ -248,7 +289,7 @@ trainer = Optimize(DummyDetectorTrainer(DummySmoothedDetector())).optimize(
     demo_train
 )
 learned_detector = trainer.optimized_pipeline_.algorithm
-learned_detector.state_means
+learned_detector.threshold
 
 # %%
 learned_detector.detect(datapoint.data).states_[:20]
@@ -256,8 +297,14 @@ learned_detector.detect(datapoint.data).states_[:20]
 # %%
 # Score predictions
 # -----------------
-# Both algorithms use the same prediction pipeline and scorer. Training and
-# hyperparameter search do not belong in the scoring function.
+# A scoring function receives a pipeline and one recording. It runs prediction,
+# then compares the result with the reference labels. Returning a dictionary
+# lets tpcp retain several metrics while optimizing one of them.
+#
+# :class:`~tpcp.validate.Scorer` applies this function across a dataset and
+# aggregates the results. We use per-sample F1, precision, and recall; a real
+# event-detection study might use event matching instead. For scoring and custom
+# aggregation, see :ref:`validation_example` and :ref:`custom_scorer`.
 
 
 def score(
@@ -276,17 +323,23 @@ def score(
 # %%
 # Search hyperparameters on training data
 # ---------------------------------------
-# Next, wrap the inner training operation in hyperparameter search. The
-# learnable detector uses GridSearchCV with participant-wise inner folds.
-# GridSearchCV fits each candidate on inner training participants, scores it on
-# inner validation participants, and refits the winner on all supplied data.
-# The baseline has no fit step, so GridSearch selects its threshold directly
-# on the supplied recordings. Both return a pipeline with the same run API.
-
-# All configuration lives here. The learnable algorithm uses a trainer and
-# participant-wise inner CV. The non-learnable algorithm needs no fitting, but
-# its threshold is still selected using labeled training data. Both optimizers
-# expose the same interface to the outer evaluation.
+# In tpcp, both fitting and parameter search are optimization: each produces a
+# configured pipeline. :class:`~tpcp.optimize.GridSearchCV` fits the trainer on
+# inner training participants, scores candidates on inner validation
+# participants, and refits the winner on all supplied training recordings.
+# :class:`~tpcp.validate.DatasetSplitter` keeps participants together when
+# ``groupby="participant"`` is set. See :ref:`gridsearch_cv` for this inner
+# loop.
+#
+# The baseline has no fitting step. :class:`~tpcp.optimize.GridSearch` can
+# select its threshold directly on the development recordings; see
+# :ref:`grid_search`. Its use of labels still counts as development and must
+# stay outside testing.
+#
+# Each entry below carries its pipeline or trainer, search space, and scorer.
+# ``return_optimized="f1"`` ranks candidates by F1 and makes the selected
+# pipeline available as ``optimized_pipeline_``. Evaluation code can treat both
+# optimizers identically, without checking algorithm types.
 searches = {
     "learnable": GridSearchCV(
         pipeline=DummyDetectorTrainer(DummySmoothedDetector()),
@@ -314,8 +367,10 @@ pd.DataFrame(
 )
 
 # %%
-# The selected pipeline can now predict a recording. These are training
-# recordings, so this score is only an interface demonstration.
+# ``best_params_`` reports the selected configuration above.
+# :func:`~tpcp.validate.validate` below scores the selected pipeline without
+# fitting it. These are still development recordings, so this score is only an
+# interface demonstration, not an estimate of generalization.
 
 validate(
     demo_searches["learnable"].optimized_pipeline_,
@@ -327,14 +382,21 @@ validate(
 # %%
 # Select participants and recording sources in the splitter
 # ---------------------------------------------------------
-# Every inner and outer split groups by participant. Source selection is a
-# separate step: training uses either hospital or home recordings, while
-# testing always uses home recordings.
+# Now define the experiment through its splitters, rather than changing the
+# trainer. Every participant's hospital visit and home days must stay on one
+# side of a split. After participant assignment, select hospital or home
+# training recordings and always select home test recordings.
 #
-# DatasetSplitter handles the participant assignments. The small adapter below
-# only filters each side by source afterwards. It implements the native
-# BaseDatasetSplitter interface so cross_validate can handle the entire outer
-# evaluation. The trainer and algorithms never select their own training data.
+# The built-in :class:`~tpcp.validate.DatasetSplitter` owns participant
+# splitting. The adapter below adds only the source filter. Native splitters
+# yield dataset group labels, so it can select recordings through ``get_subset``
+# without manipulating sample arrays or positional indices.
+#
+# Subclassing :class:`~tpcp.validate.BaseDatasetSplitter` makes this custom rule
+# usable by the standard evaluation tools. For fixed assignments or selection
+# before splitting, see :class:`~tpcp.validate.NoSplit` and
+# :class:`~tpcp.validate.SubsetSplitter`;
+# :class:`~tpcp.validate.CombinedSplitter` combines rules for multiple subsets.
 
 
 class RecordingSourceSplitter(BaseDatasetSplitter):
@@ -370,6 +432,12 @@ class RecordingSourceSplitter(BaseDatasetSplitter):
 # %%
 # Evaluate one outer train/test split
 # -----------------------------------
+# :func:`~tpcp.validate.cross_validate` wraps the *whole optimizer*, not just
+# the trained detector. It selects the outer training data, runs the search
+# there, and scores the resulting pipeline on the outer test data. A splitter
+# with one split gives a conventional train/test evaluation through that same
+# interface. See :ref:`cross_validation` for the evaluation API.
+#
 # A single grouped shuffle split holds out four participants. All experimental
 # configurations reuse the same assignments, so their home test recordings are
 # identical. Only the source of development labels changes between the two
@@ -407,8 +475,8 @@ experiments = {
     ),
 }
 
-# Each entry contains its optimizer and splitter. Adding another method does
-# not require changing any evaluation code or checking algorithm types.
+# Each entry contains its optimizer and splitter. Adding another method does not
+# require changing any evaluation code or checking algorithm types.
 outer_scorer = Scorer(score, progress_bar=False)
 holdout_results = {
     name: cross_validate(
@@ -421,31 +489,34 @@ holdout_results = {
     )
     for name, (search, splitter) in experiments.items()
 }
-pd.concat(
-    {name: pd.DataFrame(result) for name, result in holdout_results.items()}
-)[
-    [
-        "test__agg__f1",
-        "test__agg__precision",
-        "test__agg__recall",
-        "test__data_labels",
-    ]
+# Each row below is one outer split. ``test__agg__...`` contains the mean
+# recording score, and ``test__data_labels`` identifies the tested recordings.
+score_columns = [
+    "test__agg__f1",
+    "test__agg__precision",
+    "test__agg__recall",
+    "test__data_labels",
 ]
+holdout_table = pd.concat(
+    {name: pd.DataFrame(result) for name, result in holdout_results.items()}
+)
+holdout_table[score_columns]
 
 # %%
 # Extend the outer evaluation to cross-validation
 # -----------------------------------------------
-# Change only the participant splitter to three-fold grouped CV. Source
-# selectors and optimizers stay the same. cross_validate clones each optimizer
-# and runs the full search within each outer training fold. Every participant's
-# home days are tested exactly once per experimental configuration.
+# Change only the participant splitter to three-fold grouped CV. tpcp's
+# ``clone().set_params(...)`` creates a new configuration while preserving the
+# single-split experiment. The ``splitter__base_splitter`` path updates a nested
+# parameter; the participant grouping and source selectors stay in place.
+# :func:`~tpcp.validate.cross_validate` clones each optimizer and runs the full
+# search within each outer training fold. Every participant's home days are
+# tested exactly once per experimental configuration.
 
 cv_experiments = {
     name: (
         search,
-        splitter.clone().set_params(
-            splitter=DatasetSplitter(3, groupby="participant")
-        ),
+        splitter.clone().set_params(splitter__base_splitter=3),
     )
     for name, (search, splitter) in experiments.items()
 }
@@ -463,27 +534,26 @@ cv_results = {
 cv_result_table = pd.concat(
     {name: pd.DataFrame(result) for name, result in cv_results.items()}
 )
-cv_result_table[
-    [
-        "test__agg__f1",
-        "test__agg__precision",
-        "test__agg__recall",
-        "test__data_labels",
-    ]
-]
+cv_result_table[score_columns]
 
 # %%
-# tpcp retains recording scores, data labels, and fitted optimizers. These
-# scores average recordings; every participant has three home days, so all
-# participants have equal weight. The standard deviation across three folds
-# below is descriptive, not a confidence interval. Keep the single-split and
+# The result also retains ``test__single__f1`` for individual recording scores.
+# With ``return_optimizer=True``, ``optimizer`` holds each fitted outer-fold
+# search, including its ``best_params_`` and inner search results. These scores
+# average recordings; every participant has three home days, so all participants
+# have equal weight. The standard deviation across three folds below is
+# descriptive, not a confidence interval. Keep the single-split and
 # cross-validation results separate.
 
 cv_result_table.groupby(level=0)["test__agg__f1"].agg(["mean", "std"])
 
 # %%
+# Inspect an individual fold's selected configuration without fitting again.
+cv_results["hospital_to_home_learnable"]["optimizer"][0].best_params_
+
+# %%
 # With real data, the paired held-out home results would let us assess whether
-# home labels improve performance over hospital-only development. The dummy
-# data cannot establish that conclusion. To fit a deployment detector, repeat
-# its configured search on all development participants from the chosen source.
+# home labels improve performance over hospital-only development. The dummy data
+# cannot establish that conclusion. To fit a deployment detector, repeat its
+# configured search on all development participants from the chosen source.
 # Report held-out performance rather than its development score.

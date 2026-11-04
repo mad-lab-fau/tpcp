@@ -288,7 +288,7 @@ def test_complex_clinical_evaluation():
                 assert {label.source for label in test_labels} == {"home"}
                 assert len(test_labels) == 12
                 if name.endswith("learnable"):
-                    assert search.optimized_pipeline_.algorithm.state_means.shape == (2, 3)
+                    assert np.isfinite(search.optimized_pipeline_.algorithm.threshold)
                     for split in range(2):
                         for inner_train, inner_test in zip(
                             search.cv_results_[f"split{split}__train__data_labels"],
@@ -304,4 +304,4 @@ def test_complex_clinical_evaluation():
                     assert not hasattr(search.optimized_pipeline_.algorithm, "self_optimize")
                     assert len(search.gs_results_["params"]) == 3
                     assert {p["algorithm__threshold"] for p in search.gs_results_["params"]} == {0.7, 0.9, 1.1}
-    assert searches["learnable"].pipeline.algorithm.state_means is None
+    assert searches["learnable"].pipeline.algorithm.threshold is None
