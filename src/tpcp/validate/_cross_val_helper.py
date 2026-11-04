@@ -11,10 +11,10 @@ from tpcp._dataset import GroupLabelT
 DatasetSelector = Callable[[Dataset], Dataset]
 
 
-def _validate_subset(parent: Dataset, selected: Dataset) -> list[GroupLabelT]:
+def _validate_subset(parent_labels: list[GroupLabelT], selected: Dataset) -> list[GroupLabelT]:
     """Require selected group labels to exist in the input dataset."""
     labels = selected.group_labels
-    if not set(labels).issubset(parent.group_labels):
+    if not set(labels).issubset(parent_labels):
         raise ValueError("Selector returned a subset containing a group outside its input dataset.")
     return labels
 
@@ -200,10 +200,10 @@ class DatasetSplitter(BaseDatasetSplitter):
             test_labels = [labels[i] for i in test]
             if self.train_selector is not None:
                 train_subset = dataset.get_subset(group_labels=train_labels)
-                train_labels = _validate_subset(train_subset, self.train_selector(train_subset))
+                train_labels = _validate_subset(train_labels, self.train_selector(train_subset))
             if self.test_selector is not None:
                 test_subset = dataset.get_subset(group_labels=test_labels)
-                test_labels = _validate_subset(test_subset, self.test_selector(test_subset))
+                test_labels = _validate_subset(test_labels, self.test_selector(test_subset))
             yield train_labels, test_labels
 
     def get_n_splits(self, dataset: Dataset) -> int:
