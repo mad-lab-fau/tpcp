@@ -245,3 +245,55 @@ def test_pretrained_models_example():
 def test_warning_error_context_example():
     # Import the gallery example to ensure that it executes without errors.
     import examples.recipies._07_warning_error_context  # noqa: F401
+
+
+def test_complex_clinical_evaluation():
+    """The clinical workflow isolates participants and tests all home recordings."""
+    from examples.validation._07_complex_clinical_evaluation import (
+        algorithms,
+        dataset,
+        evaluations,
+        fold_results,
+        recording_results,
+    )
+
+    assert len(dataset) == 48
+    assert dataset[0].data.shape == (160, 3)
+    assert dataset[1].data.shape == (180, 3)
+    assert dataset[0].metadata == dataset[1].metadata
+    assert dataset[0].daily_annotations != dataset[1].daily_annotations
+    assert len(fold_results) == 12
+    assert fold_results["f1"].between(0, 1).all()
+    assert len(recording_results) == 144
+    # Each comparison must evaluate every home day exactly once, using identical
+    # participant assignments for both training sources and algorithms.
+    expected = {(p, day) for p in range(12) for day in (1, 2, 3)}
+    for _, comparison in recording_results.groupby(["train_source", "algorithm"]):
+        assert len(comparison) == 36
+        assert set(zip(comparison["participant"], comparison["day"], strict=True)) == expected
+    for _, fold in recording_results.groupby("fold"):
+        assert fold["participant"].nunique() == 4
+
+    for evaluation in evaluations:
+        train, test, search = (evaluation[key] for key in ("train", "test", "search"))
+        train_ids = set(train.index["participant"])
+        test_ids = set(test.index["participant"])
+        assert len(train_ids) == 8
+        assert len(test_ids) == 4
+        assert train_ids.isdisjoint(test_ids)
+        assert set(test.index["source"]) == {"home"}
+        assert len(set(train.index["source"])) == 1
+        for split in range(2):
+            for train_labels, validation_labels in zip(
+                search.cv_results_[f"split{split}__train__data_labels"],
+                search.cv_results_[f"split{split}__test__data_labels"],
+                strict=True,
+            ):
+                inner_train_ids = {label.participant for label in train_labels}
+                inner_validation_ids = {label.participant for label in validation_labels}
+                assert inner_train_ids.isdisjoint(inner_validation_ids)
+                assert inner_train_ids | inner_validation_ids == train_ids
+                assert {label.source for label in train_labels + validation_labels} == set(train.index["source"])
+        assert search.optimized_pipeline_.algorithm.state_means.shape == (2, 3)
+    # Cloning must leave the original detector configurations untrained.
+    assert all(algorithm.state_means is None for algorithm, _ in algorithms.values())

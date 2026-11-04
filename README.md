@@ -51,6 +51,15 @@ sources per participant, a non-traditional ML algorithm, and a complex train-tes
 
 With `tpcp` we want to provide a flexible framework to approach such complex problems with structure and confidence.
 
+See the [complete hospital-to-home evaluation example](https://tpcp.readthedocs.io/en/latest/auto_examples/validation/_07_complex_clinical_evaluation.html)
+for a runnable version with dummy sensor data, participant metadata and daily annotations, a toy HMM and comparison
+algorithm, and nested participant-wise cross-validation for both training settings.
+Run it from this repository with:
+
+```bash
+uv run python examples/validation/_07_complex_clinical_evaluation.py
+```
+
 ## How?
 
 To make `tpcp` easy to use, we try to focus on a couple of key ideas:
