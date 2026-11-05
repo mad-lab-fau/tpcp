@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `tpcp.validate.train_test_split(splitter, dataset)` to return train and test group labels from a
+  native splitter configured with exactly one fold.
 - Added optional `train_selector` and `test_selector` callbacks to `DatasetSplitter` to select subsets after
   groupwise fold assignment. Each callback receives only its assigned side, and selecting labels outside that
   side raises `ValueError`. Both default to `None`, preserving the existing assignments.
