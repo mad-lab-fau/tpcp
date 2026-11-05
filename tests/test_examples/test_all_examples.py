@@ -301,7 +301,6 @@ def test_complex_clinical_evaluation():
                             assert inner_train_ids | inner_test_ids == train_ids
                             assert {label.source for label in inner_train + inner_test} == {expected_source}
                 else:
-                    assert not hasattr(search.optimized_pipeline_.algorithm, "self_optimize")
                     assert len(search.gs_results_["params"]) == 3
                     assert {p["algorithm__threshold"] for p in search.gs_results_["params"]} == {0.7, 0.9, 1.1}
     assert searches["learnable"].pipeline.algorithm.threshold is None
@@ -316,3 +315,18 @@ def test_complex_clinical_detector_learning():
     detector = DummySmoothedDetector(window_size=1).self_optimize([signal], [labels])
     assert detector.threshold == 1.0
     assert_array_equal(detector.clone().detect(signal).states_, labels)
+
+
+def test_complex_clinical_detector_interface():
+    """Detectors must implement prediction; fitting remains optional."""
+    from examples.validation._08_complex_clinical_evaluation import (
+        BaseEventDetector,
+        DummyThresholdDetector,
+        EventPipeline,
+        dataset,
+    )
+
+    with pytest.raises(TypeError, match="abstract"):
+        BaseEventDetector()
+    with pytest.raises(NotImplementedError, match="does not support fitting"):
+        EventPipeline(DummyThresholdDetector()).self_optimize(dataset[:1])

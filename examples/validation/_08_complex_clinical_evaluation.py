@@ -42,6 +42,7 @@ For background, see the :ref:`dataset and pipeline guide
 # :ref:`custom_dataset_basics` for indexing, subsets, and grouping, and
 # :ref:`custom_dataset_ecg` for a dataset backed by real recordings.
 
+from abc import ABC, abstractmethod
 from typing import Self
 
 import numpy as np
@@ -162,12 +163,34 @@ dataset[0].daily_annotations
 # Neither detector needs to know where recordings or labels are stored.
 
 
-class DummySmoothedDetector(Algorithm):
-    """Dummy detector with a tunable smoothing window."""
+# The shared base class makes the detector contract explicit: every detector
+# implements ``detect`` and exposes ``states_``. Fitting is optional; the base
+# implementation rejects it. This lets the pipeline use one concrete interface
+# without referring to either detector's configuration or learned parameters.
+
+
+class BaseEventDetector(Algorithm, ABC):
+    """Interface for event prediction and optional fitting."""
 
     _action_methods = "detect"
-    threshold: OptimizableParameter[float | None]
     states_: np.ndarray
+
+    @abstractmethod
+    def detect(self, data: pd.DataFrame) -> Self:
+        """Predict event states and store them in ``states_``."""
+        raise NotImplementedError
+
+    def self_optimize(
+        self, data: list[pd.DataFrame], labels: list[np.ndarray]
+    ) -> Self:
+        """Fit the detector when supported by its implementation."""
+        raise NotImplementedError("This detector does not support fitting.")
+
+
+class DummySmoothedDetector(BaseEventDetector):
+    """Dummy detector with a tunable smoothing window."""
+
+    threshold: OptimizableParameter[float | None]
     window_size: Parameter[int]
 
     def __init__(self, window_size: int = 5, threshold: float | None = None):
@@ -202,11 +225,8 @@ class DummySmoothedDetector(Algorithm):
         return self
 
 
-class DummyThresholdDetector(Algorithm):
+class DummyThresholdDetector(BaseEventDetector):
     """Non-learnable detector with a tunable threshold."""
-
-    _action_methods = "detect"
-    states_: np.ndarray
 
     def __init__(self, threshold: float = 0.9):
         self.threshold = threshold
@@ -241,10 +261,10 @@ class DummyThresholdDetector(Algorithm):
 class EventPipeline(OptimizablePipeline[ClinicalDataset]):
     """Adapt prediction and optional algorithm fitting to a clinical dataset."""
 
-    algorithm: OptimizableParameter[Algorithm]
+    algorithm: OptimizableParameter[BaseEventDetector]
     states_: np.ndarray
 
-    def __init__(self, algorithm: Algorithm):
+    def __init__(self, algorithm: BaseEventDetector):
         self.algorithm = algorithm
 
     def run(self, datapoint: ClinicalDataset) -> Self:
@@ -279,7 +299,7 @@ baseline.states_[:20]
 # %%
 fitted = Optimize(EventPipeline(DummySmoothedDetector())).optimize(demo_train)
 learned_detector = fitted.optimized_pipeline_.algorithm
-learned_detector.threshold
+learned_detector.get_params()
 
 # %%
 learned_detector.detect(datapoint.data).states_[:20]
@@ -327,7 +347,8 @@ def score(
 # stay outside testing. It bypasses ``self_optimize`` entirely. For evaluation
 # without parameter search, :class:`~tpcp.optimize.DummyOptimize` serves the
 # same no-fitting role. Calling ``self_optimize`` on a pipeline whose algorithm
-# lacks that method would fail naturally; the pipeline does not special-case it.
+# does not support fitting raises ``NotImplementedError`` through the base
+# interface; the pipeline does not special-case it.
 #
 # Each entry below carries its pipeline, search space, and scorer.
 # The ``algorithm__...`` search keys address parameters on the nested detector.
