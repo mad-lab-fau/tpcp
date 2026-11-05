@@ -11,7 +11,7 @@ from tpcp.validate._scorer import (
     mean_agg,
     no_agg,
 )
-from tpcp.validate._validate import cross_validate, validate
+from tpcp.validate._validate import async_cross_validate, cross_validate, cross_validate_async, validate
 
 __all__ = [
     "Aggregator",
@@ -24,7 +24,9 @@ __all__ = [
     "Scorer",
     "ScorerTypes",
     "SubsetSplitter",
+    "async_cross_validate",
     "cross_validate",
+    "cross_validate_async",
     "mean_agg",
     "no_agg",
     "validate",
