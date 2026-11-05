@@ -228,10 +228,11 @@ class DummyThresholdDetector(Algorithm):
 # The algorithm owns fitting; the pipeline contains no algorithm-specific logic.
 # Reference labels are absent from the inference path.
 #
-# ``OptimizableParameter`` marks the nested threshold as a value fitting may
-# change. The window size stays fixed during a fit and controls smoothing, so
-# it affects the fitted model. See :ref:`optimize_pipelines` and the
-# :ref:`optimization guide <optimization>` for these conventions.
+# ``OptimizableParameter`` marks the complete algorithm as optimizable. The
+# algorithm owns its learned parameters; the pipeline does not need to name
+# them or change its annotations for a different detector. See
+# :ref:`optimize_pipelines` and the :ref:`optimization guide <optimization>`
+# for these conventions.
 #
 # Cloning isolates each fit and prediction while preserving fitted constructor
 # parameters. See :ref:`general_concepts` for parameters, results, and cloning.
@@ -240,13 +241,10 @@ class DummyThresholdDetector(Algorithm):
 class EventPipeline(OptimizablePipeline[ClinicalDataset]):
     """Adapt prediction and optional algorithm fitting to a clinical dataset."""
 
-    algorithm: Parameter[DummySmoothedDetector | DummyThresholdDetector]
-    algorithm__threshold: OptimizableParameter[float | None]
+    algorithm: OptimizableParameter[Algorithm]
     states_: np.ndarray
 
-    def __init__(
-        self, algorithm: DummySmoothedDetector | DummyThresholdDetector
-    ):
+    def __init__(self, algorithm: Algorithm):
         self.algorithm = algorithm
 
     def run(self, datapoint: ClinicalDataset) -> Self:
