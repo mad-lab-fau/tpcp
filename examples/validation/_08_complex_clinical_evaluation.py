@@ -11,7 +11,7 @@ from unseen participants. Hospital-only development uses no home labels for
 training or hyperparameter selection.
 
 We build the evaluation from the inside out: run two dummy algorithms, fit the
-learnable algorithm through a trainer, search hyperparameters, evaluate a single
+learnable algorithm through a generic pipeline, search parameters, evaluate one
 participant-wise train/test split, and finally use outer cross-validation.
 Dummy sensor recordings keep the example focused on the evaluation structure.
 Their results cannot answer the clinical research question.
@@ -54,7 +54,6 @@ from tpcp import (
     OptimizableParameter,
     OptimizablePipeline,
     Parameter,
-    Pipeline,
 )
 from tpcp.optimize import GridSearch, GridSearchCV, Optimize
 from tpcp.validate import (
@@ -167,7 +166,7 @@ class DummySmoothedDetector(Algorithm):
     """Dummy detector with a tunable smoothing window."""
 
     _action_methods = "detect"
-    threshold: Parameter[float | None]
+    threshold: OptimizableParameter[float | None]
     states_: np.ndarray
     window_size: Parameter[int]
 
@@ -182,6 +181,19 @@ class DummySmoothedDetector(Algorithm):
             .rolling(self.window_size, center=True, min_periods=1)
             .mean()
         )
+
+    def self_optimize(
+        self, data: list[pd.DataFrame], labels: list[np.ndarray]
+    ) -> Self:
+        """Learn a threshold directly from labeled signals."""
+        signals = np.concatenate(
+            [self.smooth(recording).to_numpy() for recording in data]
+        )
+        reference = np.concatenate(labels)
+        background_mean = signals[reference == 0].mean()
+        event_mean = signals[reference == 1].mean()
+        self.threshold = float((background_mean + event_mean) / 2)
+        return self
 
     def detect(self, data: pd.DataFrame) -> Self:
         """Threshold a smoothed signal."""
@@ -210,20 +222,26 @@ class DummyThresholdDetector(Algorithm):
 # %%
 # Connect a detector to a dataset
 # -------------------------------
-# A :class:`~tpcp.Pipeline` defines ``run(datapoint)``. Our detector accepts a
-# DataFrame, so the pipeline reads ``datapoint.data`` and passes it to the
-# detector. Both detectors use this same adapter and produce the same output.
-# Reference labels are absent from this inference path.
+# An :class:`~tpcp.OptimizablePipeline` connects dataset properties to algorithm
+# inputs. ``run`` forwards sensor data to ``detect``. ``self_optimize`` extracts
+# signals and labels, then forwards them to the algorithm's ``self_optimize``.
+# The algorithm owns fitting; the pipeline contains no algorithm-specific logic.
+# Reference labels are absent from the inference path.
 #
-# Clone the detector before running it. Each recording then gets an independent
-# result object, while constructor parameters, including fitted values, survive
-# cloning. See :ref:`general_concepts` for parameters, results, and cloning.
+# ``OptimizableParameter`` marks the nested threshold as a value fitting may
+# change. The window size stays fixed during a fit and controls smoothing, so
+# it affects the fitted model. See :ref:`optimize_pipelines` and the
+# :ref:`optimization guide <optimization>` for these conventions.
+#
+# Cloning isolates each fit and prediction while preserving fitted constructor
+# parameters. See :ref:`general_concepts` for parameters, results, and cloning.
 
 
-class EventPipeline(Pipeline[ClinicalDataset]):
-    """Run either detector through the same prediction interface."""
+class EventPipeline(OptimizablePipeline[ClinicalDataset]):
+    """Adapt prediction and optional algorithm fitting to a clinical dataset."""
 
     algorithm: Parameter[DummySmoothedDetector | DummyThresholdDetector]
+    algorithm__threshold: OptimizableParameter[float | None]
     states_: np.ndarray
 
     def __init__(
@@ -236,41 +254,11 @@ class EventPipeline(Pipeline[ClinicalDataset]):
         self.states_ = self.algorithm.clone().detect(datapoint.data).states_
         return self
 
-
-# %%
-# Add fitting with a trainer
-# --------------------------
-# An :class:`~tpcp.OptimizablePipeline` adds ``self_optimize(dataset)``. Here a
-# trainer subclasses the inference pipeline, fits a cloned detector, and stores
-# that detector as its ``algorithm`` parameter. It can therefore run through the
-# same prediction interface after training, or hand the detector to an ordinary
-# ``EventPipeline``.
-#
-# This separation follows mobgap's wear-time trainers: detectors own inference
-# parameters, trainers own fitting, and splitters decide which data they see.
-# ``OptimizableParameter`` marks the nested threshold as a value fitting may
-# change. The window size stays fixed during a fit and controls the smoothing
-# used to estimate the threshold, so it affects the fitted model. See
-# :ref:`optimize_pipelines` and the :ref:`optimization guide <optimization>` for
-# these conventions.
-
-
-class DummyDetectorTrainer(EventPipeline, OptimizablePipeline[ClinicalDataset]):
-    """Fit a detector and reuse the normal prediction pipeline."""
-
-    algorithm: Parameter[DummySmoothedDetector]
-    algorithm__threshold: OptimizableParameter[float | None]
-
     def self_optimize(self, dataset: ClinicalDataset, **_kwargs) -> Self:
-        """Fit a cloned detector using the supplied training recordings."""
-        signals = np.concatenate(
-            [self.algorithm.smooth(d.data).to_numpy() for d in dataset]
-        )
-        labels = np.concatenate([d.reference_states for d in dataset])
-        background_mean = signals[labels == 0].mean()
-        event_mean = signals[labels == 1].mean()
-        self.algorithm = self.algorithm.clone().set_params(
-            threshold=float((background_mean + event_mean) / 2)
+        """Forward the supplied signals and labels to the algorithm."""
+        self.algorithm = self.algorithm.clone().self_optimize(
+            data=[d.data for d in dataset],
+            labels=[d.reference_states for d in dataset],
         )
         return self
 
@@ -279,7 +267,7 @@ class DummyDetectorTrainer(EventPipeline, OptimizablePipeline[ClinicalDataset]):
 # Train and run on a few recordings
 # ---------------------------------
 # Start with one hospital recording. The baseline can run immediately.
-# :class:`~tpcp.optimize.Optimize` calls the trainer's ``self_optimize`` on the
+# :class:`~tpcp.optimize.Optimize` calls the pipeline's ``self_optimize`` on the
 # supplied training dataset and exposes the result as ``optimized_pipeline_``.
 # Extracting its ``algorithm`` gives a detector that can run on its own. These
 # recordings demonstrate the interfaces; this is not a performance estimate. The
@@ -291,10 +279,8 @@ baseline = DummyThresholdDetector().detect(datapoint.data)
 baseline.states_[:20]
 
 # %%
-trainer = Optimize(DummyDetectorTrainer(DummySmoothedDetector())).optimize(
-    demo_train
-)
-learned_detector = trainer.optimized_pipeline_.algorithm
+fitted = Optimize(EventPipeline(DummySmoothedDetector())).optimize(demo_train)
+learned_detector = fitted.optimized_pipeline_.algorithm
 learned_detector.threshold
 
 # %%
@@ -330,7 +316,7 @@ def score(
 # Search hyperparameters on training data
 # ---------------------------------------
 # In tpcp, both fitting and parameter search are optimization: each produces a
-# configured pipeline. :class:`~tpcp.optimize.GridSearchCV` fits the trainer on
+# configured pipeline. :class:`~tpcp.optimize.GridSearchCV` fits the pipeline on
 # inner training participants, scores candidates on inner validation
 # participants, and refits the winner on all supplied training recordings.
 # :class:`~tpcp.validate.DatasetSplitter` keeps participants together when
@@ -340,16 +326,19 @@ def score(
 # The baseline has no fitting step. :class:`~tpcp.optimize.GridSearch` can
 # select its threshold directly on the development recordings; see
 # :ref:`grid_search`. Its use of labels still counts as development and must
-# stay outside testing.
+# stay outside testing. It bypasses ``self_optimize`` entirely. For evaluation
+# without parameter search, :class:`~tpcp.optimize.DummyOptimize` serves the
+# same no-fitting role. Calling ``self_optimize`` on a pipeline whose algorithm
+# lacks that method would fail naturally; the pipeline does not special-case it.
 #
-# Each entry below carries its pipeline or trainer, search space, and scorer.
+# Each entry below carries its pipeline, search space, and scorer.
 # The ``algorithm__...`` search keys address parameters on the nested detector.
 # ``return_optimized="f1"`` ranks candidates by F1 and makes the selected
 # pipeline available as ``optimized_pipeline_``. Evaluation code can treat both
 # optimizers identically, without checking algorithm types.
 searches = {
     "learnable": GridSearchCV(
-        pipeline=DummyDetectorTrainer(DummySmoothedDetector()),
+        pipeline=EventPipeline(DummySmoothedDetector()),
         parameter_grid=ParameterGrid({"algorithm__window_size": [1, 5, 11]}),
         scoring=Scorer(score, progress_bar=False),
         cv=DatasetSplitter(2, groupby="participant"),
@@ -394,7 +383,7 @@ validate(
 # ``test_selector`` then select recordings from their respective assigned sides.
 # Selecting a source cannot introduce a held-out participant into training.
 #
-# These selectors define the experiment. Neither trainer nor algorithm needs
+# These selectors define the experiment. Neither pipeline nor algorithm needs
 # to know whether we are developing on hospital or home recordings. For an
 # example that retains all training tests and selects only one evaluation test,
 # see :ref:`participant_test_selection`.

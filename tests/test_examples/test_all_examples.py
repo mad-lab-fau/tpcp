@@ -305,3 +305,14 @@ def test_complex_clinical_evaluation():
                     assert len(search.gs_results_["params"]) == 3
                     assert {p["algorithm__threshold"] for p in search.gs_results_["params"]} == {0.7, 0.9, 1.1}
     assert searches["learnable"].pipeline.algorithm.threshold is None
+
+
+def test_complex_clinical_detector_learning():
+    """The detector learns from arrays and retains its learned value on cloning."""
+    from examples.validation._08_complex_clinical_evaluation import DummySmoothedDetector
+
+    signal = pd.DataFrame({"x": [0.0, 0.0, 2.0, 2.0], "y": [0.0, 0.0, 2.0, 2.0]})
+    labels = np.array([0, 0, 1, 1])
+    detector = DummySmoothedDetector(window_size=1).self_optimize([signal], [labels])
+    assert detector.threshold == 1.0
+    assert_array_equal(detector.clone().detect(signal).states_, labels)
