@@ -223,6 +223,10 @@ def validate(
         return_data_labels=True,
         return_times=True,
     )
+    return _format_validation_results(results)
+
+
+def _format_validation_results(results):
     results = _aggregate_final_results([results])
 
     # Fix the formatting of all the score results

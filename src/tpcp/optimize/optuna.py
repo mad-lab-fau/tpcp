@@ -25,7 +25,7 @@ from optuna.trial import FrozenTrial, Trial
 
 from tpcp import OptimizablePipeline, clone
 from tpcp._dataset import DatasetT
-from tpcp._optimize import BaseOptimize
+from tpcp._optimize import BaseOptimize, _Optimizer
 from tpcp._pipeline import PipelineT
 from tpcp.misc import warning_error_context
 from tpcp.optimize import Optimize
@@ -67,7 +67,7 @@ class StudyParamsDict(TypedDict, total=False):
     directions: Sequence[str | StudyDirection] | None
 
 
-class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
+class _StudyOptimizer(_Optimizer[PipelineT, DatasetT]):
     pipeline: PipelineT
     get_study_params: Callable[[int], StudyParamsDict]
     return_optimized: bool
@@ -141,7 +141,7 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         """Best trial in the :class:`~optuna.study.Study`."""
         return self.study_.best_trial
 
-    def optimize(self, dataset: DatasetT, **_: Any) -> Self:
+    def _run_study(self, dataset: DatasetT, **_: Any) -> Self:
         """Optimize the objective over the dataset and find the best parameter combination.
 
         This method calls `self.create_objective` to obtain the objective function that should be optimized.
@@ -330,7 +330,45 @@ class _CustomOptunaOptimize(BaseOptimize[PipelineT, DatasetT]):
         return pipeline_with_best_params
 
 
-class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
+class _CustomOptunaOptimize(_StudyOptimizer[PipelineT, DatasetT], BaseOptimize[PipelineT, DatasetT]):
+    def optimize(self, dataset: DatasetT, **kwargs: Any) -> Self:
+        """Run the configured objective and store its study and fitted results."""
+        return self._run_study(dataset, **kwargs)
+
+
+class _CustomOptunaOptimizeConfig(_StudyOptimizer[PipelineT, DatasetT]):
+    def __init__(
+        self,
+        pipeline: PipelineT,
+        get_study_params: Callable[[int], StudyParamsDict],
+        *,
+        n_trials: int | None = None,
+        timeout: float | None = None,
+        callbacks: list[Callable[[Study, FrozenTrial], None]] | None = None,
+        gc_after_trial: bool = False,
+        n_jobs: int = 1,
+        random_seed: int | None = None,
+        eval_str_paras: Sequence[str] = (),
+        show_progress_bar: bool = False,
+        return_optimized: bool = True,
+    ) -> None:
+        self.pipeline = pipeline
+        self.get_study_params = get_study_params
+
+        self.n_trials = n_trials
+        self.random_seed = random_seed
+        self.timeout = timeout
+        self.callbacks = callbacks
+        self.gc_after_trial = gc_after_trial
+        self.show_progress_bar = show_progress_bar
+        self.n_jobs = n_jobs
+        self.eval_str_paras = eval_str_paras
+        self.return_optimized = return_optimized
+
+
+class CustomOptunaOptimize(
+    _CustomOptunaOptimizeConfig[PipelineT, DatasetT], _CustomOptunaOptimize[PipelineT, DatasetT]
+):
     """Base class for custom Optuna optimizer.
 
     This provides a relatively simple tpcp compatible interface to Optuna.
@@ -562,34 +600,6 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
 
     """
 
-    def __init__(
-        self,
-        pipeline: PipelineT,
-        get_study_params: Callable[[int], StudyParamsDict],
-        *,
-        n_trials: int | None = None,
-        timeout: float | None = None,
-        callbacks: list[Callable[[Study, FrozenTrial], None]] | None = None,
-        gc_after_trial: bool = False,
-        n_jobs: int = 1,
-        random_seed: int | None = None,
-        eval_str_paras: Sequence[str] = (),
-        show_progress_bar: bool = False,
-        return_optimized: bool = True,
-    ) -> None:
-        self.pipeline = pipeline
-        self.get_study_params = get_study_params
-
-        self.n_trials = n_trials
-        self.random_seed = random_seed
-        self.timeout = timeout
-        self.callbacks = callbacks
-        self.gc_after_trial = gc_after_trial
-        self.show_progress_bar = show_progress_bar
-        self.n_jobs = n_jobs
-        self.eval_str_paras = eval_str_paras
-        self.return_optimized = return_optimized
-
     @staticmethod
     def as_dataclass():
         """Return a version of the Dataset class that can be subclassed using dataclasses."""
@@ -657,7 +667,147 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
 T = TypeVar("T")
 
 
-class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
+class _OptunaSearchConfig(_StudyOptimizer[PipelineT, DatasetT]):
+    create_search_space: Callable[[Trial], None]
+    scoring: ScorerTypes[PipelineT, DatasetT]
+    score_name: str | None
+
+    multimetric_: bool
+
+    def __init__(
+        self,
+        pipeline: PipelineT,
+        get_study_params: Callable[[int], StudyParamsDict],
+        create_search_space: Callable[[Trial], None],
+        *,
+        scoring: ScorerTypes[PipelineT, DatasetT],
+        score_name: str | None = None,
+        n_trials: int | None = None,
+        timeout: float | None = None,
+        callbacks: list[Callable[[Study, FrozenTrial], None]] | None = None,
+        gc_after_trial: bool = False,
+        n_jobs: int = 1,
+        random_seed: int | None = None,
+        eval_str_paras: Sequence[str] = (),
+        show_progress_bar: bool = False,
+        return_optimized: bool = True,
+    ) -> None:
+        self.create_search_space = create_search_space
+        self.scoring = scoring
+        self.score_name = score_name
+
+        self.pipeline = pipeline
+        self.get_study_params = get_study_params
+        self.n_trials = n_trials
+        self.timeout = timeout
+        self.callbacks = callbacks
+        self.gc_after_trial = gc_after_trial
+        self.n_jobs = n_jobs
+        self.random_seed = random_seed
+        self.eval_str_paras = eval_str_paras
+        self.show_progress_bar = show_progress_bar
+        self.return_optimized = return_optimized
+
+    @property
+    def multimetric_(self) -> bool:
+        """Whether the study contains results from a multi-metric scorer."""
+        return any("__average_scores" in trial.user_attrs for trial in self.study_.get_trials(deepcopy=False))
+
+    def _study_scorer(self):
+        return _validate_scorer(self.scoring)
+
+    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], float | Sequence[float]]:
+        """Create the objective function for optuna.
+
+        This is an internal function and should not be called directly.
+        """
+        # Here we define our objective function
+
+        scoring = self._study_scorer()
+
+        def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
+            # First we need to select parameters for the current trial
+            if self.create_search_space is None:
+                raise ValueError("No valid search space parameter.")
+            self.create_search_space(trial)
+            # Then we apply these parameters to the pipeline
+            pipeline = pipeline.set_params(**self.sanitize_params(trial.params))
+
+            average_scores, single_scores = scoring(pipeline, dataset)
+
+            multimetric = isinstance(average_scores, dict)
+            if multimetric:
+                if self.score_name is None:
+                    raise ValueError("score_name must be set if scoring returns a dictionary of scores")
+                if self.score_name not in average_scores:
+                    raise ValueError(f"score_name '{self.score_name}' not in scoring results ({average_scores.keys()})")
+                score = average_scores[self.score_name]
+            else:
+                if self.score_name is not None:
+                    warnings.warn(
+                        "score_name is ignored if scoring returns a single score",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+                score = average_scores
+
+            # As a bonus, we use the custom params option of optuna to store the individual scores per datapoint and the
+            # respective data labels
+            if multimetric:
+                trial.set_user_attr("__average_scores", average_scores)
+                trial.set_user_attr("__single_scores", single_scores)
+            else:
+                # No need to set average scores, as their is only one score and that is returned by the objective
+                # function and will be included in the results by optuna
+                trial.set_user_attr("__single_scores", {"score": single_scores})
+            trial.set_user_attr("__data_labels", dataset.group_labels)
+
+            return score
+
+        return objective
+
+    @property
+    def search_results_(self) -> dict[str, Sequence[Any]]:
+        search_results = super().search_results_
+        if not search_results:
+            return {}
+        search_results["data_labels"] = search_results.pop("user_attrs___data_labels")
+
+        if self.multimetric_:
+            search_results.pop("score")
+            if average_scores := search_results.pop("user_attrs___average_scores", None):
+                search_results.update(_invert_list_of_dicts(average_scores))
+
+        if single_scores := search_results.pop("user_attrs___single_scores", None):
+            search_results.update({f"single__{k}": v for k, v in _invert_list_of_dicts(single_scores).items()})
+
+        # We add params back to the end of the dict to make it easier to read
+        search_results["params"] = [self.sanitize_params(p) for p in search_results.pop("params")]
+        return search_results
+
+    def return_optimized_pipeline(
+        self,
+        pipeline: PipelineT,
+        dataset: DatasetT,  # noqa: ARG002
+        study: Study,
+    ) -> PipelineT:
+        """Return the pipeline with the best parameters of a study.
+
+        This is an internal function and should not be called directly.
+        """
+        # Pipeline that will be passed here is already cloned, so no need to clone again.
+        pipeline_with_best_params = pipeline.set_params(**self.sanitize_params(study.best_params))
+        return pipeline_with_best_params
+
+
+def _invert_list_of_dicts(list_of_dicts: list[dict[str, Any] | float]) -> dict[str, list]:
+    # Running trials have no score metadata yet. Preserve their positions in the trial table.
+    return pd.DataFrame([scores if isinstance(scores, dict) else {} for scores in list_of_dicts], dtype=object).to_dict(
+        orient="list"
+    )
+
+
+class OptunaSearch(_OptunaSearchConfig[PipelineT, DatasetT], _CustomOptunaOptimize[PipelineT, DatasetT]):
     """GridSearch equivalent using Optuna.
 
     An opinionated parameter optimization for simple (i.e. non-optimizable) pipelines that can be used as a
@@ -802,138 +952,3 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
         This is either the value passed to `random_seed` or a random integer between 0 and 100.
 
     """
-
-    create_search_space: Callable[[Trial], None]
-    scoring: ScorerTypes[PipelineT, DatasetT]
-    score_name: str | None
-
-    multimetric_: bool
-
-    def __init__(
-        self,
-        pipeline: PipelineT,
-        get_study_params: Callable[[int], StudyParamsDict],
-        create_search_space: Callable[[Trial], None],
-        *,
-        scoring: ScorerTypes[PipelineT, DatasetT],
-        score_name: str | None = None,
-        n_trials: int | None = None,
-        timeout: float | None = None,
-        callbacks: list[Callable[[Study, FrozenTrial], None]] | None = None,
-        gc_after_trial: bool = False,
-        n_jobs: int = 1,
-        random_seed: int | None = None,
-        eval_str_paras: Sequence[str] = (),
-        show_progress_bar: bool = False,
-        return_optimized: bool = True,
-    ) -> None:
-        self.create_search_space = create_search_space
-        self.scoring = scoring
-        self.score_name = score_name
-
-        self.pipeline = pipeline
-        self.get_study_params = get_study_params
-        self.n_trials = n_trials
-        self.timeout = timeout
-        self.callbacks = callbacks
-        self.gc_after_trial = gc_after_trial
-        self.n_jobs = n_jobs
-        self.random_seed = random_seed
-        self.eval_str_paras = eval_str_paras
-        self.show_progress_bar = show_progress_bar
-        self.return_optimized = return_optimized
-
-    @property
-    def multimetric_(self) -> bool:
-        """Whether the study contains results from a multi-metric scorer."""
-        return any("__average_scores" in trial.user_attrs for trial in self.study_.get_trials(deepcopy=False))
-
-    def create_objective(self) -> Callable[[Trial, PipelineT, DatasetT], float | Sequence[float]]:
-        """Create the objective function for optuna.
-
-        This is an internal function and should not be called directly.
-        """
-        # Here we define our objective function
-
-        scoring = _validate_scorer(self.scoring)
-
-        def objective(trial: Trial, pipeline: PipelineT, dataset: DatasetT) -> float:
-            # First we need to select parameters for the current trial
-            if self.create_search_space is None:
-                raise ValueError("No valid search space parameter.")
-            self.create_search_space(trial)
-            # Then we apply these parameters to the pipeline
-            pipeline = pipeline.set_params(**self.sanitize_params(trial.params))
-
-            average_scores, single_scores = scoring(pipeline, dataset)
-
-            multimetric = isinstance(average_scores, dict)
-            if multimetric:
-                if self.score_name is None:
-                    raise ValueError("score_name must be set if scoring returns a dictionary of scores")
-                if self.score_name not in average_scores:
-                    raise ValueError(f"score_name '{self.score_name}' not in scoring results ({average_scores.keys()})")
-                score = average_scores[self.score_name]
-            else:
-                if self.score_name is not None:
-                    warnings.warn(
-                        "score_name is ignored if scoring returns a single score",
-                        UserWarning,
-                        stacklevel=2,
-                    )
-                score = average_scores
-
-            # As a bonus, we use the custom params option of optuna to store the individual scores per datapoint and the
-            # respective data labels
-            if multimetric:
-                trial.set_user_attr("__average_scores", average_scores)
-                trial.set_user_attr("__single_scores", single_scores)
-            else:
-                # No need to set average scores, as their is only one score and that is returned by the objective
-                # function and will be included in the results by optuna
-                trial.set_user_attr("__single_scores", {"score": single_scores})
-            trial.set_user_attr("__data_labels", dataset.group_labels)
-
-            return score
-
-        return objective
-
-    @property
-    def search_results_(self) -> dict[str, Sequence[Any]]:  # noqa: D102
-        search_results = super().search_results_
-        if not search_results:
-            return {}
-        search_results["data_labels"] = search_results.pop("user_attrs___data_labels")
-
-        if self.multimetric_:
-            search_results.pop("score")
-            if average_scores := search_results.pop("user_attrs___average_scores", None):
-                search_results.update(_invert_list_of_dicts(average_scores))
-
-        if single_scores := search_results.pop("user_attrs___single_scores", None):
-            search_results.update({f"single__{k}": v for k, v in _invert_list_of_dicts(single_scores).items()})
-
-        # We add params back to the end of the dict to make it easier to read
-        search_results["params"] = [self.sanitize_params(p) for p in search_results.pop("params")]
-        return search_results
-
-    def return_optimized_pipeline(
-        self,
-        pipeline: PipelineT,
-        dataset: DatasetT,  # noqa: ARG002
-        study: Study,
-    ) -> PipelineT:
-        """Return the pipeline with the best parameters of a study.
-
-        This is an internal function and should not be called directly.
-        """
-        # Pipeline that will be passed here is already cloned, so no need to clone again.
-        pipeline_with_best_params = pipeline.set_params(**self.sanitize_params(study.best_params))
-        return pipeline_with_best_params
-
-
-def _invert_list_of_dicts(list_of_dicts: list[dict[str, Any] | float]) -> dict[str, list]:
-    # Running trials have no score metadata yet. Preserve their positions in the trial table.
-    return pd.DataFrame([scores if isinstance(scores, dict) else {} for scores in list_of_dicts], dtype=object).to_dict(
-        orient="list"
-    )

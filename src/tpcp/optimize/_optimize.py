@@ -10,7 +10,6 @@ from tempfile import TemporaryDirectory
 from typing import (
     TYPE_CHECKING,
     Any,
-    Generic,
     Literal,
     Self,
     TypeVar,
@@ -54,7 +53,18 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-class DummyOptimize(BaseOptimize[PipelineT, DatasetT]):
+class _DummyOptimize(_Optimizer[PipelineT, DatasetT]):
+    pipeline: Parameter[PipelineT]
+    ignore_potential_user_error_warning: Parameter[bool]
+
+    optimized_pipeline_: PipelineT
+
+    def __init__(self, pipeline: PipelineT, *, ignore_potential_user_error_warning: bool = False) -> None:
+        self.pipeline = pipeline
+        self.ignore_potential_user_error_warning = ignore_potential_user_error_warning
+
+
+class DummyOptimize(_DummyOptimize[PipelineT, DatasetT], BaseOptimize[PipelineT, DatasetT]):
     """Provide API compatibility for SimplePipelines in optimize wrappers.
 
     This is a simple dummy Optimizer that will **not** optimize anything, but just provide the correct API so that
@@ -85,15 +95,6 @@ class DummyOptimize(BaseOptimize[PipelineT, DatasetT]):
         In case of this class, this is just an unmodified clone of the input pipeline.
 
     """
-
-    pipeline: Parameter[PipelineT]
-    ignore_potential_user_error_warning: Parameter[bool]
-
-    optimized_pipeline_: PipelineT
-
-    def __init__(self, pipeline: PipelineT, *, ignore_potential_user_error_warning: bool = False) -> None:
-        self.pipeline = pipeline
-        self.ignore_potential_user_error_warning = ignore_potential_user_error_warning
 
     def optimize(self, dataset: DatasetT, **optimize_params: Any) -> Self:  # noqa: ARG002
         """Run the "dummy" optimization.
@@ -127,7 +128,31 @@ class DummyOptimize(BaseOptimize[PipelineT, DatasetT]):
         return self
 
 
-class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
+class _Optimize(_Optimizer[OptimizablePipelineT, DatasetT]):
+    pipeline: Parameter[OptimizablePipelineT]
+    train_dataset_transform: Callable[[DatasetT], DatasetT] | None
+    safe_optimize: bool
+    optimize_with_info: bool
+
+    optimized_pipeline_: OptimizablePipelineT
+    optimization_info_: Any
+    transformed_dataset_: DatasetT
+
+    def __init__(
+        self,
+        pipeline: OptimizablePipelineT,
+        *,
+        train_dataset_transform: Callable[[DatasetT], DatasetT] | None = None,
+        safe_optimize: bool = True,
+        optimize_with_info: bool = True,
+    ) -> None:
+        self.pipeline = pipeline
+        self.train_dataset_transform = train_dataset_transform
+        self.safe_optimize = safe_optimize
+        self.optimize_with_info = optimize_with_info
+
+
+class Optimize(_Optimize[OptimizablePipelineT, DatasetT], BaseOptimize[OptimizablePipelineT, DatasetT]):
     """Run a generic self-optimization on the pipeline.
 
     This is a simple wrapper for pipelines that already implement a `self_optimize` method.
@@ -191,28 +216,6 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
         this is the original dataset.
 
     """
-
-    pipeline: Parameter[OptimizablePipelineT]
-    train_dataset_transform: Callable[[DatasetT], DatasetT] | None
-    safe_optimize: bool
-    optimize_with_info: bool
-
-    optimized_pipeline_: OptimizablePipelineT
-    optimization_info_: Any
-    transformed_dataset_: DatasetT
-
-    def __init__(
-        self,
-        pipeline: OptimizablePipelineT,
-        *,
-        train_dataset_transform: Callable[[DatasetT], DatasetT] | None = None,
-        safe_optimize: bool = True,
-        optimize_with_info: bool = True,
-    ) -> None:
-        self.pipeline = pipeline
-        self.train_dataset_transform = train_dataset_transform
-        self.safe_optimize = safe_optimize
-        self.optimize_with_info = optimize_with_info
 
     def optimize(self, dataset: DatasetT, **optimize_params: Any) -> Self:
         """Run the self-optimization defined by the pipeline.
@@ -532,10 +535,241 @@ class GridSearch(_GridSearch[PipelineT, DatasetT], BaseOptimize[PipelineT, Datas
         return self._set_search_results(results)
 
 
-class GridSearchCV(
-    BaseOptimize[OptimizablePipelineT, DatasetT],
-    Generic[OptimizablePipelineT, DatasetT],
-):
+class _GridSearchCV(_Optimizer[OptimizablePipelineT, DatasetT]):
+    pipeline: OptimizablePipelineT
+    parameter_grid: ParameterGrid
+    scoring: ScorerTypes[OptimizablePipelineT, DatasetT]
+    return_optimized: bool | str
+    cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None
+    train_dataset_transform: Callable[[DatasetT], DatasetT] | None
+    pure_parameters: bool | list[str]
+    return_train_score: bool
+    verbose: int
+    n_jobs: int | None
+    pre_dispatch: int | str
+    progress_bar: bool
+    safe_optimize: bool
+    optimize_with_info: bool
+
+    cv_results_: dict[str, Any]
+    best_params_: dict[str, Any]
+    best_index_: int
+    best_score_: float
+    multimetric_: bool
+    final_optimize_time_: float
+    optimization_info_: Any
+
+    def __init__(
+        self,
+        pipeline: OptimizablePipelineT,
+        parameter_grid: ParameterGrid,
+        *,
+        scoring: ScorerTypes[OptimizablePipelineT, DatasetT],
+        return_optimized: bool | str = True,
+        cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None = None,
+        train_dataset_transform: Callable[[DatasetT], DatasetT] | None = None,
+        pure_parameters: bool | list[str] = False,
+        return_train_score: bool = False,
+        verbose: int = 0,
+        n_jobs: int | None = None,
+        pre_dispatch: int | str = "n_jobs",
+        progress_bar: bool = True,
+        safe_optimize: bool = True,
+        optimize_with_info: bool = True,
+    ) -> None:
+        self.pipeline = pipeline
+        self.parameter_grid = parameter_grid
+        self.scoring = scoring
+        self.return_optimized = return_optimized
+        self.cv = cv
+        self.train_dataset_transform = train_dataset_transform
+        self.pure_parameters = pure_parameters
+        self.return_train_score = return_train_score
+        self.verbose = verbose
+        self.n_jobs = n_jobs
+        self.pre_dispatch = pre_dispatch
+        self.progress_bar = progress_bar
+        self.safe_optimize = safe_optimize
+        self.optimize_with_info = optimize_with_info
+
+    def _plan(self, dataset):
+        cv = _normalize_splitter(self.cv)
+
+        n_splits = cv.get_n_splits(dataset)
+
+        optimizer = self._wrap_pipeline()
+
+        # For each para combi, we separate the pure parameters (parameters that do not affect the optimization) and
+        # the hyperparameters.
+        # This allows for massive caching optimizations in the `_optimize_and_score`.
+        pure_parameters: list[str] | None
+        if self.pure_parameters is False:
+            pure_parameters = None
+        elif self.pure_parameters is True:
+            pure_parameters = _get_annotated_fields_of_type(self.pipeline, _ParaTypes.PURE)
+        elif isinstance(self.pure_parameters, list):
+            pure_parameters = self.pure_parameters
+        else:
+            raise ValueError(
+                "`self.pure_parameters` must either be a List of field names (nested are allowed) or True/False."
+            )
+
+        parameters = list(self.parameter_grid)
+        split_parameters = _split_hyper_and_pure_parameters(parameters, pure_parameters)
+        splits = list(cv.split(dataset))
+
+        return n_splits, optimizer, pure_parameters, parameters, split_parameters, splits
+
+    def _select(self, parameters, n_splits, out):
+        results = self._format_results(parameters, n_splits, out)
+        self.cv_results_ = results
+
+        first_test_score = out[0]["test__scores"]
+        self.multimetric_ = isinstance(first_test_score, dict)
+        reverse_ranking, return_optimized = _validate_return_optimized(
+            self.return_optimized, self.multimetric_, first_test_score
+        )
+        if return_optimized:
+            assert isinstance(return_optimized, str)
+            (
+                self.best_index_,
+                self.best_score_,
+                self.best_params_,
+            ) = _extract_return_optimize_info(
+                return_optimized,
+                reverse_ranking,
+                results,
+                rank_prefix="rank__test__agg__",
+                score_prefix="mean__test__agg__",
+            )
+        return bool(return_optimized)
+
+    def _wrap_pipeline(self):
+        # We need to wrap our pipeline for a consistent interface.
+        # In the future we might be able to allow objects with optimizer Interface as input directly.
+        optimizer = Optimize(
+            self.pipeline,
+            train_dataset_transform=self.train_dataset_transform,
+            safe_optimize=self.safe_optimize,
+            optimize_with_info=self.optimize_with_info,
+        )
+        return optimizer
+
+    def _format_results(self, candidate_params, n_splits, out, more_results=None):  # noqa: C901
+        """Format the final result dict.
+
+        This function is adapted based on sklearn's `BaseSearchCV`.
+        """
+        n_candidates = len(candidate_params)
+        out = _aggregate_final_results(out)
+
+        results = dict(more_results or {})
+
+        def _store_non_numeric(key_name: str, array):
+            """Store non-numeric scores/times to the cv_results_."""
+            # We avoid performing any sort of conversion into numpy arrays as this might modify the dtypes.
+            # Instead we use list comprehension to do the reshaping.
+            # The result is a list of lists and not a numpy array.
+            #
+            # Note that the results were produced by iterating first by splits and then by parameters.
+            # We do the same here, but directly transpose the results, as we need to access the data per parameters
+            # afterwards.
+            iterable_array = iter(array)
+            array = [[next(iterable_array) for _ in range(n_splits)] for _ in range(n_candidates)]
+            # "Transpose" the array
+            array = map(list, zip(*array, strict=True))
+
+            for split_idx, split in enumerate(array):
+                # Uses closure to alter the results
+                results[f"split{split_idx}__{key_name}"] = split
+
+        def _store(key_name: str, array, weights=None, splits=False, rank=False):
+            """Store numeric scores/times to the cv_results_."""
+            # When iterated first by splits, then by parameters
+            # We want `array` to have `n_candidates` rows and `n_splits` cols.
+            array = np.array(array, dtype=np.float64).reshape(n_candidates, n_splits)
+
+            if splits:
+                for split_idx in range(n_splits):
+                    # Uses closure to alter the results
+                    results[f"split{split_idx}__{key_name}"] = array[:, split_idx]
+            array_means = np.average(array, axis=1, weights=weights)
+            results[f"mean__{key_name}"] = array_means
+
+            if key_name.startswith(("train__", "__test")) and np.any(~np.isfinite(array_means)):
+                warnings.warn(
+                    f"One or more of the {key_name.split('__')[0]} scores are non-finite: {array_means}",
+                    category=UserWarning,
+                    stacklevel=2,
+                )
+            # Weighted std is not directly available in numpy
+            array_stds = np.sqrt(np.average((array - array_means[:, np.newaxis]) ** 2, axis=1, weights=weights))
+            results[f"std__{key_name}"] = array_stds
+
+            if rank:
+                rank = np.asarray(rankdata(-array_means, method="min"), dtype=np.int32)
+                results[f"rank__{key_name}"] = rank
+
+        _store("debug__optimize_time", out["debug__optimize_time"])
+        _store("debug__score_time", out["debug__score_time"])
+        _store_non_numeric("test__data_labels", out["test__data_labels"])
+        _store_non_numeric("train__data_labels", out["train__data_labels"])
+        # Use one MaskedArray and mask all the places where the param is not
+        # applicable for that candidate. Use defaultdict as each candidate may
+        # not contain all the params
+        param_results: dict = defaultdict(
+            partial(
+                MaskedArray,
+                np.empty(
+                    n_candidates,
+                ),
+                mask=True,
+                dtype=object,
+            )
+        )
+        for cand_idx, params in enumerate(candidate_params):
+            for name, value in params.items():
+                # An all masked empty array gets created for the key
+                # `"param_{name}"` at the first occurrence of `name`.
+                # Setting the value at an index also unmasks that index
+                param_results[f"param__{name}"][cand_idx] = value
+
+        results.update(param_results)
+        # Store a list of param dicts at the key 'params'
+        results["params"] = candidate_params
+
+        test_scores_dict = _prefix_para_dict(_normalize_score_results(out["test__scores"]) or {}, "agg__")
+        test_single_scores_dict = _prefix_para_dict(
+            _normalize_score_results(out["test__single__scores"]) or {}, "single__"
+        )
+        for scorer_name in test_scores_dict:
+            # Computed the (weighted) mean and std for test scores alone
+            _store(
+                f"test__{scorer_name}",
+                test_scores_dict[scorer_name],
+                splits=True,
+                rank=True,
+                weights=None,
+            )
+        for scorer_name in test_single_scores_dict:
+            # Because of custom aggregators, it can be that single scores dicts have different keys than the aggregated
+            # scores.
+            _store_non_numeric(f"test__{scorer_name}", test_single_scores_dict[scorer_name])
+
+        if self.return_train_score:
+            train_scores_dict = _normalize_score_results(out["train__scores"])
+            train_single_scores_dict = _prefix_para_dict(
+                _normalize_score_results(out["train__single__scores"]) or {}, "single__"
+            )
+            for scorer_name in train_scores_dict:
+                _store(f"train__{scorer_name}", train_scores_dict[scorer_name], splits=True)
+            for scorer_name in train_single_scores_dict:
+                _store_non_numeric(f"train__{scorer_name}", train_single_scores_dict[scorer_name])
+
+        return results
+
+
+class GridSearchCV(_GridSearchCV[OptimizablePipelineT, DatasetT], BaseOptimize[OptimizablePipelineT, DatasetT]):
     """Exhaustive (hyper)parameter search using a cross validation based score to optimize pipeline parameters.
 
     This class follows as much as possible the interface of :func:`~sklearn.model_selection.GridSearchCV`.
@@ -713,62 +947,6 @@ class GridSearchCV(
 
     """
 
-    pipeline: OptimizablePipelineT
-    parameter_grid: ParameterGrid
-    scoring: ScorerTypes[OptimizablePipelineT, DatasetT]
-    return_optimized: bool | str
-    cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None
-    train_dataset_transform: Callable[[DatasetT], DatasetT] | None
-    pure_parameters: bool | list[str]
-    return_train_score: bool
-    verbose: int
-    n_jobs: int | None
-    pre_dispatch: int | str
-    progress_bar: bool
-    safe_optimize: bool
-    optimize_with_info: bool
-
-    cv_results_: dict[str, Any]
-    best_params_: dict[str, Any]
-    best_index_: int
-    best_score_: float
-    multimetric_: bool
-    final_optimize_time_: float
-    optimization_info_: Any
-
-    def __init__(
-        self,
-        pipeline: OptimizablePipelineT,
-        parameter_grid: ParameterGrid,
-        *,
-        scoring: ScorerTypes[OptimizablePipelineT, DatasetT],
-        return_optimized: bool | str = True,
-        cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None = None,
-        train_dataset_transform: Callable[[DatasetT], DatasetT] | None = None,
-        pure_parameters: bool | list[str] = False,
-        return_train_score: bool = False,
-        verbose: int = 0,
-        n_jobs: int | None = None,
-        pre_dispatch: int | str = "n_jobs",
-        progress_bar: bool = True,
-        safe_optimize: bool = True,
-        optimize_with_info: bool = True,
-    ) -> None:
-        self.pipeline = pipeline
-        self.parameter_grid = parameter_grid
-        self.scoring = scoring
-        self.return_optimized = return_optimized
-        self.cv = cv
-        self.train_dataset_transform = train_dataset_transform
-        self.pure_parameters = pure_parameters
-        self.return_train_score = return_train_score
-        self.verbose = verbose
-        self.n_jobs = n_jobs
-        self.pre_dispatch = pre_dispatch
-        self.progress_bar = progress_bar
-        self.safe_optimize = safe_optimize
-        self.optimize_with_info = optimize_with_info
-
     def optimize(self, dataset: DatasetT, **optimize_params) -> Self:
         """Run the GridSearchCV on the given dataset.
 
@@ -781,33 +959,8 @@ class GridSearchCV(
         self.dataset = dataset
 
         scoring = _validate_scorer(self.scoring)
-
-        cv = _normalize_splitter(self.cv)
-
-        n_splits = cv.get_n_splits(dataset)
-
-        optimizer = self._wrap_pipeline()
-
-        # For each para combi, we separate the pure parameters (parameters that do not affect the optimization) and
-        # the hyperparameters.
-        # This allows for massive caching optimizations in the `_optimize_and_score`.
-        pure_parameters: list[str] | None
-        if self.pure_parameters is False:
-            pure_parameters = None
-        elif self.pure_parameters is True:
-            pure_parameters = _get_annotated_fields_of_type(self.pipeline, _ParaTypes.PURE)
-        elif isinstance(self.pure_parameters, list):
-            pure_parameters = self.pure_parameters
-        else:
-            raise ValueError(
-                "`self.pure_parameters` must either be a List of field names (nested are allowed) or True/False."
-            )
-
-        parameters = list(self.parameter_grid)
-        split_parameters = _split_hyper_and_pure_parameters(parameters, pure_parameters)
+        n_splits, optimizer, pure_parameters, parameters, split_parameters, splits = self._plan(dataset)
         parameter_prefix = "pipeline__"
-        splits = list(cv.split(dataset))
-
         n_combinations = len(split_parameters) * len(splits)
         pbar = partial(tqdm, total=n_combinations, desc="Split-Para Combos") if self.progress_bar else _passthrough
 
@@ -857,27 +1010,7 @@ class GridSearchCV(
                 # Evaluate each parameter combination
                 out = list(pbar(parallel(tasks())))
         assert out is not None  # For the type checker
-        results = self._format_results(parameters, n_splits, out)
-        self.cv_results_ = results
-
-        first_test_score = out[0]["test__scores"]
-        self.multimetric_ = isinstance(first_test_score, dict)
-        reverse_ranking, return_optimized = _validate_return_optimized(
-            self.return_optimized, self.multimetric_, first_test_score
-        )
-        if return_optimized:
-            assert isinstance(return_optimized, str)
-            (
-                self.best_index_,
-                self.best_score_,
-                self.best_params_,
-            ) = _extract_return_optimize_info(
-                return_optimized,
-                reverse_ranking,
-                results,
-                rank_prefix="rank__test__agg__",
-                score_prefix="mean__test__agg__",
-            )
+        if self._select(parameters, n_splits, out):
             # We clone twice, in case one of the params was itself an algorithm.
             best_optimizer = Optimize(
                 self.pipeline.clone().set_params(**self.best_params_).clone(),
@@ -892,130 +1025,6 @@ class GridSearchCV(
             self.final_optimize_time_ = final_optimize_start_time - time.time()
 
         return self
-
-    def _wrap_pipeline(self):
-        # We need to wrap our pipeline for a consistent interface.
-        # In the future we might be able to allow objects with optimizer Interface as input directly.
-        optimizer = Optimize(
-            self.pipeline,
-            train_dataset_transform=self.train_dataset_transform,
-            safe_optimize=self.safe_optimize,
-            optimize_with_info=self.optimize_with_info,
-        )
-        return optimizer
-
-    def _format_results(self, candidate_params, n_splits, out, more_results=None):  # noqa: C901
-        """Format the final result dict.
-
-        This function is adapted based on sklearn's `BaseSearchCV`.
-        """
-        n_candidates = len(candidate_params)
-        out = _aggregate_final_results(out)
-
-        results = dict(more_results or {})
-
-        def _store_non_numeric(key_name: str, array):
-            """Store non-numeric scores/times to the cv_results_."""
-            # We avoid performing any sort of conversion into numpy arrays as this might modify the dtypes.
-            # Instead we use list comprehension to do the reshaping.
-            # The result is a list of lists and not a numpy array.
-            #
-            # Note that the results were produced by iterating first by splits and then by parameters.
-            # We do the same here, but directly transpose the results, as we need to access the data per parameters
-            # afterwards.
-            iterable_array = iter(array)
-            array = [[next(iterable_array) for _ in range(n_splits)] for _ in range(n_candidates)]
-            # "Transpose" the array
-            array = map(list, zip(*array, strict=True))
-
-            for split_idx, split in enumerate(array):
-                # Uses closure to alter the results
-                results[f"split{split_idx}__{key_name}"] = split
-
-        def _store(key_name: str, array, weights=None, splits=False, rank=False):
-            """Store numeric scores/times to the cv_results_."""
-            # When iterated first by splits, then by parameters
-            # We want `array` to have `n_candidates` rows and `n_splits` cols.
-            array = np.array(array, dtype=np.float64).reshape(n_candidates, n_splits)
-
-            if splits:
-                for split_idx in range(n_splits):
-                    # Uses closure to alter the results
-                    results[f"split{split_idx}__{key_name}"] = array[:, split_idx]
-            array_means = np.average(array, axis=1, weights=weights)
-            results[f"mean__{key_name}"] = array_means
-
-            if key_name.startswith(("train__", "__test")) and np.any(~np.isfinite(array_means)):
-                warnings.warn(
-                    f"One or more of the {key_name.split('__')[0]} scores are non-finite: {array_means}",
-                    category=UserWarning,
-                    stacklevel=2,
-                )
-            # Weighted std is not directly available in numpy
-            array_stds = np.sqrt(np.average((array - array_means[:, np.newaxis]) ** 2, axis=1, weights=weights))
-            results[f"std__{key_name}"] = array_stds
-
-            if rank:
-                rank = np.asarray(rankdata(-array_means, method="min"), dtype=np.int32)
-                results[f"rank__{key_name}"] = rank
-
-        _store("debug__optimize_time", out["debug__optimize_time"])
-        _store("debug__score_time", out["debug__score_time"])
-        _store_non_numeric("test__data_labels", out["test__data_labels"])
-        _store_non_numeric("train__data_labels", out["train__data_labels"])
-        # Use one MaskedArray and mask all the places where the param is not
-        # applicable for that candidate. Use defaultdict as each candidate may
-        # not contain all the params
-        param_results: dict = defaultdict(
-            partial(
-                MaskedArray,
-                np.empty(
-                    n_candidates,
-                ),
-                mask=True,
-                dtype=object,
-            )
-        )
-        for cand_idx, params in enumerate(candidate_params):
-            for name, value in params.items():
-                # An all masked empty array gets created for the key
-                # `"param_{name}"` at the first occurrence of `name`.
-                # Setting the value at an index also unmasks that index
-                param_results[f"param__{name}"][cand_idx] = value
-
-        results.update(param_results)
-        # Store a list of param dicts at the key 'params'
-        results["params"] = candidate_params
-
-        test_scores_dict = _prefix_para_dict(_normalize_score_results(out["test__scores"]) or {}, "agg__")
-        test_single_scores_dict = _prefix_para_dict(
-            _normalize_score_results(out["test__single__scores"]) or {}, "single__"
-        )
-        for scorer_name in test_scores_dict:
-            # Computed the (weighted) mean and std for test scores alone
-            _store(
-                f"test__{scorer_name}",
-                test_scores_dict[scorer_name],
-                splits=True,
-                rank=True,
-                weights=None,
-            )
-        for scorer_name in test_single_scores_dict:
-            # Because of custom aggregators, it can be that single scores dicts have different keys than the aggregated
-            # scores.
-            _store_non_numeric(f"test__{scorer_name}", test_single_scores_dict[scorer_name])
-
-        if self.return_train_score:
-            train_scores_dict = _normalize_score_results(out["train__scores"])
-            train_single_scores_dict = _prefix_para_dict(
-                _normalize_score_results(out["train__single__scores"]) or {}, "single__"
-            )
-            for scorer_name in train_scores_dict:
-                _store(f"train__{scorer_name}", train_scores_dict[scorer_name], splits=True)
-            for scorer_name in train_single_scores_dict:
-                _store_non_numeric(f"train__{scorer_name}", train_single_scores_dict[scorer_name])
-
-        return results
 
 
 def _validate_return_optimized(return_optimized, multi_metric, results) -> tuple[bool, str | Literal[False]]:
