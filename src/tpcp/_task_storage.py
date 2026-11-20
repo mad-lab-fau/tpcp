@@ -2,8 +2,9 @@
 
 import sqlite3
 import threading
-from contextlib import closing, contextmanager
+from contextlib import AbstractContextManager, closing, contextmanager
 from dataclasses import astuple, dataclass
+from typing import Protocol
 
 
 @dataclass(frozen=True)
@@ -15,6 +16,19 @@ class TaskRecord:
     started: float
     finished: float | None
     artifact: str | None
+
+
+class TaskTransaction(Protocol):
+    """Read and replace records under one serializable transaction."""
+
+    def get(self, task_id: str) -> TaskRecord | None: ...
+    def put(self, record: TaskRecord) -> None: ...
+
+
+class TaskStorage(Protocol):
+    """Roll back on exception and commit all changes on normal exit."""
+
+    def transaction(self) -> AbstractContextManager[TaskTransaction]: ...
 
 
 class _Records:

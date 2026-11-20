@@ -7,11 +7,12 @@ import functools
 import inspect
 import multiprocessing
 import os
+import queue as queue_module
 import threading
 import time
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import Context, ContextVar, copy_context
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from itertools import count
 from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, TypeVar, cast, overload
 
@@ -76,6 +77,8 @@ class BoundTask(Job[T]):
         from tpcp._task_worker import active_worker
 
         worker = active_worker.get()
+        if self.cached and worker is None:
+            raise RuntimeError("CachedTask requires an active Worker.")
         return (worker.execute(self) if worker else self._execute()).__await__()
 
     async def _execute(self) -> T:
@@ -90,47 +93,69 @@ P = ParamSpec("P")
 Resource = Literal["cpu", "gpu"]
 
 
-class _TaskFactory(BoundTask[T], Generic[P, T]):
-    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> BoundTask[T]:
-        return BoundTask(
-            self.func, args, kwargs, self.metadata, self.resource, self.pass_context, self.kind, self.cached
-        )
+R = TypeVar("R")
 
 
-@overload
-def Task(
-    func: Callable[P, Awaitable[T]], *, resource: Resource = ..., kind: Literal["workflow"] = ...
-) -> _TaskFactory[P, T]: ...
-
-
-@overload
-def Task(
-    func: Callable[P, T], *, resource: Resource = ..., metadata: dict[str, Any] | None = ...
-) -> _TaskFactory[P, T]: ...
-
-
-@overload
-def Task(
-    func: Callable[..., T],
-    *,
-    args: tuple | Callable[[], tuple],
-    kwargs: dict | None = ...,
-    resource: Resource = ...,
-    metadata: dict | None = ...,
-) -> BoundTask[T]: ...
-
-
-def Task(
-    func, *, resource: Resource = "cpu", kind=None, metadata=None, args=(), kwargs=None, pass_context=False
-) -> BoundTask:  # noqa: N802
+class Task(BoundTask[T]):
     """Configure a lazy call. Bind the function arguments with a second call."""
-    kind = kind or ("workflow" if inspect.iscoroutinefunction(func) else "worker")
-    return _TaskFactory(func, args, kwargs or {}, metadata or {}, resource, pass_context, kind)
+
+    @overload
+    def __new__(
+        cls, func: Callable[P, Awaitable[R]], *, resource: Resource = ..., kind: Literal["workflow"] = ...
+    ) -> _TaskFactory[P, R]: ...
+
+    @overload
+    def __new__(
+        cls, func: Callable[P, R], *, resource: Resource = ..., metadata: dict | None = ...
+    ) -> _TaskFactory[P, R]: ...
+
+    @overload
+    def __new__(
+        cls,
+        func: Callable[..., R],
+        args: tuple | Callable[[], tuple],
+        kwargs: dict | None = ...,
+        metadata: dict | None = ...,
+        resource: Resource = ...,
+        pass_context: bool = ...,
+        kind: str | None = ...,
+    ) -> Task[R]: ...
+
+    def __new__(cls, *_args, **_kwargs) -> Task:
+        # Preserve the generic prototype class while the factory tracks the callable signature.
+        return object.__new__(_TaskFactory if cls is Task else cls)
+
+    def __init__(
+        self,
+        func,
+        args=(),
+        kwargs=None,
+        metadata=None,
+        resource: Resource = "cpu",
+        pass_context=False,
+        kind=None,
+        cached=False,
+    ):
+        kind = kind or ("workflow" if inspect.iscoroutinefunction(func) else "worker")
+        super().__init__(func, args, kwargs or {}, metadata or {}, resource, pass_context, kind, cached)
 
 
-def CachedTask(func: Callable[P, T], *, resource: Resource = "cpu") -> _TaskFactory[P, T]:  # noqa: N802
+class _TaskFactory(Task[T], Generic[P, T]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> BoundTask[T]:
+        return replace(self, args=args, kwargs=kwargs)
+
+
+@overload
+def CachedTask(func: Callable[P, Awaitable[T]], *, resource: Resource = ...) -> _TaskFactory[P, T]: ...
+
+
+@overload
+def CachedTask(func: Callable[P, T], *, resource: Resource = ...) -> _TaskFactory[P, T]: ...
+
+
+def CachedTask(func, *, resource: Resource = "cpu") -> _TaskFactory:  # noqa: N802
     """Coordinate a function using its original joblib Memory cache entry."""
-    return _TaskFactory(func, resource=resource, cached=True)
+    return cast("_TaskFactory", replace(Task(func, resource=resource), cached=True))
 
 
 @dataclass(frozen=True)
@@ -252,6 +277,20 @@ async def _gather_with_progress(coroutines, *, total: int, desc: str, progress_b
     return [task.result() for task in tasks]
 
 
+class _SharedSlots:
+    """A capacity budget available to coordinators on separate event loops."""
+
+    def __init__(self, count):
+        self.slots = threading.BoundedSemaphore(count)
+
+    async def __aenter__(self):
+        while not self.slots.acquire(blocking=False):
+            await asyncio.sleep(0.01)
+
+    async def __aexit__(self, *exc):
+        self.slots.release()
+
+
 class _AsyncExecution:
     def __init__(
         self,
@@ -268,6 +307,7 @@ class _AsyncExecution:
         self._job_ids = count()
         self._batch_ids = count()
         self.users = 0
+        self.coordinated = False
         # Keep joblib's pool configuration and serialization in one adapter.
         # Going through Parallel's configuration also preserves worker thread
         # limits and the exact arguments used to select its reusable executor.
@@ -294,9 +334,12 @@ class _AsyncExecution:
             context_id=self._context_id,
             **executor_kwargs,
         )
+        # Coordinated participants sharing this pool share its admission budget.
+        self.claim_slots = _SharedSlots(n_jobs)
+        self.gpu_claim_slots = _SharedSlots(n_gpu_jobs)
         self._slots = asyncio.Semaphore(n_jobs)
         self._gpu_slots = asyncio.Semaphore(n_gpu_jobs)
-        self._gpu_ids: asyncio.Queue[int] = asyncio.Queue()
+        self._gpu_ids: queue_module.Queue[int] = queue_module.Queue()
         for slot in range(n_gpu_jobs):
             self._gpu_ids.put_nowait(gpu_ids[slot % len(gpu_ids)])
         self._n_gpu_jobs = n_gpu_jobs
@@ -438,6 +481,13 @@ class _AsyncExecution:
         )
         return True
 
+    async def _acquire_gpu_id(self):
+        while True:
+            try:
+                return self._gpu_ids.get_nowait()
+            except queue_module.Empty:
+                await asyncio.sleep(0.01)
+
     async def _dispatch(self, resource):
         queue = self._queues[resource]
         while True:
@@ -452,7 +502,7 @@ class _AsyncExecution:
                 if resource == "gpu":
                     await self._gpu_slots.acquire()
                     gpu_acquired = True
-                    gpu_id = self._gpu_ids.get_nowait()
+                    gpu_id = await self._acquire_gpu_id()
                 await self._slots.acquire()
                 cpu_acquired = True
                 requests = self._take_batch(queue, request, resource)
@@ -468,7 +518,8 @@ class _AsyncExecution:
                 if cpu_acquired:
                     self._slots.release()
                 if gpu_acquired:
-                    self._gpu_ids.put_nowait(cast("int", gpu_id))
+                    if gpu_id is not None:
+                        self._gpu_ids.put_nowait(gpu_id)
                     self._gpu_slots.release()
 
     def _batch_finished(self, future, *, requests, resource, gpu_id, started):
@@ -513,12 +564,11 @@ class _AsyncExecution:
 
 
 _current_execution: ContextVar[_AsyncExecution | None] = ContextVar("tpcp_async_execution", default=None)
-_active_execution: _AsyncExecution | None = None
+_active_executions: dict[asyncio.AbstractEventLoop, _AsyncExecution] = {}
 _execution_ownership_lock = threading.Lock()
 
 
-@asynccontextmanager
-async def execution_context(
+def execution_context(
     *,
     n_jobs: int = 1,
     n_gpu_jobs: int = 0,
@@ -546,6 +596,17 @@ async def execution_context(
     Overlapping contexts share the same execution adapter and must use identical
     configuration, so they cannot replace joblib's active singleton pool.
     """
+    return _execution_context(
+        n_jobs=n_jobs,
+        n_gpu_jobs=n_gpu_jobs,
+        gpu_ids=gpu_ids,
+        on_job_event=on_job_event,
+        coordinated=False,
+        **parallel_kwargs,
+    )
+
+
+def _device_configuration(n_jobs, n_gpu_jobs, gpu_ids):
     if n_jobs < 1:
         raise ValueError("n_jobs must be positive.")
     if n_gpu_jobs < 0:
@@ -553,21 +614,33 @@ async def execution_context(
     devices = tuple(range(n_gpu_jobs)) if gpu_ids is None else tuple(gpu_ids)
     if n_gpu_jobs and not devices:
         raise ValueError("GPU slots require at least one gpu_id.")
-    global _active_execution  # noqa: PLW0603
+    return devices
+
+
+@asynccontextmanager
+async def _execution_context(*, n_jobs, n_gpu_jobs, coordinated, gpu_ids=None, on_job_event=None, **parallel_kwargs):
+    devices = _device_configuration(n_jobs, n_gpu_jobs, gpu_ids)
+    loop = asyncio.get_running_loop()
     with _execution_ownership_lock:
-        if _active_execution is not None:
-            if _active_execution.loop is not asyncio.get_running_loop():
+        active = next(iter(_active_executions.values()), None)
+        execution = _active_executions.get(loop)
+        if active is not None:
+            if execution is None and not (coordinated and all(e.coordinated for e in _active_executions.values())):
                 raise RuntimeError("Overlapping execution contexts must use the same event loop.")
-            if _active_execution._closing:
-                raise RuntimeError("The active execution context is closing.")
-            if _active_execution.configuration != (n_jobs, n_gpu_jobs, devices, on_job_event, parallel_kwargs):
+            if active.configuration != (n_jobs, n_gpu_jobs, devices, on_job_event, parallel_kwargs):
                 raise ValueError("Overlapping execution contexts require identical configuration.")
-            execution = _active_execution
-        else:
+        if execution is None:
             execution = _AsyncExecution(
                 n_jobs, n_gpu_jobs=n_gpu_jobs, gpu_ids=devices, on_job_event=on_job_event, **parallel_kwargs
             )
-            _active_execution = execution
+            execution.coordinated = coordinated
+            if active is not None:
+                execution.claim_slots = active.claim_slots
+                execution.gpu_claim_slots = active.gpu_claim_slots
+                execution._gpu_ids = active._gpu_ids
+            _active_executions[loop] = execution
+        elif execution._closing:
+            raise RuntimeError("The active execution context is closing.")
         execution.users += 1
     token = _current_execution.set(execution)
     try:
@@ -582,7 +655,7 @@ async def execution_context(
                 await execution.close()
             finally:
                 with _execution_ownership_lock:
-                    _active_execution = None
+                    del _active_executions[loop]
 
 
 async def run_in_worker(func: Callable[..., T] | Job[T], /, *args: Any, **kwargs: Any) -> T:

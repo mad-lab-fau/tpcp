@@ -8,14 +8,14 @@ import uuid
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager, suppress
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, cast
 
 from joblib import Memory
 from joblib import hash as joblib_hash
 
-from tpcp._async_execution import BoundTask, execution_context
+from tpcp._async_execution import BoundTask, _execution_context
 from tpcp._task_artifacts import CallArtifacts
-from tpcp._task_storage import InMemoryTaskStorage, TaskRecord
+from tpcp._task_storage import InMemoryTaskStorage, TaskRecord, TaskStorage
 
 T = TypeVar("T")
 active_worker: ContextVar[Worker | None] = ContextVar("active_worker", default=None)
@@ -51,15 +51,22 @@ def _scope_value():
 class Worker:
     """Run tasks with local capacity and share their results through storage and Memory."""
 
-    def __init__(self, memory: Memory, storage=None, *, n_jobs=1, n_gpu_jobs=0, lease_seconds=60, **pool_options):
+    def __init__(
+        self,
+        memory: Memory,
+        storage: TaskStorage | None = None,
+        *,
+        n_jobs=1,
+        n_gpu_jobs=0,
+        lease_seconds: float = 60,
+        **pool_options,
+    ):
         if memory.store_backend is None or lease_seconds <= 0:
             raise ValueError("Worker requires filesystem Memory and a positive lease_seconds.")
         self.memory = memory
         self.storage = InMemoryTaskStorage() if storage is None else storage
         self.lease_seconds = lease_seconds
-        self._pool = execution_context(n_jobs=n_jobs, n_gpu_jobs=n_gpu_jobs, **pool_options)
-        self._slots = asyncio.Semaphore(n_jobs)
-        self._gpu = asyncio.Semaphore(n_gpu_jobs)
+        self._pool = _execution_context(coordinated=True, n_jobs=n_jobs, n_gpu_jobs=n_gpu_jobs, **pool_options)
         self._gpu_count = n_gpu_jobs
         self._scope_slots = asyncio.Semaphore(n_jobs)
         self._scope: ContextVar[tuple] = ContextVar("worker_scope", default=())
@@ -67,24 +74,34 @@ class Worker:
         self._pending = {}
 
     async def __aenter__(self):
-        await self._pool.__aenter__()
+        execution = await self._pool.__aenter__()
+        self._slots = execution.claim_slots
+        self._gpu = execution.gpu_claim_slots
         self._token = active_worker.set(self)
         return self
 
     async def __aexit__(self, *exc):
+        cancellation = None
         try:
             while self._pending:
-                await asyncio.gather(*self._pending.values(), return_exceptions=True)
+                drain = asyncio.gather(*self._pending.values(), return_exceptions=True)
+                while not drain.done():
+                    try:
+                        await asyncio.shield(drain)
+                    except asyncio.CancelledError as error:
+                        cancellation = error
+            if cancellation is not None:
+                raise cancellation
         finally:
             active_worker.reset(self._token)
             await self._pool.__aexit__(*exc)
 
     def scope(self, key):
+        """Append a stable identity to ordinary tasks prepared inside this block."""
         return self._enter_scope(("scope", key))
 
     @contextmanager
     def _enter_scope(self, key):
-        """Append a stable identity to ordinary tasks prepared inside this block."""
         token = self._scope.set((*self._scope.get(), joblib_hash(key)))
         try:
             yield
@@ -117,6 +134,10 @@ class Worker:
             self._check(records, parent)
 
     def acquire(self, prepared: PreparedTask[T]) -> Decision[T]:
+        """Claim available work or return the existing attempt."""
+        return cast("Decision[T]", self._decide(prepared, claim=True))
+
+    def _decide(self, prepared: PreparedTask[T], *, claim: bool) -> Decision[T] | None:
         with self.storage.transaction() as records:
             self._check_parents(records, prepared)
             now = time.time()
@@ -132,11 +153,13 @@ class Worker:
                     previous = TaskRecord(prepared.task_id, "completed", attempt, now, now, now, artifact)
                     records.put(previous)
                 return Decision(prepared, previous, False)
+            if not claim:
+                return None
             record = TaskRecord(prepared.task_id, "running", attempt, now + self.lease_seconds, now, None, None)
             records.put(record)
             return Decision(prepared, record, True)
 
-    def _update(self, decision, status, value=None):
+    def _update(self, decision, status, stage=None):
         with self.storage.transaction() as records:
             self._check_parents(records, decision.prepared)
             record = decision.record
@@ -145,7 +168,7 @@ class Worker:
             reference = None
             if status == "completed":
                 reference = decision.prepared.artifacts.reference(record.attempt)
-                decision.prepared.artifacts.publish(reference, value, now - record.started)
+                decision.prepared.artifacts.publish(reference, stage)
             records.put(
                 replace(
                     record,
@@ -155,6 +178,11 @@ class Worker:
                     artifact=reference,
                 )
             )
+
+    def _publish(self, decision, value):
+        duration = time.time() - decision.record.started
+        with decision.prepared.artifacts.stage(value, duration) as stage:
+            self._update(decision, "completed", stage)
 
     @asynccontextmanager
     async def _maintain(self, decision):
@@ -177,6 +205,9 @@ class Worker:
     async def run(self, claim: Decision[T]) -> T:
         if not claim.acquired:
             raise ValueError("run requires an acquired claim")
+        return await self._shared_call(("claim", claim.record.attempt), self._run, claim)
+
+    async def _run(self, claim):
         self._update(claim, "running")
         async with self._maintain(claim):
             worker_token = active_worker.set(self)
@@ -188,7 +219,9 @@ class Worker:
                 self._parents.reset(parent_token)
                 self._scope.reset(scope_token)
                 active_worker.reset(worker_token)
-            self._update(claim, "completed", value)
+            await asyncio.to_thread(self._publish, claim, value)
+            if self.memory.mmap_mode:
+                return await self.result(claim)
             return value
 
     async def result(self, decision: Decision[T]) -> T:
@@ -198,33 +231,39 @@ class Worker:
                 self._check_parents(records, decision.prepared)
                 record = records.get(decision.prepared.task_id)
                 if record and record.status == "completed" and decision.prepared.artifacts.available(record.artifact):
-                    return decision.prepared.artifacts.load(record.artifact)
+                    break
                 if not record or record.status != "running" or record.expires <= time.time():
                     raise ClaimLostError("Result unavailable. Acquire the prepared task again.")
             await asyncio.sleep(min(0.05, self.lease_seconds / 3))
+        return await asyncio.to_thread(decision.prepared.artifacts.load, record.artifact)
 
     async def _execute(self, prepared):
         while True:
-            async with AsyncExitStack() as capacity:
-                if prepared.task.kind == "worker":
-                    if prepared.task.resource == "gpu":
-                        if not self._gpu_count:
-                            raise ValueError("GPU tasks require n_gpu_jobs > 0")
-                        await capacity.enter_async_context(self._gpu)
-                    await capacity.enter_async_context(self._slots)
-                decision = self.acquire(prepared)
-                if decision.acquired:
-                    return await self.run(decision)
+            decision = self._decide(prepared, claim=False)
+            if decision is None:
+                async with AsyncExitStack() as capacity:
+                    if prepared.task.kind == "worker":
+                        if prepared.task.resource == "gpu":
+                            if not self._gpu_count:
+                                raise ValueError("GPU tasks require n_gpu_jobs > 0")
+                            await capacity.enter_async_context(self._gpu)
+                        await capacity.enter_async_context(self._slots)
+                    decision = self.acquire(prepared)
+                    if decision.acquired:
+                        return await self.run(decision)
             try:
                 return await self.result(decision)
             except ClaimLostError:
                 continue
 
     async def execute(self, task: BoundTask[T]) -> T:
-        prepared = self.prepare(task)
+        prepared = await asyncio.to_thread(self.prepare, task)
         key = (prepared.task_id, tuple(p.attempt for p in prepared.parents))
+        return await self._shared_call(key, self._execute, prepared)
+
+    async def _shared_call(self, key, operation, argument):
         if key not in self._pending:
-            future = asyncio.create_task(self._execute(prepared))
+            future = asyncio.create_task(operation(argument))
             self._pending[key] = future
 
             def finished(done):
@@ -266,7 +305,7 @@ class _Subtask:
     async def complete(self, value):
         if not self.acquired:
             raise ValueError("Only the owner may complete a subtask")
-        self.worker._update(self.decision, "completed", value)
+        await asyncio.to_thread(self.worker._publish, self.decision, value)
         self.completed = True
 
     async def result(self):

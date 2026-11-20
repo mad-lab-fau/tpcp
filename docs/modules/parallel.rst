@@ -155,10 +155,10 @@ directory. A multi-machine deployment would require a server database.
     from joblib import Memory
     from tpcp.parallel import CachedTask, SQLiteTaskStorage, Task, Worker
 
-    async def evaluate_fold(fold_id, data):
+    async def evaluate_fold(dataset_revision, fold_id, data):
         memory = Memory("artifacts", verbose=0)
         async with Worker(memory, SQLiteTaskStorage("tasks.sqlite"), n_jobs=2) as worker:
-            with worker.scope("study-2026"):
+            with worker.scope(("study-2026", dataset_revision)):
                 async with worker.subtask("fold", key=fold_id) as fold:
                     if fold.acquired:
                         features = await CachedTask(transform)(data)
@@ -183,8 +183,10 @@ worker.acquire(prepared) when capacity is available. Inspect
 decision.record for the attempt, status, timestamps and artifact reference.
 An acquired claim needs await worker.run(decision). For an existing claim,
 choose other work or await worker.result(decision). If its owner fails or
-its lease expires, acquire again. A stalled owner can duplicate computation
-after takeover. Publication checks the attempt and enclosing scope leases.
+its lease expires, acquire again. If the enclosing subtask expired, re-enter
+that subtask and prepare its children under the new claim. A stalled owner can
+duplicate computation after takeover. Publication checks the ordinary task
+attempt and all enclosing leases. CachedTask checks its independent lease.
 
 Earlier experimental examples bound arguments using Task(fn, args=(x,)).
 Use Task(fn)(x). Put scheduling options on the first call and function

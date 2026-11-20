@@ -3,7 +3,11 @@
 import json
 import os
 import time
+from contextlib import contextmanager
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
+from joblib import dump
 from joblib import hash as joblib_hash
 from joblib.func_inspect import filter_args
 
@@ -32,16 +36,29 @@ class CallArtifacts:
             return self.function._is_in_cache_and_valid(self.call_id)
         return reference and self.backend.contains_item(json.loads(reference))
 
-    def publish(self, reference, value, duration):
-        key = tuple(json.loads(reference))
-        self.backend.dump_item(key, value, verbose=0)
-        if not self.backend.contains_item(key):
-            raise OSError("Joblib failed to persist the task result.")
+    @contextmanager
+    def stage(self, value, duration):
+        # Keep scratch on the artifact filesystem so promotion is an atomic rename.
+        with TemporaryDirectory(dir=self.backend.location, prefix=".tpcp-stage-") as directory:
+            stage = Path(directory)
+            with (stage / "output.pkl").open("wb") as output:
+                dump(value, output, compress=self.backend.compress)
+            if self.cached:
+                inputs = filter_args(self.function.func, self.function.ignore, self.args, self.kwargs)
+                metadata = {
+                    "time": time.time(),
+                    "duration": duration,
+                    "input_args": {k: repr(v) for k, v in inputs.items()},
+                }
+                (stage / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+            yield stage
+
+    def publish(self, reference, stage):
+        destination = Path(self.backend.location).joinpath(*json.loads(reference))
+        destination.mkdir(parents=True, exist_ok=True)
         if self.cached:
-            inputs = filter_args(self.function.func, self.function.ignore, self.args, self.kwargs)
-            self.backend.store_metadata(
-                key, {"time": time.time(), "duration": duration, "input_args": {k: repr(v) for k, v in inputs.items()}}
-            )
+            (stage / "metadata.json").replace(destination / "metadata.json")
+        (stage / "output.pkl").replace(destination / "output.pkl")
 
     def load(self, reference):
         return self.backend.load_item(tuple(json.loads(reference)), verbose=0)

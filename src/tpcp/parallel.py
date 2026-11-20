@@ -406,15 +406,18 @@ __all__ = [
     "CachedTask",
     "ClaimLostError",
     "Decision",
-    "PreparedTask",
     "InMemoryTaskStorage",
-    "SQLiteTaskStorage",
-    "Worker",
     "Job",
     "JobEvent",
     "Parallel",
+    "PreparedTask",
+    "SQLiteTaskStorage",
     "Task",
     "TaskConfig",
+    "TaskRecord",
+    "TaskStorage",
+    "TaskTransaction",
+    "Worker",
     "WorkerContext",
     "delayed",
     "execution_context",
@@ -445,6 +448,11 @@ from tpcp._async_execution import (  # noqa: E402
     job_metadata,
     run_in_worker,
 )
-
-from tpcp._task_storage import InMemoryTaskStorage, SQLiteTaskStorage  # noqa: E402
+from tpcp._task_storage import (  # noqa: E402
+    InMemoryTaskStorage,
+    SQLiteTaskStorage,
+    TaskRecord,
+    TaskStorage,
+    TaskTransaction,
+)
 from tpcp._task_worker import ClaimLostError, Decision, PreparedTask, Worker  # noqa: E402
