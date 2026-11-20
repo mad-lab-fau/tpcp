@@ -81,6 +81,13 @@ def test_scope_takeover_fences_child_and_reuses_completed_results(tmp_path):
                 with pytest.raises(ClaimLostError):
                     await first.run(pending)
                 await new.complete(value)
+            from tpcp.aio import Algorithm
+
+            async def local_action():
+                pytest.fail("A stale owner executed a caller-owned action")
+
+            with pytest.raises(ClaimLostError):
+                await first.execute(Algorithm().action(local_action))
             with pytest.raises(ClaimLostError):
                 await old.complete("stale")
             raise ClaimLostError("leave expired owner")

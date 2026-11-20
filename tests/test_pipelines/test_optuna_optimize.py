@@ -689,13 +689,13 @@ def test_async_study_runs_each_time(custom, tmp_path):
         def create_objective(self):
             return lambda _trial, _pipeline, _dataset: 1.0
 
-    options = dict(
-        pipeline=DummyPipeline(),
-        get_study_params=study_params,
-        n_trials=1,
-        callbacks=[callback],
-        return_optimized=False,
-    )
+    options = {
+        "pipeline": DummyPipeline(),
+        "get_study_params": study_params,
+        "n_trials": 1,
+        "callbacks": [callback],
+        "return_optimized": False,
+    }
     optimizer = (
         Study(**options)
         if custom
