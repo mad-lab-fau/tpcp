@@ -268,7 +268,9 @@ async def _cross_validate_async(
                 ):
                     scores = cast(
                         "dict[str, Any]",
-                        await Task(_score, resource=resource)(optimizer.optimized_pipeline_, subset, scorer, None),
+                        await Task(_score, resource=resource)(
+                            optimizer.optimized_pipeline_, cast("Dataset", subset), scorer, None
+                        ),
                     )
                 result[f"{prefix}__scores"] = scores["scores"]
                 result[f"{prefix}__single__scores"] = scores["single__scores"]

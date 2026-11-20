@@ -283,3 +283,33 @@ def test_prepared_workflow_runs_children_in_captured_scope(tmp_path):
                 assert await Task(sample)(resource="nested") != expected
 
     asyncio.run(scenario())
+
+
+def test_staging_large_result_leaves_coordinator_and_storage_available(tmp_path):
+    """A slow serializer cannot block heartbeats or prevent other claims."""
+    from threading import Event
+
+    writing, release = Event(), Event()
+
+    class SlowResult:
+        def __reduce__(self):
+            writing.set()
+            if not release.wait(5):
+                raise TimeoutError("serialization blocked the coordinator")
+            return int, (42,)
+
+    async def scenario():
+        async with Worker(Memory(tmp_path)) as worker:
+            async with worker.subtask("fold", key=1) as fold:
+                pending = asyncio.create_task(fold.complete(SlowResult()))
+                try:
+                    assert await asyncio.to_thread(writing.wait, 5)
+                    assert worker.acquire(worker.prepare(Task(sample)(resource="independent"))).acquired
+                finally:
+                    release.set()
+                await pending
+            async with worker.subtask("fold", key=1) as replay:
+                assert not replay.acquired
+                assert await replay.result() == 42
+
+    asyncio.run(scenario())
