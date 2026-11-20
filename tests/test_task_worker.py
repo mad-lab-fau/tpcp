@@ -4,6 +4,7 @@ import asyncio
 import uuid
 from typing import TYPE_CHECKING, Any
 
+import pytest
 from joblib import Memory
 
 from tpcp.parallel import CachedTask, InMemoryTaskStorage, Task, Worker
@@ -418,3 +419,249 @@ def test_replacement_during_failed_load_is_preserved(tmp_path, monkeypatch):
             assert value == replacement[0] != old
 
     asyncio.run(scenario())
+
+
+def test_worker_loop_binding_and_owner_identity(tmp_path):
+    """Deferred arguments run on the loop and an ordinary owner keeps its value."""
+
+    async def scenario():
+        value = []
+
+        async def workflow(*, argument):
+            assert argument == 2
+            return value
+
+        kwargs = {}
+        metadata = {}
+
+        def args():
+            asyncio.get_running_loop()
+            return ()
+
+        task = Task(workflow, args=args, kwargs=kwargs, metadata=metadata)
+        kwargs["argument"] = 2
+        metadata["fold"] = 1
+        assert task.metadata == metadata
+        async with Worker(Memory(tmp_path, mmap_mode="r")):
+            assert await task is value
+            assert await task is not value
+
+    asyncio.run(scenario())
+
+
+def test_explicit_run_cancellation_releases_lease(tmp_path):
+    """A timed-out owner immediately yields its claim."""
+
+    async def scenario():
+        release = asyncio.Event()
+
+        async def blocked():
+            await release.wait()
+
+        async with Worker(Memory(tmp_path)) as worker:
+            prepared = worker.prepare(Task(blocked)())
+            try:
+                with pytest.raises(TimeoutError):
+                    await asyncio.wait_for(worker.run(worker.acquire(prepared)), 0.05)
+                assert worker.acquire(prepared).acquired
+            finally:
+                release.set()
+
+    asyncio.run(scenario())
+
+
+def test_cancelled_staging_cannot_publish(tmp_path, monkeypatch):
+    """A cancelled serializer cannot overwrite its replacement."""
+    from contextlib import contextmanager
+    from threading import Event
+
+    from tpcp._task_artifacts import CallArtifacts
+
+    entered, release, discarded = Event(), Event(), Event()
+    original_stage = CallArtifacts.stage
+
+    @contextmanager
+    def stage(self, value, duration):
+        try:
+            with original_stage(self, value, duration) as path:
+                yield path
+        finally:
+            if isinstance(value, SlowResult):
+                discarded.set()
+
+    class SlowResult:
+        def __reduce__(self):
+            entered.set()
+            assert release.wait(5)
+            return int, (99,)
+
+    monkeypatch.setattr(CallArtifacts, "stage", stage)
+
+    async def scenario():
+        async with Worker(Memory(tmp_path)) as worker:
+            async with worker.subtask("fold", key=1) as sub:
+                pending = asyncio.create_task(sub.complete(SlowResult()))
+                try:
+                    assert await asyncio.to_thread(entered.wait, 5)
+                    pending.cancel()
+                    with pytest.raises(asyncio.CancelledError):
+                        await pending
+                finally:
+                    release.set()
+                assert await asyncio.to_thread(discarded.wait, 5)
+                await sub.complete(42)
+            async with worker.subtask("fold", key=1) as peer:
+                assert await peer.result() == 42
+
+    asyncio.run(scenario())
+
+
+def test_plain_memory_repairs_recorded_damage(tmp_path):
+    """Replay an external repair committed after a failed load."""
+    import json
+    from pathlib import Path
+
+    from tpcp.parallel import ClaimLostError
+
+    memory = Memory(tmp_path)
+
+    async def scenario():
+        async with Worker(memory) as worker:
+            task = CachedTask(sample)(resource="cpu")
+            old = await task
+            prepared = worker.prepare(task)
+            decision = worker.acquire(prepared)
+            assert decision.record.artifact is not None
+            output = Path(prepared.artifacts.backend.location, *json.loads(decision.record.artifact), "output.pkl")
+            output.write_bytes(b"broken")
+            with pytest.raises(ClaimLostError):
+                await worker.result(decision)
+            output.unlink()
+            cached: Any = memory.cache(sample)
+            repaired = cached(resource="cpu")
+            assert await task == repaired != old
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("scope", [False, True])
+def test_stalled_coordinator_releases_expired_capacity(tmp_path, scope):
+    """A second loop can take over a stalled leaf or top-level scope with one slot."""
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event, current_thread
+
+    from tpcp.parallel import ClaimLostError
+
+    stalled, resume = Event(), Event()
+    storage = InMemoryTaskStorage()
+    events = []
+
+    def on_event(event):
+        events.append(event)
+        if not scope and event.status == "completed" and current_thread().name.startswith("owner"):
+            stalled.set()
+            assert resume.wait(10)
+
+    async def participant(owner):
+        async with Worker(Memory(tmp_path), storage, n_gpu_jobs=1, lease_seconds=0.25, on_job_event=on_event) as worker:
+            if scope:
+                async with worker.subtask("fold", key=1) as sub:
+                    assert sub.acquired
+                    if owner:
+                        stalled.set()
+                        assert resume.wait(10)
+                    await sub.complete(42)
+            else:
+                await Task(sample, resource="gpu")(resource="gpu")
+
+    with ThreadPoolExecutor(1, thread_name_prefix="owner") as executor:
+        pending = executor.submit(asyncio.run, participant(True))
+        try:
+            assert stalled.wait(10)
+
+            async def takeover():
+                await asyncio.sleep(0.35)
+                await asyncio.wait_for(participant(False), 5)
+
+            asyncio.run(takeover())
+        finally:
+            resume.set()
+        with pytest.raises(ClaimLostError):
+            pending.result()
+    if not scope:
+        completed = [event for event in events if event.status == "completed"]
+        assert len({event.job_id for event in completed}) == 2
+        assert len({event.worker.batch_id for event in completed}) == 2
+
+
+def test_publication_uses_coordinator_storage_thread(tmp_path):
+    """A storage transaction can use a thread-affine connection."""
+    from threading import get_ident
+
+    owner = get_ident()
+
+    class Storage(InMemoryTaskStorage):
+        def transaction(self):
+            assert get_ident() == owner
+            return super().transaction()
+
+    async def scenario():
+        async with Worker(Memory(tmp_path), Storage()):
+            await Task(sample)(resource="cpu")
+
+    asyncio.run(scenario())
+
+
+def test_legacy_context_checks_existing_loop_adapter(tmp_path):
+    """An existing Worker adapter cannot bypass single-loop context ownership."""
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    from tpcp.parallel import execution_context
+
+    ready, try_context, checked = Event(), Event(), Event()
+
+    async def other_loop():
+        async with Worker(Memory(tmp_path)):
+            ready.set()
+            assert await asyncio.to_thread(try_context.wait, 5)
+            with pytest.raises(RuntimeError, match="same event loop"):
+                async with execution_context():
+                    pass
+            checked.set()
+
+    async def scenario():
+        async with Worker(Memory(tmp_path)):
+            with ThreadPoolExecutor(1) as executor:
+                peer = executor.submit(asyncio.run, other_loop())
+                try:
+                    assert await asyncio.to_thread(ready.wait, 5)
+                    async with execution_context():
+                        try_context.set()
+                        assert await asyncio.to_thread(checked.wait, 5)
+                finally:
+                    try_context.set()
+                peer.result()
+
+    asyncio.run(scenario())
+
+
+def test_upgrade_existing_task_records(tmp_path):
+    """Open a seven-column task database and preserve its existing rows."""
+    import sqlite3
+    from contextlib import closing
+
+    from tpcp.parallel import SQLiteTaskStorage
+
+    path = tmp_path / "tasks.sqlite"
+    with closing(sqlite3.connect(path)) as connection, connection:
+        connection.execute(
+            "CREATE TABLE tasks (task_id TEXT PRIMARY KEY, status, attempt, expires, started, finished, artifact)"
+        )
+        connection.execute("INSERT INTO tasks VALUES ('key','completed','owner',0,0,0,'artifact')")
+    with SQLiteTaskStorage(path).transaction() as records:
+        record = records.get("key")
+        assert record is not None
+        assert record.artifact == "artifact"
+        assert record.damaged_identity is None
+        records.put(record)

@@ -25,6 +25,7 @@ from tqdm.auto import tqdm
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Generator, Sequence
 
+_optimization_resource: ContextVar[Literal["cpu", "gpu"]] = ContextVar("optimization_resource", default="cpu")
 T = TypeVar("T")
 
 
@@ -140,7 +141,16 @@ class Task(BoundTask[T]):
         cached=False,
     ):
         kind = kind or ("workflow" if inspect.iscoroutinefunction(func) else "worker")
-        super().__init__(func, args, kwargs or {}, metadata or {}, resource, pass_context, kind, cached)
+        super().__init__(
+            func,
+            args,
+            {} if kwargs is None else kwargs,
+            {} if metadata is None else metadata,
+            resource,
+            pass_context,
+            kind,
+            cached,
+        )
 
 
 class _TaskFactory(Task[T], Generic[P, T]):
@@ -230,6 +240,7 @@ class _Request:
     job: Job
     metadata: dict[str, Any]
     job_id: int
+    wrapped: Callable
     context: Context
     future: asyncio.Future
 
@@ -287,15 +298,38 @@ async def _gather_with_progress(coroutines, *, total: int, desc: str, progress_b
 class _SharedSlots:
     """A capacity budget available to coordinators on separate event loops."""
 
-    def __init__(self, count):
-        self.slots = threading.BoundedSemaphore(count)
+    def __init__(self, count, gpu_count=0):
+        self.capacity = count
+        self.gpu_capacity = gpu_count
+        self.lock = threading.Lock()
+        self.deadlines = {}
 
-    async def __aenter__(self):
-        while not self.slots.acquire(blocking=False):
+    @asynccontextmanager
+    async def reserve(self, duration, *, gpu=False):
+        token = object()
+        while True:
+            with self.lock:
+                now = time.time()
+                self.deadlines = {key: slot for key, slot in self.deadlines.items() if slot[0] > now}
+                if len(self.deadlines) < self.capacity and (
+                    not gpu or sum(slot[1] for slot in self.deadlines.values()) < self.gpu_capacity
+                ):
+                    self.deadlines[token] = (now + duration, gpu)
+                    break
             await asyncio.sleep(0.01)
 
-    async def __aexit__(self, *exc):
-        self.slots.release()
+        def renew(expires):
+            with self.lock:
+                if self.deadlines.get(token, (0, False))[0] <= time.time():
+                    return False
+                self.deadlines[token] = (expires, gpu)
+                return True
+
+        try:
+            yield renew
+        finally:
+            with self.lock:
+                self.deadlines.pop(token, None)
 
 
 class _AsyncExecution:
@@ -314,7 +348,7 @@ class _AsyncExecution:
         self._job_ids = count()
         self._batch_ids = count()
         self.users = 0
-        self.coordinated = False
+        self.legacy_users = 0
         # Keep joblib's pool configuration and serialization in one adapter.
         # Going through Parallel's configuration also preserves worker thread
         # limits and the exact arguments used to select its reusable executor.
@@ -343,8 +377,7 @@ class _AsyncExecution:
         )
         # Coordinated participants sharing this pool share its admission budget.
         self.scope_slots = _SharedSlots(n_jobs)
-        self.claim_slots = _SharedSlots(n_jobs)
-        self.gpu_claim_slots = _SharedSlots(n_gpu_jobs)
+        self.claim_slots = _SharedSlots(n_jobs, n_gpu_jobs)
         self._slots = asyncio.Semaphore(n_jobs)
         self._gpu_slots = asyncio.Semaphore(n_gpu_jobs)
         self._gpu_ids: queue_module.Queue[int] = queue_module.Queue()
@@ -368,16 +401,18 @@ class _AsyncExecution:
         return await self._dispatch_job(func, *args, **kwargs)
 
     async def _dispatch_job(self, func: Callable[..., T] | Job[T], /, *args: Any, **kwargs: Any) -> T:
-        from tpcp.parallel import _merge_parallel_side_channel_data
+        from tpcp.parallel import _capture_worker_call, _merge_parallel_side_channel_data
 
         if self._closing:
             raise RuntimeError("The execution context is closing.")
         finished = asyncio.get_running_loop().create_future()
-        self._calls.add(finished)
         job = func if isinstance(func, Job) else Job(func, args=args, kwargs=kwargs)
         metadata = {**get_job_metadata(), **job.metadata}
         job_id = next(self._job_ids)
-        request = _Request(job, metadata, job_id, copy_context(), self.loop.create_future())
+        with job_metadata(**metadata):
+            wrapped = _capture_worker_call(job.func)
+        request = _Request(job, metadata, job_id, wrapped, copy_context(), self.loop.create_future())
+        self._calls.add(finished)
         worker = None
         try:
             self._emit(job_id, "queued", metadata, job.resource)
@@ -412,17 +447,13 @@ class _AsyncExecution:
                 _current_job_metadata.reset(token)
 
     def _prepare(self, request):
-        from tpcp.parallel import delayed
-
         job = request.job
         args = cast("tuple[Any, ...]", job.args() if callable(job.args) else job.args)
-        with job_metadata(**request.metadata):
-            return delayed(job.func)(*args, **job.kwargs)
+        return request.wrapped, args, job.kwargs
 
     def _release_slots(self, gpu_id):
         self._slots.release()
         if gpu_id is not None:
-            self._gpu_ids.put_nowait(gpu_id)
             self._gpu_slots.release()
 
     def _take_batch(self, queue, first, resource):
@@ -479,7 +510,10 @@ class _AsyncExecution:
         ]
         started = time.perf_counter()
         batch = BatchedCalls(packets, self._nested_backend, reducer_callback=self._select_memmap_context)
-        future = asyncio.wrap_future(self._executor.submit(batch))
+        submitted = self._executor.submit(batch)
+        if gpu_id is not None:
+            submitted.add_done_callback(lambda _: self._gpu_ids.put_nowait(gpu_id))
+        future = asyncio.wrap_future(submitted)
         self._pending.add(future)
         future.add_done_callback(
             functools.partial(
@@ -636,7 +670,11 @@ async def _execution_context(*, n_jobs, n_gpu_jobs, coordinated, gpu_ids=None, o
         active = next(iter(_active_executions.values()), None)
         execution = _active_executions.get(loop)
         if active is not None:
-            if execution is None and not (coordinated and all(e.coordinated for e in _active_executions.values())):
+            legacy_elsewhere = any(
+                other.legacy_users for other in _active_executions.values() if other is not execution
+            )
+            joining_new_loop = execution is None
+            if (joining_new_loop and not coordinated) or (legacy_elsewhere and (joining_new_loop or not coordinated)):
                 raise RuntimeError("Overlapping execution contexts must use the same event loop.")
             if active.configuration != (n_jobs, n_gpu_jobs, devices, on_job_event, parallel_kwargs):
                 raise ValueError("Overlapping execution contexts require identical configuration.")
@@ -644,15 +682,16 @@ async def _execution_context(*, n_jobs, n_gpu_jobs, coordinated, gpu_ids=None, o
             execution = _AsyncExecution(
                 n_jobs, n_gpu_jobs=n_gpu_jobs, gpu_ids=devices, on_job_event=on_job_event, **parallel_kwargs
             )
-            execution.coordinated = coordinated
             if active is not None:
+                execution._job_ids = active._job_ids
+                execution._batch_ids = active._batch_ids
                 execution.scope_slots = active.scope_slots
                 execution.claim_slots = active.claim_slots
-                execution.gpu_claim_slots = active.gpu_claim_slots
                 execution._gpu_ids = active._gpu_ids
             _active_executions[loop] = execution
         elif execution._closing:
             raise RuntimeError("The active execution context is closing.")
+        execution.legacy_users += int(not coordinated)
         execution.users += 1
     token = _current_execution.set(execution)
     try:
@@ -660,6 +699,7 @@ async def _execution_context(*, n_jobs, n_gpu_jobs, coordinated, gpu_ids=None, o
     finally:
         _current_execution.reset(token)
         with _execution_ownership_lock:
+            execution.legacy_users -= int(not coordinated)
             execution.users -= 1
             last_user = execution.users == 0
         if last_user:

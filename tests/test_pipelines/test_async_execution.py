@@ -8,13 +8,13 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from joblib import Parallel, delayed
+from joblib import Memory, Parallel, delayed
 from sklearn.model_selection import ParameterGrid
 
 from tests.test_pipelines.conftest import DummyDataset, DummyPipeline
 from tpcp.exceptions import TestError as ScoringError
 from tpcp.optimize import GridSearch
-from tpcp.parallel import Job, execution_context, get_job_metadata, get_worker_context, job_metadata
+from tpcp.parallel import Job, Worker, execution_context, get_job_metadata, get_worker_context, job_metadata
 from tpcp.validate import Scorer, async_cross_validate, cross_validate, cross_validate_async, no_agg
 
 
@@ -51,7 +51,8 @@ def test_async_grid_search_populates_original_object():
 
 
 @pytest.mark.parametrize("return_train_score", [False, True])
-def test_async_cross_validation_matches_sync(return_train_score):
+@pytest.mark.parametrize("coordinated", [False, True])
+def test_async_cross_validation_matches_sync(return_train_score, coordinated, tmp_path):
     """Nested async search preserves fold ordering, scores, labels and selected parameters."""
     search = GridSearch(
         DummyPipeline(), ParameterGrid({"para_1": range(5)}), scoring=score_candidate, progress_bar=False
@@ -65,7 +66,7 @@ def test_async_cross_validation_matches_sync(return_train_score):
     expected = cross_validate(search, DummyDataset(), progress_bar=False, **kwargs)
 
     async def run():
-        async with execution_context(n_jobs=2):
+        async with Worker(Memory(tmp_path), n_jobs=2) if coordinated else execution_context(n_jobs=2):
             return await cross_validate_async(search, DummyDataset(), **kwargs)
 
     actual = asyncio.run(run())
@@ -364,7 +365,8 @@ def test_gpu_parallelism_respects_cpu_budget(cpu_slots):
         assert ordered[1][1] <= ordered[2][0]
 
 
-def test_nested_grid_search_can_schedule_all_evaluations_as_gpu_jobs():
+@pytest.mark.parametrize("candidate_resource", [None, "cpu"])
+def test_nested_grid_search_can_schedule_all_evaluations_as_gpu_jobs(candidate_resource):
     """The async action option marks candidate and held-out scoring jobs for the GPU queue."""
     events = []
     search = GridSearch(
@@ -374,14 +376,22 @@ def test_nested_grid_search_can_schedule_all_evaluations_as_gpu_jobs():
     async def run():
         async with execution_context(n_jobs=2, n_gpu_jobs=1, on_job_event=events.append):
             return await cross_validate_async(
-                search, DummyDataset(), scoring=score_candidate, cv=2, resource="gpu", progress_bar=False
+                search,
+                DummyDataset(),
+                scoring=score_candidate,
+                cv=2,
+                resource="gpu",
+                optimize_params={"resource": candidate_resource} if candidate_resource else None,
+                progress_bar=False,
             )
 
     results = asyncio.run(run())
     assert len(results["test__agg__score"]) == 2
     completed = [event for event in events if event.status == "completed"]
     assert len(completed) == 8  # Six candidates and two held-out scoring jobs.
-    assert all(event.resource == "gpu" for event in completed)
+    for event in completed:
+        expected = "gpu" if event.metadata["stage"] == "test_score" else (candidate_resource or "gpu")
+        assert event.resource == expected
 
 
 def test_previously_run_pipeline_results_are_not_serialized_for_candidates():
@@ -644,8 +654,10 @@ def test_cross_validation_preserves_coroutine_override_dispatch():
     )
 
     async def run():
-        async with execution_context(n_jobs=2):
-            return await cross_validate_async(search, DummyDataset(), scoring=score_candidate, cv=2, progress_bar=False)
+        async with execution_context(n_jobs=2, n_gpu_jobs=1):
+            return await cross_validate_async(
+                search, DummyDataset(), scoring=score_candidate, cv=2, resource="gpu", progress_bar=False
+            )
 
     assert len(asyncio.run(run())["test__agg__score"]) == 2
     assert len(calls) == 2
@@ -719,9 +731,6 @@ def test_job_events_use_exact_metadata_across_overlapping_callers():
 
 def test_grid_search_replays_leaves_on_fresh_instance(tmp_path):
     """Apply results to each caller while sharing completed candidate scores."""
-    from joblib import Memory
-
-    from tpcp.parallel import Worker
 
     async def scenario():
         events = []
@@ -737,5 +746,26 @@ def test_grid_search_replays_leaves_on_fresh_instance(tmp_path):
             assert await worker.execute(fresh.async_optimize(dataset)) is fresh
             assert fresh.best_params_ == search.best_params_
             assert len(events) == count
+
+    asyncio.run(scenario())
+
+
+def test_warning_filter_captured_before_queued_callback():
+    """Admission preserves the filter active when the job was accepted."""
+    import warnings
+
+    def on_event(event):
+        if event.status == "queued":
+            warnings.simplefilter("ignore", UserWarning)
+
+    def warn():
+        warnings.warn("captured filter", UserWarning, stacklevel=1)
+
+    async def scenario():
+        async with execution_context(on_job_event=on_event) as execution:
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", UserWarning)
+                with pytest.raises(UserWarning, match="captured filter"):
+                    await execution.run(warn)
 
     asyncio.run(scenario())

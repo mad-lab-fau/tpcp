@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 import uuid
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager, suppress
@@ -76,7 +77,6 @@ class Worker:
         execution = await self._pool.__aenter__()
         self._scope_slots = execution.scope_slots
         self._slots = execution.claim_slots
-        self._gpu = execution.gpu_claim_slots
         self._token = active_worker.set(self)
         return self
 
@@ -109,13 +109,19 @@ class Worker:
             self._scope.reset(token)
 
     def prepare(self, task: BoundTask[T]) -> PreparedTask[T]:
+        return self._prepare(self._resolve(task), self._scope.get(), self._parents.get())
+
+    @staticmethod
+    def _resolve(task):
         args = task.args() if callable(task.args) else task.args
-        task = replace(task, args=args, kwargs=task.kwargs.copy())
+        return replace(task, args=args, kwargs=task.kwargs.copy())
+
+    def _prepare(self, task, scope, parents):
         return PreparedTask(
             task,
-            CallArtifacts(self.memory, task, self._scope.get()),
-            () if task.cached else self._parents.get(),
-            self._scope.get(),
+            CallArtifacts(self.memory, task, scope),
+            () if task.cached else parents,
+            scope,
         )
 
     @staticmethod
@@ -148,8 +154,12 @@ class Worker:
             artifact = prepared.artifacts.reference(attempt) if prepared.task.cached else None
             if previous and previous.status == "completed":
                 artifact = previous.artifact
-            # Failed loads retain the damaged reference across retries until publication.
-            damaged = previous.artifact if previous and previous.status != "completed" else None
+            # A plain Memory writer may have repaired the same call since its last failed load.
+            damaged = previous.damaged_identity if previous else None
+            if damaged and prepared.task.cached:
+                identity = prepared.artifacts.output_identity(artifact)
+                if damaged != json.dumps(identity):
+                    damaged = None
             if not damaged and prepared.artifacts.available(artifact):
                 if not previous or previous.status != "completed":
                     previous = TaskRecord(prepared.task_id, "completed", attempt, now, now, now, artifact)
@@ -157,16 +167,27 @@ class Worker:
                 return Decision(prepared, previous, False)
             if not claim:
                 return None
-            record = TaskRecord(prepared.task_id, "running", attempt, now + self.lease_seconds, now, None, damaged)
+            record = TaskRecord(
+                prepared.task_id,
+                "running",
+                attempt,
+                now + self.lease_seconds,
+                now,
+                None,
+                previous.artifact if previous and damaged else None,
+                damaged,
+            )
             records.put(record)
             return Decision(prepared, record, True)
 
-    def _update(self, decision, status, stage=None):
+    def _update(self, decision, status, stage=None, renew=None):
         with self.storage.transaction() as records:
             self._check_parents(records, decision.prepared)
             record = decision.record
             self._check(records, record)
             now = time.time()
+            if renew is not None and not renew(now + self.lease_seconds):
+                raise ClaimLostError("Admission reservation expired")
             reference = record.artifact
             if status == "completed":
                 reference = decision.prepared.artifacts.reference(record.attempt)
@@ -178,23 +199,39 @@ class Worker:
                     expires=now + self.lease_seconds,
                     finished=None if status == "running" else now,
                     artifact=reference,
+                    damaged_identity=None if status == "completed" else record.damaged_identity,
                 )
             )
 
-    def _publish(self, decision, value):
+    async def _publish(self, decision, value):
         duration = time.time() - decision.record.started
-        with decision.prepared.artifacts.stage(value, duration) as stage:
+        staging = decision.prepared.artifacts.stage(value, duration)
+        writer = asyncio.create_task(asyncio.to_thread(staging.__enter__))
+        try:
+            stage = await asyncio.shield(writer)
+        except asyncio.CancelledError:
+
+            def discard(done):
+                if not done.cancelled() and done.exception() is None:
+                    staging.__exit__(None, None, None)
+
+            writer.add_done_callback(discard)
+            raise
+        try:
             self._update(decision, "completed", stage)
+        finally:
+            staging.__exit__(None, None, None)
 
     @asynccontextmanager
-    async def _maintain(self, decision):
+    async def _maintain(self, decision, renew=None):
         async def heartbeat():
             while True:
                 await asyncio.sleep(self.lease_seconds / 3)
-                self._update(decision, "running")
+                self._update(decision, "running", renew=renew)
 
         beat = asyncio.create_task(heartbeat())
         try:
+            self._update(decision, "running", renew=renew)
             yield
         except BaseException:
             with suppress(ClaimLostError):
@@ -207,11 +244,10 @@ class Worker:
     async def run(self, claim: Decision[T]) -> T:
         if not claim.acquired:
             raise ValueError("run requires an acquired claim")
-        return await self._shared_call(("claim", claim.record.attempt), self._run, claim)
+        return await self._shared_call(("claim", claim.record.attempt), self._run, claim, shield=False)
 
-    async def _run(self, claim):
-        self._update(claim, "running")
-        async with self._maintain(claim):
+    async def _run(self, claim, renew=None):
+        async with self._maintain(claim, renew):
             worker_token = active_worker.set(self)
             scope_token = self._scope.set(claim.prepared.scope)
             parent_token = self._parents.set(claim.prepared.parents)
@@ -221,8 +257,8 @@ class Worker:
                 self._parents.reset(parent_token)
                 self._scope.reset(scope_token)
                 active_worker.reset(worker_token)
-            await asyncio.to_thread(self._publish, claim, value)
-            if self.memory.mmap_mode:
+            await self._publish(claim, value)
+            if claim.prepared.task.cached and self.memory.mmap_mode:
                 return await self.result(claim)
             return value
 
@@ -246,7 +282,7 @@ class Worker:
                     records.get(record.task_id) == record
                     and decision.prepared.artifacts.output_identity(record.artifact) == identity
                 ):
-                    records.put(replace(record, status="failed"))
+                    records.put(replace(record, status="failed", damaged_identity=json.dumps(identity)))
             raise ClaimLostError("Artifact load failed. Acquire the prepared task again.") from error
 
     async def _execute(self, prepared):
@@ -254,15 +290,15 @@ class Worker:
             decision = self._decide(prepared, claim=False)
             if decision is None:
                 async with AsyncExitStack() as capacity:
+                    renew = None
                     if prepared.task.kind == "worker":
-                        if prepared.task.resource == "gpu":
-                            if not self._gpu_count:
-                                raise ValueError("GPU tasks require n_gpu_jobs > 0")
-                            await capacity.enter_async_context(self._gpu)
-                        await capacity.enter_async_context(self._slots)
+                        gpu = prepared.task.resource == "gpu"
+                        if gpu and not self._gpu_count:
+                            raise ValueError("GPU tasks require n_gpu_jobs > 0")
+                        renew = await capacity.enter_async_context(self._slots.reserve(self.lease_seconds, gpu=gpu))
                     decision = self.acquire(prepared)
                     if decision.acquired:
-                        return await self.run(decision)
+                        return await self._run(decision, renew)
             try:
                 return await self.result(decision)
             except ClaimLostError:
@@ -275,11 +311,11 @@ class Worker:
                 return await task._execute()
             finally:
                 active_worker.reset(token)
-        prepared = await asyncio.to_thread(self.prepare, task)
+        prepared = await asyncio.to_thread(self._prepare, self._resolve(task), self._scope.get(), self._parents.get())
         key = (prepared.task_id, tuple(p.attempt for p in prepared.parents))
         return await self._shared_call(key, self._execute, prepared)
 
-    async def _shared_call(self, key, operation, argument):
+    async def _shared_call(self, key, operation, argument, *, shield=True):
         if key not in self._pending:
             future = asyncio.create_task(operation(argument))
             self._pending[key] = future
@@ -290,20 +326,22 @@ class Worker:
                     done.exception()
 
             future.add_done_callback(finished)
-        return await asyncio.shield(self._pending[key])
+        pending = self._pending[key]
+        return await (asyncio.shield(pending) if shield else pending)
 
     @asynccontextmanager
     async def subtask(self, name, *, key):
         """Claim a manual scope. Only the acquired participant executes its body."""
         async with AsyncExitStack() as stack:
             stack.enter_context(self._enter_scope(("subtask", name, key)))
+            renew = None
             if not self._parents.get():
-                await stack.enter_async_context(self._scope_slots)
+                renew = await stack.enter_async_context(self._scope_slots.reserve(self.lease_seconds))
             prepared = self.prepare(BoundTask(_scope_value))
             decision = self.acquire(prepared)
             handle = _Subtask(self, decision)
             if decision.acquired:
-                await stack.enter_async_context(self._maintain(decision))
+                await stack.enter_async_context(self._maintain(decision, renew))
                 token = self._parents.set((*prepared.parents, decision.record))
                 stack.callback(self._parents.reset, token)
             else:
@@ -323,7 +361,7 @@ class _Subtask:
     async def complete(self, value):
         if not self.acquired:
             raise ValueError("Only the owner may complete a subtask")
-        await asyncio.to_thread(self.worker._publish, self.decision, value)
+        await self.worker._publish(self.decision, value)
         self.completed = True
 
     async def result(self):

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from sklearn.model_selection import BaseCrossValidator
 from tqdm.auto import tqdm
 
-from tpcp._async_execution import _gather_with_progress
+from tpcp._async_execution import _gather_with_progress, _LocalWorkflow, _optimization_resource
 from tpcp._base import _Default
 from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
@@ -176,7 +176,7 @@ def async_cross_validate(
     See :func:`cross_validate` for result fields. Failures from composed jobs
     propagate as an ``ExceptionGroup``.
     """
-    return Task(_cross_validate_async)(
+    return _LocalWorkflow(_cross_validate_async)(
         optimizable,
         dataset,
         scoring=scoring,
@@ -252,9 +252,11 @@ async def _cross_validate_async(
             start = time.perf_counter()
             with warning_error_context("optimize", {"data_labels": train.group_labels}):
                 parameters = dict(optimize_params or {})
-                if resource != "cpu":
-                    parameters.setdefault("resource", resource)
-                optimizer = await optimizer.optimize_async(train, **parameters)
+                token = _optimization_resource.set(resource)
+                try:
+                    optimizer = await optimizer.optimize_async(train, **parameters)
+                finally:
+                    _optimization_resource.reset(token)
             optimize_time = time.perf_counter() - start
             score_start = time.perf_counter()
             result: dict[str, Any] = {"debug__optimize_time": optimize_time}

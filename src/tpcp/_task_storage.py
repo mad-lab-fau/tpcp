@@ -5,6 +5,7 @@ import threading
 from contextlib import AbstractContextManager, closing, contextmanager
 from dataclasses import astuple, dataclass
 from typing import Protocol
+from weakref import finalize
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class TaskRecord:
     started: float
     finished: float | None
     artifact: str | None
+    damaged_identity: str | None = None
 
 
 class TaskTransaction(Protocol):
@@ -40,12 +42,12 @@ class _Records:
         return TaskRecord(*row) if row else None
 
     def put(self, record):
-        self.connection.execute("INSERT OR REPLACE INTO tasks VALUES (?,?,?,?,?,?,?)", astuple(record))
+        self.connection.execute("INSERT OR REPLACE INTO tasks VALUES (?,?,?,?,?,?,?,?)", astuple(record))
 
 
 _SCHEMA = """CREATE TABLE IF NOT EXISTS tasks (
 task_id TEXT PRIMARY KEY, status TEXT, attempt TEXT, expires REAL,
-started REAL, finished REAL, artifact TEXT)"""
+started REAL, finished REAL, artifact TEXT, damaged_identity TEXT)"""
 
 
 @contextmanager
@@ -60,8 +62,10 @@ class SQLiteTaskStorage:
 
     def __init__(self, path):
         self.path = path
-        with closing(sqlite3.connect(path)) as connection:
+        with closing(sqlite3.connect(path)) as connection, _transaction(connection):
             connection.execute(_SCHEMA)
+            if "damaged_identity" not in {row[1] for row in connection.execute("PRAGMA table_info(tasks)")}:
+                connection.execute("ALTER TABLE tasks ADD COLUMN damaged_identity TEXT")
 
     @contextmanager
     def transaction(self):
@@ -74,6 +78,7 @@ class InMemoryTaskStorage:
 
     def __init__(self):
         self._connection = sqlite3.connect(":memory:", check_same_thread=False)
+        finalize(self, self._connection.close)
         self._connection.execute(_SCHEMA)
         self._lock = threading.Lock()
 
