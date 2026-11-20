@@ -705,10 +705,104 @@ def test_async_study_runs_each_time(custom, tmp_path):
     assert not visits
 
     async def run():
-        async with Worker(Memory(tmp_path), n_jobs=1):
-            assert await task is optimizer
+        async with Worker(Memory(tmp_path), n_jobs=1) as worker:
+            with pytest.raises(TypeError, match=r"Worker\.execute"):
+                worker.prepare(task)
+            assert await worker.execute(task) is optimizer
             assert await task is optimizer
 
     asyncio.run(run())
     assert visits == [0, 1]
     assert optimizer.best_score_ == 1.0
+
+
+@pytest.mark.parametrize("factory", ["as_dataclass", "as_attrs"])
+def test_async_study_factories(factory):
+    """Generated subclasses inherit the configured study fields and bind lazy optimize actions."""
+    import asyncio
+    import dataclasses
+
+    import attrs
+
+    from tpcp.aio.optimize.optuna import CustomOptunaOptimize as AsyncCustom
+    from tpcp.parallel import BoundTask, execution_context
+
+    decorate = dataclasses.dataclass if factory == "as_dataclass" else attrs.define(slots=False)
+
+    @decorate
+    class Optimizer(getattr(AsyncCustom, factory)()):
+        value: int = 42
+
+        def create_objective(self):
+            return lambda *_args: self.value
+
+    optimizer = Optimizer(pipeline=DummyPipeline(), get_study_params=lambda _: {}, n_trials=1, return_optimized=False)
+    task = optimizer.optimize(DummyDataset())
+    assert isinstance(task, BoundTask)
+
+    async def run():
+        async with execution_context(n_jobs=1):
+            assert await task is optimizer
+
+    asyncio.run(run())
+    assert optimizer.best_score_ == 42
+
+
+def test_pending_trial_results():
+    """Missing labels and metrics retain their trial positions."""
+    from optuna import create_study
+
+    optimizer = OptunaSearch(DummyPipeline(), lambda _: {}, dummy_search_space, scoring=dummy_single_score_func)
+    optimizer.study_ = create_study()
+    optimizer.study_.ask()
+    assert np.isnan(optimizer.search_results_["data_labels"][0])
+    completed = optimizer.study_.ask()
+    completed.set_user_attr("__data_labels", ["completed"])
+    completed.set_user_attr("__average_scores", {"metric": 2})
+    optimizer.study_.tell(completed, 2)
+    results = optimizer.search_results_
+    assert all(len(column) == 2 for column in results.values())
+    assert np.isnan(results["metric"][0])
+    assert results["metric"][1] == 2
+    assert results["data_labels"][1] == ["completed"]
+
+
+def test_concurrent_studies_refit_their_own_data(tmp_path):
+    """Separate worker loops must finish each study and refit together."""
+    import asyncio
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from contextlib import suppress
+
+    from joblib import Memory
+
+    from tpcp.aio.optimize.optuna import CustomOptunaOptimize as AsyncCustom
+    from tpcp.parallel import Worker
+
+    start = threading.Barrier(2)
+    overlap = threading.Barrier(2)
+    fits = []
+
+    class Optimizer(AsyncCustom):
+        def create_objective(self):
+            def objective(_trial, _pipeline, dataset):
+                with suppress(threading.BrokenBarrierError):
+                    overlap.wait(timeout=0.2)
+                return dataset.group_label.value
+
+            return objective
+
+        def return_optimized_pipeline(self, pipeline, dataset, study):
+            fits.append((dataset.group_label.value, study.best_value))
+            return pipeline
+
+    optimizer = Optimizer(DummyPipeline(), lambda _: {}, n_trials=1)
+
+    async def run(i):
+        async with Worker(Memory(tmp_path), n_jobs=2):
+            start.wait(timeout=5)
+            await optimizer.optimize(DummyDataset()[i])
+
+    with ThreadPoolExecutor(2) as pool:
+        list(pool.map(lambda i: asyncio.run(run(i)), [0, 1]))
+    assert sorted(fits) == [(0, 0), (1, 1)]

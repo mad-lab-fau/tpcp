@@ -117,7 +117,9 @@ class _StudyOptimizer(_Optimizer[PipelineT, DatasetT]):
         base_df = (
             trials_df.drop("number", axis=1).rename(columns={"value": "score"}).rename(columns=rename_param_columns)
         )
-        base_df["params"] = [self.sanitize_params(t.params) for t in self.study_.trials]
+        # Another worker may start a trial after trials_dataframe() takes its snapshot.
+        trials = self.study_.get_trials(deepcopy=False)
+        base_df["params"] = [self.sanitize_params(trials[number].params) for number in trials_df["number"]]
 
         # If a trial is pruned we set the score to nan.
         # This is clearer than showing the last step value.
@@ -366,6 +368,69 @@ class _CustomOptunaOptimizeConfig(_StudyOptimizer[PipelineT, DatasetT]):
         self.return_optimized = return_optimized
 
 
+def _as_dataclass(base):
+    """Return an optimizer base that can be subclassed using dataclasses."""
+    import dataclasses  # pylint: disable=import-outside-toplevel
+
+    @dataclasses.dataclass(eq=False, repr=False, order=False)
+    class CustomOptunaOptimizeDc(base):
+        """Dataclass version of CustomOptunaOptimize."""
+
+        pipeline: PipelineT
+        get_study_params: Callable[[int], StudyParamsDict]
+
+        # Optuna Parameters that are directly forwarded to study.optimize
+        n_trials: int | None = None
+        timeout: float | None = None
+        callbacks: list[Callable[[Study, FrozenTrial], None]] | None = None
+        gc_after_trial: bool = False
+        show_progress_bar: bool = False
+
+        n_jobs: int = 1
+        random_seed: int | None = None
+        return_optimized: bool = True
+
+        eval_str_paras: Sequence[str] = ()
+
+        optimized_pipeline_: PipelineT = dataclasses.field(init=False, repr=False)
+        study_: Study = dataclasses.field(init=False, repr=False)
+
+    return CustomOptunaOptimizeDc
+
+
+def _as_attrs(base):
+    """Return an optimizer base that can be subclassed using `attrs` defined classes.
+
+    Note, this requires `attrs` to be installed!
+    """
+    from attrs import define, field  # pylint: disable=import-outside-toplevel
+
+    @define(eq=False, repr=False, order=False, kw_only=True, slots=False)
+    class CustomOptunaOptimizeAt(base):
+        """Attrs version of CustomOptunaOptimize."""
+
+        pipeline: PipelineT
+        get_study_params: Callable[[int], StudyParamsDict]
+
+        # Optuna Parameters that are directly forwarded to study.optimize
+        n_trials: int | None = None
+        timeout: float | None = None
+        callbacks: list[Callable[[Study, FrozenTrial], None]] | None = None
+        gc_after_trial: bool = False
+        show_progress_bar: bool = False
+
+        n_jobs: int = 1
+        random_seed: int | None = None
+        return_optimized: bool = True
+
+        eval_str_paras: Sequence[str] = ()
+
+        optimized_pipeline_: PipelineT = field(init=False, repr=False)
+        study_: Study = field(init=False, repr=False)
+
+    return CustomOptunaOptimizeAt
+
+
 class CustomOptunaOptimize(
     _CustomOptunaOptimizeConfig[PipelineT, DatasetT], _CustomOptunaOptimize[PipelineT, DatasetT]
 ):
@@ -602,66 +667,13 @@ class CustomOptunaOptimize(
 
     @staticmethod
     def as_dataclass():
-        """Return a version of the Dataset class that can be subclassed using dataclasses."""
-        import dataclasses  # pylint: disable=import-outside-toplevel
-
-        @dataclasses.dataclass(eq=False, repr=False, order=False)
-        class CustomOptunaOptimizeDc(_CustomOptunaOptimize[PipelineT, DatasetT]):
-            """Dataclass version of CustomOptunaOptimize."""
-
-            pipeline: PipelineT
-            get_study_params: Callable[[int], StudyParamsDict]
-
-            # Optuna Parameters that are directly forwarded to study.optimize
-            n_trials: int | None = None
-            timeout: float | None = None
-            callbacks: list[Callable[[Study, FrozenTrial], None]] | None = None
-            gc_after_trial: bool = False
-            show_progress_bar: bool = False
-
-            n_jobs: int = 1
-            random_seed: int | None = None
-            return_optimized: bool = True
-
-            eval_str_paras: Sequence[str] = ()
-
-            optimized_pipeline_: PipelineT = dataclasses.field(init=False, repr=False)
-            study_: Study = dataclasses.field(init=False, repr=False)
-
-        return CustomOptunaOptimizeDc
+        """Return a generic optimizer base for dataclass subclasses."""
+        return _as_dataclass(_CustomOptunaOptimize[PipelineT, DatasetT])
 
     @staticmethod
     def as_attrs():
-        """Return a version of the Dataset class that can be subclassed using `attrs` defined classes.
-
-        Note, this requires `attrs` to be installed!
-        """
-        from attrs import define, field  # pylint: disable=import-outside-toplevel
-
-        @define(eq=False, repr=False, order=False, kw_only=True, slots=False)
-        class CustomOptunaOptimizeAt(_CustomOptunaOptimize[PipelineT, DatasetT]):
-            """Attrs version of CustomOptunaOptimize."""
-
-            pipeline: PipelineT
-            get_study_params: Callable[[int], StudyParamsDict]
-
-            # Optuna Parameters that are directly forwarded to study.optimize
-            n_trials: int | None = None
-            timeout: float | None = None
-            callbacks: list[Callable[[Study, FrozenTrial], None]] | None = None
-            gc_after_trial: bool = False
-            show_progress_bar: bool = False
-
-            n_jobs: int = 1
-            random_seed: int | None = None
-            return_optimized: bool = True
-
-            eval_str_paras: Sequence[str] = ()
-
-            optimized_pipeline_: PipelineT = field(init=False, repr=False)
-            study_: Study = field(init=False, repr=False)
-
-        return CustomOptunaOptimizeAt
+        """Return a generic optimizer base for attrs subclasses."""
+        return _as_attrs(_CustomOptunaOptimize[PipelineT, DatasetT])
 
 
 T = TypeVar("T")
@@ -771,9 +783,11 @@ class _OptunaSearchConfig(_StudyOptimizer[PipelineT, DatasetT]):
         search_results = super().search_results_
         if not search_results:
             return {}
-        search_results["data_labels"] = search_results.pop("user_attrs___data_labels")
+        search_results["data_labels"] = search_results.pop(
+            "user_attrs___data_labels", [np.nan] * len(search_results["params"])
+        )
 
-        if self.multimetric_:
+        if "user_attrs___average_scores" in search_results:
             search_results.pop("score")
             if average_scores := search_results.pop("user_attrs___average_scores", None):
                 search_results.update(_invert_list_of_dicts(average_scores))

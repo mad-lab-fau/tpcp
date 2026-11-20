@@ -109,6 +109,9 @@ class Worker:
             self._scope.reset(token)
 
     def prepare(self, task: BoundTask[T]) -> PreparedTask[T]:
+        """Prepare a replayable task. Await local workflows directly or use execute()."""
+        if isinstance(task, _LocalWorkflow):
+            raise TypeError("Local workflows require await or Worker.execute().")
         return self._prepare(self._resolve(task), self._scope.get(), self._parents.get())
 
     @staticmethod
