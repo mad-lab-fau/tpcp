@@ -145,6 +145,10 @@ def cross_validate(
     with parallel:
         results = list(pbar(parallel(tasks())))
     assert results is not None  # For the typechecker
+    return _format_cv_results(results)
+
+
+def _format_cv_results(results):
     results = _aggregate_final_results(results)
 
     # Fix the formatting of all the score results
@@ -219,6 +223,10 @@ def validate(
         return_data_labels=True,
         return_times=True,
     )
+    return _format_validation_results(results)
+
+
+def _format_validation_results(results):
     results = _aggregate_final_results([results])
 
     # Fix the formatting of all the score results

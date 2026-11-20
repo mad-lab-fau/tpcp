@@ -247,35 +247,44 @@ def delayed(func):
     for one worker task and optionally returned to the parent process.
 
     """
-    _parallel_setter = []
-    for g in _PARALLEL_CONTEXT_CALLBACKS.values():
-        _parallel_setter.append(g())
+    setters = _capture_parallel_setters()
 
     @functools.wraps(func)
     def create_task(*task_args, **task_kwargs):
-        warning_filters = list(warnings.filters)
-        parallel_side_channels = []
-        for name, side_channel in _PARALLEL_SIDE_CHANNELS.items():
-            captured_state = side_channel.capture()
-            if captured_state is not None:
-                parallel_side_channels.append((name, captured_state, side_channel.restore))
-
-        @functools.wraps(func)
-        def inner(*args, **kwargs):
-            if multiprocessing.parent_process() is not None:
-                with warnings.catch_warnings():
-                    warnings.filters[:] = warning_filters
-                    warnings._filters_mutated()
-                    for value, setter in _parallel_setter:
-                        setter(value)
-                    return _call_with_parallel_side_channels(func, args, kwargs, parallel_side_channels)
-            if _are_parallel_side_channels_enabled():
-                return _call_with_parallel_side_channels(func, args, kwargs, parallel_side_channels)
-            return func(*args, **kwargs)
-
-        return joblib.delayed(inner)(*task_args, **task_kwargs)
+        wrapped = _capture_worker_call(func, setters)
+        return joblib.delayed(wrapped)(*task_args, **task_kwargs)
 
     return create_task
+
+
+def _capture_parallel_setters():
+    return [getter() for getter in _PARALLEL_CONTEXT_CALLBACKS.values()]
+
+
+def _capture_worker_call(func, setters=None):
+    if setters is None:
+        setters = _capture_parallel_setters()
+    warning_filters = list(warnings.filters)
+    parallel_side_channels = []
+    for name, side_channel in _PARALLEL_SIDE_CHANNELS.items():
+        captured_state = side_channel.capture()
+        if captured_state is not None:
+            parallel_side_channels.append((name, captured_state, side_channel.restore))
+
+    @functools.wraps(func)
+    def inner(*args, **kwargs):
+        if multiprocessing.parent_process() is not None:
+            with warnings.catch_warnings():
+                warnings.filters[:] = warning_filters
+                warnings._filters_mutated()
+                for value, setter in setters:
+                    setter(value)
+                return _call_with_parallel_side_channels(func, args, kwargs, parallel_side_channels)
+        if _are_parallel_side_channels_enabled():
+            return _call_with_parallel_side_channels(func, args, kwargs, parallel_side_channels)
+        return func(*args, **kwargs)
+
+    return inner
 
 
 def register_parallel_side_channel(
@@ -402,10 +411,57 @@ def remove_global_parallel_callback(name: str):
 
 
 __all__ = [
+    "BoundTask",
+    "CachedTask",
+    "ClaimLostError",
+    "Decision",
+    "InMemoryTaskStorage",
+    "Job",
+    "JobEvent",
     "Parallel",
+    "PreparedTask",
+    "SQLiteTaskStorage",
+    "Task",
+    "TaskConfig",
+    "TaskRecord",
+    "TaskStorage",
+    "TaskTransaction",
+    "Worker",
+    "WorkerContext",
     "delayed",
+    "execution_context",
+    "get_job_metadata",
+    "get_worker_context",
+    "job_metadata",
     "register_global_parallel_callback",
     "register_parallel_side_channel",
     "remove_global_parallel_callback",
     "remove_parallel_side_channel",
+    "run_in_worker",
 ]
+
+
+# Re-export after the legacy worker helpers are defined. The async adapter uses
+# those helpers at execution time, preserving synchronous worker-state behavior.
+from tpcp._async_execution import (  # noqa: E402
+    BoundTask,
+    CachedTask,
+    Job,
+    JobEvent,
+    Task,
+    TaskConfig,
+    WorkerContext,
+    execution_context,
+    get_job_metadata,
+    get_worker_context,
+    job_metadata,
+    run_in_worker,
+)
+from tpcp._task_storage import (  # noqa: E402
+    InMemoryTaskStorage,
+    SQLiteTaskStorage,
+    TaskRecord,
+    TaskStorage,
+    TaskTransaction,
+)
+from tpcp._task_worker import ClaimLostError, Decision, PreparedTask, Worker  # noqa: E402

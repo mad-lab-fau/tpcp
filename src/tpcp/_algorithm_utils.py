@@ -153,6 +153,10 @@ def _check_safe_run(algorithm: AlgorithmT, old_method: Callable, *args: Any, **k
 
     # In this case the method is already bound and we do not need to pass the algo as first argument
     output = old_method(*args, **kwargs) if hasattr(old_method, "__self__") else old_method(algorithm, *args, **kwargs)
+    return _check_run_result(algorithm, old_method, before_paras_hash, output)
+
+
+def _check_run_result(algorithm, old_method, before_paras_hash, output):
     after_paras = algorithm.get_params(deep=False)
     after_paras_hash = custom_hash(after_paras)
     if not before_paras_hash == after_paras_hash:

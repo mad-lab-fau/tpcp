@@ -10,10 +10,10 @@ from tpcp._dataset import DatasetT
 from tpcp._pipeline import PipelineT
 
 
-class BaseOptimize(Algorithm, Generic[PipelineT, DatasetT]):
-    """Base class for all optimizer."""
+class _Optimizer(Algorithm, Generic[PipelineT, DatasetT]):
+    """Shared configuration and fitted state for optimizer classes."""
 
-    _action_methods: ClassVar[str] = "optimize"
+    _action_methods: ClassVar[tuple[str, ...] | str] = "optimize"
 
     pipeline: Parameter[PipelineT]
 
@@ -21,9 +21,9 @@ class BaseOptimize(Algorithm, Generic[PipelineT, DatasetT]):
 
     optimized_pipeline_: PipelineT
 
-    def optimize(self, dataset: DatasetT, **optimize_params: Any) -> Self:
-        """Apply some form of optimization on the input parameters of the pipeline."""
-        raise NotImplementedError()
+
+class BaseOptimize(_Optimizer[PipelineT, DatasetT]):
+    """Base class for synchronous optimizers."""
 
     def run(self, datapoint: DatasetT) -> PipelineT:
         """Run the optimized pipeline.
@@ -38,3 +38,7 @@ class BaseOptimize(Algorithm, Generic[PipelineT, DatasetT]):
         This is a wrapper to contain API compatibility with `Pipeline`.
         """
         return self.optimized_pipeline_.safe_run(datapoint)
+
+    def optimize(self, dataset: DatasetT, **optimize_params: Any) -> Self:
+        """Apply some form of optimization on the input parameters of the pipeline."""
+        raise NotImplementedError()

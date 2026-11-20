@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Async validation, optimization, and task execution are available under `tpcp.aio`.
+  Validation, scoring, grid searches, pipeline fitting and optional Optuna studies return lazy tasks.
+  Custom async algorithms and pipelines can compose these actions.
+
+- Experimental asynchronous tasks support delayed-style binding with `Task(fn)(*args, **kwargs)`.
+  `Worker` coordinates scoped results through shared memory or SQLite records. `CachedTask` shares
+  entries with the supplied joblib Memory store across experiment scopes.
+
 - Added optional `train_selector` and `test_selector` callbacks to `DatasetSplitter` to select subsets after
   groupwise fold assignment. Each callback receives only its assigned side, and selecting labels outside that
   side raises `ValueError`. Both default to `None`, preserving the existing assignments.

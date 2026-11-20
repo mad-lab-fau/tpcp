@@ -265,53 +265,8 @@ def mean_agg(value: float) -> FloatAggregator:
     return _mean_agg(value)
 
 
-class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
-    """A scorer to score multiple data points of a dataset and average the results.
-
-    Parameters
-    ----------
-    score_func
-        The callable that is used to score each data point
-    default_aggregator
-        Aggregates scores that do not specify their own aggregator. By default, this uses ``numpy.nanmean``
-        and ignores NaN scores. Pass :func:`mean_agg` to retain the previous mean behavior.
-    single_score_callback
-        Callback function that is called after each datapoint that is scored.
-        It should have the following call signature:
-
-        >>> def callback(
-        ...     *,
-        ...     step: int,
-        ...     scores: Tuple[_SCORE_TYPE, ...],
-        ...     scorer: "Scorer",
-        ...     pipeline: Pipeline,
-        ...     dataset: Dataset,
-        ...     **_,
-        ... ) -> None: ...
-
-        All parameters will be passed as keyword arguments.
-        This means, if your callback only needs a subset of the defined parameters, you can ignore them by using
-        unused kwargs:
-
-        >>> def callback(*, step: int, pipeline: Pipeline, **_): ...
-
-    n_jobs
-        The number of parallel jobs to run.
-        Each job will run on a single data point.
-        Note, that the single_score_callback will still be called in the main thread, after a job is finished.
-        However, it could be that multiple jobs are finished before the callback is called.
-        The callback is still gurateed to be called in the order of the data points.
-        If None, no parallelization is used.
-    verbose
-        Controls the verbosity of the parallelization.
-        See :class:`joblib.Parallel` for more details.
-    pre_dispatch
-        Controls the number of jobs that get dispatched during parallelization.
-        See :class:`joblib.Parallel` for more details.
-    progress_bar
-        True/False to enable/disable a `tqdm` progress bar.
-
-    """
+class _Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
+    """Scorer configuration, callbacks and aggregation shared by both execution modes."""
 
     score_func: ScoreFunc[PipelineT, DatasetT]
     default_aggregator: Aggregator
@@ -343,21 +298,6 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
         self.verbose = verbose
         self.pre_dispatch = pre_dispatch
         self.progress_bar = progress_bar
-
-    def __call__(
-        self, pipeline: PipelineT, dataset: DatasetT
-    ) -> tuple[float | dict[str, float], list | None | dict[str, list]]:
-        """Score the pipeline with the provided data.
-
-        Returns
-        -------
-        agg_scores
-            The average scores over all data-points
-        single_scores
-            The scores for each individual data-point
-
-        """
-        return self._score(pipeline=pipeline, dataset=dataset)
 
     def _aggregate(
         self,
@@ -409,55 +349,129 @@ class Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
             return agg_scores.get("__single__", agg_scores), raw_scores.get("__single__")
         return agg_scores, raw_scores
 
-    def _score(self, pipeline: PipelineT, dataset: DatasetT):
-        def per_datapoint(i, d):
-            group_label = None
-            group_label_available = False
+
+def _finish_scores(scorer, pipeline, dataset, score_results):
+    scores: list[ScoreType] = []
+    for result in score_results:
+        _record_score(scorer, pipeline, dataset, scores, result)
+    return _aggregate_scores(scorer, pipeline, dataset, scores)
+
+
+def _record_score(scorer, pipeline, dataset, scores, result):
+    i, score = result
+    scores.append(score)
+    if scorer.single_score_callback:
+        with warning_error_context("single_score_callback", {"i": i}):
+            scorer.single_score_callback(
+                step=i, scores=tuple(scores), scorer=scorer, pipeline=pipeline, dataset=dataset
+            )
+
+
+def _aggregate_scores(scorer, pipeline, dataset, scores):
+    agg_scores, raw_scores = scorer._aggregate(
+        _check_and_invert_score_dict(scores, scorer.default_aggregator), list(dataset)
+    )
+    if scorer.final_aggregator:
+        return scorer.final_aggregator(agg_scores, raw_scores, pipeline, dataset)
+    return agg_scores, raw_scores
+
+
+def _score_datapoint(score_func, pipeline, i, d):
+    group_label = None
+    group_label_available = False
+    try:
+        # We need to clone here again, to make sure that the run for each data point is truly independent.
+        group_label = d.group_label
+        group_label_available = True
+        with warning_error_context("datapoint", {"index": i, "group_label": group_label}):
+            score = score_func(pipeline.clone(), d)
+    except Exception as e:
+        group_label_display = "<unavailable>"
+        if group_label_available:
             try:
-                # We need to clone here again, to make sure that the run for each data point is truly independent.
-                group_label = d.group_label
-                group_label_available = True
-                with warning_error_context("datapoint", {"index": i, "group_label": group_label}):
-                    score = self.score_func(pipeline.clone(), d)
-            except Exception as e:
-                group_label_display = "<unavailable>"
-                if group_label_available:
-                    try:
-                        group_label_display = str(group_label)
-                    except BaseException:  # noqa: BLE001 - diagnostics must not replace the scoring error
-                        group_label_display = f"<unrenderable {type(group_label).__name__}>"
-                raise ScorerFailedError(
-                    f"Scorer failed while scoring datapoint {i} ({group_label_display}). "
-                    "Handle expected error cases inside the scoring function."
-                ) from e
-            return i, score
+                group_label_display = str(group_label)
+            except BaseException:  # noqa: BLE001 - diagnostics must not replace the scoring error
+                group_label_display = f"<unrenderable {type(group_label).__name__}>"
+        raise ScorerFailedError(
+            f"Scorer failed while scoring datapoint {i} ({group_label_display}). "
+            "Handle expected error cases inside the scoring function."
+        ) from e
+    return i, score
 
-        scores: list[ScoreType] = []
 
+class Scorer(_Scorer[PipelineT, DatasetT]):
+    """A scorer to score multiple data points of a dataset and average the results.
+
+    Parameters
+    ----------
+    score_func
+        The callable that is used to score each data point
+    default_aggregator
+        Aggregates scores that do not specify their own aggregator. By default, this uses ``numpy.nanmean``
+        and ignores NaN scores. Pass :func:`mean_agg` to retain the previous mean behavior.
+    single_score_callback
+        Callback function that is called after each datapoint that is scored.
+        It should have the following call signature:
+
+        >>> def callback(
+        ...     *,
+        ...     step: int,
+        ...     scores: Tuple[_SCORE_TYPE, ...],
+        ...     scorer: "Scorer",
+        ...     pipeline: Pipeline,
+        ...     dataset: Dataset,
+        ...     **_,
+        ... ) -> None: ...
+
+        All parameters will be passed as keyword arguments.
+        This means, if your callback only needs a subset of the defined parameters, you can ignore them by using
+        unused kwargs:
+
+        >>> def callback(*, step: int, pipeline: Pipeline, **_): ...
+
+    n_jobs
+        The number of parallel jobs to run.
+        Each job will run on a single data point.
+        Note, that the single_score_callback will still be called in the main thread, after a job is finished.
+        However, it could be that multiple jobs are finished before the callback is called.
+        The callback is still gurateed to be called in the order of the data points.
+        If None, no parallelization is used.
+    verbose
+        Controls the verbosity of the parallelization.
+        See :class:`joblib.Parallel` for more details.
+    pre_dispatch
+        Controls the number of jobs that get dispatched during parallelization.
+        See :class:`joblib.Parallel` for more details.
+    progress_bar
+        True/False to enable/disable a `tqdm` progress bar.
+
+    """
+
+    def __call__(
+        self, pipeline: PipelineT, dataset: DatasetT
+    ) -> tuple[float | dict[str, float], list | None | dict[str, list]]:
+        """Score the pipeline with the provided data.
+
+        Returns
+        -------
+        agg_scores
+            The average scores over all data-points
+        single_scores
+            The scores for each individual data-point
+
+        """
+        return self._score(pipeline=pipeline, dataset=dataset)
+
+    def _score(self, pipeline: PipelineT, dataset: DatasetT):
         pbar = partial(tqdm, total=len(dataset), desc="Datapoints") if self.progress_bar else _passthrough
         parallel = Parallel(
             n_jobs=self.n_jobs, verbose=self.verbose, pre_dispatch=self.pre_dispatch, return_as="generator"
         )
         with parallel:
-            score_results = pbar(parallel(delayed(per_datapoint)(i, d) for i, d in enumerate(dataset)))
-            for make_context, (i, r) in iter_with_warning_error_context(score_results):
-                scores.append(r)
-                if self.single_score_callback:
-                    with make_context("single_score_callback"):
-                        self.single_score_callback(
-                            step=i,
-                            scores=tuple(scores),
-                            scorer=self,
-                            pipeline=pipeline,
-                            dataset=dataset,
-                        )
-
-        agg_scores, raw_scores = self._aggregate(
-            _check_and_invert_score_dict(scores, self.default_aggregator), list(dataset)
-        )
-        if self.final_aggregator:
-            return self.final_aggregator(agg_scores, raw_scores, pipeline, dataset)
-        return agg_scores, raw_scores
+            score_results = pbar(
+                parallel(delayed(_score_datapoint)(self.score_func, pipeline, i, d) for i, d in enumerate(dataset))
+            )
+            return _finish_scores(self, pipeline, dataset, score_results)
 
 
 ScorerTypes = ScoreFunc[PipelineT, DatasetT] | Scorer[PipelineT, DatasetT]
