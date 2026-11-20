@@ -15,7 +15,7 @@ from tpcp._pipeline import PipelineT
 from tpcp._utils._general import _aggregate_final_results, _normalize_score_results, _passthrough, _prefix_para_dict
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.misc import iter_with_warning_error_context, warning_error_context
-from tpcp.parallel import Parallel, Task, delayed, job_metadata
+from tpcp.parallel import BoundTask, Parallel, Task, delayed, job_metadata
 from tpcp.validate._cross_val_helper import BaseDatasetSplitter, _normalize_splitter
 from tpcp.validate._scorer import ScoreFunc, Scorer, ScorerTypes, _validate_scorer
 
@@ -165,7 +165,7 @@ def async_cross_validate(
     return_optimizer: bool = False,
     progress_bar: bool = True,
     resource: Literal["cpu", "gpu"] = "cpu",
-) -> Task:
+) -> BoundTask:
     """Bind a lazy cross-validation workflow; await it inside an execution context.
 
     Fold workflows and GridSearch candidates share one process pool. Search
@@ -176,19 +176,16 @@ def async_cross_validate(
     See :func:`cross_validate` for result fields. Failures from composed jobs
     propagate as an ``ExceptionGroup``.
     """
-    return Task(
-        _cross_validate_async,
-        args=(optimizable, dataset),
-        kwargs={
-            "scoring": scoring,
-            "cv": cv,
-            "optimize_params": optimize_params,
-            "return_train_score": return_train_score,
-            "return_optimizer": return_optimizer,
-            "progress_bar": progress_bar,
-            "resource": resource,
-        },
-        kind="workflow",
+    return Task(_cross_validate_async)(
+        optimizable,
+        dataset,
+        scoring=scoring,
+        cv=cv,
+        optimize_params=optimize_params,
+        return_train_score=return_train_score,
+        return_optimizer=return_optimizer,
+        progress_bar=progress_bar,
+        resource=resource,
     )
 
 
@@ -271,9 +268,7 @@ async def _cross_validate_async(
                 ):
                     scores = cast(
                         "dict[str, Any]",
-                        await Task(
-                            _score, args=(optimizer.optimized_pipeline_, subset, scorer, None), resource=resource
-                        ),
+                        await Task(_score, resource=resource)(optimizer.optimized_pipeline_, subset, scorer, None),
                     )
                 result[f"{prefix}__scores"] = scores["scores"]
                 result[f"{prefix}__single__scores"] = scores["single__scores"]

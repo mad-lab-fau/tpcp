@@ -44,7 +44,7 @@ from tpcp._utils._general import (
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
 from tpcp.misc import iter_with_warning_error_context, warning_error_context
-from tpcp.parallel import Parallel, Task, delayed, get_job_metadata, job_metadata
+from tpcp.parallel import BoundTask, Parallel, Task, delayed, get_job_metadata, job_metadata
 from tpcp.validate import BaseDatasetSplitter
 from tpcp.validate._cross_val_helper import _normalize_splitter
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
@@ -265,6 +265,18 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
         return self
 
 
+def _score_candidate(pipeline, dataset, scoring, parameters):
+    return _score(
+        pipeline.clone(),
+        dataset,
+        scoring,
+        parameters,
+        return_parameters=True,
+        return_data_labels=True,
+        return_times=True,
+    )
+
+
 class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]):
     """Perform a grid search over various parameters.
 
@@ -447,7 +459,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
 
     def async_optimize(
         self, dataset: DatasetT, *, resource: Literal["cpu", "gpu"] = "cpu", **kwargs: Any
-    ) -> Task[Self]:
+    ) -> BoundTask[Self]:
         """Bind an async optimization workflow without executing it.
 
         Await the returned effect inside :func:`tpcp.parallel.execution_context`.
@@ -456,7 +468,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
         shows candidate completion; synchronous ``n_jobs`` is ignored. Selection
         and result attributes are applied to this instance on the main thread.
         """
-        return Task(self._optimize_async, args=(dataset,), kwargs={"resource": resource, **kwargs}, kind="workflow")
+        return Task(self._optimize_async)(dataset, resource=resource, **kwargs)
 
     async def optimize_async(self, dataset: DatasetT, **kwargs: Any) -> Self:
         """Execute :meth:`async_optimize` through a coroutine entry point."""
@@ -477,21 +489,14 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
         self.dataset = dataset
         scoring = _validate_scorer(self.scoring).clone().set_params(n_jobs=1, progress_bar=False)
 
+        pipeline = self.pipeline.clone()
+
         async def evaluate(index, parameters):
             with (
                 job_metadata(parameter_candidate=index, parameters=parameters, stage="candidate_score"),
                 warning_error_context("parameter_candidate", {"i": index, "parameters": parameters}),
             ):
-                return await Task(
-                    _score,
-                    args=lambda: (self.pipeline.clone(), dataset, scoring, parameters),
-                    kwargs={
-                        "return_parameters": True,
-                        "return_data_labels": True,
-                        "return_times": True,
-                    },
-                    resource=resource,
-                )
+                return await Task(_score_candidate, resource=resource)(pipeline, dataset, scoring, parameters)
 
         fold = get_job_metadata().get("cv_fold")
         desc = "Parameter Combinations" if fold is None else f"Parameter Combinations [fold {fold}]"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import inspect
 import multiprocessing
 import os
 import threading
@@ -12,7 +13,7 @@ from contextlib import asynccontextmanager, contextmanager
 from contextvars import Context, ContextVar, copy_context
 from dataclasses import dataclass, field
 from itertools import count
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, TypeVar, cast, overload
 
 import joblib
 from joblib.executor import get_memmapping_executor
@@ -47,7 +48,7 @@ class TaskConfig:
 
 
 @dataclass(frozen=True, eq=False)
-class Task(Job[T]):
+class BoundTask(Job[T]):
     """An early-bound, awaitable action with callee-owned scheduling requirements.
 
     Worker tasks execute their callable in the shared process pool. Workflow
@@ -58,6 +59,7 @@ class Task(Job[T]):
 
     func: Callable[..., T | Awaitable[T]]
     kind: Literal["worker", "workflow"] = "worker"
+    cached: bool = False
     # Awaitables represent executions, not values. Override the inherited Job
     # equality/hash as well: gather deduplicates awaitables by identity.
     __hash__ = object.__hash__
@@ -71,7 +73,10 @@ class Task(Job[T]):
         return TaskConfig(self.kind, self.resource if self.kind == "worker" else None)
 
     def __await__(self) -> Generator[Any, None, T]:
-        return self._execute().__await__()
+        from tpcp._task_worker import active_worker
+
+        worker = active_worker.get()
+        return (worker.execute(self) if worker else self._execute()).__await__()
 
     async def _execute(self) -> T:
         if self.kind == "worker":
@@ -79,6 +84,53 @@ class Task(Job[T]):
         with job_metadata(**self.metadata):
             args = self.args() if callable(self.args) else self.args
             return await cast("Awaitable[T]", self.func(*args, **self.kwargs))
+
+
+P = ParamSpec("P")
+Resource = Literal["cpu", "gpu"]
+
+
+class _TaskFactory(BoundTask[T], Generic[P, T]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> BoundTask[T]:
+        return BoundTask(
+            self.func, args, kwargs, self.metadata, self.resource, self.pass_context, self.kind, self.cached
+        )
+
+
+@overload
+def Task(
+    func: Callable[P, Awaitable[T]], *, resource: Resource = ..., kind: Literal["workflow"] = ...
+) -> _TaskFactory[P, T]: ...
+
+
+@overload
+def Task(
+    func: Callable[P, T], *, resource: Resource = ..., metadata: dict[str, Any] | None = ...
+) -> _TaskFactory[P, T]: ...
+
+
+@overload
+def Task(
+    func: Callable[..., T],
+    *,
+    args: tuple | Callable[[], tuple],
+    kwargs: dict | None = ...,
+    resource: Resource = ...,
+    metadata: dict | None = ...,
+) -> BoundTask[T]: ...
+
+
+def Task(
+    func, *, resource: Resource = "cpu", kind=None, metadata=None, args=(), kwargs=None, pass_context=False
+) -> BoundTask:  # noqa: N802
+    """Configure a lazy call. Bind the function arguments with a second call."""
+    kind = kind or ("workflow" if inspect.iscoroutinefunction(func) else "worker")
+    return _TaskFactory(func, args, kwargs or {}, metadata or {}, resource, pass_context, kind)
+
+
+def CachedTask(func: Callable[P, T], *, resource: Resource = "cpu") -> _TaskFactory[P, T]:  # noqa: N802
+    """Coordinate a function using its original joblib Memory cache entry."""
+    return _TaskFactory(func, resource=resource, cached=True)
 
 
 @dataclass(frozen=True)
@@ -264,7 +316,7 @@ class _AsyncExecution:
 
         if self._closing:
             raise RuntimeError("The execution context is closing.")
-        if isinstance(func, Task) and func.kind == "workflow":
+        if isinstance(func, BoundTask) and func.kind == "workflow":
             return await func
         finished = asyncio.get_running_loop().create_future()
         self._calls.add(finished)
@@ -539,7 +591,7 @@ async def run_in_worker(func: Callable[..., T] | Job[T], /, *args: Any, **kwargs
     Result and side-channel merging happen in the calling event loop. Cancelling
     the await does not interrupt a job already running in a worker process.
     """
-    if isinstance(func, Task) and func.kind == "workflow":
+    if isinstance(func, BoundTask) and func.kind == "workflow":
         return await func
     execution = _current_execution.get()
     if execution is None:

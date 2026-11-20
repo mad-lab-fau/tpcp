@@ -402,6 +402,14 @@ def remove_global_parallel_callback(name: str):
 
 
 __all__ = [
+    "BoundTask",
+    "CachedTask",
+    "ClaimLostError",
+    "Decision",
+    "PreparedTask",
+    "InMemoryTaskStorage",
+    "SQLiteTaskStorage",
+    "Worker",
     "Job",
     "JobEvent",
     "Parallel",
@@ -424,6 +432,8 @@ __all__ = [
 # Re-export after the legacy worker helpers are defined. The async adapter uses
 # those helpers at execution time, preserving synchronous worker-state behavior.
 from tpcp._async_execution import (  # noqa: E402
+    BoundTask,
+    CachedTask,
     Job,
     JobEvent,
     Task,
@@ -435,3 +445,6 @@ from tpcp._async_execution import (  # noqa: E402
     job_metadata,
     run_in_worker,
 )
+
+from tpcp._task_storage import InMemoryTaskStorage, SQLiteTaskStorage  # noqa: E402
+from tpcp._task_worker import ClaimLostError, Decision, PreparedTask, Worker  # noqa: E402
