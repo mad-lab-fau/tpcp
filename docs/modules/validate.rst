@@ -58,8 +58,8 @@ Functions
 The :doc:`scoring aliases <types>` describe score functions, aggregator return values, and the
 ``scoring`` argument accepted by validation functions.
 
-Async scoring and pipeline actions
-----------------------------------
+Async scoring
+-------------
 
 ``tpcp.aio.validate.Scorer`` submits one worker task per datapoint. It calls the
 score function with an independent pipeline clone, then runs callbacks and
@@ -77,24 +77,18 @@ returns the same score fields and group labels as synchronous validation.
             return await validate(pipeline, dataset, scoring=scorer)
 
 Built-in scorers and search objectives call synchronous score functions with
-synchronous pipelines. To compose native async actions, subclass ``Algorithm``,
-``Pipeline`` or ``OptimizablePipeline`` from tpcp.aio. Declare action names on an
-algorithm with _action_methods. Pipelines already declare ``safe_run`` and run.
-Bind a coordinator method with ``self.action`` and await worker tasks inside it.
+synchronous pipelines. See :doc:`algorithm_and_pipeline` for native async
+pipeline actions.
 
-.. code-block:: python
+.. autosummary::
+   :toctree: generated/aio
+   :template: class_with_private.rst
 
-    from tpcp.aio import Pipeline, Task
+    tpcp.aio.validate.Scorer
 
-    class Detector(Pipeline):
-        def run(self, datapoint):
-            return self.action(self._detect, datapoint)
+.. autosummary::
+   :toctree: generated/aio
+   :template: function.rst
 
-        async def _detect(self, datapoint):
-            self.events_ = await Task(find_events)(datapoint)
-            return self
-
-Await ``detector.safe_run(datapoint)`` to apply pipeline action checks. Implement
-``self_optimize`` or ``self_optimize_with_info`` on an async optimizable pipeline to
-bind custom training. Call native async actions directly inside your workflow.
-The built-in ``Optimize`` wrapper trains synchronous pipelines.
+    tpcp.aio.validate.validate
+    tpcp.aio.validate.cross_validate

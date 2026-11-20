@@ -67,3 +67,10 @@ Optuna Interface
 
     optuna.CustomOptunaOptimize
     optuna.OptunaSearch
+
+.. autosummary::
+   :toctree: generated/aio
+   :template: class_with_private.rst
+
+    tpcp.aio.optimize.optuna.CustomOptunaOptimize
+    tpcp.aio.optimize.optuna.OptunaSearch
