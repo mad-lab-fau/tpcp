@@ -12,11 +12,11 @@ from joblib import Memory, Parallel, delayed
 from sklearn.model_selection import ParameterGrid
 
 from tests.test_pipelines.conftest import DummyDataset, DummyPipeline
+from tpcp.aio.optimize import GridSearch
+from tpcp.aio.validate import cross_validate as aio_cross_validate
 from tpcp.exceptions import TestError as ScoringError
 from tpcp.optimize import GridSearch as SyncGridSearch
 from tpcp.parallel import Job, Worker, execution_context, get_job_metadata, get_worker_context, job_metadata
-from tpcp.aio.optimize import GridSearch
-from tpcp.aio.validate import cross_validate as aio_cross_validate
 from tpcp.validate import Scorer, cross_validate, no_agg
 
 
@@ -784,3 +784,145 @@ def test_warning_filter_captured_before_queued_callback():
                     await execution.run(warn)
 
     asyncio.run(scenario())
+
+
+def test_async_actions_fit_and_validate():
+    """Training transfers the fitted pipeline and optimization information."""
+    from tests.test_pipelines.conftest import DummyOptimizablePipelineWithInfo
+    from tpcp.aio.optimize import Optimize
+    from tpcp.aio.validate import validate
+
+    data = DummyDataset()
+    optimizer = Optimize(DummyOptimizablePipelineWithInfo(para_1=2, para_2=True))
+
+    async def run():
+        async with execution_context(n_jobs=1):
+            assert await optimizer.optimize(data) is optimizer
+            return await validate(optimizer.optimized_pipeline_, data, scoring=score_candidate)
+
+    assert asyncio.run(run())["agg__score"] == [-2]
+    assert optimizer.optimization_info_ == "info"
+
+
+def test_async_grid_search_cv_matches_sync(tmp_path):
+    """Pure-parameter search preserves all non-timing results."""
+    from tests.test_pipelines.conftest import DummyOptimizablePipelineWithInfo
+    from tpcp.aio.optimize import GridSearchCV
+    from tpcp.optimize import GridSearchCV as SyncGridSearchCV
+
+    options = {
+        "pipeline": DummyOptimizablePipelineWithInfo(),
+        "parameter_grid": ParameterGrid({"para_1": [0, 2], "para_2": [True]}),
+        "cv": 2,
+        "scoring": score_candidate,
+        "return_train_score": True,
+        "pure_parameters": True,
+        "progress_bar": False,
+    }
+    dataset = DummyDataset()
+    expected = SyncGridSearchCV(**options).optimize(dataset)
+
+    async def run():
+        events = []
+        async with Worker(Memory(tmp_path), n_jobs=2, on_job_event=events.append):
+            search = GridSearchCV(**options)
+            await search.optimize(dataset)
+            # Two shared fold fits, four held-out scores and one full-data refit.
+            assert sum(event.status == "completed" for event in events) == 7
+            count = len(events)
+            fresh = search.clone()
+            assert await fresh.optimize(dataset) is fresh
+            assert len(events) == count
+            return fresh
+
+    actual = asyncio.run(run())
+    assert actual.best_params_ == expected.best_params_
+    assert actual.optimization_info_ == expected.optimization_info_
+    for key in actual.cv_results_:
+        if "time" not in key:
+            np.testing.assert_equal(actual.cv_results_[key], expected.cv_results_[key])
+
+
+def test_async_pipeline_action_discovery_and_safety():
+    """Action discovery returns a task that applies results to its receiver."""
+    from tpcp import get_action_method
+    from tpcp.aio import OptimizablePipeline
+
+    class Example(OptimizablePipeline):
+        def run(self, datapoint):
+            return self.action(self._run, datapoint)
+
+        async def _run(self, datapoint):
+            self.value_ = datapoint.group_label.value
+            return self
+
+        def self_optimize(self, dataset):
+            return self.run(dataset[0])
+
+    async def run():
+        example = Example()
+        async with execution_context(n_jobs=1):
+            fitted, _ = await example.self_optimize_with_info(DummyDataset())
+            assert await get_action_method(fitted)(DummyDataset()[2]) is example
+        assert example.value_ == 2
+
+    asyncio.run(run())
+
+
+def test_worker_replays_scores_and_calls_callbacks_in_order(tmp_path):
+    """Cached datapoint results still invoke every callback on each await."""
+    from tpcp.aio.validate import Scorer as AsyncScorer
+
+    steps = []
+
+    def callback(*, step, scores, **_kwargs):
+        steps.append((step, tuple(scores)))
+
+    scorer = AsyncScorer(score_candidate, single_score_callback=callback, progress_bar=False)
+    task = scorer(DummyPipeline(para_1=2), DummyDataset())
+
+    async def run():
+        async with Worker(Memory(tmp_path), n_jobs=2):
+            assert await task == await task
+
+    asyncio.run(run())
+    assert steps[:5] == steps[5:]
+    assert steps[:5] == list(enumerate([(-4,), (-4, -1), (-4, -1, 0), (-4, -1, 0, -1), (-4, -1, 0, -1, -4)]))
+
+
+def test_async_cv_dummy_optimizer(tmp_path):
+    """Cross-validation can compose a non-search optimizer in one worker slot."""
+    from tpcp.aio.optimize import DummyOptimize
+
+    search = DummyOptimize(DummyPipeline(para_1=2))
+
+    async def run():
+        async with Worker(Memory(tmp_path), n_jobs=1):
+            return await aio_cross_validate(
+                search, DummyDataset(), cv=2, scoring=score_candidate, return_optimizer=True
+            )
+
+    result = asyncio.run(run())
+    np.testing.assert_allclose(result["test__agg__score"], [-5 / 3, -2.5])
+    assert all(item.optimized_pipeline_.para_1 == 2 for item in result["optimizer"])
+
+
+def test_async_optimizer_prediction_uses_fitted_pipeline():
+    """Both prediction actions return the fitted pipeline with its latest results."""
+    from tpcp.aio.optimize import DummyOptimize
+
+    class Prediction(DummyPipeline):
+        def run(self, datapoint):
+            self.value_ = datapoint.group_label.value
+            return self
+
+    async def run():
+        dataset = DummyDataset()
+        optimizer = DummyOptimize(Prediction())
+        async with execution_context(n_jobs=1):
+            await optimizer.optimize(dataset)
+            assert (await optimizer.run(dataset[0])).value_ == 0
+            assert await optimizer.safe_run(dataset[1]) is optimizer.optimized_pipeline_
+            assert optimizer.optimized_pipeline_.value_ == 1
+
+    asyncio.run(run())

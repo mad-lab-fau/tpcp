@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Async validation, optimization, and task execution are available under `tpcp.aio`.
-  `tpcp.aio.validate.cross_validate` and `tpcp.aio.optimize.GridSearch.optimize` return lazy, awaitable tasks.
+  Validation, scoring, grid searches, pipeline fitting and optional Optuna studies return lazy tasks.
+  Custom async algorithms and pipelines can compose these actions.
 
 - Experimental asynchronous tasks support delayed-style binding with `Task(fn)(*args, **kwargs)`.
   `Worker` coordinates scoped results through shared memory or SQLite records. `CachedTask` shares

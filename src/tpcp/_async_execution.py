@@ -10,7 +10,7 @@ import os
 import queue as queue_module
 import threading
 import time
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from contextvars import Context, ContextVar, copy_context
 from dataclasses import dataclass, field, replace
 from itertools import count
@@ -27,10 +27,11 @@ if TYPE_CHECKING:
 
 _optimization_resource: ContextVar[Literal["cpu", "gpu"]] = ContextVar("optimization_resource", default="cpu")
 T = TypeVar("T")
+_Result_co = TypeVar("_Result_co", covariant=True)
 
 
 @dataclass(frozen=True)
-class Job(Generic[T]):
+class Job(Generic[_Result_co]):
     """Describe a worker call and its metadata without reserving function keywords."""
 
     func: Callable[..., Any]
@@ -50,7 +51,7 @@ class TaskConfig:
 
 
 @dataclass(frozen=True, eq=False)
-class BoundTask(Job[T]):
+class BoundTask(Job[_Result_co]):
     """An early-bound, awaitable action with callee-owned scheduling requirements.
 
     Worker tasks execute their callable in the shared process pool. Workflow
@@ -59,7 +60,7 @@ class BoundTask(Job[T]):
     Arguments are bound by reference, as with ``joblib.delayed``.
     """
 
-    func: Callable[..., T | Awaitable[T]]
+    func: Callable[..., _Result_co | Awaitable[_Result_co]]
     kind: Literal["worker", "workflow"] = "worker"
     cached: bool = False
     # Awaitables represent executions, not values. Override the inherited Job
@@ -74,7 +75,7 @@ class BoundTask(Job[T]):
         """Inspect scheduling without running the action."""
         return TaskConfig(self.kind, self.resource if self.kind == "worker" else None)
 
-    def __await__(self) -> Generator[Any, None, T]:
+    def __await__(self) -> Generator[Any, None, _Result_co]:
         from tpcp._task_worker import active_worker
 
         worker = active_worker.get()
@@ -82,7 +83,7 @@ class BoundTask(Job[T]):
             raise RuntimeError("CachedTask requires an active Worker.")
         return (worker.execute(self) if worker else self._execute()).__await__()
 
-    async def _execute(self) -> T:
+    async def _execute(self) -> _Result_co:
         if self.kind == "worker":
             execution = _current_execution.get()
             if execution is None:
@@ -90,7 +91,7 @@ class BoundTask(Job[T]):
             return await execution._dispatch_job(self)
         with job_metadata(**self.metadata):
             args = self.args() if callable(self.args) else self.args
-            return await cast("Awaitable[T]", self.func(*args, **self.kwargs))
+            return await cast("Awaitable[_Result_co]", self.func(*args, **self.kwargs))
 
 
 P = ParamSpec("P")
@@ -708,6 +709,34 @@ async def _execution_context(*, n_jobs, n_gpu_jobs, coordinated, gpu_ids=None, o
             finally:
                 with _execution_ownership_lock:
                     del _active_executions[loop]
+
+
+async def _run_local_call(func, /, *args, **kwargs):
+    """Admit a live, non-replayable CPU operation and wait for it before releasing capacity."""
+    from tpcp._task_worker import active_worker
+
+    execution = _current_execution.get()
+    if execution is None:
+        raise RuntimeError("Async actions require an active execution_context.")
+    worker = active_worker.get()
+    async with AsyncExitStack() as capacity:
+        if worker is not None:
+            await capacity.enter_async_context(execution.claim_slots.reserve(float("inf")))
+        await capacity.enter_async_context(execution._slots)
+        if worker is not None:
+            worker._check_active_parents()
+        running = asyncio.create_task(asyncio.to_thread(func, *args, **kwargs))
+        cancellation = None
+        while not running.done():
+            try:
+                await asyncio.shield(running)
+            except asyncio.CancelledError as error:
+                cancellation = error
+        if worker is not None:
+            worker._check_active_parents()
+        if cancellation is not None:
+            raise cancellation
+        return running.result()
 
 
 async def run_in_worker(func: Callable[..., T] | Job[T], /, *args: Any, **kwargs: Any) -> T:

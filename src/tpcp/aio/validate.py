@@ -6,31 +6,33 @@ import time
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from tpcp._async_execution import _gather_with_progress, _LocalWorkflow, _optimization_resource
+from tpcp._dataset import DatasetT
+from tpcp._pipeline import PipelineT
 from tpcp._utils._score import _score
+from tpcp.aio._pipeline import Pipeline as AsyncPipeline
 from tpcp.misc import warning_error_context
 from tpcp.parallel import BoundTask, Task, job_metadata
 from tpcp.validate._cross_val_helper import _normalize_splitter
-from tpcp.validate._scorer import _validate_scorer
-from tpcp.validate._validate import _format_cv_results
+from tpcp.validate._scorer import Scorer as SyncScorer
+from tpcp.validate._scorer import _finish_scores, _score_datapoint, _Scorer, _validate_scorer
+from tpcp.validate._validate import _format_cv_results, _format_validation_results
 
 if TYPE_CHECKING:
     from sklearn.model_selection import BaseCrossValidator
 
     from tpcp import Dataset
-    from tpcp._dataset import DatasetT
-    from tpcp._pipeline import PipelineT
-    from tpcp.aio.optimize import GridSearch
+    from tpcp.aio.optimize import BaseOptimize
     from tpcp.validate._cross_val_helper import BaseDatasetSplitter
     from tpcp.validate._scorer import ScorerTypes
 
-__all__ = ["cross_validate"]
+__all__ = ["Scorer", "cross_validate", "validate"]
 
 
 def cross_validate(
-    optimizable: GridSearch[PipelineT, DatasetT],
+    optimizable: BaseOptimize[PipelineT, DatasetT],
     dataset: DatasetT,
     *,
-    scoring: ScorerTypes[PipelineT, DatasetT],
+    scoring: ScorerTypes[PipelineT, DatasetT] | Scorer[PipelineT, DatasetT],
     cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None = None,
     optimize_params: dict[str, Any] | None = None,
     return_train_score: bool = False,
@@ -40,7 +42,7 @@ def cross_validate(
 ) -> BoundTask:
     """Bind a lazy cross-validation workflow; await it inside an execution context.
 
-    Fold workflows and GridSearch candidates share one process pool. Search
+    Fold workflows and optimizer jobs share one process pool. Search
     selection and results stay on the main thread; scoring runs in workers.
     ``resource="gpu"`` requests both CPU and GPU slots for leaf jobs.
     ``progress_bar`` shows fold completion; candidate bars follow the search's
@@ -62,10 +64,10 @@ def cross_validate(
 
 
 async def _cross_validate_async(
-    optimizable: GridSearch[PipelineT, DatasetT],
+    optimizable: BaseOptimize[PipelineT, DatasetT],
     dataset: DatasetT,
     *,
-    scoring: ScorerTypes[PipelineT, DatasetT],
+    scoring: ScorerTypes[PipelineT, DatasetT] | Scorer[PipelineT, DatasetT],
     cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None = None,
     optimize_params: dict[str, Any] | None = None,
     return_train_score: bool = False,
@@ -73,21 +75,8 @@ async def _cross_validate_async(
     progress_bar: bool = True,
     resource: Literal["cpu", "gpu"] = "cpu",
 ):
-    """Evaluate GridSearch folds through one experimental async execution context.
-
-    Use inside ``async with tpcp.parallel.execution_context(n_jobs=...)``.
-    Each fold awaits its own cloned GridSearch, which submits candidate jobs to
-    the shared pool. Test and optional train scoring use the same pool, with
-    datapoints scored serially inside each job. Results have the same structure
-    as :func:`tpcp.validate.cross_validate`; timings measure elapsed time including pool waits.
-    ``progress_bar`` displays completed folds using tqdm. Inner search progress
-    follows ``GridSearch.progress_bar``. Scorer ``n_jobs`` and datapoint progress
-    bars do not apply to this prototype.
-    ``resource="gpu"`` schedules candidate and held-out scoring through the GPU
-    gate. ``optimize_params`` can override the resource for optimization only.
-    Failures propagate as an ``ExceptionGroup`` from the task group.
-    """
-    scorer = _validate_scorer(scoring).clone().set_params(n_jobs=1, progress_bar=False)
+    """Clone each optimizer, await its action and score the pipeline it returns."""
+    scorer = _serial_scorer(optimizable.pipeline, scoring)
     splits = list(_normalize_splitter(cv).split(cast("Dataset", dataset)))
 
     async def evaluate_fold(index, train_labels, test_labels):
@@ -136,3 +125,73 @@ async def _cross_validate_async(
         progress_bar=progress_bar,
     )
     return _format_cv_results(results)
+
+
+class Scorer(_Scorer[PipelineT, DatasetT]):
+    """Score independent pipeline clones, then process results in dataset order."""
+
+    def __call__(self, pipeline: PipelineT, dataset: DatasetT, *, resource="cpu") -> BoundTask:
+        """Bind per-datapoint scoring and ordered aggregation."""
+        return _LocalWorkflow(_score_dataset)(self, pipeline, dataset, resource)
+
+
+async def _score_dataset(scorer, pipeline, dataset, resource):
+    _require_sync_pipeline(pipeline)
+    results = await _gather_with_progress(
+        (Task(_score_datapoint, resource=resource)(scorer.score_func, pipeline, i, d) for i, d in enumerate(dataset)),
+        total=len(dataset),
+        desc="Datapoints",
+        progress_bar=scorer.progress_bar,
+    )
+    return _finish_scores(scorer, pipeline, dataset, results)
+
+
+def _require_sync_pipeline(pipeline):
+    from tpcp.aio.optimize import BaseOptimize
+
+    if isinstance(pipeline, (AsyncPipeline, BaseOptimize)):
+        raise TypeError(
+            "This operation requires a synchronous pipeline. Compose native async pipeline actions directly."
+        )
+
+
+def _serial_scorer(pipeline, scoring):
+    _require_sync_pipeline(pipeline)
+    if type(scoring) is Scorer:
+        scoring = SyncScorer(**scoring.get_params(deep=False))
+    elif isinstance(scoring, Scorer):
+        raise TypeError("Use a synchronous Scorer subclass for scoring inside worker jobs.")
+    return _validate_scorer(scoring).clone().set_params(n_jobs=1, progress_bar=False)
+
+
+def validate(
+    pipeline: PipelineT,
+    dataset: DatasetT,
+    *,
+    scoring: ScorerTypes[PipelineT, DatasetT] | Scorer[PipelineT, DatasetT],
+    progress_bar: bool | None = None,
+    resource: Literal["cpu", "gpu"] = "cpu",
+) -> BoundTask:
+    """Evaluate a synchronous pipeline and return the regular validation result fields."""
+    return _LocalWorkflow(_validate)(pipeline, dataset, scoring, resource, progress_bar)
+
+
+async def _validate(pipeline, dataset, scoring, resource, progress_bar):
+    _require_sync_pipeline(pipeline)
+    if progress_bar is not None:
+        if isinstance(scoring, _Scorer):
+            raise ValueError("Set progress_bar on the supplied Scorer.")
+        scoring = Scorer(scoring, progress_bar=progress_bar)
+    start = time.perf_counter()
+    if isinstance(scoring, SyncScorer) and type(scoring) is not SyncScorer:
+        result = await Task(_score, resource=resource)(
+            pipeline.clone(), dataset, scoring.clone().set_params(n_jobs=1), None, return_times=True
+        )
+    else:
+        pipeline = pipeline.clone()
+        if isinstance(scoring, Scorer):
+            agg, single = await scoring(pipeline, dataset, resource=resource)
+        else:
+            agg, single = await _score_dataset(_validate_scorer(scoring), pipeline, dataset, resource)
+        result = {"scores": agg, "single__scores": single, "debug__score_time": time.perf_counter() - start}
+    return _format_validation_results({**result, "data_labels": dataset.group_labels})

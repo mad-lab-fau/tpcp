@@ -135,6 +135,14 @@ class Worker:
         ):
             raise ClaimLostError(f"Claim expired for {claim.task_id}")
 
+    def _check_active_parents(self):
+        parents = self._parents.get()
+        if not parents:
+            return
+        with self.storage.transaction() as records:
+            for parent in parents:
+                self._check(records, parent)
+
     def _check_parents(self, records, prepared):
         for parent in prepared.parents:
             self._check(records, parent)
@@ -308,7 +316,10 @@ class Worker:
         if isinstance(task, _LocalWorkflow):
             token = active_worker.set(self)
             try:
-                return await task._execute()
+                self._check_active_parents()
+                result = await task._execute()
+                self._check_active_parents()
+                return result
             finally:
                 active_worker.reset(token)
         prepared = await asyncio.to_thread(self._prepare, self._resolve(task), self._scope.get(), self._parents.get())
