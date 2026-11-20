@@ -28,10 +28,9 @@ from tpcp._algorithm_utils import (
     _check_safe_optimize,
     _split_returns,
 )
-from tpcp._async_execution import _gather_with_progress, _LocalWorkflow, _optimization_resource
 from tpcp._base import NOTHING, _get_annotated_fields_of_type
 from tpcp._dataset import DatasetT
-from tpcp._optimize import BaseOptimize
+from tpcp._optimize import BaseOptimize, _Optimizer
 from tpcp._parameters import Parameter, _ParaTypes
 from tpcp._pipeline import OptimizablePipelineT, PipelineT
 from tpcp._utils._general import (
@@ -43,8 +42,8 @@ from tpcp._utils._general import (
 )
 from tpcp._utils._score import _optimize_and_score, _score
 from tpcp.exceptions import PotentialUserErrorWarning
-from tpcp.misc import iter_with_warning_error_context, warning_error_context
-from tpcp.parallel import BoundTask, Parallel, Task, delayed, get_job_metadata, job_metadata
+from tpcp.misc import iter_with_warning_error_context
+from tpcp.parallel import Parallel, delayed
 from tpcp.validate import BaseDatasetSplitter
 from tpcp.validate._cross_val_helper import _normalize_splitter
 from tpcp.validate._scorer import ScorerTypes, _validate_scorer
@@ -265,18 +264,126 @@ class Optimize(BaseOptimize[OptimizablePipelineT, DatasetT]):
         return self
 
 
-def _score_candidate(pipeline, dataset, scoring, parameters):
-    return _score(
-        pipeline.clone(),
-        dataset,
-        scoring,
-        parameters,
-        return_parameters=True,
-        return_times=True,
-    )
+class _GridSearch(_Optimizer[PipelineT, DatasetT]):
+    """Configuration and result handling shared by both grid searches."""
+
+    parameter_grid: ParameterGrid
+    scoring: ScorerTypes[PipelineT, DatasetT]
+    n_jobs: int | None
+    return_optimized: bool | str
+    pre_dispatch: int | str
+    progress_bar: bool
+
+    gs_results_: dict[str, Any]
+    best_params_: dict[str, Any]
+    best_index_: int
+    best_score_: float
+    multimetric_: bool
+
+    def __init__(
+        self,
+        pipeline: PipelineT,
+        parameter_grid: ParameterGrid,
+        *,
+        scoring: ScorerTypes[PipelineT, DatasetT],
+        n_jobs: int | None = None,
+        return_optimized: bool | str = True,
+        pre_dispatch: int | str = "n_jobs",
+        progress_bar: bool = True,
+    ) -> None:
+        self.pipeline = pipeline
+        self.parameter_grid = parameter_grid
+        self.scoring = scoring
+        self.n_jobs = n_jobs
+        self.pre_dispatch = pre_dispatch
+        self.return_optimized = return_optimized
+        self.progress_bar = progress_bar
+
+    def _set_search_results(self, results) -> Self:
+        # We check here if all results are dicts. We only check the dtype of the first value, as the scorer should
+        # have handled issues with non-uniform cases already.
+        first_test_score = results[0]["scores"]
+        self.multimetric_ = isinstance(first_test_score, dict)
+
+        results = self._format_results(
+            list(self.parameter_grid),
+            results,
+        )
+
+        reverse_ranking, return_optimized = _validate_return_optimized(
+            self.return_optimized, self.multimetric_, first_test_score
+        )
+        if return_optimized:
+            assert isinstance(return_optimized, str)
+            (
+                self.best_index_,
+                self.best_score_,
+                self.best_params_,
+            ) = _extract_return_optimize_info(
+                return_optimized,
+                reverse_ranking,
+                results,
+                rank_prefix="rank__agg__",
+                score_prefix="agg__",
+            )
+            # We clone twice, in case one of the params was itself an algorithm.
+            self.optimized_pipeline_ = self.pipeline.clone().set_params(**self.best_params_).clone()
+
+        self.gs_results_ = results
+
+        return self
+
+    def _format_results(self, candidate_params, out):
+        """Format the final result dict.
+
+        This function is adapted based on sklearn's `BaseSearchCV`
+        """
+        n_candidates = len(candidate_params)
+        out = _aggregate_final_results(out)
+
+        results = {}
+
+        scores_dict = _prefix_para_dict(_normalize_score_results(out["scores"]) or {}, "agg__")
+        single_scores_dict = _prefix_para_dict(_normalize_score_results(out["single__scores"]) or {}, "single__")
+        for c, v in scores_dict.items():
+            results[c] = v
+            results[f"rank__{c}"] = np.asarray(rankdata(-v, method="min"), dtype=np.int32)
+        for c, _v in single_scores_dict.items():
+            # Because of custom aggregators, it can be that single scores dicts have different keys than the aggregated
+            # scores.
+            results[c] = _v
+
+        results["data_labels"] = out["data_labels"]
+        results["debug__score_time"] = out["debug__score_time"]
+
+        # Use one MaskedArray and mask all the places where the param is not
+        # applicable for that candidate. Use defaultdict as each candidate may
+        # not contain all the params
+        param_results = defaultdict(
+            partial(
+                MaskedArray,
+                np.empty(
+                    n_candidates,
+                ),
+                mask=True,
+                dtype=object,
+            )
+        )
+        for cand_idx, params in enumerate(candidate_params):
+            for name, value in params.items():
+                # An all masked empty array gets created for the key
+                # `"param_%s" % name` at the first occurrence of `name`.
+                # Setting the value at an index also unmasks that index
+                param_results[f"param__{name}"][cand_idx] = value
+
+        results.update(param_results)
+        # Store a list of param dicts at the key 'params'
+        results["params"] = candidate_params
+
+        return results
 
 
-class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]):
+class GridSearch(_GridSearch[PipelineT, DatasetT], BaseOptimize[PipelineT, DatasetT]):
     """Perform a grid search over various parameters.
 
     This scores the pipeline for every combination of data points in the provided dataset and parameter combinations
@@ -375,38 +482,6 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
 
     """
 
-    parameter_grid: ParameterGrid
-    scoring: ScorerTypes[PipelineT, DatasetT]
-    n_jobs: int | None
-    return_optimized: bool | str
-    pre_dispatch: int | str
-    progress_bar: bool
-
-    gs_results_: dict[str, Any]
-    best_params_: dict[str, Any]
-    best_index_: int
-    best_score_: float
-    multimetric_: bool
-
-    def __init__(
-        self,
-        pipeline: PipelineT,
-        parameter_grid: ParameterGrid,
-        *,
-        scoring: ScorerTypes[PipelineT, DatasetT],
-        n_jobs: int | None = None,
-        return_optimized: bool | str = True,
-        pre_dispatch: int | str = "n_jobs",
-        progress_bar: bool = True,
-    ) -> None:
-        self.pipeline = pipeline
-        self.parameter_grid = parameter_grid
-        self.scoring = scoring
-        self.n_jobs = n_jobs
-        self.pre_dispatch = pre_dispatch
-        self.return_optimized = return_optimized
-        self.progress_bar = progress_bar
-
     def optimize(self, dataset: DatasetT, **_: Any) -> Self:
         """Run the grid search over the dataset and find the best parameter combination.
 
@@ -455,142 +530,6 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
             results = list(pbar(parallel(tasks())))
         assert results is not None  # For the typechecker
         return self._set_search_results(results)
-
-    def async_optimize(
-        self, dataset: DatasetT, *, resource: Literal["cpu", "gpu"] | None = None, **kwargs: Any
-    ) -> BoundTask[Self]:
-        """Bind an async optimization workflow without executing it.
-
-        Await the returned effect inside :func:`tpcp.parallel.execution_context`.
-        Candidates share its pool and run serial scoring within each worker.
-        ``resource="gpu"`` requests both GPU and CPU slots. ``progress_bar``
-        shows candidate completion; synchronous ``n_jobs`` is ignored. Selection
-        and result attributes are applied to this instance on the main thread.
-        """
-        if resource is None:
-            resource = _optimization_resource.get()
-        return _LocalWorkflow(self._optimize_async)(dataset, resource=resource, **kwargs)
-
-    async def _optimize_async(self, dataset: DatasetT, *, resource: Literal["cpu", "gpu"] = "cpu", **_: Any) -> Self:
-        """Run experimental async GridSearch in the active execution context.
-
-        Candidate evaluations share the context's pool with enclosing async CV
-        folds. The execution context controls pool concurrency; synchronous
-        ``n_jobs`` and ``pre_dispatch`` settings are ignored. ``progress_bar``
-        displays candidate completions using tqdm.
-        ``resource="gpu"`` requires both a GPU slot and a CPU/process slot.
-        Scorers run serially inside each candidate job to avoid nested pools.
-        Results are stored on this instance in the calling event loop.
-        Failures propagate as an ``ExceptionGroup`` from the task group.
-        """
-        self.dataset = dataset
-        scoring = _validate_scorer(self.scoring).clone().set_params(n_jobs=1, progress_bar=False)
-
-        pipeline = self.pipeline.clone()
-
-        # Pandas creates the label namedtuple class at runtime. Keep it out of persisted scores.
-        labels = dataset.group_labels
-
-        async def evaluate(index, parameters):
-            with (
-                job_metadata(parameter_candidate=index, parameters=parameters, stage="candidate_score"),
-                warning_error_context("parameter_candidate", {"i": index, "parameters": parameters}),
-            ):
-                result = await Task(_score_candidate, resource=resource)(pipeline, dataset, scoring, parameters)
-                return {**result, "data_labels": list(labels)}
-
-        fold = get_job_metadata().get("cv_fold")
-        desc = "Parameter Combinations" if fold is None else f"Parameter Combinations [fold {fold}]"
-        results = await _gather_with_progress(
-            (evaluate(i, paras) for i, paras in enumerate(self.parameter_grid)),
-            total=len(self.parameter_grid),
-            desc=desc,
-            progress_bar=self.progress_bar,
-        )
-        return self._set_search_results(results)
-
-    def _set_search_results(self, results) -> Self:
-        # We check here if all results are dicts. We only check the dtype of the first value, as the scorer should
-        # have handled issues with non-uniform cases already.
-        first_test_score = results[0]["scores"]
-        self.multimetric_ = isinstance(first_test_score, dict)
-
-        results = self._format_results(
-            list(self.parameter_grid),
-            results,
-        )
-
-        reverse_ranking, return_optimized = _validate_return_optimized(
-            self.return_optimized, self.multimetric_, first_test_score
-        )
-        if return_optimized:
-            assert isinstance(return_optimized, str)
-            (
-                self.best_index_,
-                self.best_score_,
-                self.best_params_,
-            ) = _extract_return_optimize_info(
-                return_optimized,
-                reverse_ranking,
-                results,
-                rank_prefix="rank__agg__",
-                score_prefix="agg__",
-            )
-            # We clone twice, in case one of the params was itself an algorithm.
-            self.optimized_pipeline_ = self.pipeline.clone().set_params(**self.best_params_).clone()
-
-        self.gs_results_ = results
-
-        return self
-
-    def _format_results(self, candidate_params, out):
-        """Format the final result dict.
-
-        This function is adapted based on sklearn's `BaseSearchCV`
-        """
-        n_candidates = len(candidate_params)
-        out = _aggregate_final_results(out)
-
-        results = {}
-
-        scores_dict = _prefix_para_dict(_normalize_score_results(out["scores"]) or {}, "agg__")
-        single_scores_dict = _prefix_para_dict(_normalize_score_results(out["single__scores"]) or {}, "single__")
-        for c, v in scores_dict.items():
-            results[c] = v
-            results[f"rank__{c}"] = np.asarray(rankdata(-v, method="min"), dtype=np.int32)
-        for c, _v in single_scores_dict.items():
-            # Because of custom aggregators, it can be that single scores dicts have different keys than the aggregated
-            # scores.
-            results[c] = _v
-
-        results["data_labels"] = out["data_labels"]
-        results["debug__score_time"] = out["debug__score_time"]
-
-        # Use one MaskedArray and mask all the places where the param is not
-        # applicable for that candidate. Use defaultdict as each candidate may
-        # not contain all the params
-        param_results = defaultdict(
-            partial(
-                MaskedArray,
-                np.empty(
-                    n_candidates,
-                ),
-                mask=True,
-                dtype=object,
-            )
-        )
-        for cand_idx, params in enumerate(candidate_params):
-            for name, value in params.items():
-                # An all masked empty array gets created for the key
-                # `"param_%s" % name` at the first occurrence of `name`.
-                # Setting the value at an index also unmasks that index
-                param_results[f"param__{name}"][cand_idx] = value
-
-        results.update(param_results)
-        # Store a list of param dicts at the key 'params'
-        results["params"] = candidate_params
-
-        return results
 
 
 class GridSearchCV(

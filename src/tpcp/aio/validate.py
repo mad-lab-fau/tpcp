@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 from tpcp._async_execution import _gather_with_progress, _LocalWorkflow, _optimization_resource
 from tpcp._utils._score import _score
-from tpcp.aio.optimize import optimize
 from tpcp.misc import warning_error_context
 from tpcp.parallel import BoundTask, Task, job_metadata
 from tpcp.validate._cross_val_helper import _normalize_splitter
@@ -20,7 +19,7 @@ if TYPE_CHECKING:
     from tpcp import Dataset
     from tpcp._dataset import DatasetT
     from tpcp._pipeline import PipelineT
-    from tpcp.optimize import GridSearch
+    from tpcp.aio.optimize import GridSearch
     from tpcp.validate._cross_val_helper import BaseDatasetSplitter
     from tpcp.validate._scorer import ScorerTypes
 
@@ -101,7 +100,7 @@ async def _cross_validate_async(
                 parameters = dict(optimize_params or {})
                 token = _optimization_resource.set(resource)
                 try:
-                    optimizer = await optimize(optimizer, train, **parameters)
+                    optimizer = await optimizer.optimize(train, **parameters)
                 finally:
                     _optimization_resource.reset(token)
             optimize_time = time.perf_counter() - start

@@ -20,6 +20,19 @@ Classes
     DummyOptimize
     BaseOptimize
 
+Asynchronous grid search
+------------------------
+
+Import :class:`tpcp.aio.optimize.GridSearch` to use the task-based action.
+Its ``optimize(dataset)`` method returns a bound task. Await it inside an
+execution context or a worker to populate the search results.
+
+.. autosummary::
+   :toctree: generated/aio
+   :template: class_with_private.rst
+
+    tpcp.aio.optimize.GridSearch
+
 Optuna Interface
 ----------------
 

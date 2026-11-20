@@ -45,28 +45,21 @@ Classes
 Experimental async execution
 ----------------------------
 
-``tpcp.aio.validate.cross_validate`` and ``tpcp.aio.optimize.optimize`` return
-lazy, awaitable bound tasks. Inspect a task before execution, await it directly,
+Use ``GridSearch`` from ``tpcp.aio.optimize`` for asynchronous search. Its
+``optimize`` action and ``tpcp.aio.validate.cross_validate`` both return lazy,
+awaitable bound tasks. Inspect a task before execution, await it directly,
 or pass it to ``Worker.execute``. Arguments are bound by reference, as with
 ``joblib.delayed``. For ``asyncio.create_task`` or ``TaskGroup.create_task``,
 wrap the await in a coroutine.
 
 .. code-block:: python
 
-    from tpcp.aio.parallel import Task, execution_context, get_worker_context
+    from tpcp.aio.optimize import GridSearch
+    from tpcp.aio.parallel import execution_context
     from tpcp.aio.validate import cross_validate
 
-    class Algorithm:
-        def async_optimize(self, data):
-            # The callee owns the resource request, not its caller.
-            return Task(self.optimize, resource="gpu")(data)
-
-        def optimize(self, data):
-            worker = get_worker_context()
-            # Select worker.gpu_id in your GPU framework here.
-            return compute(data)
-
-    async def evaluate(search, dataset, scoring):
+    async def evaluate(pipeline, parameter_grid, dataset, scoring):
+        search = GridSearch(pipeline, parameter_grid, scoring=scoring)
         effect = cross_validate(search, dataset, scoring=scoring, cv=5)
         assert effect.config.kind == "workflow"
         async with execution_context(n_jobs=4, n_gpu_jobs=1, batch_size="auto"):
@@ -76,8 +69,8 @@ Worker tasks run synchronous callables in joblib's reusable loky process pool.
 ``Task(async_function)(...)`` instead awaits an async callable on the
 main event loop. Workflow tasks compose child effects without reserving a worker;
 only leaf effects occupy slots. ``asyncio.gather`` can await independent effects
-concurrently. A GPU search can override ``async_optimize`` to return
-``super().async_optimize(dataset, resource="gpu")``; the surrounding CV awaits
+concurrently. A GPU search can override ``optimize`` to return
+``super().optimize(dataset, resource="gpu")``; the surrounding CV awaits
 its effect normally. An optimizer effect may return a new fitted instance, for
 example after process serialization. CV uses the returned instance for held-out
 scoring and ``return_optimizer``. ``resource="gpu"`` on CV is also available as a convenience

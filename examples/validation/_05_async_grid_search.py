@@ -16,7 +16,7 @@ import os
 import pandas as pd
 from sklearn.model_selection import ParameterGrid
 from tpcp import Dataset, Pipeline
-from tpcp.optimize import GridSearch
+from tpcp.aio.optimize import GridSearch
 from tpcp.aio.parallel import Task, execution_context, get_worker_context
 from tpcp.aio.validate import cross_validate
 from tpcp.validate import no_agg

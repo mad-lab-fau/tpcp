@@ -13,9 +13,9 @@ from sklearn.model_selection import ParameterGrid
 
 from tests.test_pipelines.conftest import DummyDataset, DummyPipeline
 from tpcp.exceptions import TestError as ScoringError
-from tpcp.optimize import GridSearch
+from tpcp.optimize import GridSearch as SyncGridSearch
 from tpcp.parallel import Job, Worker, execution_context, get_job_metadata, get_worker_context, job_metadata
-from tpcp.aio.optimize import optimize
+from tpcp.aio.optimize import GridSearch
 from tpcp.aio.validate import cross_validate as aio_cross_validate
 from tpcp.validate import Scorer, cross_validate, no_agg
 
@@ -43,7 +43,7 @@ def test_async_grid_search_populates_original_object():
 
     async def run():
         async with execution_context(n_jobs=2):
-            return await optimize(search, DummyDataset())
+            return await search.optimize(DummyDataset())
 
     assert asyncio.run(run()) is search
     assert search.best_params_ == {"para_1": 2}
@@ -65,7 +65,9 @@ def test_async_cross_validation_matches_sync(return_train_score, coordinated, tm
         "return_optimizer": True,
         "return_train_score": return_train_score,
     }
-    expected = cross_validate(search, DummyDataset(), progress_bar=False, **kwargs)
+    expected = cross_validate(
+        SyncGridSearch(**search.get_params(deep=False)), DummyDataset(), progress_bar=False, **kwargs
+    )
 
     async def run():
         async with Worker(Memory(tmp_path), n_jobs=2) if coordinated else execution_context(n_jobs=2):
@@ -141,9 +143,9 @@ def test_failed_search_leaves_execution_available_for_another_search(resource):
     async def run():
         async with execution_context(n_jobs=2, n_gpu_jobs=1):
             with pytest.raises(ExceptionGroup) as error:
-                await optimize(bad, DummyDataset(), resource=resource)
+                await bad.optimize(DummyDataset(), resource=resource)
             assert error.value.subgroup(ScoringError) is not None
-            await optimize(good, DummyDataset(), resource=resource)
+            await good.optimize(DummyDataset(), resource=resource)
 
     asyncio.run(run())
     assert good.best_params_ == {"para_1": 2}
@@ -187,7 +189,7 @@ def test_candidate_pipeline_copies_are_bounded_by_admitted_work():
 
     async def run():
         async with execution_context(n_jobs=2, batch_size=1):
-            await optimize(search, DummyDataset())
+            await search.optimize(DummyDataset())
 
     asyncio.run(run())
     np.testing.assert_array_equal(search.gs_results_["agg__score"], [-6, -3, -2, -3, -6])
@@ -404,7 +406,7 @@ def test_previously_run_pipeline_results_are_not_serialized_for_candidates():
 
     async def run():
         async with execution_context(n_jobs=2):
-            await optimize(search, DummyDataset())
+            await search.optimize(DummyDataset())
 
     asyncio.run(run())
     assert search.best_params_ == {"para_1": 2}
@@ -529,10 +531,10 @@ def test_action_effects_bind_calls_and_declare_resources():
     from tpcp.parallel import Task
 
     class Algorithm:
-        def async_optimize(self, value):
+        def optimize(self, value):
             return Task(lambda bound: (bound, get_worker_context()), args=(value,), resource="gpu")
 
-    effect = Algorithm().async_optimize(42)
+    effect = Algorithm().optimize(42)
     assert effect.config.kind == "worker"
     assert effect.config.resource == "gpu"
 
@@ -554,7 +556,7 @@ def test_workflow_effects_are_lazy_and_compose_on_main_thread():
         DummyPipeline(), ParameterGrid({"para_1": [0, 2, 4]}), scoring=score_candidate, progress_bar=False
     )
     dataset = DummyDataset()
-    effect = optimize(search, dataset)
+    effect = search.optimize(dataset)
     assert effect.config.kind == "workflow"
     assert not hasattr(search, "gs_results_")
 
@@ -581,8 +583,8 @@ def test_nested_action_owns_its_gpu_requirement():
     """CV executes the callee's effect without choosing its candidate queue."""
 
     class GpuSearch(GridSearch):
-        def async_optimize(self, dataset, **kwargs):
-            return super().async_optimize(dataset, **{**kwargs, "resource": "gpu"})
+        def optimize(self, dataset, **kwargs):
+            return super().optimize(dataset, **{**kwargs, "resource": "gpu"})
 
     search = GpuSearch(DummyPipeline(), ParameterGrid({"para_1": [0, 2]}), scoring=score_candidate, progress_bar=False)
     events = []
@@ -634,7 +636,7 @@ def test_bound_workflows_compose_with_task_group():
 
     async def run():
         async with execution_context(n_jobs=2):
-            await asyncio.create_task(await_task(optimize(search, DummyDataset())))
+            await asyncio.create_task(await_task(search.optimize(DummyDataset())))
             async with asyncio.TaskGroup() as group:
                 cv_task = group.create_task(
                     await_task(
@@ -651,9 +653,9 @@ def test_cross_validation_preserves_task_override_dispatch():
     calls = []
 
     class CustomSearch(GridSearch):
-        def async_optimize(self, dataset):
+        def optimize(self, dataset):
             calls.append(dataset.group_labels)
-            return super().async_optimize(dataset)
+            return super().optimize(dataset)
 
     search = CustomSearch(
         DummyPipeline(), ParameterGrid({"para_1": [0, 2]}), scoring=score_candidate, progress_bar=False
@@ -674,13 +676,20 @@ def test_cv_uses_optimizer_returned_by_worker_effect():
     from tpcp.parallel import Task
 
     class WorkerSearch(GridSearch):
-        def async_optimize(self, dataset, **_):
-            return Task(self.optimize, args=(dataset,), resource="gpu", metadata={"stage": "custom_optimize"})
+        def optimize(self, dataset, **_):
+            search = SyncGridSearch(**self.get_params(deep=False))
+            return Task(search.optimize, resource="gpu", metadata={"stage": "custom_optimize"})(dataset)
 
     search = WorkerSearch(
         DummyPipeline(), ParameterGrid({"para_1": [0, 2]}), scoring=score_candidate, n_jobs=1, progress_bar=False
     )
-    expected = cross_validate(search, DummyDataset(), scoring=score_candidate, cv=2, progress_bar=False)
+    expected = cross_validate(
+        SyncGridSearch(**search.get_params(deep=False)),
+        DummyDataset(),
+        scoring=score_candidate,
+        cv=2,
+        progress_bar=False,
+    )
     events = []
 
     async def run():
@@ -746,10 +755,10 @@ def test_grid_search_replays_leaves_on_fresh_instance(tmp_path):
                 DummyPipeline(), ParameterGrid({"para_1": [0, 2]}), scoring=score_candidate, progress_bar=False
             )
             fresh = search.clone()
-            assert await search.async_optimize(dataset) is search
+            assert await search.optimize(dataset) is search
             count = len(events)
             assert count
-            assert await worker.execute(fresh.async_optimize(dataset)) is fresh
+            assert await worker.execute(fresh.optimize(dataset)) is fresh
             assert fresh.best_params_ == search.best_params_
             assert len(events) == count
 
