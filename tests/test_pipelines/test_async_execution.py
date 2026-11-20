@@ -926,3 +926,48 @@ def test_async_optimizer_prediction_uses_fitted_pipeline():
             assert optimizer.optimized_pipeline_.value_ == 1
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("callback_fails", [True, False])
+def test_async_scorer_delivers_prefix_before_failure(monkeypatch, callback_fails):
+    """Deliver the first callback while later scores are pending and cancel them if it fails."""
+    from tpcp.aio import validate as aio_validate
+
+    release = asyncio.Event()
+    cancelled = []
+    steps = []
+
+    async def score(_func, _pipeline, index, _datapoint):
+        if index == 0:
+            return index, 10
+        try:
+            await asyncio.wait_for(release.wait(), timeout=2)
+        except asyncio.CancelledError:
+            cancelled.append(index)
+            raise
+        raise ValueError("datapoint failure")
+
+    monkeypatch.setattr(aio_validate, "Task", lambda *_args, **_kwargs: score)
+
+    def callback(*, step, scores, **_kwargs):
+        steps.append((step, scores))
+        if callback_fails:
+            raise ValueError("callback failure")
+        release.set()
+
+    scorer = aio_validate.Scorer(score_candidate, single_score_callback=callback, progress_bar=False)
+
+    async def run():
+        async with execution_context():
+            if callback_fails:
+                with pytest.raises(ValueError, match="callback failure"):
+                    await scorer(DummyPipeline(), DummyDataset())
+            else:
+                with pytest.raises(ExceptionGroup) as caught:
+                    await scorer(DummyPipeline(), DummyDataset())
+                assert str(caught.value.exceptions[0]) == "datapoint failure"
+
+    asyncio.run(run())
+    assert steps == [(0, (10,))]
+    if callback_fails:
+        assert sorted(cancelled) == [1, 2, 3, 4]

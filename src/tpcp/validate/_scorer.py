@@ -352,18 +352,22 @@ class _Scorer(Generic[PipelineT, DatasetT], BaseTpcpObject):
 
 def _finish_scores(scorer, pipeline, dataset, score_results):
     scores: list[ScoreType] = []
-    for make_context, (i, r) in iter_with_warning_error_context(score_results):
-        scores.append(r)
-        if scorer.single_score_callback:
-            with make_context("single_score_callback"):
-                scorer.single_score_callback(
-                    step=i,
-                    scores=tuple(scores),
-                    scorer=scorer,
-                    pipeline=pipeline,
-                    dataset=dataset,
-                )
+    for result in score_results:
+        _record_score(scorer, pipeline, dataset, scores, result)
+    return _aggregate_scores(scorer, pipeline, dataset, scores)
 
+
+def _record_score(scorer, pipeline, dataset, scores, result):
+    i, score = result
+    scores.append(score)
+    if scorer.single_score_callback:
+        with warning_error_context("single_score_callback", {"i": i}):
+            scorer.single_score_callback(
+                step=i, scores=tuple(scores), scorer=scorer, pipeline=pipeline, dataset=dataset
+            )
+
+
+def _aggregate_scores(scorer, pipeline, dataset, scores):
     agg_scores, raw_scores = scorer._aggregate(
         _check_and_invert_score_dict(scores, scorer.default_aggregator), list(dataset)
     )

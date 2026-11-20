@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import TYPE_CHECKING, Any, Literal, cast
+
+from tqdm.auto import tqdm
 
 from tpcp._async_execution import _gather_with_progress, _LocalWorkflow, _optimization_resource
 from tpcp._dataset import DatasetT
@@ -14,7 +17,7 @@ from tpcp.misc import warning_error_context
 from tpcp.parallel import BoundTask, Task, job_metadata
 from tpcp.validate._cross_val_helper import _normalize_splitter
 from tpcp.validate._scorer import Scorer as SyncScorer
-from tpcp.validate._scorer import _finish_scores, _score_datapoint, _Scorer, _validate_scorer
+from tpcp.validate._scorer import _aggregate_scores, _record_score, _score_datapoint, _Scorer, _validate_scorer
 from tpcp.validate._validate import _format_cv_results, _format_validation_results
 
 if TYPE_CHECKING:
@@ -137,13 +140,29 @@ class Scorer(_Scorer[PipelineT, DatasetT]):
 
 async def _score_dataset(scorer, pipeline, dataset, resource):
     _require_sync_pipeline(pipeline)
-    results = await _gather_with_progress(
-        (Task(_score_datapoint, resource=resource)(scorer.score_func, pipeline, i, d) for i, d in enumerate(dataset)),
-        total=len(dataset),
-        desc="Datapoints",
-        progress_bar=scorer.progress_bar,
-    )
-    return _finish_scores(scorer, pipeline, dataset, results)
+    scores = []
+    with tqdm(total=len(dataset), desc="Datapoints", disable=not scorer.progress_bar) as bar:
+
+        async def score(index, datapoint):
+            result = await Task(_score_datapoint, resource=resource)(scorer.score_func, pipeline, index, datapoint)
+            bar.update()
+            return result
+
+        tasks = []
+        try:
+            for index, datapoint in enumerate(dataset):
+                tasks.append(asyncio.create_task(score(index, datapoint)))
+            for task in tasks:
+                try:
+                    result = await task
+                except Exception as error:  # noqa: BLE001 - preserve the workflow exception group
+                    raise ExceptionGroup("Datapoint scoring failed", [error]) from None
+                _record_score(scorer, pipeline, dataset, scores, result)
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+    return _aggregate_scores(scorer, pipeline, dataset, scores)
 
 
 def _require_sync_pipeline(pipeline):
