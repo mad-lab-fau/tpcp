@@ -17,8 +17,9 @@ import pandas as pd
 from sklearn.model_selection import ParameterGrid
 from tpcp import Dataset, Pipeline
 from tpcp.optimize import GridSearch
-from tpcp.parallel import Task, execution_context, get_worker_context
-from tpcp.validate import async_cross_validate, no_agg
+from tpcp.aio.parallel import Task, execution_context, get_worker_context
+from tpcp.aio.validate import cross_validate_task
+from tpcp.validate import no_agg
 
 
 class NumberDataset(Dataset):
@@ -60,7 +61,7 @@ async def main():
         progress_bar=True,
     )
     # Binding an effect is lazy; its config can be inspected before execution.
-    effect = async_cross_validate(
+    effect = cross_validate_task(
         search, NumberDataset(), scoring=score, cv=2, return_optimizer=True
     )
     print("Workflow config:", effect.config)

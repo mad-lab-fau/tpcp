@@ -45,18 +45,22 @@ Classes
 Experimental async execution
 ----------------------------
 
+Use ``tpcp.aio.validate.cross_validate`` and ``tpcp.aio.optimize.optimize``
+for coroutine entry points. Use ``tpcp.aio.validate.cross_validate_task`` when
+you need to inspect a bound task before awaiting it.
+
 The prototype supports ``GridSearch.async_optimize`` inside
-``async_cross_validate``. These factories
+``cross_validate_task``. These factories
 return lazy, awaitable ``Task`` effects. Constructing an effect binds its callable,
 arguments and scheduling requirements; awaiting it performs the computation.
-Arguments are bound by reference, as with ``joblib.delayed``. The suffix APIs
-``GridSearch.optimize_async`` and ``cross_validate_async`` remain coroutine
+Arguments are bound by reference, as with ``joblib.delayed``. The coroutine entry points
+``tpcp.aio.optimize.optimize`` and ``tpcp.aio.validate.cross_validate`` are coroutine
 wrappers, supporting ``asyncio.create_task`` and ``TaskGroup.create_task``.
 
 .. code-block:: python
 
-    from tpcp.parallel import Task, execution_context, get_worker_context
-    from tpcp.validate import async_cross_validate
+    from tpcp.aio.parallel import Task, execution_context, get_worker_context
+    from tpcp.aio.validate import cross_validate_task
 
     class Algorithm:
         def async_optimize(self, data):
@@ -69,7 +73,7 @@ wrappers, supporting ``asyncio.create_task`` and ``TaskGroup.create_task``.
             return compute(data)
 
     async def evaluate(search, dataset, scoring):
-        effect = async_cross_validate(search, dataset, scoring=scoring, cv=5)
+        effect = cross_validate_task(search, dataset, scoring=scoring, cv=5)
         assert effect.config.kind == "workflow"
         async with execution_context(n_jobs=4, n_gpu_jobs=1, batch_size="auto"):
             return await effect
@@ -153,7 +157,7 @@ directory. A multi-machine deployment would require a server database.
 .. code-block:: python
 
     from joblib import Memory
-    from tpcp.parallel import CachedTask, SQLiteTaskStorage, Task, Worker
+    from tpcp.aio.parallel import CachedTask, SQLiteTaskStorage, Task, Worker
 
     async def evaluate_fold(dataset_revision, fold_id, data):
         memory = Memory("artifacts", verbose=0)

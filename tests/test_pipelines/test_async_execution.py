@@ -15,7 +15,10 @@ from tests.test_pipelines.conftest import DummyDataset, DummyPipeline
 from tpcp.exceptions import TestError as ScoringError
 from tpcp.optimize import GridSearch
 from tpcp.parallel import Job, Worker, execution_context, get_job_metadata, get_worker_context, job_metadata
-from tpcp.validate import Scorer, async_cross_validate, cross_validate, cross_validate_async, no_agg
+from tpcp.aio.optimize import optimize, optimize_task
+from tpcp.aio.validate import cross_validate as aio_cross_validate
+from tpcp.aio.validate import cross_validate_task
+from tpcp.validate import Scorer, cross_validate, no_agg
 
 
 def score_candidate(pipeline, datapoint):
@@ -67,7 +70,7 @@ def test_async_cross_validation_matches_sync(return_train_score, coordinated, tm
 
     async def run():
         async with Worker(Memory(tmp_path), n_jobs=2) if coordinated else execution_context(n_jobs=2):
-            return await cross_validate_async(search, DummyDataset(), **kwargs)
+            return await aio_cross_validate(search, DummyDataset(), **kwargs)
 
     actual = asyncio.run(run())
     assert actual.keys() == expected.keys()
@@ -94,7 +97,7 @@ def test_nested_search_and_cv_use_only_the_shared_workers():
 
     async def run():
         async with execution_context(n_jobs=2):
-            return await cross_validate_async(search, DummyDataset(), scoring=scorer, cv=2, return_optimizer=True)
+            return await aio_cross_validate(search, DummyDataset(), scoring=scorer, cv=2, return_optimizer=True)
 
     results = asyncio.run(run())
     pids = {pid for fold in results["test__single__pid"] for pid in fold}
@@ -300,7 +303,7 @@ def test_nested_progress_bars_and_fold_candidate_metadata(capsys):
 
     async def run():
         async with execution_context(n_jobs=2, on_job_event=events.append):
-            return await cross_validate_async(search, DummyDataset(), scoring=score_candidate, cv=2, progress_bar=True)
+            return await aio_cross_validate(search, DummyDataset(), scoring=score_candidate, cv=2, progress_bar=True)
 
     asyncio.run(run())
     output = capsys.readouterr().err
@@ -375,7 +378,7 @@ def test_nested_grid_search_can_schedule_all_evaluations_as_gpu_jobs(candidate_r
 
     async def run():
         async with execution_context(n_jobs=2, n_gpu_jobs=1, on_job_event=events.append):
-            return await cross_validate_async(
+            return await aio_cross_validate(
                 search,
                 DummyDataset(),
                 scoring=score_candidate,
@@ -552,7 +555,7 @@ def test_workflow_effects_are_lazy_and_compose_on_main_thread():
         DummyPipeline(), ParameterGrid({"para_1": [0, 2, 4]}), scoring=score_candidate, progress_bar=False
     )
     dataset = DummyDataset()
-    effect = search.async_optimize(dataset)
+    effect = optimize_task(search, dataset)
     assert effect.config.kind == "workflow"
     assert not hasattr(search, "gs_results_")
 
@@ -571,7 +574,7 @@ def test_workflow_effects_are_lazy_and_compose_on_main_thread():
     assert pid == os.getpid()
     assert search.best_params_ == {"para_1": 2}
     assert (
-        async_cross_validate(search, dataset, scoring=score_candidate, cv=2, progress_bar=False).config.kind
+        cross_validate_task(search, dataset, scoring=score_candidate, cv=2, progress_bar=False).config.kind
         == "workflow"
     )
 
@@ -588,7 +591,7 @@ def test_nested_action_owns_its_gpu_requirement():
 
     async def run():
         async with execution_context(n_jobs=2, n_gpu_jobs=1, on_job_event=events.append):
-            return await cross_validate_async(search, DummyDataset(), scoring=score_candidate, cv=2, progress_bar=False)
+            return await aio_cross_validate(search, DummyDataset(), scoring=score_candidate, cv=2, progress_bar=False)
 
     results = asyncio.run(run())
     assert len(results["test__agg__score"]) == 2
@@ -630,10 +633,10 @@ def test_coroutine_interfaces_support_create_task():
 
     async def run():
         async with execution_context(n_jobs=2):
-            await asyncio.create_task(search.optimize_async(DummyDataset()))
+            await asyncio.create_task(optimize(search, DummyDataset()))
             async with asyncio.TaskGroup() as group:
                 cv_task = group.create_task(
-                    cross_validate_async(search, DummyDataset(), scoring=score_candidate, cv=2, progress_bar=False)
+                    aio_cross_validate(search, DummyDataset(), scoring=score_candidate, cv=2, progress_bar=False)
                 )
             return cv_task.result()
 
@@ -655,7 +658,7 @@ def test_cross_validation_preserves_coroutine_override_dispatch():
 
     async def run():
         async with execution_context(n_jobs=2, n_gpu_jobs=1):
-            return await cross_validate_async(
+            return await aio_cross_validate(
                 search, DummyDataset(), scoring=score_candidate, cv=2, resource="gpu", progress_bar=False
             )
 
@@ -679,7 +682,7 @@ def test_cv_uses_optimizer_returned_by_worker_effect():
 
     async def run():
         async with execution_context(n_jobs=2, n_gpu_jobs=1, on_job_event=events.append):
-            return await async_cross_validate(
+            return await cross_validate_task(
                 search, DummyDataset(), scoring=score_candidate, cv=2, return_optimizer=True, progress_bar=False
             )
 

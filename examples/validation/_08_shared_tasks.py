@@ -9,7 +9,7 @@ import random
 from pathlib import Path
 
 from joblib import Memory
-from tpcp.parallel import CachedTask, SQLiteTaskStorage, Task, Worker
+from tpcp.aio.parallel import CachedTask, SQLiteTaskStorage, Task, Worker
 
 
 def square(value):

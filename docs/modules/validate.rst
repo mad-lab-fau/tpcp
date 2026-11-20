@@ -53,8 +53,6 @@ Functions
    :template: function.rst
 
     cross_validate
-    cross_validate_async
-    async_cross_validate
     validate
 
 The :doc:`scoring aliases <types>` describe score functions, aggregator return values, and the

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Async validation, optimization, and task execution are available under `tpcp.aio`.
+  Import `cross_validate` or `cross_validate_task` from `tpcp.aio.validate` for the coroutine
+  or lazy task API, respectively.
+
 - Experimental asynchronous tasks support delayed-style binding with `Task(fn)(*args, **kwargs)`.
   `Worker` coordinates scoped results through shared memory or SQLite records. `CachedTask` shares
   entries with the supplied joblib Memory store across experiment scopes.
