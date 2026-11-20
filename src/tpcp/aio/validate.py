@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 from tpcp._async_execution import _gather_with_progress, _LocalWorkflow, _optimization_resource
 from tpcp._utils._score import _score
+from tpcp.aio.optimize import optimize
 from tpcp.misc import warning_error_context
 from tpcp.parallel import BoundTask, Task, job_metadata
 from tpcp.validate._cross_val_helper import _normalize_splitter
@@ -23,10 +24,10 @@ if TYPE_CHECKING:
     from tpcp.validate._cross_val_helper import BaseDatasetSplitter
     from tpcp.validate._scorer import ScorerTypes
 
-__all__ = ["cross_validate", "cross_validate_task"]
+__all__ = ["cross_validate"]
 
 
-def cross_validate_task(
+def cross_validate(
     optimizable: GridSearch[PipelineT, DatasetT],
     dataset: DatasetT,
     *,
@@ -61,32 +62,6 @@ def cross_validate_task(
     )
 
 
-async def cross_validate(
-    optimizable: GridSearch[PipelineT, DatasetT],
-    dataset: DatasetT,
-    *,
-    scoring: ScorerTypes[PipelineT, DatasetT],
-    cv: BaseDatasetSplitter | int | BaseCrossValidator | list | None = None,
-    optimize_params: dict[str, Any] | None = None,
-    return_train_score: bool = False,
-    return_optimizer: bool = False,
-    progress_bar: bool = True,
-    resource: Literal["cpu", "gpu"] = "cpu",
-):
-    """Execute :func:`cross_validate_task` through a coroutine entry point."""
-    return await cross_validate_task(
-        optimizable,
-        dataset,
-        scoring=scoring,
-        cv=cv,
-        optimize_params=optimize_params,
-        return_train_score=return_train_score,
-        return_optimizer=return_optimizer,
-        progress_bar=progress_bar,
-        resource=resource,
-    )
-
-
 async def _cross_validate_async(
     optimizable: GridSearch[PipelineT, DatasetT],
     dataset: DatasetT,
@@ -105,7 +80,7 @@ async def _cross_validate_async(
     Each fold awaits its own cloned GridSearch, which submits candidate jobs to
     the shared pool. Test and optional train scoring use the same pool, with
     datapoints scored serially inside each job. Results have the same structure
-    as :func:`cross_validate`; timings measure elapsed time including pool waits.
+    as :func:`tpcp.validate.cross_validate`; timings measure elapsed time including pool waits.
     ``progress_bar`` displays completed folds using tqdm. Inner search progress
     follows ``GridSearch.progress_bar``. Scorer ``n_jobs`` and datapoint progress
     bars do not apply to this prototype.
@@ -126,7 +101,7 @@ async def _cross_validate_async(
                 parameters = dict(optimize_params or {})
                 token = _optimization_resource.set(resource)
                 try:
-                    optimizer = await optimizer.optimize_async(train, **parameters)
+                    optimizer = await optimize(optimizer, train, **parameters)
                 finally:
                     _optimization_resource.reset(token)
             optimize_time = time.perf_counter() - start

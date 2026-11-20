@@ -18,7 +18,7 @@ from sklearn.model_selection import ParameterGrid
 from tpcp import Dataset, Pipeline
 from tpcp.optimize import GridSearch
 from tpcp.aio.parallel import Task, execution_context, get_worker_context
-from tpcp.aio.validate import cross_validate_task
+from tpcp.aio.validate import cross_validate
 from tpcp.validate import no_agg
 
 
@@ -61,7 +61,7 @@ async def main():
         progress_bar=True,
     )
     # Binding an effect is lazy; its config can be inspected before execution.
-    effect = cross_validate_task(
+    effect = cross_validate(
         search, NumberDataset(), scoring=score, cv=2, return_optimizer=True
     )
     print("Workflow config:", effect.config)

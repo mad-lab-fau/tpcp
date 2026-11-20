@@ -45,22 +45,16 @@ Classes
 Experimental async execution
 ----------------------------
 
-Use ``tpcp.aio.validate.cross_validate`` and ``tpcp.aio.optimize.optimize``
-for coroutine entry points. Use ``tpcp.aio.validate.cross_validate_task`` when
-you need to inspect a bound task before awaiting it.
-
-The prototype supports ``GridSearch.async_optimize`` inside
-``cross_validate_task``. These factories
-return lazy, awaitable ``Task`` effects. Constructing an effect binds its callable,
-arguments and scheduling requirements; awaiting it performs the computation.
-Arguments are bound by reference, as with ``joblib.delayed``. The coroutine entry points
-``tpcp.aio.optimize.optimize`` and ``tpcp.aio.validate.cross_validate`` are coroutine
-wrappers, supporting ``asyncio.create_task`` and ``TaskGroup.create_task``.
+``tpcp.aio.validate.cross_validate`` and ``tpcp.aio.optimize.optimize`` return
+lazy, awaitable bound tasks. Inspect a task before execution, await it directly,
+or pass it to ``Worker.execute``. Arguments are bound by reference, as with
+``joblib.delayed``. For ``asyncio.create_task`` or ``TaskGroup.create_task``,
+wrap the await in a coroutine.
 
 .. code-block:: python
 
     from tpcp.aio.parallel import Task, execution_context, get_worker_context
-    from tpcp.aio.validate import cross_validate_task
+    from tpcp.aio.validate import cross_validate
 
     class Algorithm:
         def async_optimize(self, data):
@@ -73,7 +67,7 @@ wrappers, supporting ``asyncio.create_task`` and ``TaskGroup.create_task``.
             return compute(data)
 
     async def evaluate(search, dataset, scoring):
-        effect = cross_validate_task(search, dataset, scoring=scoring, cv=5)
+        effect = cross_validate(search, dataset, scoring=scoring, cv=5)
         assert effect.config.kind == "workflow"
         async with execution_context(n_jobs=4, n_gpu_jobs=1, batch_size="auto"):
             return await effect

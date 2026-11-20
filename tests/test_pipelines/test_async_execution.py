@@ -15,9 +15,8 @@ from tests.test_pipelines.conftest import DummyDataset, DummyPipeline
 from tpcp.exceptions import TestError as ScoringError
 from tpcp.optimize import GridSearch
 from tpcp.parallel import Job, Worker, execution_context, get_job_metadata, get_worker_context, job_metadata
-from tpcp.aio.optimize import optimize, optimize_task
+from tpcp.aio.optimize import optimize
 from tpcp.aio.validate import cross_validate as aio_cross_validate
-from tpcp.aio.validate import cross_validate_task
 from tpcp.validate import Scorer, cross_validate, no_agg
 
 
@@ -44,7 +43,7 @@ def test_async_grid_search_populates_original_object():
 
     async def run():
         async with execution_context(n_jobs=2):
-            return await search.optimize_async(DummyDataset())
+            return await optimize(search, DummyDataset())
 
     assert asyncio.run(run()) is search
     assert search.best_params_ == {"para_1": 2}
@@ -142,9 +141,9 @@ def test_failed_search_leaves_execution_available_for_another_search(resource):
     async def run():
         async with execution_context(n_jobs=2, n_gpu_jobs=1):
             with pytest.raises(ExceptionGroup) as error:
-                await bad.optimize_async(DummyDataset(), resource=resource)
+                await optimize(bad, DummyDataset(), resource=resource)
             assert error.value.subgroup(ScoringError) is not None
-            await good.optimize_async(DummyDataset(), resource=resource)
+            await optimize(good, DummyDataset(), resource=resource)
 
     asyncio.run(run())
     assert good.best_params_ == {"para_1": 2}
@@ -188,7 +187,7 @@ def test_candidate_pipeline_copies_are_bounded_by_admitted_work():
 
     async def run():
         async with execution_context(n_jobs=2, batch_size=1):
-            await search.optimize_async(DummyDataset())
+            await optimize(search, DummyDataset())
 
     asyncio.run(run())
     np.testing.assert_array_equal(search.gs_results_["agg__score"], [-6, -3, -2, -3, -6])
@@ -405,7 +404,7 @@ def test_previously_run_pipeline_results_are_not_serialized_for_candidates():
 
     async def run():
         async with execution_context(n_jobs=2):
-            await search.optimize_async(DummyDataset())
+            await optimize(search, DummyDataset())
 
     asyncio.run(run())
     assert search.best_params_ == {"para_1": 2}
@@ -555,7 +554,7 @@ def test_workflow_effects_are_lazy_and_compose_on_main_thread():
         DummyPipeline(), ParameterGrid({"para_1": [0, 2, 4]}), scoring=score_candidate, progress_bar=False
     )
     dataset = DummyDataset()
-    effect = optimize_task(search, dataset)
+    effect = optimize(search, dataset)
     assert effect.config.kind == "workflow"
     assert not hasattr(search, "gs_results_")
 
@@ -574,8 +573,7 @@ def test_workflow_effects_are_lazy_and_compose_on_main_thread():
     assert pid == os.getpid()
     assert search.best_params_ == {"para_1": 2}
     assert (
-        cross_validate_task(search, dataset, scoring=score_candidate, cv=2, progress_bar=False).config.kind
-        == "workflow"
+        aio_cross_validate(search, dataset, scoring=score_candidate, cv=2, progress_bar=False).config.kind == "workflow"
     )
 
 
@@ -627,30 +625,35 @@ def test_effects_can_be_gathered_directly():
     assert len([event for event in events if event.status == "completed"]) == 3
 
 
-def test_coroutine_interfaces_support_create_task():
-    """The previously agreed suffix interfaces remain coroutine entry points."""
+def test_bound_workflows_compose_with_task_group():
+    """A coroutine can await a bound workflow inside a task group."""
     search = GridSearch(DummyPipeline(), ParameterGrid({"para_1": [0, 2]}), scoring=score_candidate, progress_bar=False)
+
+    async def await_task(task):
+        return await task
 
     async def run():
         async with execution_context(n_jobs=2):
-            await asyncio.create_task(optimize(search, DummyDataset()))
+            await asyncio.create_task(await_task(optimize(search, DummyDataset())))
             async with asyncio.TaskGroup() as group:
                 cv_task = group.create_task(
-                    aio_cross_validate(search, DummyDataset(), scoring=score_candidate, cv=2, progress_bar=False)
+                    await_task(
+                        aio_cross_validate(search, DummyDataset(), scoring=score_candidate, cv=2, progress_bar=False)
+                    )
                 )
             return cv_task.result()
 
     assert len(asyncio.run(run())["test__agg__score"]) == 2
 
 
-def test_cross_validation_preserves_coroutine_override_dispatch():
+def test_cross_validation_preserves_task_override_dispatch():
     """An existing override need not accept new scheduling keywords."""
     calls = []
 
     class CustomSearch(GridSearch):
-        async def optimize_async(self, dataset):
+        def async_optimize(self, dataset):
             calls.append(dataset.group_labels)
-            return await super().optimize_async(dataset)
+            return super().async_optimize(dataset)
 
     search = CustomSearch(
         DummyPipeline(), ParameterGrid({"para_1": [0, 2]}), scoring=score_candidate, progress_bar=False
@@ -682,7 +685,7 @@ def test_cv_uses_optimizer_returned_by_worker_effect():
 
     async def run():
         async with execution_context(n_jobs=2, n_gpu_jobs=1, on_job_event=events.append):
-            return await cross_validate_task(
+            return await aio_cross_validate(
                 search, DummyDataset(), scoring=score_candidate, cv=2, return_optimizer=True, progress_bar=False
             )
 

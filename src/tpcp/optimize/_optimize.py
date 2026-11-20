@@ -471,10 +471,6 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
             resource = _optimization_resource.get()
         return _LocalWorkflow(self._optimize_async)(dataset, resource=resource, **kwargs)
 
-    async def optimize_async(self, dataset: DatasetT, **kwargs: Any) -> Self:
-        """Execute :meth:`async_optimize` through a coroutine entry point."""
-        return await self.async_optimize(dataset, **kwargs)
-
     async def _optimize_async(self, dataset: DatasetT, *, resource: Literal["cpu", "gpu"] = "cpu", **_: Any) -> Self:
         """Run experimental async GridSearch in the active execution context.
 
