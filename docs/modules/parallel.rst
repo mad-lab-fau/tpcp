@@ -61,7 +61,7 @@ wrappers, supporting ``asyncio.create_task`` and ``TaskGroup.create_task``.
     class Algorithm:
         def async_optimize(self, data):
             # The callee owns the resource request, not its caller.
-            return Task(self.optimize, args=(data,), resource="gpu")
+            return Task(self.optimize, resource="gpu")(data)
 
         def optimize(self, data):
             worker = get_worker_context()
@@ -75,7 +75,7 @@ wrappers, supporting ``asyncio.create_task`` and ``TaskGroup.create_task``.
             return await effect
 
 Worker tasks run synchronous callables in joblib's reusable loky process pool.
-``Task(async_function, kind="workflow")`` instead awaits an async callable on the
+``Task(async_function)(...)`` instead awaits an async callable on the
 main event loop. Workflow tasks compose child effects without reserving a worker;
 only leaf effects occupy slots. ``asyncio.gather`` can await independent effects
 concurrently. A GPU search can override ``async_optimize`` to return
@@ -141,3 +141,51 @@ workflows; it does not transform arbitrary synchronous optimizers or user code.
 For best responsiveness with long jobs, use ``batch_size=1``.
 
 See ``examples/validation/_05_async_grid_search.py`` for a runnable example.
+
+Sharing task results
+~~~~~~~~~~~~~~~~~~~~
+
+A Worker uses a filesystem joblib Memory for artifacts. Pass the same
+InMemoryTaskStorage instance to share records in one process. For independent
+processes on one machine, give each participant the same SQLite file and Memory
+directory. A multi-machine deployment would require a server database.
+
+.. code-block:: python
+
+    from joblib import Memory
+    from tpcp.parallel import CachedTask, SQLiteTaskStorage, Task, Worker
+
+    async def evaluate_fold(fold_id, data):
+        memory = Memory("artifacts", verbose=0)
+        async with Worker(memory, SQLiteTaskStorage("tasks.sqlite"), n_jobs=2) as worker:
+            with worker.scope("study-2026"):
+                async with worker.subtask("fold", key=fold_id) as fold:
+                    if fold.acquired:
+                        features = await CachedTask(transform)(data)
+                        scores = await Task(score)(features)
+                        await fold.complete(scores)
+                    else:
+                        scores = await fold.result()
+                    return scores
+
+Preparation captures the current manual scope and resolves the arguments once.
+Keep bound inputs stable until completion. Nested scope keys accumulate. At
+the root all participants share an empty scope. Use distinct experiment keys
+or seeds for independent random trials. Ordinary tasks replay their first
+successful result in that scope. Scope exit retains child records and artifacts.
+CachedTask uses the original function's joblib cache entry across all scopes.
+Participants must use consistent function definitions, dependencies and inputs.
+Ordinary joblib callers can read and populate the same cache without taking
+worker leases.
+
+For explicit scheduling, call worker.prepare(task) followed by
+worker.acquire(prepared) when capacity is available. Inspect
+decision.record for the attempt, status, timestamps and artifact reference.
+An acquired claim needs await worker.run(decision). For an existing claim,
+choose other work or await worker.result(decision). If its owner fails or
+its lease expires, acquire again. A stalled owner can duplicate computation
+after takeover. Publication checks the attempt and enclosing scope leases.
+
+Earlier experimental examples bound arguments using Task(fn, args=(x,)).
+Use Task(fn)(x). Put scheduling options on the first call and function
+arguments on the second.

@@ -71,7 +71,7 @@ async def main():
         results = await effect
         # This simulates a GPU action without requiring GPU hardware. A real
         # action would use the assigned ID for device placement.
-        gpu_effect = Task(get_worker_context, resource="gpu")
+        gpu_effect = Task(get_worker_context, resource="gpu")()
         gpu_worker = await gpu_effect
     print("GPU slot context:", gpu_worker)
     print("Completed jobs:", sum(e.status == "completed" for e in events))
