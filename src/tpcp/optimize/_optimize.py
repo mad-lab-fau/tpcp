@@ -28,7 +28,7 @@ from tpcp._algorithm_utils import (
     _check_safe_optimize,
     _split_returns,
 )
-from tpcp._async_execution import _gather_with_progress
+from tpcp._async_execution import _gather_with_progress, _LocalWorkflow
 from tpcp._base import NOTHING, _get_annotated_fields_of_type
 from tpcp._dataset import DatasetT
 from tpcp._optimize import BaseOptimize
@@ -272,7 +272,6 @@ def _score_candidate(pipeline, dataset, scoring, parameters):
         scoring,
         parameters,
         return_parameters=True,
-        return_data_labels=True,
         return_times=True,
     )
 
@@ -468,7 +467,7 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
         shows candidate completion; synchronous ``n_jobs`` is ignored. Selection
         and result attributes are applied to this instance on the main thread.
         """
-        return Task(self._optimize_async)(dataset, resource=resource, **kwargs)
+        return _LocalWorkflow(self._optimize_async)(dataset, resource=resource, **kwargs)
 
     async def optimize_async(self, dataset: DatasetT, **kwargs: Any) -> Self:
         """Execute :meth:`async_optimize` through a coroutine entry point."""
@@ -491,12 +490,16 @@ class GridSearch(BaseOptimize[PipelineT, DatasetT], Generic[PipelineT, DatasetT]
 
         pipeline = self.pipeline.clone()
 
+        # Pandas creates the label namedtuple class at runtime. Keep it out of persisted scores.
+        labels = dataset.group_labels
+
         async def evaluate(index, parameters):
             with (
                 job_metadata(parameter_candidate=index, parameters=parameters, stage="candidate_score"),
                 warning_error_context("parameter_candidate", {"i": index, "parameters": parameters}),
             ):
-                return await Task(_score_candidate, resource=resource)(pipeline, dataset, scoring, parameters)
+                result = await Task(_score_candidate, resource=resource)(pipeline, dataset, scoring, parameters)
+                return {**result, "data_labels": list(labels)}
 
         fold = get_job_metadata().get("cv_fold")
         desc = "Parameter Combinations" if fold is None else f"Parameter Combinations [fold {fold}]"

@@ -13,7 +13,7 @@ from typing import Generic, TypeVar, cast
 from joblib import Memory
 from joblib import hash as joblib_hash
 
-from tpcp._async_execution import BoundTask, _execution_context
+from tpcp._async_execution import BoundTask, _execution_context, _LocalWorkflow
 from tpcp._task_artifacts import CallArtifacts
 from tpcp._task_storage import InMemoryTaskStorage, TaskRecord, TaskStorage
 
@@ -68,13 +68,13 @@ class Worker:
         self.lease_seconds = lease_seconds
         self._pool = _execution_context(coordinated=True, n_jobs=n_jobs, n_gpu_jobs=n_gpu_jobs, **pool_options)
         self._gpu_count = n_gpu_jobs
-        self._scope_slots = asyncio.Semaphore(n_jobs)
         self._scope: ContextVar[tuple] = ContextVar("worker_scope", default=())
         self._parents: ContextVar[tuple[TaskRecord, ...]] = ContextVar("worker_parents", default=())
         self._pending = {}
 
     async def __aenter__(self):
         execution = await self._pool.__aenter__()
+        self._scope_slots = execution.scope_slots
         self._slots = execution.claim_slots
         self._gpu = execution.gpu_claim_slots
         self._token = active_worker.set(self)
@@ -148,14 +148,16 @@ class Worker:
             artifact = prepared.artifacts.reference(attempt) if prepared.task.cached else None
             if previous and previous.status == "completed":
                 artifact = previous.artifact
-            if prepared.artifacts.available(artifact):
+            # Failed loads retain the damaged reference across retries until publication.
+            damaged = previous.artifact if previous and previous.status != "completed" else None
+            if not damaged and prepared.artifacts.available(artifact):
                 if not previous or previous.status != "completed":
                     previous = TaskRecord(prepared.task_id, "completed", attempt, now, now, now, artifact)
                     records.put(previous)
                 return Decision(prepared, previous, False)
             if not claim:
                 return None
-            record = TaskRecord(prepared.task_id, "running", attempt, now + self.lease_seconds, now, None, None)
+            record = TaskRecord(prepared.task_id, "running", attempt, now + self.lease_seconds, now, None, damaged)
             records.put(record)
             return Decision(prepared, record, True)
 
@@ -165,7 +167,7 @@ class Worker:
             record = decision.record
             self._check(records, record)
             now = time.time()
-            reference = None
+            reference = record.artifact
             if status == "completed":
                 reference = decision.prepared.artifacts.reference(record.attempt)
                 decision.prepared.artifacts.publish(reference, stage)
@@ -231,11 +233,21 @@ class Worker:
                 self._check_parents(records, decision.prepared)
                 record = records.get(decision.prepared.task_id)
                 if record and record.status == "completed" and decision.prepared.artifacts.available(record.artifact):
+                    identity = decision.prepared.artifacts.output_identity(record.artifact)
                     break
                 if not record or record.status != "running" or record.expires <= time.time():
                     raise ClaimLostError("Result unavailable. Acquire the prepared task again.")
             await asyncio.sleep(min(0.05, self.lease_seconds / 3))
-        return await asyncio.to_thread(decision.prepared.artifacts.load, record.artifact)
+        try:
+            return await asyncio.to_thread(decision.prepared.artifacts.load, record.artifact)
+        except Exception as error:
+            with self.storage.transaction() as records:
+                if (
+                    records.get(record.task_id) == record
+                    and decision.prepared.artifacts.output_identity(record.artifact) == identity
+                ):
+                    records.put(replace(record, status="failed"))
+            raise ClaimLostError("Artifact load failed. Acquire the prepared task again.") from error
 
     async def _execute(self, prepared):
         while True:
@@ -257,6 +269,12 @@ class Worker:
                 continue
 
     async def execute(self, task: BoundTask[T]) -> T:
+        if isinstance(task, _LocalWorkflow):
+            token = active_worker.set(self)
+            try:
+                return await task._execute()
+            finally:
+                active_worker.reset(token)
         prepared = await asyncio.to_thread(self.prepare, task)
         key = (prepared.task_id, tuple(p.attempt for p in prepared.parents))
         return await self._shared_call(key, self._execute, prepared)

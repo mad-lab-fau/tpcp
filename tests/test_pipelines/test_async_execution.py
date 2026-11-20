@@ -715,3 +715,27 @@ def test_job_events_use_exact_metadata_across_overlapping_callers():
     assert owner_metadata == {"experiment": "A"}
     assert caller_metadata == {"work": "B"}
     assert all(event_metadata == scope_metadata for event_metadata, scope_metadata in observations)
+
+
+def test_grid_search_replays_leaves_on_fresh_instance(tmp_path):
+    """Apply results to each caller while sharing completed candidate scores."""
+    from joblib import Memory
+
+    from tpcp.parallel import Worker
+
+    async def scenario():
+        events = []
+        async with Worker(Memory(tmp_path), on_job_event=events.append) as worker:
+            dataset = DummyDataset()
+            search = GridSearch(
+                DummyPipeline(), ParameterGrid({"para_1": [0, 2]}), scoring=score_candidate, progress_bar=False
+            )
+            fresh = search.clone()
+            assert await search.async_optimize(dataset) is search
+            count = len(events)
+            assert count
+            assert await worker.execute(fresh.async_optimize(dataset)) is fresh
+            assert fresh.best_params_ == search.best_params_
+            assert len(events) == count
+
+    asyncio.run(scenario())

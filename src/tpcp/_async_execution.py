@@ -83,7 +83,10 @@ class BoundTask(Job[T]):
 
     async def _execute(self) -> T:
         if self.kind == "worker":
-            return await run_in_worker(self)
+            execution = _current_execution.get()
+            if execution is None:
+                raise RuntimeError("Async actions require an active execution_context.")
+            return await execution._dispatch_job(self)
         with job_metadata(**self.metadata):
             args = self.args() if callable(self.args) else self.args
             return await cast("Awaitable[T]", self.func(*args, **self.kwargs))
@@ -143,6 +146,10 @@ class Task(BoundTask[T]):
 class _TaskFactory(Task[T], Generic[P, T]):
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> BoundTask[T]:
         return replace(self, args=args, kwargs=kwargs)
+
+
+class _LocalWorkflow(_TaskFactory[P, T]):
+    """Apply workflow results to caller-owned state on every execution."""
 
 
 @overload
@@ -335,6 +342,7 @@ class _AsyncExecution:
             **executor_kwargs,
         )
         # Coordinated participants sharing this pool share its admission budget.
+        self.scope_slots = _SharedSlots(n_jobs)
         self.claim_slots = _SharedSlots(n_jobs)
         self.gpu_claim_slots = _SharedSlots(n_gpu_jobs)
         self._slots = asyncio.Semaphore(n_jobs)
@@ -355,12 +363,15 @@ class _AsyncExecution:
         self._executor._temp_folder_manager.set_current_context(self._context_id)
 
     async def run(self, func: Callable[..., T] | Job[T], /, *args: Any, **kwargs: Any) -> T:
+        if isinstance(func, BoundTask):
+            return await func
+        return await self._dispatch_job(func, *args, **kwargs)
+
+    async def _dispatch_job(self, func: Callable[..., T] | Job[T], /, *args: Any, **kwargs: Any) -> T:
         from tpcp.parallel import _merge_parallel_side_channel_data
 
         if self._closing:
             raise RuntimeError("The execution context is closing.")
-        if isinstance(func, BoundTask) and func.kind == "workflow":
-            return await func
         finished = asyncio.get_running_loop().create_future()
         self._calls.add(finished)
         job = func if isinstance(func, Job) else Job(func, args=args, kwargs=kwargs)
@@ -635,6 +646,7 @@ async def _execution_context(*, n_jobs, n_gpu_jobs, coordinated, gpu_ids=None, o
             )
             execution.coordinated = coordinated
             if active is not None:
+                execution.scope_slots = active.scope_slots
                 execution.claim_slots = active.claim_slots
                 execution.gpu_claim_slots = active.gpu_claim_slots
                 execution._gpu_ids = active._gpu_ids
@@ -664,7 +676,7 @@ async def run_in_worker(func: Callable[..., T] | Job[T], /, *args: Any, **kwargs
     Result and side-channel merging happen in the calling event loop. Cancelling
     the await does not interrupt a job already running in a worker process.
     """
-    if isinstance(func, BoundTask) and func.kind == "workflow":
+    if isinstance(func, BoundTask):
         return await func
     execution = _current_execution.get()
     if execution is None:

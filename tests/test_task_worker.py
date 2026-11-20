@@ -64,8 +64,8 @@ def test_scope_takeover_fences_child_and_reuses_completed_results(tmp_path):
         memory = Memory(tmp_path, verbose=0)
         # Blocking the owner loop models a stalled coordinator that cannot heartbeat.
         async with (
-            Worker(memory, store, lease_seconds=0.3) as first,
-            Worker(memory, store) as second,
+            Worker(memory, store, n_jobs=2, lease_seconds=0.3) as first,
+            Worker(memory, store, n_jobs=2) as second,
             first.subtask("fold", key=1) as old,
         ):
             completed = Task(sample)(resource="done")
@@ -311,5 +311,110 @@ def test_staging_large_result_leaves_coordinator_and_storage_available(tmp_path)
             async with worker.subtask("fold", key=1) as replay:
                 assert not replay.acquired
                 assert await replay.result() == 42
+
+    asyncio.run(scenario())
+
+
+def context_sample(context, suffix):
+    """Identify the injected context and distinguish separate executions."""
+    return context.resource, suffix, uuid.uuid4().hex
+
+
+def test_public_dispatch_coordinates_context_calls(tmp_path):
+    """Both submission paths honor cache admission and inject worker context."""
+    import pytest
+
+    from tpcp.parallel import execution_context, run_in_worker
+
+    async def scenario():
+        async with execution_context() as adapter:
+            cached = CachedTask(sample)(resource="cpu")
+            for submit in (adapter.run, run_in_worker):
+                with pytest.raises(RuntimeError, match="active Worker"):
+                    await submit(cached)
+            async with Worker(Memory(tmp_path)):
+                call = Task(context_sample, ("arg",), pass_context=True)
+                value = await run_in_worker(call)
+                assert value[:2] == ("cpu", "arg")
+                assert await adapter.run(call) == await call == value
+
+    asyncio.run(scenario())
+
+
+def test_corrupt_artifact_recovery(tmp_path):
+    """Recompute damaged ordinary and persistent entries once."""
+    import json
+    from pathlib import Path
+
+    async def scenario():
+        async with Worker(Memory(tmp_path)) as worker:
+            for task in (Task(sample)(resource="cpu"), CachedTask(sample)(resource="cpu")):
+                old = await task
+                decision = worker.acquire(worker.prepare(task))
+                assert decision.record.artifact is not None
+                path = Path(decision.prepared.artifacts.backend.location).joinpath(
+                    *json.loads(decision.record.artifact)
+                )
+                (path / "output.pkl").write_bytes(b"damaged")
+                new = await task
+                assert new != old
+                assert await task == new
+
+    asyncio.run(scenario())
+
+
+def test_subtask_capacity_shared_across_workers(tmp_path):
+    """Top-level scopes share a slot while the admitted scope can still run leaves."""
+
+    async def scenario():
+        memory = Memory(tmp_path)
+        started = asyncio.Event()
+        entered = asyncio.Event()
+        async with Worker(memory) as first, Worker(memory) as second:
+
+            async def contender():
+                started.set()
+                async with second.subtask("fold", key=2) as sub:
+                    entered.set()
+                    await sub.complete(2)
+
+            async with first.subtask("fold", key=1) as sub:
+                pending = asyncio.create_task(contender())
+                await started.wait()
+                value = await first.execute(Task(sample)(resource="cpu"))
+                assert not entered.is_set()
+                await sub.complete(value)
+            await asyncio.wait_for(pending, 5)
+
+    asyncio.run(scenario())
+
+
+def test_replacement_during_failed_load_is_preserved(tmp_path, monkeypatch):
+    """An external joblib writer can replace the output while a reader fails."""
+    import json
+    from pathlib import Path
+
+    from tpcp._task_artifacts import CallArtifacts
+
+    original_load = CallArtifacts.load
+    memory = Memory(tmp_path, verbose=0)
+    cached: Any = memory.cache(sample)
+    replacement = []
+
+    def racing_load(self, reference):
+        if not replacement:
+            path = Path(self.backend.location).joinpath(*json.loads(reference), "output.pkl")
+            path.unlink()
+            replacement.append(cached(resource="cpu"))
+            raise FileNotFoundError
+        return original_load(self, reference)
+
+    async def scenario():
+        async with Worker(memory):
+            task = CachedTask(sample)(resource="cpu")
+            old = await task
+            monkeypatch.setattr(CallArtifacts, "load", racing_load)
+            value = await task
+            assert value == replacement[0] != old
 
     asyncio.run(scenario())
