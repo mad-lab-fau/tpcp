@@ -53,6 +53,7 @@ Functions
    :template: function.rst
 
     cross_validate
+    train_test_split
     validate
 
 The :doc:`scoring aliases <types>` describe score functions, aggregator return values, and the

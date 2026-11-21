@@ -54,6 +54,18 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
+def _get_pure_parameter_names(pipeline, parameters: list[dict]) -> list[str]:
+    """Infer pure roles without inheriting them from objects replaced in the grid."""
+    pure_parameters = _get_annotated_fields_of_type(pipeline, _ParaTypes.PURE, recursive=True)
+    explicit_pure = _get_annotated_fields_of_type(pipeline, _ParaTypes.PURE)
+    grid_keys = {key for candidate in parameters for key in candidate}
+    return [
+        name
+        for name in pure_parameters
+        if name in explicit_pure or not any(name.startswith(f"{key}__") for key in grid_keys)
+    ]
+
+
 class DummyOptimize(BaseOptimize[PipelineT, DatasetT]):
     """Provide API compatibility for SimplePipelines in optimize wrappers.
 
@@ -602,9 +614,16 @@ class GridSearchCV(
 
         Instead of passing a list of names, you can also just set the value to `True`.
         In this case all parameters of the provided pipeline that are marked as :class:`~tpcp.PureParameter` are used.
-        Note that pure parameters of nested objects are not considered, but only top-level attributes.
-        If you need to mark nested parameters as pure, use the first method and pass the names (with `__`) as part of
-        the list of names.
+        For nested objects marked as :class:`~tpcp.OptimizableParameter`, their annotations are checked recursively,
+        including named children of composite parameters. Other nested objects are not inspected.
+        Explicit annotations on the containing object take precedence over those on nested objects.
+        Descendants of objects replaced in the parameter grid are not inferred as pure; use explicit annotations
+        on the pipeline or an explicit list of names if their roles remain the same across replacements.
+        Alternatively, pass nested names (with ``__``) in the list of names.
+
+        The pipeline's training must respect the child's pure-parameter declarations. If it uses a child's pure
+        parameter during training, override that annotation on the pipeline or pass an explicit list instead of
+        ``True``. Use ``False`` to disable this optimization.
 
         For more information on this approach see the :func:`evaluation guide <algorithm_evaluation>`.
     return_train_score
@@ -784,11 +803,12 @@ class GridSearchCV(
         # For each para combi, we separate the pure parameters (parameters that do not affect the optimization) and
         # the hyperparameters.
         # This allows for massive caching optimizations in the `_optimize_and_score`.
+        parameters = list(self.parameter_grid)
         pure_parameters: list[str] | None
         if self.pure_parameters is False:
             pure_parameters = None
         elif self.pure_parameters is True:
-            pure_parameters = _get_annotated_fields_of_type(self.pipeline, _ParaTypes.PURE)
+            pure_parameters = _get_pure_parameter_names(self.pipeline, parameters)
         elif isinstance(self.pure_parameters, list):
             pure_parameters = self.pure_parameters
         else:
@@ -796,7 +816,6 @@ class GridSearchCV(
                 "`self.pure_parameters` must either be a List of field names (nested are allowed) or True/False."
             )
 
-        parameters = list(self.parameter_grid)
         split_parameters = _split_hyper_and_pure_parameters(parameters, pure_parameters)
         parameter_prefix = "pipeline__"
         splits = list(cv.split(dataset))

@@ -8,10 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `tpcp.validate.train_test_split(splitter, dataset)` to return train and test group labels from a
+  native splitter configured with exactly one fold.
 - Added optional `train_selector` and `test_selector` callbacks to `DatasetSplitter` to select subsets after
   groupwise fold assignment. Each callback receives only its assigned side, and selecting labels outside that
   side raises `ValueError`. Both default to `None`, preserving the existing assignments.
   (https://github.com/mad-lab-fau/tpcp/pull/171)
+
+### Changed
+
+- `GridSearchCV(pure_parameters=True)` now discovers `PureParameter` annotations recursively inside objects
+  marked as `OptimizableParameter`, including composite children. Explicit annotations on the containing
+  object take precedence, including non-optimizable subtree overrides. Descendants of objects replaced in the
+  search grid remain training parameters unless explicitly declared pure on the pipeline or passed by name.
+  Existing `True` users whose pipeline training uses a child's pure parameters should override those annotations
+  on the pipeline or pass an explicit list to retain top-level-only discovery.
 
 ## [3.5.0] - 2026-10-21
 

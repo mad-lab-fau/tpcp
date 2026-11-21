@@ -90,6 +90,16 @@ To see these parameter annotations in action, check out this :ref:`example <opti
           don't need to rerun the optimization when only pure parameters are changed.
           For :class:`~tpcp.optimize.GridSearchCV` such an optimization can be enabled via the `pure_parameters`
           parameter.
+          With ``pure_parameters=True``, annotations are also read recursively from nested objects marked as
+          :class:`~tpcp.OptimizableParameter`, including named children of composite parameters.
+          This lets a generic pipeline mark its algorithm as optimizable while the algorithm declares its own
+          pure parameters. The pipeline must preserve that distinction when forwarding training to the algorithm:
+          a child's pure parameter must not affect the pipeline's training either.
+          Explicit annotations on the containing object take precedence over the child's annotations.
+          An explicit non-optimizable annotation on an intermediate object also stops discovery below that object.
+          When the grid replaces an object, its descendants remain training parameters unless explicitly marked
+          pure on the pipeline or listed in ``pure_parameters``: the replacement may define different roles.
+          To keep discovery limited to the pipeline's own annotations, pass their names as a list instead of ``True``.
           See :ref:`pure_parameters` for an example that shows how this avoids repeated training.
 
 

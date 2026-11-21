@@ -465,9 +465,9 @@ class CustomOptunaOptimize(_CustomOptunaOptimize[PipelineT, DatasetT]):
             When the trial ended
         duration
             The duration of the trial
-        user_attrs_...
+        ``user_attrs_...``
             User attributes set within the objective function
-        system_attrs_...
+        ``system_attrs_...``
             System attributes set internally by optuna (usually empty)
 
         If you need access to further parameter, inspect `self.study_` directly.
@@ -777,9 +777,9 @@ class OptunaSearch(_CustomOptunaOptimize[PipelineT, DatasetT]):
             When the trial ended
         duration
             The duration of the trial
-        user_attrs_...
+        ``user_attrs_...``
             User attributes set within the objective function
-        system_attrs_...
+        ``system_attrs_...``
             System attributes set internally by optuna (usually empty)
 
         If you need access to further parameter, inspect `self.study_` directly.

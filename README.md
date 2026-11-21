@@ -51,6 +51,9 @@ sources per participant, a non-traditional ML algorithm, and a complex train-tes
 
 With `tpcp` we want to provide a flexible framework to approach such complex problems with structure and confidence.
 
+Jump over to the [end-to-end example](https://tpcp.readthedocs.io/en/latest/auto_examples/validation/_08_complex_clinical_evaluation.html) 
+to see how the problem from above would be solved in tpcp. then jump into the detailed examples to understand what is going on. 
+
 ## How?
 
 To make `tpcp` easy to use, we try to focus on a couple of key ideas:

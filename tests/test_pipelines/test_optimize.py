@@ -1,6 +1,6 @@
 import warnings
 from tempfile import TemporaryDirectory
-from typing import Union
+from typing import ClassVar, Union
 from unittest.mock import patch
 
 import joblib
@@ -23,13 +23,75 @@ from tests.test_pipelines.conftest import (
     dummy_single_score_func,
 )
 from tests.test_safe_decorator import DummyOptimizablePipelineUnsafe
-from tpcp import NOTHING, OptimizableParameter, OptimizablePipeline, Pipeline, clone, make_optimize_safe
+from tpcp import NOTHING, HyperParameter, OptimizableParameter, OptimizablePipeline, Pipeline, clone, make_optimize_safe
 from tpcp._optimize import BaseOptimize
 from tpcp._utils._score import _optimize_and_score
 from tpcp.exceptions import OptimizationError, PotentialUserErrorWarning, TestError
 from tpcp.optimize import DummyOptimize, GridSearch, GridSearchCV, Optimize
 from tpcp.testing import TestAlgorithmMixin
 from tpcp.validate import Aggregator, Scorer
+
+
+class CountingOptimizablePipeline(DummyOptimizablePipeline):
+    optimize_calls: ClassVar[int] = 0
+
+    def self_optimize(self, dataset, **kwargs):
+        type(self).optimize_calls += 1
+        self.optimized = self.para_2
+        return self
+
+
+class NestedOptimizablePipeline(OptimizablePipeline):
+    algorithm: OptimizableParameter[OptimizablePipeline]
+
+    def __init__(self, algorithm):
+        self.algorithm = algorithm
+
+    def self_optimize(self, dataset, **kwargs):
+        self.algorithm.self_optimize(dataset, **kwargs)
+        return self
+
+
+class OverrideNestedAnnotationPipeline(NestedOptimizablePipeline):
+    algorithm__para_1: HyperParameter[int]
+
+
+class OverrideNestedSubtreePipeline(NestedOptimizablePipeline):
+    algorithm__algorithm: HyperParameter[OptimizablePipeline]
+
+
+class ReplacementOptimizablePipeline(DummyOptimizablePipeline):
+    para_1: HyperParameter[int]
+
+    def self_optimize(self, dataset, **kwargs):
+        self.optimized = self.para_1 + self.para_2
+        return self
+
+
+class CompositeOptimizablePipeline(OptimizablePipeline):
+    _composite_params = ("algorithms",)
+    algorithms: OptimizableParameter[list]
+
+    def __init__(self, algorithms):
+        self.algorithms = algorithms
+
+    def self_optimize(self, dataset, **kwargs):
+        for _, algorithm in self.algorithms:
+            algorithm.self_optimize(dataset, **kwargs)
+        return self
+
+
+class TrainingFromConfigPipeline(OptimizablePipeline):
+    algorithm: HyperParameter[OptimizablePipeline]
+    fitted: OptimizableParameter[int]
+
+    def __init__(self, algorithm, fitted=0):
+        self.algorithm = algorithm
+        self.fitted = fitted
+
+    def self_optimize(self, dataset, **kwargs):
+        self.fitted = self.algorithm.para_1
+        return self
 
 
 class TestMetaFunctionalityGridSearch(TestAlgorithmMixin):
@@ -667,6 +729,100 @@ class TestGridSearchCV:
         # We just run our test twice. If the cache is not deleted, the second run should fail.
         self.test_pure_parameters(True, 4)
         self.test_pure_parameters(True, 4)
+
+    @pytest.mark.parametrize("depth", [1, 2])
+    @pytest.mark.parametrize("pure_parameters", [False, True])
+    def test_nested_pure_parameters_reuse_training_and_score_each_candidate(self, depth, pure_parameters):
+        CountingOptimizablePipeline.optimize_calls = 0
+        pipeline = CountingOptimizablePipeline()
+        for _ in range(depth):
+            pipeline = NestedOptimizablePipeline(pipeline)
+        prefix = "algorithm__" * depth
+        grid = ParameterGrid({prefix + "para_1": [1, 2, 3], prefix + "para_2": [1, 2]})
+        result = GridSearchCV(
+            pipeline,
+            grid,
+            scoring=Scorer(lambda p, _: p.get_params()[prefix + "para_1"], progress_bar=False),
+            cv=2,
+            pure_parameters=pure_parameters,
+            progress_bar=False,
+        ).optimize(DummyDataset())
+
+        # Two training configurations in two folds, followed by the final fit.
+        assert CountingOptimizablePipeline.optimize_calls == (5 if pure_parameters else 13)
+        assert list(result.cv_results_["mean__test__agg__score"]) == [1, 1, 2, 2, 3, 3]
+        assert result.optimized_pipeline_.get_params()[prefix + "para_1"] == 3
+
+    def test_pure_parameters_in_optimizable_composite_field(self):
+        CountingOptimizablePipeline.optimize_calls = 0
+        result = GridSearchCV(
+            CompositeOptimizablePipeline([("detector", CountingOptimizablePipeline())]),
+            ParameterGrid({"algorithms__detector__para_1": [1, 2, 3], "algorithms__detector__para_2": [1, 2]}),
+            scoring=Scorer(lambda p, _: p.algorithms[0][1].para_1, progress_bar=False),
+            cv=2,
+            pure_parameters=True,
+            progress_bar=False,
+        ).optimize(DummyDataset())
+
+        assert CountingOptimizablePipeline.optimize_calls == 5
+        assert list(result.cv_results_["mean__test__agg__score"]) == [1, 1, 2, 2, 3, 3]
+
+    def test_containing_pipeline_can_override_nested_pure_annotation(self):
+        CountingOptimizablePipeline.optimize_calls = 0
+        GridSearchCV(
+            OverrideNestedAnnotationPipeline(CountingOptimizablePipeline()),
+            ParameterGrid({"algorithm__para_1": [1, 2, 3], "algorithm__para_2": [1, 2]}),
+            scoring=Scorer(lambda p, _: p.algorithm.para_1, progress_bar=False),
+            cv=2,
+            pure_parameters=True,
+            progress_bar=False,
+        ).optimize(DummyDataset())
+
+        assert CountingOptimizablePipeline.optimize_calls == 13
+
+    def test_pure_annotations_on_non_optimizable_objects_are_not_inferred(self):
+        result = GridSearchCV(
+            TrainingFromConfigPipeline(DummyOptimizablePipeline()),
+            ParameterGrid({"algorithm__para_1": [1, 2, 3]}),
+            scoring=Scorer(lambda p, _: p.fitted, progress_bar=False),
+            cv=2,
+            pure_parameters=True,
+            progress_bar=False,
+        ).optimize(DummyDataset())
+
+        # This child parameter is pure only for the child's own training, not for its parent.
+        assert list(result.cv_results_["mean__test__agg__score"]) == [1, 2, 3]
+
+    def test_containing_pipeline_can_override_nested_subtree_annotations(self):
+        CountingOptimizablePipeline.optimize_calls = 0
+        GridSearchCV(
+            OverrideNestedSubtreePipeline(NestedOptimizablePipeline(CountingOptimizablePipeline())),
+            ParameterGrid({"algorithm__algorithm__para_1": [1, 2, 3], "algorithm__algorithm__para_2": [1, 2]}),
+            scoring=Scorer(lambda p, _: p.algorithm.algorithm.para_1, progress_bar=False),
+            cv=2,
+            pure_parameters=True,
+            progress_bar=False,
+        ).optimize(DummyDataset())
+
+        assert CountingOptimizablePipeline.optimize_calls == 13
+
+    def test_replacing_child_in_grid_does_not_infer_roles_from_original_child(self):
+        result = GridSearchCV(
+            NestedOptimizablePipeline(CountingOptimizablePipeline()),
+            ParameterGrid(
+                {
+                    "algorithm": [ReplacementOptimizablePipeline(para_1=1, para_2=1)],
+                    "algorithm__para_1": [1, 2, 3],
+                    "algorithm__para_2": [1, 2],
+                }
+            ),
+            scoring=Scorer(lambda p, _: p.algorithm.optimized, progress_bar=False),
+            cv=2,
+            pure_parameters=True,
+            progress_bar=False,
+        ).optimize(DummyDataset())
+
+        assert list(result.cv_results_["mean__test__agg__score"]) == [2, 3, 3, 4, 4, 5]
 
     def test_pure_parameter_modified_error(self):
         optimized_pipe = DummyOptimizablePipeline()

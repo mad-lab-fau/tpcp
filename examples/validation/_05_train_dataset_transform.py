@@ -1,6 +1,6 @@
 r"""
 Transforming training datasets.
-==============================
+===============================
 
 Some optimization workflows need a different *set of datapoints* during training without changing the interface
 expected by the pipeline. Data augmentation can multiply datapoints, while a quick smoke test might train on only a

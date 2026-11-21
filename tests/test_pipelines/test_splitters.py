@@ -517,3 +517,34 @@ def test_dataset_splitter_rejects_selector_restoring_unassigned_datapoints(side)
     splitter = DatasetSplitter(5, **{side: lambda ds: ds.set_params(subset_index=None)})
     with pytest.raises(ValueError, match="subset.*outside"):
         next(splitter.split(DummyDataset()))
+
+
+def test_train_test_split_returns_selected_labels_in_selector_order():
+    from tpcp.validate import train_test_split
+
+    dataset = DummyDataset()[[3, 1, 4, 0, 2]]
+    splitter = DatasetSplitter(
+        [([0, 2, 4], [1, 3])],
+        train_selector=lambda ds: ds[[2, 0]],
+    )
+    train, test = train_test_split(splitter, dataset)
+    assert train == [(2,), (3,)]
+    assert test == [(1,), (0,)]
+    assert dataset.get_subset(group_labels=train).index["value"].to_list() == [2, 3]
+
+
+@pytest.mark.parametrize("splitter", [DatasetSplitter(2), NoSplit(None)])
+def test_train_test_split_requires_one_finite_fold(splitter):
+    from tpcp.validate import train_test_split
+
+    with pytest.raises(ValueError, match="exactly one fold"):
+        train_test_split(splitter, DummyDataset())
+
+
+def test_train_test_split_accepts_native_splitter_with_empty_test_side():
+    from tpcp.validate import train_test_split
+
+    dataset = DummyDataset()
+    train, test = train_test_split(NoSplit(n_splits=1, train=lambda ds: ds), dataset)
+    assert train == dataset.group_labels
+    assert test == []

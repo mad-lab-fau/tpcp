@@ -53,9 +53,12 @@ class BaseTypedIterator(Algorithm, Generic[InputTypeT, DataclassT]):
         If a result-name is in the list, the aggregation will be applied to it, when accessing the ``results_``
         (i.e. ``results_.{result_name}``).
         If no aggregation is defined for a result, a simple list of all results will be returned.
-        .. note:: It is possible to define aggregations with names not present in the result dataclass.
-                  This allows to provide multiple aggregations from the same data.
-                  The results can still be accessed via the ``additional_results_`` attribute.
+
+        .. note::
+
+            It is possible to define aggregations with names not present in the result dataclass.
+            This allows to provide multiple aggregations from the same data.
+            The results can still be accessed via the ``additional_results_`` attribute.
     NULL_VALUE
         (Class attribute) The value that is used to initialize the result dataclass and will remain in the results, if
         no result was for a specific attribute in one or more iterations.
@@ -316,9 +319,12 @@ class TypedIterator(BaseTypedIterator[InputTypeT, DataclassT], Generic[InputType
         If a result-name is in the list, the aggregation will be applied to it, when accessing the ``results_``
         (i.e. ``results_.{result_name}``).
         If no aggregation is defined for a result, a simple list of all results will be returned.
-        .. note:: It is possible to define aggregations with names not present in the result dataclass.
-                  This allows to provide multiple aggregations from the same data.
-                  The results can still be accessed via the ``additional_results_`` attribute.
+
+        .. note::
+
+            It is possible to define aggregations with names not present in the result dataclass.
+            This allows to provide multiple aggregations from the same data.
+            The results can still be accessed via the ``additional_results_`` attribute.
     NULL_VALUE
         (Class attribute) The value that is used to initialize the result dataclass and will remain in the results, if
         no result was for a specific attribute in one or more iterations.

@@ -805,11 +805,37 @@ def get_param_names(obj: type[_BaseTpcpObject] | _BaseTpcpObject) -> list[str]:
 
 
 def _get_annotated_fields_of_type(
-    instance_or_cls: BaseTpcpObject, field_type: _ParaTypes | Iterable[_ParaTypes]
+    instance_or_cls: BaseTpcpObject, field_type: _ParaTypes | Iterable[_ParaTypes], *, recursive: bool = False
 ) -> list[str]:
+    """Find annotations, optionally following objects marked as optimizable.
+
+    Annotations on the containing object take precedence over annotations discovered on its children.
+    """
     if isinstance(field_type, _ParaTypes):
         field_type = [field_type]
-    return [k for k, v in instance_or_cls.__field_annotations__.items() if v in field_type]
+    annotations = instance_or_cls.__field_annotations__
+    matches = dict.fromkeys(k for k, v in annotations.items() if v in field_type)
+    if recursive:
+        parameters = instance_or_cls.get_params()
+        for name, annotation in annotations.items():
+            if annotation is not _ParaTypes.OPTI:
+                continue
+            value = parameters[name]
+            children = (
+                [(f"{name}__{key}", child) for key, child in value]
+                if name in instance_or_cls._composite_params and value is not None
+                else [(name, value)]
+            )
+            for prefix, child in children:
+                if isinstance(child, BaseTpcpObject):
+                    for nested in _get_annotated_fields_of_type(child, field_type, recursive=True):
+                        path = f"{prefix}__{nested}"
+                        if path not in annotations and not any(
+                            path.startswith(f"{parent}__") and role is not _ParaTypes.OPTI
+                            for parent, role in annotations.items()
+                        ):
+                            matches[path] = None
+    return list(matches)
 
 
 def _has_dangerous_mutable_default(fields: dict[str, inspect.Parameter], cls: type[_BaseTpcpObject]) -> None:

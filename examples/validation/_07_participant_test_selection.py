@@ -1,25 +1,34 @@
 r"""
 .. _participant_test_selection:
 
-Evaluate one test type on held-out participants
-===============================================
+Advanced train-test splits
+==========================
 
-Each participant completes several tests. We want to train on all tests from
-training participants, then evaluate only the ``Continuous long walking test``
-from participants held out for testing. Other tests of held-out participants
-are unused in that fold.
+In previous examples we already showed how to control which datapoints appear
+in training and evaluation and how to select data before it enters optimization.
+These tools can already solve many problems, but sometimes we need an additional
+selection step after the main splitter runs.
+A typical example is when we have multiple recordings per participant and only
+want to train or evaluate on a subset of these recordings.
+Conceptually, we want to perform a grouped K-fold split on the participants and
+then select recordings within the training and test sets of each fold.
 
-:class:`~tpcp.validate.DatasetSplitter` first assigns participants to folds,
-then applies a selector to the test side. The training selector stays unset,
-so training keeps every assigned recording, including the continuous walking
-tests. See :class:`~tpcp.validate.DatasetSplitter` for the selection contract.
+In the concrete example below we have three recordings per participant, but we
+are only interested in evaluating on the continuous long walking test, which
+represents our deployment use case.
+All recordings from the training participants can still add value to training,
+including their continuous walking tests. The other recordings from held-out
+participants are unused in that fold.
+
+This example shows how to implement this using a custom selector function on
+:class:`~tpcp.validate.DatasetSplitter`.
 """
 
 # %%
-# One datapoint per test recording
-# --------------------------------
-# This index-only dataset is enough to inspect the protocol. Each participant
-# has three test recordings, and each row is a separate Dataset datapoint.
+# Dummy dataset
+# -------------
+# We create a dummy dataset with three recordings per participant and six
+# participants. Each recording is a separate datapoint.
 
 import pandas as pd
 from tpcp import Dataset
@@ -46,74 +55,69 @@ class ParticipantTestDataset(Dataset):
 
 
 dataset = ParticipantTestDataset()
-dataset.index
+dataset
 
 # %%
-# Assign participants, then select the evaluation test
-# ----------------------------------------------------
-# ``groupby="participant"`` keeps every recording of a participant on the
-# same side of a fold. It does not merge recordings into a single datapoint.
-# The selector receives only recordings of that fold's held-out participants.
-# Leaving ``train_selector`` at its default ``None`` retains all recordings
-# of the training participants.
+# The group splitter
+# ------------------
+# The most important part is that we want to split the dataset by participant,
+# so that no participant has recordings in both training and evaluation.
+# This is usually done with a grouped K-fold splitter.
+# :class:`~tpcp.validate.DatasetSplitter` adapts sklearn splitters to work with
+# tpcp datasets and supports grouping directly by dataset columns.
+# With ``base_splitter=3`` and ``groupby="participant"``, it uses sklearn's
+# :class:`~sklearn.model_selection.GroupKFold` with three folds.
+#
+# All recordings from a participant stay on the same side of each fold, and two
+# participants are held out for evaluation in each fold. The dataset still has
+# one datapoint per recording.
+grouped_splitter = DatasetSplitter(base_splitter=3, groupby="participant")
 
+grouped_folds = list(grouped_splitter.split(dataset))
+len(grouped_folds)
 
-def select_continuous_walking(ds: Dataset) -> Dataset:
-    """Keep continuous walking tests from the supplied fold side."""
-    return ds.get_subset(test="Continuous long walking test")
+# %%
+grouped_folds[0]
 
-
+# %%
+# Custom test selection
+# ---------------------
+# Now we want to expand this base splitter to keep only the continuous walking
+# tests in the evaluation set. We can do this by providing a custom
+# ``test_selector`` function to :class:`~tpcp.validate.DatasetSplitter`.
+# We leave ``train_selector`` unset to keep all twelve recordings from the four
+# training participants, including their continuous walking tests.
+#
+# Each selector receives only its own side of a specific fold: ``test_selector``
+# receives the held-out dataset, while ``train_selector``, if provided, receives
+# the training dataset. Each must return a dataset whose group labels are a
+# subset of the labels assigned to that side.
+#
+# Here we select the continuous walking tests with ``get_subset``. The other
+# tests of the held-out participants are unused; they do not move into training.
 cv = DatasetSplitter(
     base_splitter=3,
     groupby="participant",
-    test_selector=select_continuous_walking,
+    test_selector=lambda ds: ds.get_subset(test="Continuous long walking test"),
 )
 folds = list(cv.split(dataset))
 
 # %%
 # Inspect the first fold
-# -----------------------
+# ----------------------
 # Native tpcp splitters yield group labels. Use those labels to select the
 # corresponding Dataset subsets. All three test types appear in training.
 
 train_labels, test_labels = folds[0]
 train = dataset.get_subset(group_labels=train_labels)
 test = dataset.get_subset(group_labels=test_labels)
-train.index
+train
 
 # %%
-# Only continuous walking recordings appear in evaluation. No recording from
+# Only two continuous walking recordings appear in evaluation. No recording from
 # either held-out participant appears in training, including their other tests.
 
-test.index
-
-# %%
-# Summarize every fold
-# ---------------------
-# Each fold trains on twelve recordings from four participants and evaluates
-# two recordings from two different participants. The participant lists show
-# the separation; every participant is held out once across the three folds.
-
-rows = []
-for fold, (train_labels, test_labels) in enumerate(folds, start=1):
-    train = dataset.get_subset(group_labels=train_labels)
-    test = dataset.get_subset(group_labels=test_labels)
-    rows.append(
-        {
-            "fold": fold,
-            "training participants": train.index["participant"]
-            .unique()
-            .tolist(),
-            "test participants": test.index["participant"].unique().tolist(),
-            "training recordings": len(train),
-            "training continuous walking tests": len(
-                select_continuous_walking(train)
-            ),
-            "evaluation recordings": len(test),
-        }
-    )
-
-pd.DataFrame(rows).set_index("fold")
+test
 
 # %%
 # Use this ``cv`` object directly with :func:`~tpcp.validate.cross_validate` or

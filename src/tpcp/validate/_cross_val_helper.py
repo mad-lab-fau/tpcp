@@ -39,6 +39,34 @@ class BaseDatasetSplitter(BaseTpcpObject):
         raise NotImplementedError
 
 
+def train_test_split(splitter: BaseDatasetSplitter, dataset: Dataset) -> tuple[list[GroupLabelT], list[GroupLabelT]]:
+    """Return train and test group labels from a splitter with exactly one fold.
+
+    Parameters
+    ----------
+    splitter
+        A native tpcp splitter, such as :class:`DatasetSplitter`, configured to yield exactly one fold.
+        Grouping and per-side selectors are applied by the splitter as usual.
+    dataset
+        The dataset to split.
+
+    Returns
+    -------
+    train_labels, test_labels
+        Group labels for each side. Select the corresponding datasets with
+        ``dataset.get_subset(group_labels=train_labels)`` and the equivalent for ``test_labels``.
+
+    Raises
+    ------
+    ValueError
+        If the splitter does not have exactly one fold.
+    """
+    if splitter.get_n_splits(dataset) != 1:
+        raise ValueError("train_test_split requires a splitter with exactly one fold.")
+    (split,) = splitter.split(dataset)
+    return split
+
+
 def _requested_fold_count(requested: int | None, available: int | None) -> int:
     if requested is None:
         if available is None:
