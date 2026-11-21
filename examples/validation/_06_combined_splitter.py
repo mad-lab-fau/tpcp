@@ -1,6 +1,6 @@
 r"""
 Adding a fixed subset to every training fold
-===========================================
+============================================
 
 Some datapoints are useful for training but should never appear in testing. For
 example, artificial edge cases can supplement the ordinary recordings used for
@@ -132,7 +132,7 @@ fold_summary
 
 # %%
 # Overwrite named parts and nested values
-# --------------------------------------
+# ---------------------------------------
 # ``parts`` is a tpcp composite parameter. Use its names in ``set_params`` to
 # replace just one part, its selector, its splitter, or a nested parameter.
 # Clone first to keep the original three-fold configuration above.
