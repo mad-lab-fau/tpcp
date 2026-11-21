@@ -248,23 +248,16 @@ def test_warning_error_context_example():
 
 
 def test_complex_clinical_evaluation():
-    """Both development sources evaluate identical unseen participants at home."""
-    from examples.validation._08_complex_clinical_evaluation import (
-        cv_results,
-        dataset,
-        holdout_results,
-        searches,
-    )
+    """Compare paired outer home tests and participant-isolated inner folds."""
+    from examples.validation._08_complex_clinical_evaluation import cv_results, dataset, holdout_results, searches
 
-    assert len(dataset) == 48
-    assert dataset[0].data.shape == (160, 3)
-    assert dataset[1].data.shape == (180, 3)
-    assert dataset[0].metadata == dataset[1].metadata
-    assert dataset[0].daily_annotations != dataset[1].daily_annotations
-    expected_home = {(p, day) for p in range(12) for day in (1, 2, 3)}
+    assert len(dataset) == 36
+    all_b = set(dataset.get_subset(origin="B").group_labels)
+    expected_home = set(dataset.get_subset(origin="A", condition="home").group_labels)
     for results, n_folds in ((holdout_results, 1), (cv_results, 3)):
         reference_test_folds = None
         for name, result in results.items():
+            hospital_only = name.startswith("hospital_only_")
             assert len(result["test__agg__f1"]) == n_folds
             assert np.all((0 <= result["test__agg__f1"]) & (result["test__agg__f1"] <= 1))
             test_folds = [set(labels) for labels in result["test__data_labels"]]
@@ -273,60 +266,93 @@ def test_complex_clinical_evaluation():
             assert test_folds == reference_test_folds
             if n_folds == 3:
                 tested = [label for labels in result["test__data_labels"] for label in labels]
-                assert len(tested) == 36
-                assert {(label.participant, label.day) for label in tested} == expected_home
-            expected_source = "hospital" if name.startswith("hospital") else "home"
+                assert len(tested) == len(set(tested)) == 12
+                assert set(tested) == expected_home
             for train_labels, test_labels, search in zip(
                 result["train__data_labels"], result["test__data_labels"], result["optimizer"], strict=True
             ):
                 train_ids = {label.participant for label in train_labels}
                 test_ids = {label.participant for label in test_labels}
-                assert len(train_ids) == 8
-                assert len(test_ids) == 4
+                assert len(train_ids) == 10 and len(test_ids) == 2
                 assert train_ids.isdisjoint(test_ids)
-                assert {label.source for label in train_labels} == {expected_source}
-                assert {label.source for label in test_labels} == {"home"}
-                assert len(test_labels) == 12
+                assert all_b.issubset(train_labels)
+                assert len(train_labels) == (20 if hospital_only else 28)
+                assert {label.condition for label in train_labels} == (
+                    {"hospital"} if hospital_only else {"hospital", "home"}
+                )
+                assert len(test_labels) == 4 and set(test_labels).issubset(expected_home)
                 if name.endswith("learnable"):
-                    assert np.isfinite(search.optimized_pipeline_.algorithm.threshold)
+                    detector = search.optimized_pipeline_.algorithm
+                    assert np.all(np.isfinite(detector.template))
+                    assert len(detector.template) == 2 * search.best_params_["algorithm__template_radius"] + 1
+                    assert len(search.cv_results_["params"]) == 4
                     for split in range(2):
                         for inner_train, inner_test in zip(
                             search.cv_results_[f"split{split}__train__data_labels"],
                             search.cv_results_[f"split{split}__test__data_labels"],
                             strict=True,
                         ):
-                            inner_train_ids = {label.participant for label in inner_train}
-                            inner_test_ids = {label.participant for label in inner_test}
-                            assert inner_train_ids.isdisjoint(inner_test_ids)
-                            assert inner_train_ids | inner_test_ids == train_ids
-                            assert {label.source for label in inner_train + inner_test} == {expected_source}
+                            assert set(inner_train).isdisjoint(inner_test)
+                            assert set(inner_train + inner_test) == set(train_labels)
+                            assert {label.origin for label in inner_train} == {"A", "B"}
+                            assert {label.origin for label in inner_test} == {"A", "B"}
+                            assert {label.participant for label in inner_train}.isdisjoint(
+                                label.participant for label in inner_test
+                            )
+                            expected_conditions = {"hospital"} if hospital_only else {"hospital", "home"}
+                            assert {label.condition for label in inner_train} == expected_conditions
+                            assert {label.condition for label in inner_test} == expected_conditions
                 else:
                     assert len(search.gs_results_["params"]) == 3
-                    assert {p["algorithm__threshold"] for p in search.gs_results_["params"]} == {0.7, 0.9, 1.1}
-    assert searches["learnable"].pipeline.algorithm.threshold is None
+                    assert {p["algorithm__threshold"] for p in search.gs_results_["params"]} == {0.5, 0.9, 1.1}
+    assert searches["learnable"].pipeline.algorithm.template is None
+
+
+@pytest.mark.parametrize(
+    ("events", "reference", "tolerance", "expected"),
+    [
+        ([102, 199, 500], [100, 200, 300], 5, (2 / 3, 2 / 3, 2 / 3)),
+        ([99, 100], [100], 5, (0.5, 1.0, 2 / 3)),
+        ([205, 95], [100, 200], 5, (1.0, 1.0, 1.0)),
+        ([0, 50], [100], 5, (0.0, 0.0, 0.0)),
+        ([100], [100, 200], 5, (1.0, 0.5, 2 / 3)),
+        ([0, 9], [8, 17], 8, (1.0, 1.0, 1.0)),
+        ([], [100], 5, (0.0, 0.0, 0.0)),
+        ([100], [], 5, (0.0, 0.0, 0.0)),
+        ([], [], 5, (0.0, 0.0, 0.0)),
+    ],
+)
+def test_complex_clinical_event_scoring(events, reference, tolerance, expected):
+    """Count events once, with a sample tolerance and defined empty-input scores."""
+    from examples.validation._08_complex_clinical_evaluation import event_detection_scores
+
+    result = event_detection_scores(np.array(events), np.array(reference), tolerance)
+    assert (result["precision"], result["recall"], result["f1"]) == pytest.approx(expected)
 
 
 def test_complex_clinical_detector_learning():
-    """The detector learns from arrays and retains its learned value on cloning."""
-    from examples.validation._08_complex_clinical_evaluation import DummySmoothedDetector
+    """The learned event template survives cloning and ignores amplitude changes."""
+    from examples.validation._08_complex_clinical_evaluation import TemplateMatchingDetector
 
-    signal = pd.DataFrame({"x": [0.0, 0.0, 2.0, 2.0], "y": [0.0, 0.0, 2.0, 2.0]})
-    labels = np.array([0, 0, 1, 1])
-    detector = DummySmoothedDetector(window_size=1).self_optimize([signal], [labels])
-    assert detector.threshold == 1.0
-    assert_array_equal(detector.clone().detect(signal).states_, labels)
+    samples = np.arange(500)
+    signal = pd.DataFrame({"x": np.cos(2 * np.pi * (samples - 50) / 100)})
+    events = np.array([50, 150, 250, 350, 450])
+    detector = TemplateMatchingDetector().self_optimize([signal], [events])
+    assert len(detector.template) == 41
+    assert_almost_equal(np.linalg.norm(detector.template), 1)
+    assert_array_equal(detector.clone().detect(signal * 3).events_, events)
 
 
 def test_complex_clinical_detector_interface():
     """Detectors must implement prediction; fitting remains optional."""
     from examples.validation._08_complex_clinical_evaluation import (
         BaseEventDetector,
-        DummyThresholdDetector,
         EventPipeline,
+        PeakDetector,
         dataset,
     )
 
-    with pytest.raises(TypeError, match="abstract"):
-        BaseEventDetector()
+    with pytest.raises(NotImplementedError):
+        BaseEventDetector().detect(dataset[0].data)
     with pytest.raises(NotImplementedError, match="does not support fitting"):
-        EventPipeline(DummyThresholdDetector()).self_optimize(dataset[:1])
+        EventPipeline(PeakDetector()).self_optimize(dataset[:1])
